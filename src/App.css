@@ -1,0 +1,163 @@
+@import url('https://fonts.googleapis.com/css2?family=Arima:wght@400&family=Charm:wght@700&family=Quicksand:wght@500&display=swap');
+.homePageWrapper{
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color:rgb(8, 8, 8);
+  height:100vh;
+  font-family: '', sans-serif;
+  text-align: center;
+}
+.formWrapper{
+  background-color: rgb(238, 239, 246);
+  padding:20px;
+  border-radius: 20px;
+  width : 500px;
+  max-width: 90%;
+  border:   2px solid rgb(127, 162, 243);
+}
+.inputGroup{
+  display: flex;
+  flex-direction: column;
+}
+.inputBox{
+  padding: 8px;
+  border-radius: 5px;
+  outline:none;
+  border:none;
+  margin: 4px 0 16px 0;
+  font-size: 16px;
+  font-weight:bold ;
+  color: rgb(1, 42, 176);
+}
+.logoImg{
+  width:55%;
+  height: 70px;
+  display: block;
+  align-items: center;
+  margin: 0 auto 20px;
+}
+footer{
+  position: fixed;
+  bottom: 0;
+  color: white;
+  font-family:'Arima',sans-serif ;
+}
+footer a{
+  color: rgb(93, 129, 250);
+}
+
+a{
+  text-decoration: none;
+  color: rgb(0, 59, 251);
+  font-weight: bolder;
+  font-family: 'Arima', sans-serif;
+}
+.mainLabel{
+  margin: 0 auto 5px;
+  color: rgb(19, 39, 106);
+  font-family: sans-serif;
+  text-align: left;
+  font-family:'Lucida Sans', 'Lucida Sans Regular', 'Lucida Grande', 'Lucida Sans Unicode', Geneva, Verdana, sans-serif;
+}
+.btn{
+  border:none;
+  padding: 10px;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: all 0.3s ease-in-out;
+  font-weight: bold;
+}
+
+.joinBtn{
+  background-color: rgb(1, 42, 176);
+  margin-bottom: 10px;
+  color: white;
+  font-weight: bold;
+  width: 100px;
+  margin-left: auto;
+}
+
+.createNewBtn{
+  border-bottom: 1px solid rgb(0, 59, 251);
+  transition: all 0.3s ease-in-out;
+}
+.createNewBtn:hover {
+  color:rgb(1, 42, 176);
+  border-bottom: 1px solid rgb(1, 42, 176);
+}
+.joinBtn:hover ,.leaveBtn:hover{
+background-color: rgb(0, 59, 251);
+}
+
+.createInfo{
+  font-size: 14px;
+}
+
+
+/* ================= Editor ====================*/
+.mainWrap{
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  height: 100vh;
+}
+.aside{
+background-color: rgb(5, 52, 113);
+border-right: 2px solid rgb(0, 59, 251);
+color: white;
+display: flex;
+flex-direction: column;
+}
+.aside .logoImg{
+width:100%;
+margin: 0;
+border-bottom: 2px solid rgb(0, 59, 251);
+}
+.asideInner{
+  flex:1;
+}
+.clientList{
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap:8px;
+}
+.client{
+  display: flex;
+  align-items: center;
+  flex-direction: column;
+}
+.username{
+  margin-top: 8px;
+}
+.asideInner h3 , .clientList{
+  padding-left: 10px;
+}
+
+.asideInner h3{
+  margin: 6px;
+}
+
+.leaveBtn , .copyBtn{
+  margin: 5px;
+}
+
+.leaveBtn{
+  background-color: rgb(0, 59, 251);
+  color: white;
+}
+
+.leaveBtn:hover {
+  background-color: rgb(42, 91, 255);
+}
+
+.CodeMirror{
+  font-size: 16px;
+  height:100%;
+  line-height: 1.4;
+  padding-top: 5px;
+  min-height: calc(100vh-10px);
+}
+.CodeMirror-scroll{
+  background-color: rgb(4, 50, 109);
+}
