@@ -1,6 +1,6 @@
 # Getting Started with `Utkristi-CoLabs`
 
-This project is developed by `Utkristi.io`
+This project is developed by `Utkristi.io` & `utkarsh-1912`
 
 ## Available Scripts
 
