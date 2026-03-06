@@ -338,7 +338,6 @@ function Editor() {
             </div>
           )}
 
-          {/* ICON TRAY */}
           <div style={{
             display: "flex",
             alignItems: "center",
@@ -351,28 +350,64 @@ function Editor() {
             <button
               onClick={handleCompile}
               disabled={isExecuting}
-              style={{ display: "flex", alignItems: "center", justifyContent: "center", width: "32px", height: "32px", color: isExecuting ? "#4ade80" : "#22c55e", backgroundColor: "transparent", borderRadius: "6px", border: "none", cursor: isExecuting ? "default" : "pointer" }}
+              style={{ display: "flex", alignItems: "center", justifyContent: "center", width: "32px", height: "32px", color: isExecuting ? "#4ade80" : "#22c55e", backgroundColor: "transparent", borderRadius: "6px", border: "none", cursor: isExecuting ? "default" : "pointer", transition: "all 0.2s" }}
+              onMouseOver={(e) => !isExecuting && (e.currentTarget.style.backgroundColor = "rgba(34, 197, 94, 0.1)")}
+              onMouseOut={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
               title="Run Code"
             >
               {isExecuting ? <Pause size={18} fill="#4ade80" /> : <Play size={18} fill="#22c55e" />}
             </button>
             <button
               onClick={() => setIsLightMode(!isLightMode)}
-              style={{ display: "flex", alignItems: "center", justifyContent: "center", width: "32px", height: "32px", color: isLightMode ? "#fbbf24" : "var(--text-muted)", backgroundColor: "transparent", borderRadius: "6px", border: "none", cursor: "pointer" }}
+              style={{ display: "flex", alignItems: "center", justifyContent: "center", width: "32px", height: "32px", color: isLightMode ? "#fbbf24" : "var(--text-muted)", backgroundColor: "transparent", borderRadius: "6px", border: "none", cursor: "pointer", transition: "all 0.2s" }}
+              onMouseOver={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-card)")}
+              onMouseOut={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
               title="Toggle Theme"
             >
               {isLightMode ? <Sun size={18} /> : <Moon size={18} />}
             </button>
             {!isMobile && (
               <>
-                <div style={{ width: "1px", height: "160px", backgroundColor: "var(--border-color)", margin: "0 2px" }} />
-                <button onClick={downloadCode} style={{ width: "32px", height: "32px", color: "var(--text-muted)", background: "transparent", border: "none", cursor: "pointer" }} title="Download"><Download size={18} /></button>
-                <button onClick={copyRoomId} style={{ width: "32px", height: "32px", color: "var(--text-muted)", background: "transparent", border: "none", cursor: "pointer" }} title="Copy ID"><Copy size={18} /></button>
-                <button onClick={leaveRoom} style={{ width: "32px", height: "32px", color: "#f87171", background: "transparent", border: "none", cursor: "pointer" }} title="Leave"><LogOut size={18} /></button>
+                <div style={{ width: "1px", height: "18px", backgroundColor: "var(--border-color)", margin: "0 2px" }} />
+                <button
+                  onClick={downloadCode}
+                  style={{ width: "32px", height: "32px", color: "var(--text-muted)", background: "transparent", border: "none", borderRadius: "6px", cursor: "pointer", transition: "all 0.2s" }}
+                  onMouseOver={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-card)")}
+                  onMouseOut={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
+                  title="Download"
+                >
+                  <Download size={18} />
+                </button>
+                <button
+                  onClick={copyRoomId}
+                  style={{ width: "32px", height: "32px", color: "var(--text-muted)", background: "transparent", border: "none", borderRadius: "6px", cursor: "pointer", transition: "all 0.2s" }}
+                  onMouseOver={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-card)")}
+                  onMouseOut={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
+                  title="Copy ID"
+                >
+                  <Copy size={18} />
+                </button>
+                <button
+                  onClick={leaveRoom}
+                  style={{ width: "32px", height: "32px", color: "#f87171", background: "transparent", border: "none", borderRadius: "6px", cursor: "pointer", transition: "all 0.2s" }}
+                  onMouseOver={(e) => (e.currentTarget.style.backgroundColor = "rgba(248, 113, 113, 0.1)")}
+                  onMouseOut={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
+                  title="Leave"
+                >
+                  <LogOut size={18} />
+                </button>
               </>
             )}
             {isMobile && (
-              <button onClick={leaveRoom} style={{ width: "32px", height: "32px", color: "#f87171", background: "transparent", border: "none", cursor: "pointer" }} title="Leave"><LogOut size={18} /></button>
+              <button
+                onClick={leaveRoom}
+                style={{ width: "32px", height: "32px", color: "#f87171", background: "transparent", border: "none", borderRadius: "6px", cursor: "pointer", transition: "all 0.2s" }}
+                onMouseOver={(e) => (e.currentTarget.style.backgroundColor = "rgba(248, 113, 113, 0.1)")}
+                onMouseOut={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
+                title="Leave"
+              >
+                <LogOut size={18} />
+              </button>
             )}
           </div>
         </div>
