@@ -27,26 +27,27 @@ export default function ChatWindow({ socketRef, roomId, userName, isLightMode, i
     }, [messages, roomId]);
 
     useEffect(() => {
-        if (socketRef.current) {
-            socketRef.current.on(ACTIONS.RECEIVE_MESSAGE, (msg) => {
+        const socket = socketRef.current;
+        if (socket) {
+            socket.on(ACTIONS.RECEIVE_MESSAGE, (msg) => {
                 setMessages((prev) => {
                     // Dedup guard: skip if message with same ID already exists
                     if (prev.some(m => m.id === msg.id)) return prev;
                     return [...prev, msg];
                 });
             });
-            socketRef.current.on(ACTIONS.EDIT_MESSAGE, ({ messageId, newText }) => {
+            socket.on(ACTIONS.EDIT_MESSAGE, ({ messageId, newText }) => {
                 setMessages((prev) => prev.map(m => m.id === messageId ? { ...m, text: newText, isEdited: true } : m));
             });
-            socketRef.current.on(ACTIONS.DELETE_MESSAGE, ({ messageId }) => {
+            socket.on(ACTIONS.DELETE_MESSAGE, ({ messageId }) => {
                 setMessages((prev) => prev.filter(m => m.id !== messageId));
             });
         }
         return () => {
-            if (socketRef.current) {
-                socketRef.current.off(ACTIONS.RECEIVE_MESSAGE);
-                socketRef.current.off(ACTIONS.EDIT_MESSAGE);
-                socketRef.current.off(ACTIONS.DELETE_MESSAGE);
+            if (socket) {
+                socket.off(ACTIONS.RECEIVE_MESSAGE);
+                socket.off(ACTIONS.EDIT_MESSAGE);
+                socket.off(ACTIONS.DELETE_MESSAGE);
             }
         };
     }, [socketRef]);

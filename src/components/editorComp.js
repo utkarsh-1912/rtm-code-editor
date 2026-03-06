@@ -5,9 +5,7 @@ import { python } from "@codemirror/lang-python";
 import { cpp } from "@codemirror/lang-cpp";
 import { html } from "@codemirror/lang-html";
 import { dracula } from "@uiw/codemirror-theme-dracula";
-import { Play, RotateCcw } from "lucide-react";
 import ACTIONS from "../Action";
-
 import { LANGUAGES } from "../config";
 
 function EditorComp({
@@ -28,8 +26,9 @@ function EditorComp({
   const [editorCode, setEditorCode] = React.useState(code || "");
 
   useEffect(() => {
-    if (socketRef.current) {
-      socketRef.current.on(ACTIONS.CODE_CHANGE, ({ code: incomingCode }) => {
+    const socket = socketRef.current;
+    if (socket) {
+      socket.on(ACTIONS.CODE_CHANGE, ({ code: incomingCode }) => {
         if (incomingCode !== null) {
           setEditorCode(incomingCode);
           onCodeChange(incomingCode);
@@ -37,15 +36,15 @@ function EditorComp({
       });
     }
     return () => {
-      socketRef.current?.off(ACTIONS.CODE_CHANGE);
+      socket?.off(ACTIONS.CODE_CHANGE);
     };
-  }, [socketRef]);
+  }, [socketRef, onCodeChange]);
 
   useEffect(() => {
     if (code !== undefined && code !== editorCode) {
       setEditorCode(code);
     }
-  }, [code]);
+  }, [code, editorCode]);
 
   const handleEditorChange = (value, viewUpdate) => {
     setEditorCode(value);

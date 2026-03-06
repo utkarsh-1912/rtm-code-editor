@@ -331,7 +331,7 @@ function HomePage() {
 
       {/* FOOTER */}
       <footer className="landing-footer" style={{
-        padding: "40px 8%",
+        padding: "32px 8%",
         borderTop: "1px solid var(--border-color)",
         backgroundColor: "rgba(0,0,0,0.02)",
         position: "relative",

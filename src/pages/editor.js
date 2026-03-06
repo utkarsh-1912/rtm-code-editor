@@ -15,7 +15,6 @@ import {
   ChevronLeft,
   ChevronRight,
   Play,
-  RotateCcw,
   Pause,
   MessageSquare,
   Terminal,
@@ -42,7 +41,7 @@ function Editor() {
 
   const [clients, setClients] = useState([]);
   const [language, setLanguage] = useState(LANGUAGES[0].value);
-  const [theme, setTheme] = useState(THEMES[0]);
+  const [theme] = useState(THEMES[0]);
   const [currentCode, setCurrentCode] = useState(codeRef.current);
 
   const [output, setOutput] = useState("");
@@ -86,8 +85,6 @@ function Editor() {
     const a = document.createElement("a");
     a.href = url;
 
-    // Find extension based on language
-    const langObj = LANGUAGES.find((l) => l.value === language);
     let ext = "txt";
     if (language === "javascript") ext = "js";
     else if (language === "python") ext = "py";
@@ -159,22 +156,23 @@ function Editor() {
     init();
 
     return () => {
-      if (socketRef.current) {
-        socketRef.current.disconnect();
-        socketRef.current.off(ACTIONS.JOINED);
-        socketRef.current.off(ACTIONS.DISCONNECTED);
-        socketRef.current.off(ACTIONS.SYNC_EXECUTE);
-        socketRef.current.off(ACTIONS.SYNC_OUTPUT);
-        socketRef.current.off(ACTIONS.SYNC_LANGUAGE);
+      const socket = socketRef.current;
+      if (socket) {
+        socket.disconnect();
+        socket.off(ACTIONS.JOINED);
+        socket.off(ACTIONS.DISCONNECTED);
+        socket.off(ACTIONS.SYNC_EXECUTE);
+        socket.off(ACTIONS.SYNC_OUTPUT);
+        socket.off(ACTIONS.SYNC_LANGUAGE);
       }
     };
-  }, [socketRef, roomId, location.state?.userName, reactNavigator]);
+  }, [roomId, location.state?.userName, reactNavigator]);
 
   if (!location.state) {
     return <Navigate to="/" />;
   }
 
-  async function copyRoomId() {
+  const copyRoomId = async () => {
     try {
       await navigator.clipboard.writeText(roomId);
       toast.success("Room Id copied to clipboard", {
@@ -184,7 +182,7 @@ function Editor() {
       toast.error("Unable to copy ROOM ID");
       console.log(err);
     }
-  }
+  };
 
   const leaveRoom = () => {
     reactNavigator("/");
