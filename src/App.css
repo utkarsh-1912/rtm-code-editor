@@ -1,163 +1,319 @@
-@import url('https://fonts.googleapis.com/css2?family=Arima:wght@400&family=Charm:wght@700&family=Quicksand:wght@500&display=swap');
-.homePageWrapper{
+/* ================= Base Styles & Utilities ====================*/
+* {
+  box-sizing: border-box;
+}
+
+a {
+  text-decoration: none;
+  color: var(--primary);
+  font-weight: 600;
+  transition: color 0.3s ease;
+}
+
+a:hover {
+  color: var(--primary-hover);
+}
+
+.btn {
+  border: none;
+  padding: 12px 20px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.3s ease-in-out;
+  font-weight: 600;
+  font-size: 15px;
+  font-family: inherit;
   display: flex;
   align-items: center;
   justify-content: center;
-  color:rgb(8, 8, 8);
-  height:100vh;
-  font-family: '', sans-serif;
+  gap: 8px;
+}
+
+/* ================= Home Page ====================*/
+.homePageWrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  padding: 20px;
+}
+
+.formWrapper {
+  background: var(--bg-card);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  padding: 40px;
+  border-radius: 24px;
+  width: 500px;
+  max-width: 100%;
+  border: 1px solid var(--border-color);
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+  animation: slideUp 0.5s ease-out;
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.logoImg {
+  height: 65px;
+  display: block;
+  margin: 0 auto 30px;
+  filter: drop-shadow(0 0 10px rgba(255, 255, 255, 0.1));
+  background: white;
+  padding: 12px;
+  border-radius: 12px;
+}
+
+.mainLabel {
+  margin: 0 0 20px 0;
+  color: var(--text-main);
+  font-size: 1.2rem;
+  font-weight: 500;
+  text-align: left;
+}
+
+.inputGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.inputBox {
+  padding: 14px 16px;
+  border-radius: 10px;
+  outline: none;
+  border: 1px solid var(--border-color);
+  background: var(--secondary);
+  color: var(--text-main);
+  font-size: 16px;
+  font-family: inherit;
+  transition: all 0.3s ease;
+}
+
+.inputBox:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+}
+
+.inputBox::placeholder {
+  color: var(--text-muted);
+}
+
+.joinBtn {
+  background-color: var(--primary);
+  color: white;
+  width: 100%;
+  padding: 14px;
+  font-size: 16px;
+  margin-top: 10px;
+  box-shadow: 0 4px 14px 0 rgba(59, 130, 246, 0.39);
+}
+
+.joinBtn:hover {
+  background-color: var(--primary-hover);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(59, 130, 246, 0.4);
+}
+
+.createInfo {
+  margin-top: 20px;
+  font-size: 14px;
+  color: var(--text-muted);
   text-align: center;
 }
-.formWrapper{
-  background-color: rgb(238, 239, 246);
-  padding:20px;
-  border-radius: 20px;
-  width : 500px;
-  max-width: 90%;
-  border:   2px solid rgb(127, 162, 243);
-}
-.inputGroup{
-  display: flex;
-  flex-direction: column;
-}
-.inputBox{
-  padding: 8px;
-  border-radius: 5px;
-  outline:none;
-  border:none;
-  margin: 4px 0 16px 0;
-  font-size: 16px;
-  font-weight:bold ;
-  color: rgb(1, 42, 176);
-}
-.logoImg{
-  width:55%;
-  height: 70px;
-  display: block;
-  align-items: center;
-  margin: 0 auto 20px;
-}
-footer{
-  position: fixed;
-  bottom: 0;
-  color: white;
-  font-family:'Arima',sans-serif ;
-}
-footer a{
-  color: rgb(93, 129, 250);
+
+.createNewBtn {
+  color: var(--primary);
+  border-bottom: 1px solid transparent;
+  margin-left: 5px;
 }
 
-a{
-  text-decoration: none;
-  color: rgb(0, 59, 251);
-  font-weight: bolder;
-  font-family: 'Arima', sans-serif;
-}
-.mainLabel{
-  margin: 0 auto 5px;
-  color: rgb(19, 39, 106);
-  font-family: sans-serif;
-  text-align: left;
-  font-family:'Lucida Sans', 'Lucida Sans Regular', 'Lucida Grande', 'Lucida Sans Unicode', Geneva, Verdana, sans-serif;
-}
-.btn{
-  border:none;
-  padding: 10px;
-  border-radius: 5px;
-  cursor: pointer;
-  transition: all 0.3s ease-in-out;
-  font-weight: bold;
-}
-
-.joinBtn{
-  background-color: rgb(1, 42, 176);
-  margin-bottom: 10px;
-  color: white;
-  font-weight: bold;
-  width: 100px;
-  margin-left: auto;
-}
-
-.createNewBtn{
-  border-bottom: 1px solid rgb(0, 59, 251);
-  transition: all 0.3s ease-in-out;
-}
 .createNewBtn:hover {
-  color:rgb(1, 42, 176);
-  border-bottom: 1px solid rgb(1, 42, 176);
-}
-.joinBtn:hover ,.leaveBtn:hover{
-background-color: rgb(0, 59, 251);
+  border-bottom-color: var(--primary);
 }
 
-.createInfo{
-  font-size: 14px;
-}
+/* Footers are now handled in their respective components/pages for better control */
 
-
-/* ================= Editor ====================*/
-.mainWrap{
+/* ================= Editor Page ====================*/
+.mainWrap {
   display: grid;
-  grid-template-columns: 220px 1fr;
+  grid-template-columns: 260px 1fr;
   height: 100vh;
+  background-color: var(--bg-dark);
 }
-.aside{
-background-color: rgb(5, 52, 113);
-border-right: 2px solid rgb(0, 59, 251);
-color: white;
-display: flex;
-flex-direction: column;
-}
-.aside .logoImg{
-width:100%;
-margin: 0;
-border-bottom: 2px solid rgb(0, 59, 251);
-}
-.asideInner{
-  flex:1;
-}
-.clientList{
+
+.aside {
+  background: var(--secondary);
+  border-right: 1px solid var(--border-color);
   display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap:8px;
-}
-.client{
-  display: flex;
-  align-items: center;
   flex-direction: column;
-}
-.username{
-  margin-top: 8px;
-}
-.asideInner h3 , .clientList{
-  padding-left: 10px;
+  box-shadow: inset -10px 0 20px -10px rgba(0, 0, 0, 0.5);
+  z-index: 10;
 }
 
-.asideInner h3{
-  margin: 6px;
+.asideInner {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
 }
 
-.leaveBtn , .copyBtn{
-  margin: 5px;
+.logo {
+  padding: 20px;
+  border-bottom: 1px solid var(--border-color);
+  text-align: center;
 }
 
-.leaveBtn{
-  background-color: rgb(0, 59, 251);
-  color: white;
+.logo .logoImg {
+  height: 50px;
+  margin-bottom: 0;
+  padding: 8px;
+  border-radius: 8px;
+}
+
+.asideInner h3 {
+  margin: 20px 20px 10px;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--text-muted);
+  text-align: left;
+}
+
+.clientList {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 0 20px;
+}
+
+.client {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: rgba(255, 255, 255, 0.03);
+  padding: 10px;
+  border-radius: 10px;
+  transition: background 0.2s;
+}
+
+.client:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.username {
+  font-weight: 500;
+  font-size: 14px;
+  color: var(--text-main);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.leaveBtn,
+.copyBtn {
+  margin: 10px 20px;
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-main);
+  border: 1px solid var(--border-color);
+}
+
+.leaveBtn {
+  margin-bottom: 20px;
+  background: rgba(239, 68, 68, 0.1);
+  color: #ef4444;
+  border-color: rgba(239, 68, 68, 0.2);
 }
 
 .leaveBtn:hover {
-  background-color: rgb(42, 91, 255);
+  background: #ef4444;
+  color: white;
 }
 
-.CodeMirror{
-  font-size: 16px;
-  height:100%;
-  line-height: 1.4;
-  padding-top: 5px;
-  min-height: calc(100vh-10px);
+.copyBtn:hover {
+  background: rgba(255, 255, 255, 0.1);
 }
-.CodeMirror-scroll{
-  background-color: rgb(4, 50, 109);
+
+/* ================= Editor Component Wrapper ====================*/
+.EditorWrap {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+.editorTopbar {
+  height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 20px;
+  background: var(--bg-card);
+  border-bottom: 1px solid var(--border-color);
+  backdrop-filter: blur(10px);
+}
+
+.topbarLeft {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.topbarRight {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.selectBox {
+  padding: 8px 12px;
+  border-radius: 6px;
+  background: var(--secondary);
+  border: 1px solid var(--border-color);
+  color: var(--text-main);
+  font-family: inherit;
+  font-size: 14px;
+  outline: none;
+  cursor: pointer;
+}
+
+.selectBox:hover {
+  border-color: var(--primary);
+}
+
+.selectBox option {
+  background: var(--secondary);
+}
+
+.clearBtn {
+  padding: 8px 14px;
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  color: #ef4444;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  font-family: inherit;
+  transition: all 0.2s;
+}
+
+.clearBtn:hover {
+  color: white;
+  background: #ef4444;
+}
+
+.CodeMirror {
+  flex: 1;
+  font-size: 16px;
+  font-family: 'Fira Code', 'Consolas', monospace;
+  height: 100% !important;
 }

@@ -59,6 +59,32 @@ io.on("connection", (socket) => {
     delete userSocketMap[socket.id];
     socket.leave();
   });
+
+  // Handle chat messages
+  socket.on("send-message", ({ roomId, message }) => {
+    socket.in(roomId).emit("receive-message", message);
+  });
+
+  socket.on(ACTIONS.EDIT_MESSAGE, ({ roomId, messageId, newText }) => {
+    socket.in(roomId).emit(ACTIONS.EDIT_MESSAGE, { messageId, newText });
+  });
+
+  socket.on(ACTIONS.DELETE_MESSAGE, ({ roomId, messageId }) => {
+    socket.in(roomId).emit(ACTIONS.DELETE_MESSAGE, { messageId });
+  });
+
+  // Handle execution sync
+  socket.on(ACTIONS.SYNC_EXECUTE, ({ roomId, isExecuting }) => {
+    socket.in(roomId).emit(ACTIONS.SYNC_EXECUTE, { isExecuting });
+  });
+
+  socket.on(ACTIONS.SYNC_OUTPUT, ({ roomId, output, isError, time }) => {
+    socket.in(roomId).emit(ACTIONS.SYNC_OUTPUT, { output, isError, time });
+  });
+
+  socket.on(ACTIONS.SYNC_LANGUAGE, ({ roomId, language }) => {
+    socket.in(roomId).emit(ACTIONS.SYNC_LANGUAGE, { language });
+  });
 });
 
 const PORT = process.env.PORT || 5000;
