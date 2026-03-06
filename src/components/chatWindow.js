@@ -4,7 +4,7 @@ import { v4 as uuidv4 } from "uuid";
 import EmojiPicker, { SuggestionMode } from "emoji-picker-react";
 import ACTIONS from "../Action";
 
-export default function ChatWindow({ socketRef, roomId, userName, isLightMode, isMobile, messages, setMessages }) {
+export default function ChatWindow({ socketRef, roomId, userName, isLightMode, isMobile, messages = [], setMessages }) {
     const [inputMsg, setInputMsg] = useState("");
     const [showEmojiPicker, setShowEmojiPicker] = useState(false);
     const [editingMsgId, setEditingMsgId] = useState(null);

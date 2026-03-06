@@ -603,6 +603,8 @@ function Editor() {
                           roomId={roomId}
                           userName={location.state?.userName}
                           isLightMode={isLightMode}
+                          messages={messages}
+                          setMessages={setMessages}
                         />
                       </div>
                     </ReflexElement>
