@@ -188,19 +188,6 @@ function Editor() {
     reactNavigator("/");
   };
 
-  const handleClearCode = () => {
-    if (window.confirm("Are you sure you want to clear the editor?")) {
-      codeRef.current = "";
-      setCurrentCode("");
-      localStorage.removeItem(`code-${roomId}`);
-      socketRef.current?.emit(ACTIONS.CODE_CHANGE, {
-        roomId,
-        code: "",
-      });
-      toast.success("Editor cleared");
-    }
-  };
-
   const handleCompile = async () => {
     setIsExecuting(true);
     socketRef.current?.emit(ACTIONS.SYNC_EXECUTE, { roomId, isExecuting: true });

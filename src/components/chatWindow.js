@@ -150,12 +150,15 @@ export default function ChatWindow({ socketRef, roomId, userName, isLightMode, i
                                             borderRadius: "12px",
                                             fontSize: "14px",
                                             maxWidth: "85%",
-                                            wordBreak: "break-word",
+                                            width: "fit-content",
+                                            overflowWrap: "anywhere",
+                                            wordBreak: "normal",
                                             backgroundColor: isMe ? "var(--primary)" : "var(--secondary)",
                                             color: isMe ? "white" : "var(--text-main)",
                                             borderBottomRightRadius: isMe ? 0 : "12px",
                                             borderBottomLeftRadius: isMe ? "12px" : 0,
-                                            border: isMe ? "none" : "1px solid var(--border-color)"
+                                            border: isMe ? "none" : "1px solid var(--border-color)",
+                                            boxShadow: "0 2px 4px rgba(0,0,0,0.02)"
                                         }}>
                                             {msg.text}
                                             {msg.isEdited && <span style={{ fontSize: "10px", opacity: 0.7, marginLeft: "6px", fontStyle: "italic" }}>(edited)</span>}
