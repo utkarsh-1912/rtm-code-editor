@@ -12,6 +12,7 @@ const ACTIONS = {
   SYNC_LANGUAGE: "sync-language",
   EDIT_MESSAGE: "edit-message",
   DELETE_MESSAGE: "delete-message",
+  SYNC_CHAT: "sync-chat",
 };
 
 module.exports = ACTIONS;

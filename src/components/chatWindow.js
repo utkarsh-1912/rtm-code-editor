@@ -4,11 +4,7 @@ import { v4 as uuidv4 } from "uuid";
 import EmojiPicker, { SuggestionMode } from "emoji-picker-react";
 import ACTIONS from "../Action";
 
-export default function ChatWindow({ socketRef, roomId, userName, isLightMode, isMobile }) {
-    const [messages, setMessages] = useState(() => {
-        const saved = localStorage.getItem(`chat-${roomId}`);
-        return saved ? JSON.parse(saved) : [];
-    });
+export default function ChatWindow({ socketRef, roomId, userName, isLightMode, isMobile, messages, setMessages }) {
     const [inputMsg, setInputMsg] = useState("");
     const [showEmojiPicker, setShowEmojiPicker] = useState(false);
     const [editingMsgId, setEditingMsgId] = useState(null);
@@ -22,35 +18,8 @@ export default function ChatWindow({ socketRef, roomId, userName, isLightMode, i
     };
 
     useEffect(() => {
-        localStorage.setItem(`chat-${roomId}`, JSON.stringify(messages));
         scrollToBottom();
-    }, [messages, roomId]);
-
-    useEffect(() => {
-        const socket = socketRef.current;
-        if (socket) {
-            socket.on(ACTIONS.RECEIVE_MESSAGE, (msg) => {
-                setMessages((prev) => {
-                    // Dedup guard: skip if message with same ID already exists
-                    if (prev.some(m => m.id === msg.id)) return prev;
-                    return [...prev, msg];
-                });
-            });
-            socket.on(ACTIONS.EDIT_MESSAGE, ({ messageId, newText }) => {
-                setMessages((prev) => prev.map(m => m.id === messageId ? { ...m, text: newText, isEdited: true } : m));
-            });
-            socket.on(ACTIONS.DELETE_MESSAGE, ({ messageId }) => {
-                setMessages((prev) => prev.filter(m => m.id !== messageId));
-            });
-        }
-        return () => {
-            if (socket) {
-                socket.off(ACTIONS.RECEIVE_MESSAGE);
-                socket.off(ACTIONS.EDIT_MESSAGE);
-                socket.off(ACTIONS.DELETE_MESSAGE);
-            }
-        };
-    }, [socketRef]);
+    }, [messages]);
 
     // Close emoji picker when clicking outside
     useEffect(() => {

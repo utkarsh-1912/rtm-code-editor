@@ -14,6 +14,8 @@ app.use((req, res, next) => {
 });
 
 const userSocketMap = {};
+const roomChatHistory = {};
+
 const getAllClients = (roomId) => {
   return Array.from(io.sockets.adapter.rooms.get(roomId) || []).map(
     (socketId) => {
@@ -38,6 +40,13 @@ io.on("connection", (socket) => {
         socketId: socket.id,
       });
     });
+
+    // Sync chat history to the joining user
+    if (roomChatHistory[roomId]) {
+      socket.emit(ACTIONS.SYNC_CHAT, {
+        messages: roomChatHistory[roomId],
+      });
+    }
   });
 
   socket.on(ACTIONS.CODE_CHANGE, ({ roomId, code }) => {
@@ -58,18 +67,38 @@ io.on("connection", (socket) => {
     });
     delete userSocketMap[socket.id];
     socket.leave();
+
+    // Clean up room history if empty
+    rooms.forEach((roomId) => {
+      const remaining = getAllClients(roomId);
+      if (remaining.length === 0) {
+        delete roomChatHistory[roomId];
+      }
+    });
   });
 
   // Handle chat messages
-  socket.on("send-message", ({ roomId, message }) => {
-    socket.in(roomId).emit("receive-message", message);
+  socket.on(ACTIONS.SEND_MESSAGE, ({ roomId, message }) => {
+    if (!roomChatHistory[roomId]) roomChatHistory[roomId] = [];
+    roomChatHistory[roomId].push(message);
+    if (roomChatHistory[roomId].length > 50) roomChatHistory[roomId].shift(); // Cap history
+
+    socket.in(roomId).emit(ACTIONS.RECEIVE_MESSAGE, message);
   });
 
   socket.on(ACTIONS.EDIT_MESSAGE, ({ roomId, messageId, newText }) => {
+    if (roomChatHistory[roomId]) {
+      roomChatHistory[roomId] = roomChatHistory[roomId].map(m =>
+        m.id === messageId ? { ...m, text: newText, isEdited: true } : m
+      );
+    }
     socket.in(roomId).emit(ACTIONS.EDIT_MESSAGE, { messageId, newText });
   });
 
   socket.on(ACTIONS.DELETE_MESSAGE, ({ roomId, messageId }) => {
+    if (roomChatHistory[roomId]) {
+      roomChatHistory[roomId] = roomChatHistory[roomId].filter(m => m.id !== messageId);
+    }
     socket.in(roomId).emit(ACTIONS.DELETE_MESSAGE, { messageId });
   });
 

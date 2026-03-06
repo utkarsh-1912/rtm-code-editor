@@ -56,6 +56,17 @@ function Editor() {
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const [activeTab, setActiveTab] = useState("code"); // "code" | "output" | "chat"
 
+  // Chat Persistent State
+  const [messages, setMessages] = useState(() => {
+    const saved = localStorage.getItem(`chat-${roomId}`);
+    return saved ? JSON.parse(saved) : [];
+  });
+  const [unreadChatCount, setUnreadChatCount] = useState(0);
+
+  useEffect(() => {
+    localStorage.setItem(`chat-${roomId}`, JSON.stringify(messages));
+  }, [messages, roomId]);
+
   useEffect(() => {
     const handleResize = () => {
       setIsMobile(window.innerWidth < 768);
@@ -97,6 +108,16 @@ function Editor() {
     toast.success("Code downloaded successfully!");
   };
 
+  const activeTabRef = useRef(activeTab);
+  const isMobileRef = useRef(isMobile);
+  const isChatCollapsedRef = useRef(isChatCollapsed);
+
+  useEffect(() => {
+    activeTabRef.current = activeTab;
+    isMobileRef.current = isMobile;
+    isChatCollapsedRef.current = isChatCollapsed;
+  }, [activeTab, isMobile, isChatCollapsed]);
+
   useEffect(() => {
     const init = async () => {
       socketRef.current = await initSocket();
@@ -123,7 +144,6 @@ function Editor() {
           }
           setClients(clients);
 
-          // Only broadcast our local code state to the NEW user if we are an existing user
           if (socketRef.current.id !== socketId) {
             socketRef.current.emit(ACTIONS.SYNC_CODE, {
               socketId,
@@ -151,6 +171,29 @@ function Editor() {
       socketRef.current.on(ACTIONS.SYNC_LANGUAGE, ({ language }) => {
         setLanguage(language);
       });
+
+      socketRef.current.on(ACTIONS.SYNC_CHAT, ({ messages: history }) => {
+        setMessages(history);
+      });
+
+      socketRef.current.on(ACTIONS.RECEIVE_MESSAGE, (msg) => {
+        setMessages((prev) => {
+          if (prev.some(m => m.id === msg.id)) return prev;
+          return [...prev, msg];
+        });
+        // Handle unread count using refs for current state
+        if (activeTabRef.current !== "chat" && (isMobileRef.current || isChatCollapsedRef.current)) {
+          setUnreadChatCount((prev) => prev + 1);
+        }
+      });
+
+      socketRef.current.on(ACTIONS.EDIT_MESSAGE, ({ messageId, newText }) => {
+        setMessages((prev) => prev.map(m => m.id === messageId ? { ...m, text: newText, isEdited: true } : m));
+      });
+
+      socketRef.current.on(ACTIONS.DELETE_MESSAGE, ({ messageId }) => {
+        setMessages((prev) => prev.filter(m => m.id !== messageId));
+      });
     };
 
     init();
@@ -164,9 +207,20 @@ function Editor() {
         socket.off(ACTIONS.SYNC_EXECUTE);
         socket.off(ACTIONS.SYNC_OUTPUT);
         socket.off(ACTIONS.SYNC_LANGUAGE);
+        socket.off(ACTIONS.SYNC_CHAT);
+        socket.off(ACTIONS.RECEIVE_MESSAGE);
+        socket.off(ACTIONS.EDIT_MESSAGE);
+        socket.off(ACTIONS.DELETE_MESSAGE);
       }
     };
   }, [roomId, location.state?.userName, reactNavigator]);
+
+  // Reset unread count when chat is viewed
+  useEffect(() => {
+    if ((activeTab === "chat" && isMobile) || (!isChatCollapsed && !isMobile)) {
+      setUnreadChatCount(0);
+    }
+  }, [activeTab, isChatCollapsed, isMobile]);
 
   if (!location.state) {
     return <Navigate to="/" />;
@@ -435,6 +489,8 @@ function Editor() {
                       userName={location.state?.userName}
                       isLightMode={isLightMode}
                       isMobile={isMobile}
+                      messages={messages}
+                      setMessages={setMessages}
                     />
                   )}
                 </div>
@@ -469,7 +525,25 @@ function Editor() {
                         transition: "all 0.2s"
                       }}
                     >
-                      {tab.icon}
+                      <div style={{ position: "relative" }}>
+                        {tab.icon}
+                        {tab.id === "chat" && unreadChatCount > 0 && (
+                          <span style={{
+                            position: "absolute",
+                            top: "-6px",
+                            right: "-8px",
+                            backgroundColor: "#f87171",
+                            color: "white",
+                            fontSize: "10px",
+                            padding: "1px 5px",
+                            borderRadius: "100px",
+                            border: "2px solid var(--bg-card)",
+                            fontWeight: "bold"
+                          }}>
+                            {unreadChatCount}
+                          </span>
+                        )}
+                      </div>
                       <span style={{ fontSize: "10px", fontWeight: "600" }}>{tab.label}</span>
                     </button>
                   ))}
@@ -500,7 +574,24 @@ function Editor() {
                     boxShadow: "2px 0 8px rgba(0,0,0,0.3)",
                   }}
                 >
-                  {isChatCollapsed ? <ChevronRight size={16} pointerEvents="none" /> : <ChevronLeft size={16} pointerEvents="none" />}
+                  {isChatCollapsed ? <ChevronLeft size={14} /> : <ChevronRight size={14} />}
+                  {isChatCollapsed && unreadChatCount > 0 && (
+                    <span style={{
+                      position: "absolute",
+                      top: "-8px",
+                      left: "-8px",
+                      backgroundColor: "#f87171",
+                      color: "white",
+                      fontSize: "10px",
+                      padding: "2px 6px",
+                      borderRadius: "100px",
+                      border: "2px solid var(--bg-dark)",
+                      fontWeight: "bold",
+                      boxShadow: "0 2px 4px rgba(0,0,0,0.2)"
+                    }}>
+                      {unreadChatCount}
+                    </span>
+                  )}
                 </button>
 
                 <ReflexContainer orientation="vertical">
