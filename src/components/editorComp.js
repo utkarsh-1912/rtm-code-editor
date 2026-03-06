@@ -72,15 +72,6 @@ function EditorComp({
     }
   };
 
-  const handleClearCode = () => {
-    setEditorCode("");
-    onCodeChange("");
-    localStorage.removeItem(`code-${roomId}`);
-    socketRef.current?.emit(ACTIONS.CODE_CHANGE, {
-      roomId,
-      code: "",
-    });
-  };
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%", backgroundColor: "var(--bg-dark)" }}>

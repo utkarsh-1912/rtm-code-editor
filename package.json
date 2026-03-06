@@ -2,6 +2,9 @@
   "name": "utkristi-edit",
   "version": "0.1.0",
   "private": true,
+  "engines": {
+    "node": ">=18.0.0"
+  },
   "dependencies": {
     "@codemirror/lang-cpp": "^6.0.3",
     "@codemirror/lang-html": "^6.4.11",

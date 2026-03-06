@@ -108,7 +108,7 @@ export default function ContentLayout({ title, children }) {
                 color: "var(--text-muted)",
                 fontSize: "14px"
             }}>
-                © 2026 Utkristi Colabs. All rights reserved.
+                © {new Date().getFullYear()} Utkristi Colabs. All rights reserved.
             </footer>
         </div>
     );

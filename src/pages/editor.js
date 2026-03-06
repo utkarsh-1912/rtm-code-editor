@@ -168,7 +168,7 @@ function Editor() {
         socketRef.current.off(ACTIONS.SYNC_LANGUAGE);
       }
     };
-  }, [socketRef]);
+  }, [socketRef, roomId, location.state?.userName, reactNavigator]);
 
   if (!location.state) {
     return <Navigate to="/" />;

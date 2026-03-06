@@ -357,7 +357,6 @@ function HomePage() {
               Created with <span style={{ color: "#ef4444" }}>💙</span> by <a href="http://utkristi-io.netlify.app/" style={{ color: "var(--primary)", textDecoration: "none", fontWeight: "700" }}>Utkristi.io</a>
             </div>
             <div style={{ width: "1px", height: "12px", backgroundColor: "var(--border-color)" }} />
-            <span>© {new Date().getFullYear()} Utkristi Colabs</span>
           </div>
 
           <div style={{ color: "var(--text-muted)", fontSize: "14px", fontWeight: "600", display: "flex", alignItems: "center", gap: "16px" }} className="footer-links">
