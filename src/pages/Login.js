@@ -60,11 +60,6 @@ const Login = () => {
                 <div style={{ position: "absolute", bottom: "-10%", right: "-10%", width: "60%", height: "60%", background: "radial-gradient(circle, rgba(139,92,246,0.12) 0%, rgba(0,0,0,0) 70%)", borderRadius: "50%", filter: "blur(100px)" }}></div>
 
                 <div style={{ position: "relative", zIndex: 2, maxWidth: "500px" }}>
-                    <img
-                        src="/utkristi-colabs.png"
-                        alt="Logo"
-                        style={{ width: "48px", height: "48px", marginBottom: "32px", borderRadius: "12px", boxShadow: "0 10px 20px rgba(0,0,0,0.2)" }}
-                    />
                     <h1 style={{ fontSize: "48px", fontWeight: "900", lineHeight: 1.1, marginBottom: "24px", letterSpacing: "-0.04em" }}>
                         The workspace for <br />
                         <span style={{ background: "linear-gradient(to right, #60a5fa, #a78bfa)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>modern engineers.</span>
@@ -76,15 +71,15 @@ const Login = () => {
                     <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
                         <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
                             <div style={{ background: "rgba(255,255,255,0.05)", padding: "12px", borderRadius: "12px", color: "#60a5fa" }}><Zap size={20} /></div>
-                            <span style={{ fontSize: "16px", fontWeight: "600" }}>Sub-millisecond latency sync</span>
+                            <span style={{ fontSize: "16px", fontWeight: "600", color: "#ffffffff" }}>Sub-millisecond latency sync</span>
                         </div>
                         <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
                             <div style={{ background: "rgba(255,255,255,0.05)", padding: "12px", borderRadius: "12px", color: "#4ade80" }}><Globe size={20} /></div>
-                            <span style={{ fontSize: "16px", fontWeight: "600" }}>Multi-language cloud execution</span>
+                            <span style={{ fontSize: "16px", fontWeight: "600", color: "#ffffffff" }}>Multi-language cloud execution</span>
                         </div>
                         <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
                             <div style={{ background: "rgba(255,255,255,0.05)", padding: "12px", borderRadius: "12px", color: "#f87171" }}><Lock size={20} /></div>
-                            <span style={{ fontSize: "16px", fontWeight: "600" }}>End-to-end encrypted sessions</span>
+                            <span style={{ fontSize: "16px", fontWeight: "600", color: "#ffffffff" }}>End-to-end encrypted sessions</span>
                         </div>
                     </div>
                 </div>
