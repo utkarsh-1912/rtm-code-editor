@@ -5,8 +5,6 @@ import {
     ArrowLeft,
     ShieldCheck,
     Zap,
-    Users,
-    Code,
     Globe,
     Lock,
     ChevronRight

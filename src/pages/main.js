@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import toast from "react-hot-toast";
 import { useNavigate, useLocation } from "react-router-dom";
-import { Sun, Moon, Zap, Code, ChevronRight, LayoutDashboard, Github, Twitter, Linkedin } from "lucide-react";
+import { Sun, Moon, Zap, ChevronRight, LayoutDashboard, Github, Twitter, Linkedin } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 
 function HomePage() {
