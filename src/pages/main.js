@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import toast from "react-hot-toast";
 import { useNavigate, useLocation } from "react-router-dom";
-import { Sun, Moon, Zap, Users, Code, Terminal, ChevronRight, LayoutDashboard, Globe, Shield, HelpCircle, Github, Twitter, Linkedin } from "lucide-react";
+import { Sun, Moon, Zap, Users, Code, ChevronRight, LayoutDashboard, Globe, Shield, HelpCircle, Github, Twitter, Linkedin } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 
 function HomePage() {
@@ -440,7 +440,7 @@ function HomePage() {
               <a href="/" style={footerLinkStyle}>Editor</a>
               <a href="/dashboard" style={footerLinkStyle}>Dashboard</a>
               <a href="/about" style={footerLinkStyle}>Features</a>
-              <a href="#" style={footerLinkStyle}>Enterprise</a>
+              <a href="/about" style={footerLinkStyle}>Enterprise</a>
             </div>
           </div>
 
