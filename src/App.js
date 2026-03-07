@@ -20,6 +20,10 @@ import ErrorBoundary from "./components/ErrorBoundary";
 
 function App() {
   useEffect(() => {
+    // Global Wake-up: Ping the backend to start spin-up on Render
+    const backendUrl = process.env.REACT_APP_BACKEND_URL || window.location.origin;
+    fetch(`${backendUrl}/api/ping`).catch(() => { });
+
     const savedTheme = localStorage.getItem("app-theme");
     if (savedTheme === "light") {
       document.documentElement.classList.add("light-theme");

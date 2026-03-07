@@ -38,6 +38,7 @@ import { Github } from "lucide-react";
 import Client from "../components/clients";
 import { LANGUAGES, THEMES } from "../config";
 import { useAuth } from "../context/AuthContext";
+import LoadingScreen from "../components/LoadingScreen";
 
 function Editor() {
   const socketRef = useRef(null);
@@ -58,6 +59,7 @@ function Editor() {
   const [execTime, setExecTime] = useState(undefined);
   const [isExecuting, setIsExecuting] = useState(false);
   const [socketConnected, setSocketConnected] = useState(false);
+  const [isWakingUp, setIsWakingUp] = useState(true);
   const [isChatCollapsed, setIsChatCollapsed] = useState(false);
   const [isLightMode, setIsLightMode] = useState(() => {
     return localStorage.getItem("app-theme") === "light";
@@ -147,6 +149,33 @@ function Editor() {
 
   useEffect(() => {
     const init = async () => {
+      // Wake up the server if it's sleeping (Render)
+      const wakeServer = async () => {
+        const backendUrl = process.env.REACT_APP_BACKEND_URL || window.location.origin;
+        let retries = 0;
+        const maxRetries = 20; // 20s total wait
+
+        while (retries < maxRetries) {
+          try {
+            const resp = await fetch(`${backendUrl}/api/ping`);
+            if (resp.ok) return true;
+          } catch (e) {
+            // Ignore and retry
+          }
+          retries++;
+          await new Promise(r => setTimeout(r, 1000));
+        }
+        return false;
+      };
+
+      const isAlive = await wakeServer();
+      if (!isAlive) {
+        toast.error("Global system is currently unreachable. Please try again later.");
+        reactNavigator("/");
+        return;
+      }
+
+      setIsWakingUp(false);
       socketRef.current = await initSocket();
       setSocketConnected(true);
       socketRef.current.on("connect_error", (err) => handleErrors(err));
@@ -805,9 +834,7 @@ function Editor() {
             )}
           </>
         ) : (
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", color: "var(--text-muted)", fontSize: "16px" }}>
-            Connecting to Room...
-          </div>
+          <LoadingScreen isLightMode={isLightMode} />
         )}
       </div>
 

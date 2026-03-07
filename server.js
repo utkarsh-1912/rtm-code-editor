@@ -12,6 +12,10 @@ const io = new Server(server);
 app.use(express.static("build"));
 
 // API Routes
+app.get("/api/ping", (req, res) => {
+  res.json({ success: true, message: "pong" });
+});
+
 // API Routes
 app.get("/api/user-dashboard", async (req, res) => {
   try {
