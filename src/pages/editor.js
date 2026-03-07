@@ -394,7 +394,7 @@ function Editor() {
       }}>
         <div style={{ display: "flex", alignItems: "center", gap: isMobile ? "8px" : "14px" }}>
           <div
-            onClick={() => navigate("/")}
+            onClick={() => reactNavigator("/")}
             style={{
               display: "flex",
               alignItems: "center",
