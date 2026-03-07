@@ -101,7 +101,7 @@ function HomePage() {
         zIndex: 10
       }}>
         <div style={{ cursor: "pointer" }} onClick={() => navigate("/")}>
-          <img src="/utkristi-colabs.png" alt="Logo" style={{ width: "40px", height: "40px", borderRadius: "10px" }} />
+          <img src="/utkristi-colabs.png" alt="Logo" style={{ width: "100px", height: "40px" }} />
         </div>
 
         <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
@@ -176,10 +176,10 @@ function HomePage() {
               The ultra-lightweight workspace for modern teams. Sync your code instantly, chat in real-time, and ship faster.
             </p>
 
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "24px", maxWidth: "480px" }}>
+            <div className="features-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "24px", maxWidth: "480px" }}>
               {[
                 { icon: <Code size={20} />, title: "Live Sync", desc: "No latency collaboration." },
-                { icon: <Globe size={20} />, title: "Multi-Lang", desc: "Support for 20+ languages." },
+                { icon: <Globe size={20} />, title: "Multi-Lang", desc: "Support for multiple languages." },
                 { icon: <Users size={20} />, title: "Team Chat", desc: "Contextual discussions." },
                 { icon: <Shield size={20} />, title: "Private", desc: "Secure ephemeral rooms." }
               ].map((f, idx) => (
@@ -297,6 +297,12 @@ function HomePage() {
             margin: 0 auto 40px !important;
           }
           .hero-left div[style*="grid"] {
+            margin: 0 auto !important;
+          }
+          .features-grid {
+            grid-template-columns: 1fr !important;
+            text-align: left;
+            max-width: 320px !important;
             margin: 0 auto !important;
           }
         }
