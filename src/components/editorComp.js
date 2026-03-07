@@ -23,6 +23,7 @@ function EditorComp({
   onThemeSelect,
   isLightMode,
   isMobile,
+  onDownload,
 }) {
   const [editorCode, setEditorCode] = React.useState(code || "");
 
