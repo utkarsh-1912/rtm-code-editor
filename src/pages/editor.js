@@ -36,12 +36,14 @@ import GistModal from "../components/GistModal";
 import { Github } from "lucide-react";
 import Client from "../components/clients";
 import { LANGUAGES, THEMES } from "../config";
+import { useAuth } from "../context/AuthContext";
 
 function Editor() {
   const socketRef = useRef(null);
   const location = useLocation();
   const reactNavigator = useNavigate();
   const { roomId } = useParams();
+  const { user } = useAuth();
 
   const codeRef = useRef(localStorage.getItem(`code-${roomId}`) || "");
 
