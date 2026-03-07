@@ -10,7 +10,6 @@ import {
     Terminal,
     User,
     Search,
-    ChevronRight,
     ExternalLink
 } from 'lucide-react';
 import toast from 'react-hot-toast';
