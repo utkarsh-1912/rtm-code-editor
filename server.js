@@ -114,6 +114,10 @@ io.on("connection", (socket) => {
   socket.on(ACTIONS.SYNC_LANGUAGE, ({ roomId, language }) => {
     socket.in(roomId).emit(ACTIONS.SYNC_LANGUAGE, { language });
   });
+
+  socket.on(ACTIONS.CURSOR_MOVE, ({ roomId, cursor, userName }) => {
+    socket.in(roomId).emit(ACTIONS.CURSOR_MOVE, { cursor, userName, socketId: socket.id });
+  });
 });
 
 const PORT = process.env.PORT || 5000;

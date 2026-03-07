@@ -48,8 +48,11 @@ function HomePage() {
       toast.error("Room Id & Username are required.");
       return;
     }
+    const searchParams = new URLSearchParams(location.search);
+    const role = searchParams.get("role") || "editor";
+
     navigate(`/editor/${roomId}`, {
-      state: { userName },
+      state: { userName, role },
     });
   };
 

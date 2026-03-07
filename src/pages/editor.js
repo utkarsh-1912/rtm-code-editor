@@ -19,7 +19,9 @@ import {
   MessageSquare,
   Terminal,
   Code,
-  Share2
+  Share2,
+  Settings,
+  Users
 } from "lucide-react";
 import { ReflexContainer, ReflexSplitter, ReflexElement } from "react-reflex";
 import "react-reflex/styles.css";
@@ -29,6 +31,7 @@ import { initSocket } from "../socket";
 import EditorComp from "../components/editorComp";
 import ChatWindow from "../components/chatWindow";
 import OutputWindow from "../components/outputWindow";
+import SettingsModal from "../components/SettingsModal";
 import Client from "../components/clients";
 import { LANGUAGES, THEMES } from "../config";
 
@@ -57,12 +60,27 @@ function Editor() {
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const [activeTab, setActiveTab] = useState("code"); // "code" | "output" | "chat"
 
-  // Chat Persistent State
   const [messages, setMessages] = useState(() => {
     const saved = localStorage.getItem(`chat-${roomId}`);
     return saved ? JSON.parse(saved) : [];
   });
   const [unreadChatCount, setUnreadChatCount] = useState(0);
+
+  const [stdin, setStdin] = useState("");
+
+  const [role] = useState(location.state?.role || "editor");
+  const isReadOnly = role === "viewer";
+
+  // Editor Settings State
+  const [showSettings, setShowSettings] = useState(false);
+  const [settings, setSettings] = useState(() => {
+    const saved = localStorage.getItem("app-editor-settings");
+    return saved ? JSON.parse(saved) : { fontSize: 16, tabSize: 4, wordWrap: false };
+  });
+
+  useEffect(() => {
+    localStorage.setItem("app-editor-settings", JSON.stringify(settings));
+  }, [settings]);
 
   useEffect(() => {
     localStorage.setItem(`chat-${roomId}`, JSON.stringify(messages));
@@ -243,17 +261,22 @@ function Editor() {
     reactNavigator("/");
   };
 
-  const handleShare = async () => {
-    const shareUrl = `${window.location.origin}/?room=${roomId}`;
+  const handleShare = async (shareRole = "editor") => {
+    const roleParam = shareRole === "viewer" ? "&role=viewer" : "";
+    const shareUrl = `${window.location.origin}/?room=${roomId}${roleParam}`;
     try {
       await navigator.clipboard.writeText(shareUrl);
-      toast.success("Share link copied to clipboard!");
+      toast.success(shareRole === "viewer" ? "Spectator link copied!" : "Editor link copied!");
     } catch (err) {
       toast.error("Failed to copy link");
     }
   };
 
   const handleCompile = async () => {
+    if (isReadOnly) {
+      toast.error("Spectators cannot execute code.");
+      return;
+    }
     setIsExecuting(true);
     socketRef.current?.emit(ACTIONS.SYNC_EXECUTE, { roomId, isExecuting: true });
 
@@ -263,6 +286,7 @@ function Editor() {
     const formData = {
       language_id: languageId,
       source_code: btoa(codeRef.current),
+      ...(stdin.trim() && { stdin: btoa(stdin) })
     };
 
     const url = "https://judge0-ce.p.rapidapi.com/submissions?base64_encoded=true&fields=*";
@@ -408,6 +432,15 @@ function Editor() {
               {isExecuting ? <Pause size={18} fill="#4ade80" /> : <Play size={18} fill="#22c55e" />}
             </button>
             <button
+              onClick={() => setShowSettings(true)}
+              style={{ display: isMobile ? "none" : "flex", alignItems: "center", justifyContent: "center", width: "32px", height: "32px", color: "var(--text-muted)", backgroundColor: "transparent", borderRadius: "6px", border: "none", cursor: "pointer", transition: "all 0.2s" }}
+              onMouseOver={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-card)")}
+              onMouseOut={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
+              title="Settings"
+            >
+              <Settings size={18} />
+            </button>
+            <button
               onClick={() => setIsLightMode(!isLightMode)}
               style={{ display: "flex", alignItems: "center", justifyContent: "center", width: "32px", height: "32px", color: isLightMode ? "#fbbf24" : "var(--text-muted)", backgroundColor: "transparent", borderRadius: "6px", border: "none", cursor: "pointer", transition: "all 0.2s" }}
               onMouseOver={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-card)")}
@@ -417,13 +450,22 @@ function Editor() {
               {isLightMode ? <Sun size={18} /> : <Moon size={18} />}
             </button>
             <button
-              onClick={handleShare}
+              onClick={() => handleShare("editor")}
               style={{ width: "32px", height: "32px", color: "var(--primary)", background: "transparent", border: "none", borderRadius: "6px", cursor: "pointer", transition: "all 0.2s" }}
               onMouseOver={(e) => (e.currentTarget.style.backgroundColor = "rgba(59, 130, 246, 0.1)")}
               onMouseOut={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
-              title="Share Room"
+              title="Share Editor Link"
             >
               <Share2 size={18} />
+            </button>
+            <button
+              onClick={() => handleShare("viewer")}
+              style={{ width: "32px", height: "32px", color: "#a855f7", background: "transparent", border: "none", borderRadius: "6px", cursor: "pointer", transition: "all 0.2s" }}
+              onMouseOver={(e) => (e.currentTarget.style.backgroundColor = "rgba(168, 85, 247, 0.1)")}
+              onMouseOut={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
+              title="Share Spectator Link"
+            >
+              <Users size={18} />
             </button>
             {!isMobile && (
               <>
@@ -498,10 +540,13 @@ function Editor() {
                       isLightMode={isLightMode}
                       isMobile={isMobile}
                       onDownload={downloadCode}
+                      settings={settings}
+                      isReadOnly={isReadOnly}
+                      userName={location.state?.userName}
                     />
                   )}
                   {activeTab === "output" && (
-                    <OutputWindow output={output} isError={isError} time={execTime} isMobile={isMobile} />
+                    <OutputWindow output={output} isError={isError} time={execTime} isMobile={isMobile} stdin={stdin} setStdin={setStdin} />
                   )}
                   {activeTab === "chat" && (
                     <ChatWindow
@@ -568,6 +613,23 @@ function Editor() {
                       <span style={{ fontSize: "10px", fontWeight: "600" }}>{tab.label}</span>
                     </button>
                   ))}
+                  <button
+                    onClick={() => setShowSettings(true)}
+                    style={{
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: "center",
+                      gap: "4px",
+                      background: "transparent",
+                      border: "none",
+                      color: "var(--text-muted)",
+                      cursor: "pointer",
+                      transition: "all 0.2s"
+                    }}
+                  >
+                    <Settings size={20} />
+                    <span style={{ fontSize: "10px", fontWeight: "600" }}>Settings</span>
+                  </button>
                 </div>
               </div>
             ) : (
@@ -656,6 +718,9 @@ function Editor() {
                             onRunCode={handleCompile}
                             isExecuting={isExecuting}
                             isLightMode={isLightMode}
+                            settings={settings}
+                            isReadOnly={isReadOnly}
+                            userName={location.state?.userName}
                           />
                         </div>
                       </ReflexElement>
@@ -668,6 +733,9 @@ function Editor() {
                             output={output}
                             isError={isError}
                             time={execTime}
+                            isMobile={isMobile}
+                            stdin={stdin}
+                            setStdin={setStdin}
                           />
                         </div>
                       </ReflexElement>
@@ -684,6 +752,12 @@ function Editor() {
         )}
       </div>
 
+      <SettingsModal
+        isOpen={showSettings}
+        onClose={() => setShowSettings(false)}
+        settings={settings}
+        onSettingsChange={setSettings}
+      />
     </div>
   );
 }

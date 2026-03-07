@@ -1,6 +1,6 @@
 import React from "react";
 import ContentLayout from "../components/ContentLayout";
-import { Code, Zap, Users, Shield } from "lucide-react";
+import { Code, Zap, Users, Shield, MousePointer2, Terminal, Settings, Eye } from "lucide-react";
 
 export default function About() {
     return (
@@ -10,7 +10,7 @@ export default function About() {
             </p>
 
             <h2 style={{ color: "var(--text-main)", marginTop: "40px", marginBottom: "20px" }}>Core Features</h2>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "30px", marginTop: "20px" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "30px", marginTop: "20px" }}>
                 <div>
                     <h3 style={{ display: "flex", alignItems: "center", gap: "10px", fontSize: "18px", color: "var(--primary)" }}>
                         <Code size={20} /> Real-time Sync
@@ -24,16 +24,40 @@ export default function About() {
                     <p>Run your code across multiple languages including Python, C++, Java, and JavaScript, powered by the Judge0 API.</p>
                 </div>
                 <div>
-                    <h3 style={{ display: "flex", alignItems: "center", gap: "10px", fontSize: "18px", color: "#4ade80" }}>
-                        <Users size={20} /> Collaborative Chat
+                    <h3 style={{ display: "flex", alignItems: "center", gap: "10px", fontSize: "18px", color: "#fbbf24" }}>
+                        <MousePointer2 size={20} /> Live Cursors
                     </h3>
-                    <p>Communicate effectively without leaving the workspace. Our built-in chat supports emojis and real-time status updates.</p>
+                    <p>See exactly where your teammates are working. Real-time visual presence with name tags ensures everyone is on the same page.</p>
+                </div>
+                <div>
+                    <h3 style={{ display: "flex", alignItems: "center", gap: "10px", fontSize: "18px", color: "#a855f7" }}>
+                        <Terminal size={20} /> Custom Stdin
+                    </h3>
+                    <p>Test your logic with custom standard input. Essential for competitive programming and complex data-driven debugging.</p>
+                </div>
+                <div>
+                    <h3 style={{ display: "flex", alignItems: "center", gap: "10px", fontSize: "18px", color: "#ec4899" }}>
+                        <Settings size={20} /> Tailored Editor
+                    </h3>
+                    <p>Make the workspace yours. Customize font size, tab spacing, and word wrap settings that persist across your sessions.</p>
                 </div>
                 <div>
                     <h3 style={{ display: "flex", alignItems: "center", gap: "10px", fontSize: "18px", color: "#60a5fa" }}>
+                        <Eye size={20} /> Spectator Mode
+                    </h3>
+                    <p>Share your progress without worry. Generate read-only links for observers to follow along without interfering with the code.</p>
+                </div>
+                <div>
+                    <h3 style={{ display: "flex", alignItems: "center", gap: "10px", fontSize: "18px", color: "#4ade80" }}>
+                        <Users size={20} /> Collaborative Chat
+                    </h3>
+                    <p>Communicate effectively with built-in chat support for emojis and real-time status updates, keeping communication in-context.</p>
+                </div>
+                <div>
+                    <h3 style={{ display: "flex", alignItems: "center", gap: "10px", fontSize: "18px", color: "var(--text-muted)" }}>
                         <Shield size={20} /> Privacy First
                     </h3>
-                    <p>Your code is temporary and shared only with those you invite. We do not persist your code on our servers longer than necessary.</p>
+                    <p>Your code is shared only with those you invite. We do not persist your code on our servers longer than necessary for the session.</p>
                 </div>
             </div>
 

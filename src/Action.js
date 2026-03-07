@@ -13,6 +13,7 @@ const ACTIONS = {
   EDIT_MESSAGE: "edit-message",
   DELETE_MESSAGE: "delete-message",
   SYNC_CHAT: "sync-chat",
+  CURSOR_MOVE: "cursor-move",
 };
 
 module.exports = ACTIONS;
