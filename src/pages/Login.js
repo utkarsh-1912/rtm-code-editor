@@ -1,192 +1,215 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
-import { Github, Mail, Code, ArrowLeft, UserCircle2 } from 'lucide-react';
-import toast from 'react-hot-toast';
+import React, { useState, useEffect } from "react";
+import {
+    Github,
+    Mail,
+    ArrowLeft,
+    ShieldCheck,
+    Zap,
+    Users,
+    Code,
+    Globe,
+    Lock,
+    ChevronRight
+} from "lucide-react";
+import { useAuth } from "../context/AuthContext";
+import { useNavigate } from "react-router-dom";
+import toast from "react-hot-toast";
 
 const Login = () => {
-    const { loginWithGoogle, loginWithGitHub, user } = useAuth();
+    const { loginWithGoogle, loginWithGitHub, user, loading } = useAuth();
     const navigate = useNavigate();
     const [isHovered, setIsHovered] = useState(null);
 
-    // Redirect if already logged in
-    React.useEffect(() => {
+    useEffect(() => {
         if (user) {
-            navigate('/dashboard');
+            navigate("/dashboard");
         }
     }, [user, navigate]);
 
     const handleLogin = async (provider) => {
         try {
-            if (provider === 'Google') {
-                await loginWithGoogle();
-            } else if (provider === 'GitHub') {
-                await loginWithGitHub();
-            }
-            toast.success(`Signed in with ${provider}!`);
+            if (provider === "google") await loginWithGoogle();
+            if (provider === "github") await loginWithGitHub();
+            toast.success("Welcome to the workspace!");
         } catch (error) {
             toast.error(`Authentication failed: ${error.message}`);
         }
     };
 
-    const containerStyle = {
-        height: '100vh',
-        width: '100vw',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        backgroundColor: 'var(--bg-dark)',
-        padding: '20px',
-        position: 'relative',
-        overflow: 'hidden'
-    };
-
-    const cardStyle = {
-        width: '100%',
-        maxWidth: '440px',
-        backgroundColor: 'var(--bg-card)',
-        padding: '48px 40px',
-        borderRadius: '28px',
-        border: '1px solid var(--border-color)',
-        backdropFilter: 'blur(16px)',
-        textAlign: 'center',
-        boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
-        position: 'relative',
-        zIndex: 10,
-        animation: 'slideUp 0.5s cubic-bezier(0.16, 1, 0.3, 1)'
-    };
-
-    const socialButtonStyle = (id) => ({
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: '12px',
-        width: '100%',
-        padding: '14px',
-        marginBottom: '16px',
-        borderRadius: '12px',
-        border: '1px solid var(--border-color)',
-        backgroundColor: isHovered === id ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.02)',
-        color: 'var(--text-main)',
-        fontSize: '16px',
-        fontWeight: '600',
-        cursor: 'pointer',
-        transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-        transform: isHovered === id ? 'translateY(-2px)' : 'none',
-        boxShadow: isHovered === id ? '0 10px 15px -3px rgba(0, 0, 0, 0.3)' : 'none'
-    });
-
-    const backButtonStyle = {
-        position: 'absolute',
-        top: '40px',
-        left: '40px',
-        display: 'flex',
-        alignItems: 'center',
-        gap: '8px',
-        padding: '10px 16px',
-        backgroundColor: 'transparent',
-        border: '1px solid var(--border-color)',
-        borderRadius: '12px',
-        color: 'var(--text-muted)',
-        fontSize: '14px',
-        fontWeight: '600',
-        cursor: 'pointer',
-        transition: 'all 0.2s',
-        zIndex: 20
-    };
+    if (loading) {
+        return (
+            <div style={{ height: "100vh", display: "flex", alignItems: "center", justifyContent: "center", backgroundColor: "var(--bg-dark)" }}>
+                <div style={{ color: "var(--primary)", fontSize: "1.2rem", fontWeight: "bold" }}>Authenticating...</div>
+            </div>
+        );
+    }
 
     return (
-        <div style={containerStyle}>
-            {/* Background Orbs */}
-            <div style={{ position: 'absolute', top: '-10%', right: '-10%', width: '40vw', height: '40vw', background: 'radial-gradient(circle, rgba(59,130,246,0.1) 0%, rgba(0,0,0,0) 70%)', borderRadius: '50%', filter: 'blur(80px)' }}></div>
-            <div style={{ position: 'absolute', bottom: '-10%', left: '-10%', width: '35vw', height: '35vw', background: 'radial-gradient(circle, rgba(139,92,246,0.08) 0%, rgba(0,0,0,0) 70%)', borderRadius: '50%', filter: 'blur(70px)' }}></div>
+        <div style={{ height: "100vh", width: "100vw", display: "flex", backgroundColor: "var(--bg-dark)", color: "var(--text-main)", overflow: "hidden" }}>
 
-            <button
-                onClick={() => navigate('/')}
-                style={backButtonStyle}
-                onMouseOver={(e) => { e.currentTarget.style.color = 'var(--text-main)'; e.currentTarget.style.borderColor = 'var(--primary)'; }}
-                onMouseOut={(e) => { e.currentTarget.style.color = 'var(--text-muted)'; e.currentTarget.style.borderColor = 'var(--border-color)'; }}
-            >
-                <ArrowLeft size={18} />
-                Back to Home
-            </button>
+            {/* LEFT PANEL: BRAND & GRADIENT (Hidden on mobile) */}
+            <div className="login-left-panel" style={{
+                flex: 1,
+                background: "linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%)",
+                position: "relative",
+                display: "flex",
+                flexDirection: "column",
+                justifyContent: "center",
+                padding: "80px",
+                overflow: "hidden"
+            }}>
+                {/* Animated Background Orbs */}
+                <div style={{ position: "absolute", top: "-10%", left: "-10%", width: "60%", height: "60%", background: "radial-gradient(circle, rgba(59,130,246,0.15) 0%, rgba(0,0,0,0) 70%)", borderRadius: "50%", filter: "blur(100px)" }}></div>
+                <div style={{ position: "absolute", bottom: "-10%", right: "-10%", width: "60%", height: "60%", background: "radial-gradient(circle, rgba(139,92,246,0.12) 0%, rgba(0,0,0,0) 70%)", borderRadius: "50%", filter: "blur(100px)" }}></div>
 
-            <div style={cardStyle}>
-                <div style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    width: '64px',
-                    height: '64px',
-                    backgroundColor: 'rgba(59, 130, 246, 0.1)',
-                    borderRadius: '20px',
-                    marginBottom: '28px',
-                    color: 'var(--primary)'
-                }}>
-                    <Code size={36} />
+                <div style={{ position: "relative", zIndex: 2, maxWidth: "500px" }}>
+                    <img
+                        src="/utkristi-colabs.png"
+                        alt="Logo"
+                        style={{ width: "48px", height: "48px", marginBottom: "32px", borderRadius: "12px", boxShadow: "0 10px 20px rgba(0,0,0,0.2)" }}
+                    />
+                    <h1 style={{ fontSize: "48px", fontWeight: "900", lineHeight: 1.1, marginBottom: "24px", letterSpacing: "-0.04em" }}>
+                        The workspace for <br />
+                        <span style={{ background: "linear-gradient(to right, #60a5fa, #a78bfa)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>modern engineers.</span>
+                    </h1>
+                    <p style={{ fontSize: "18px", color: "rgba(255,255,255,0.6)", lineHeight: 1.6, marginBottom: "48px" }}>
+                        Experience the future of collaborative coding with real-time sync, lightning-fast execution, and integrated team communication.
+                    </p>
+
+                    <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
+                            <div style={{ background: "rgba(255,255,255,0.05)", padding: "12px", borderRadius: "12px", color: "#60a5fa" }}><Zap size={20} /></div>
+                            <span style={{ fontSize: "16px", fontWeight: "600" }}>Sub-millisecond latency sync</span>
+                        </div>
+                        <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
+                            <div style={{ background: "rgba(255,255,255,0.05)", padding: "12px", borderRadius: "12px", color: "#4ade80" }}><Globe size={20} /></div>
+                            <span style={{ fontSize: "16px", fontWeight: "600" }}>Multi-language cloud execution</span>
+                        </div>
+                        <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
+                            <div style={{ background: "rgba(255,255,255,0.05)", padding: "12px", borderRadius: "12px", color: "#f87171" }}><Lock size={20} /></div>
+                            <span style={{ fontSize: "16px", fontWeight: "600" }}>End-to-end encrypted sessions</span>
+                        </div>
+                    </div>
                 </div>
 
-                <h1 style={{ color: 'var(--text-main)', fontSize: '32px', fontWeight: '800', marginBottom: '12px', letterSpacing: '-0.02em' }}>Welcome Back</h1>
-                <p style={{ color: 'var(--text-muted)', marginBottom: '40px', lineHeight: '1.6', fontSize: '15px' }}>
-                    Sign in to sync your rooms, save snippets, and collaborate across all your devices.
-                </p>
-
-                <div style={{ marginBottom: '32px' }}>
-                    <button
-                        onMouseEnter={() => setIsHovered('google')}
-                        onMouseLeave={() => setIsHovered(null)}
-                        onClick={() => handleLogin('Google')}
-                        style={socialButtonStyle('google')}
-                    >
-                        <Mail size={20} color="#ea4335" />
-                        Continue with Google
-                    </button>
-
-                    <button
-                        onMouseEnter={() => setIsHovered('github')}
-                        onMouseLeave={() => setIsHovered(null)}
-                        onClick={() => handleLogin('GitHub')}
-                        style={socialButtonStyle('github')}
-                    >
-                        <Github size={20} />
-                        Continue with GitHub
-                    </button>
+                <div style={{ position: "absolute", bottom: "40px", left: "80px", color: "rgba(255,255,255,0.3)", fontSize: "13px" }}>
+                    &copy; 2026 Utkristi Colabs. Built for high-performance teams.
                 </div>
+            </div>
 
-                <div style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '12px',
-                    margin: '24px 0',
-                    color: 'var(--border-color)'
-                }}>
-                    <div style={{ flex: 1, height: '1px', backgroundColor: 'currentColor' }}></div>
-                    <span style={{ fontSize: '12px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em' }}>OR</span>
-                    <div style={{ flex: 1, height: '1px', backgroundColor: 'currentColor' }}></div>
-                </div>
-
-                <button
-                    onClick={() => navigate('/')}
-                    onMouseEnter={() => setIsHovered('guest')}
-                    onMouseLeave={() => setIsHovered(null)}
+            {/* RIGHT PANEL: AUTH FORM */}
+            <div className="login-right-panel" style={{
+                width: "600px",
+                display: "flex",
+                flexDirection: "column",
+                justifyContent: "center",
+                padding: "60px",
+                position: "relative"
+            }}>
+                {/* Simple Back Link */}
+                <div
+                    onClick={() => navigate("/")}
                     style={{
-                        ...socialButtonStyle('guest'),
-                        backgroundColor: 'transparent',
-                        border: '1px dashed var(--border-color)',
-                        marginBottom: 0
+                        position: "absolute",
+                        top: "40px",
+                        left: "60px",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "8px",
+                        fontSize: "14px",
+                        color: "var(--text-muted)",
+                        cursor: "pointer",
+                        fontWeight: "600",
+                        transition: "all 0.2s"
                     }}
+                    onMouseOver={(e) => e.target.style.color = "var(--primary)"}
+                    onMouseOut={(e) => e.target.style.color = "var(--text-muted)"}
                 >
-                    <UserCircle2 size={20} color="var(--primary)" />
-                    Don't have an account? Join as Guest
-                </button>
+                    <ArrowLeft size={16} /> Back to Home
+                </div>
+
+                <div style={{ maxWidth: "400px", width: "100%", margin: "0 auto" }}>
+                    <div style={{ marginBottom: "40px" }}>
+                        <h2 style={{ fontSize: "32px", fontWeight: "800", marginBottom: "8px", letterSpacing: "-0.02em" }}>Welcome Back</h2>
+                        <p style={{ color: "var(--text-muted)", fontSize: "15px" }}>Sign in to sync your rooms across devices.</p>
+                    </div>
+
+                    <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+                        <button
+                            onClick={() => handleLogin("google")}
+                            onMouseEnter={() => setIsHovered('google')}
+                            onMouseLeave={() => setIsHovered(null)}
+                            style={{
+                                display: "flex", alignItems: "center", justifyContent: "center", gap: "12px",
+                                width: "100%", padding: "16px", borderRadius: "14px", border: "1px solid var(--border-color)",
+                                backgroundColor: isHovered === 'google' ? "rgba(255,255,255,0.05)" : "var(--bg-card)",
+                                color: "var(--text-main)", fontSize: "16px", fontWeight: "700",
+                                cursor: "pointer", transition: "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
+                                boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.1)"
+                            }}
+                        >
+                            <Mail size={20} color="#ea4335" /> Continue with Google
+                        </button>
+
+                        <button
+                            onClick={() => handleLogin("github")}
+                            onMouseEnter={() => setIsHovered('github')}
+                            onMouseLeave={() => setIsHovered(null)}
+                            style={{
+                                display: "flex", alignItems: "center", justifyContent: "center", gap: "12px",
+                                width: "100%", padding: "16px", borderRadius: "14px", border: "1px solid var(--border-color)",
+                                backgroundColor: isHovered === 'github' ? "rgba(255,255,255,0.05)" : "var(--bg-card)",
+                                color: "var(--text-main)", fontSize: "16px", fontWeight: "700",
+                                cursor: "pointer", transition: "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
+                                boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.1)"
+                            }}
+                        >
+                            <Github size={20} /> Continue with GitHub
+                        </button>
+                    </div>
+
+                    <div style={{ display: "flex", alignItems: "center", gap: "12px", margin: "32px 0", color: "var(--border-color)" }}>
+                        <div style={{ flex: 1, height: "1px", backgroundColor: "currentcolor" }}></div>
+                        <span style={{ fontSize: "12px", fontWeight: "700", textTransform: "uppercase", letterSpacing: "0.1em", color: "var(--text-muted)" }}>or access as guest</span>
+                        <div style={{ flex: 1, height: "1px", backgroundColor: "currentcolor" }}></div>
+                    </div>
+
+                    <div style={{
+                        backgroundColor: "rgba(59, 130, 246, 0.03)",
+                        border: "1px dashed var(--primary)",
+                        padding: "24px",
+                        borderRadius: "20px",
+                        textAlign: "center"
+                    }}>
+                        <ShieldCheck size={24} style={{ color: "var(--primary)", marginBottom: "12px" }} />
+                        <h4 style={{ fontSize: "16px", fontWeight: "700", marginBottom: "8px" }}>Continue as Guest</h4>
+                        <p style={{ fontSize: "13px", color: "var(--text-muted)", marginBottom: "20px", lineHeight: 1.5 }}>
+                            Use the platform without an account. <br />Note: Rooms won't be saved to your dashboard.
+                        </p>
+                        <button
+                            onClick={() => navigate("/")}
+                            style={{
+                                width: "100%", padding: "12px", borderRadius: "12px", border: "none",
+                                backgroundColor: "var(--primary)", color: "white", fontSize: "14px", fontWeight: "800",
+                                cursor: "pointer", transition: "all 0.2s", display: "flex", alignItems: "center", justifyContent: "center", gap: "8px"
+                            }}
+                        >
+                            Launch Editor <ChevronRight size={16} />
+                        </button>
+                    </div>
+
+                    <p style={{ textAlign: "center", marginTop: "40px", fontSize: "14px", color: "var(--text-muted)" }}>
+                        Don't have an account? <span onClick={() => { }} style={{ color: "var(--primary)", fontWeight: "700", cursor: "pointer" }}>Sign In</span>
+                    </p>
+                </div>
             </div>
 
             <style>{`
-                @keyframes slideUp {
-                    from { opacity: 0; transform: translateY(20px); }
-                    to { opacity: 1; transform: translateY(0); }
-                }
-            `}</style>
+        @media (max-width: 1024px) {
+          .login-left-panel { display: none !important; }
+          .login-right-panel { width: 100% !important; padding: 40px !important; }
+        }
+      `}</style>
         </div>
     );
 };

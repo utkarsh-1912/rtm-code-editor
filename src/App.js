@@ -11,6 +11,8 @@ import { Toaster } from "react-hot-toast";
 import { AuthProvider } from "./context/AuthContext";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
+import Snippets from "./pages/Snippets";
+import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
 import OfflineBanner from "./components/OfflineBanner";
 import ErrorBoundary from "./components/ErrorBoundary";
@@ -44,6 +46,8 @@ function App() {
             <Route path="/terms" element={<Terms />} />
             <Route path="/login" element={<Login />} />
             <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/snippets" element={<Snippets />} />
+            <Route path="/settings" element={<Settings />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>

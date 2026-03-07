@@ -76,7 +76,28 @@ io.on("connection", (socket) => {
     userSocketMap[socket.id] = userName;
     socket.join(roomId);
 
-    // If logged in, handle user persistence
+    // Load or Initialize Room from DB first
+    let dbRoom;
+    try {
+      dbRoom = await db.getRoom(roomId);
+      if (dbRoom) {
+        // Load chat history into memory if needed
+        if (!roomChatHistory[roomId]) {
+          roomChatHistory[roomId] = dbRoom.chat_history || [];
+        }
+        // Send existing code to the joining user
+        if (dbRoom.code) {
+          socket.emit(ACTIONS.CODE_CHANGE, { code: dbRoom.code });
+        }
+      } else {
+        // New room, create entry
+        await db.saveRoom(roomId, "", "javascript", []);
+      }
+    } catch (err) {
+      console.error("DB Room Init Error:", err);
+    }
+
+    // Now that we're sure the room exists in DB, handle user link
     if (userProfile && userProfile.uid) {
       try {
         await db.findOrCreateUser(userProfile);
@@ -84,27 +105,6 @@ io.on("connection", (socket) => {
       } catch (err) {
         console.error("User Persistence Error:", err);
       }
-    }
-
-    // Load or Initialize Room from DB
-    let room;
-    try {
-      room = await db.getRoom(roomId);
-      if (room) {
-        // Load code into memory if not already there (optional, but good for sync)
-        if (!roomChatHistory[roomId]) {
-          roomChatHistory[roomId] = room.chat_history || [];
-        }
-        // Send existing code to the joining user
-        if (room.code) {
-          socket.emit(ACTIONS.CODE_CHANGE, { code: room.code });
-        }
-      } else {
-        // New room, create entry
-        await db.saveRoom(roomId, "", "javascript", []);
-      }
-    } catch (err) {
-      console.error("DB Join Error:", err);
     }
 
     const clients = getAllClients(roomId);

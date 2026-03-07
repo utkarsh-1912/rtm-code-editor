@@ -90,10 +90,10 @@ const Dashboard = () => {
                     <button style={navItemStyle(true)}>
                         <Clock size={18} /> <span className="nav-text">Recent Rooms</span>
                     </button>
-                    <button style={navItemStyle(false)}>
+                    <button style={navItemStyle(false)} onClick={() => navigate('/snippets')}>
                         <User size={18} /> <span className="nav-text">My Snippets</span>
                     </button>
-                    <button style={navItemStyle(false)}>
+                    <button style={navItemStyle(false)} onClick={() => navigate('/settings')}>
                         <Settings size={18} /> <span className="nav-text">Account Settings</span>
                     </button>
                 </div>
