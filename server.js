@@ -5,10 +5,17 @@ const path = require("path");
 const { Server } = require("socket.io");
 const ACTIONS = require("./src/Action");
 const db = require("./src/db");
+const cors = require("cors");
 
 const server = http.createServer(app);
-const io = new Server(server);
+const io = new Server(server, {
+  cors: {
+    origin: "*",
+    methods: ["GET", "POST"]
+  }
+});
 
+app.use(cors());
 app.use(express.static("build"));
 
 // API Routes
