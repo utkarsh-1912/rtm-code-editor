@@ -100,28 +100,48 @@ function HomePage() {
       }}>
         <img src="/utkristi-colabs.png" alt="Logo" style={{ height: "40px", filter: "drop-shadow(0px 4px 8px rgba(0,0,0,0.1))" }} />
 
-        <button
-          onClick={() => setIsLightMode(!isLightMode)}
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            width: "42px",
-            height: "42px",
-            backgroundColor: "var(--bg-card)",
-            border: "1px solid var(--border-color)",
-            borderRadius: "12px",
-            cursor: "pointer",
-            color: isLightMode ? "#fbbf24" : "var(--text-muted)",
-            transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
-            boxShadow: "0 4px 12px rgba(0,0,0,0.04)"
-          }}
-          onMouseOver={(e) => { e.currentTarget.style.transform = "rotate(15deg) scale(1.05)"; e.currentTarget.style.borderColor = "var(--primary)"; }}
-          onMouseOut={(e) => { e.currentTarget.style.transform = "none"; e.currentTarget.style.borderColor = "var(--border-color)"; }}
-          title="Toggle Theme"
-        >
-          {isLightMode ? <Sun size={20} /> : <Moon size={20} />}
-        </button>
+        <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
+          <button
+            onClick={() => navigate("/login")}
+            style={{
+              padding: "10px 24px",
+              backgroundColor: "transparent",
+              border: "1px solid var(--border-color)",
+              borderRadius: "12px",
+              color: "var(--text-main)",
+              fontSize: "14px",
+              fontWeight: "600",
+              cursor: "pointer",
+              transition: "all 0.2s"
+            }}
+            onMouseOver={(e) => { e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.05)"; e.currentTarget.style.borderColor = "var(--primary)"; }}
+            onMouseOut={(e) => { e.currentTarget.style.backgroundColor = "transparent"; e.currentTarget.style.borderColor = "var(--border-color)"; }}
+          >
+            Sign In
+          </button>
+          <button
+            onClick={() => setIsLightMode(!isLightMode)}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              width: "42px",
+              height: "42px",
+              backgroundColor: "var(--bg-card)",
+              border: "1px solid var(--border-color)",
+              borderRadius: "12px",
+              cursor: "pointer",
+              color: isLightMode ? "#fbbf24" : "var(--text-muted)",
+              transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+              boxShadow: "0 4px 12px rgba(0,0,0,0.04)"
+            }}
+            onMouseOver={(e) => { e.currentTarget.style.transform = "rotate(15deg) scale(1.05)"; e.currentTarget.style.borderColor = "var(--primary)"; }}
+            onMouseOut={(e) => { e.currentTarget.style.transform = "none"; e.currentTarget.style.borderColor = "var(--border-color)"; }}
+            title="Toggle Theme"
+          >
+            {isLightMode ? <Sun size={20} /> : <Moon size={20} />}
+          </button>
+        </div>
       </header>
 
       {/* MAIN CONTENT */}

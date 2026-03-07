@@ -32,6 +32,8 @@ import EditorComp from "../components/editorComp";
 import ChatWindow from "../components/chatWindow";
 import OutputWindow from "../components/outputWindow";
 import SettingsModal from "../components/SettingsModal";
+import GistModal from "../components/GistModal";
+import { Github } from "lucide-react";
 import Client from "../components/clients";
 import { LANGUAGES, THEMES } from "../config";
 
@@ -73,6 +75,7 @@ function Editor() {
 
   // Editor Settings State
   const [showSettings, setShowSettings] = useState(false);
+  const [showGistModal, setShowGistModal] = useState(false);
   const [settings, setSettings] = useState(() => {
     const saved = localStorage.getItem("app-editor-settings");
     return saved ? JSON.parse(saved) : { fontSize: 16, tabSize: 4, wordWrap: false };
@@ -469,6 +472,15 @@ function Editor() {
             </button>
             {!isMobile && (
               <>
+                <button
+                  onClick={() => setShowGistModal(true)}
+                  style={{ width: "32px", height: "32px", color: "var(--text-main)", background: "transparent", border: "none", borderRadius: "6px", cursor: "pointer", transition: "all 0.2s" }}
+                  onMouseOver={(e) => (e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.05)")}
+                  onMouseOut={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
+                  title="Export to GitHub Gist"
+                >
+                  <Github size={18} />
+                </button>
                 <div style={{ width: "1px", height: "18px", backgroundColor: "var(--border-color)", margin: "0 2px" }} />
                 <button
                   onClick={downloadCode}
@@ -757,6 +769,14 @@ function Editor() {
         onClose={() => setShowSettings(false)}
         settings={settings}
         onSettingsChange={setSettings}
+      />
+
+      <GistModal
+        isOpen={showGistModal}
+        onClose={() => setShowGistModal(false)}
+        code={codeRef.current}
+        language={language}
+        fileName={`${roomId}.${language === 'javascript' ? 'js' : language === 'python' ? 'py' : 'txt'}`}
       />
     </div>
   );

@@ -61,7 +61,7 @@ const cursorPlugin = (remoteCursors) => ViewPlugin.fromClass(class {
   }
   getDecorations(view) {
     const widgets = [];
-    for (const [socketId, data] of Object.entries(remoteCursors)) {
+    for (const [, data] of Object.entries(remoteCursors)) {
       if (data.pos !== undefined && data.pos <= view.state.doc.length) {
         widgets.push(Decoration.widget({
           widget: new CursorWidget(data.userName, data.color),

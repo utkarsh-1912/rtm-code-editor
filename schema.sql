@@ -1,0 +1,22 @@
+CREATE TABLE IF NOT EXISTS rooms (
+    id SERIAL PRIMARY KEY,
+    room_id VARCHAR(255) UNIQUE NOT NULL,
+    code TEXT,
+    language VARCHAR(50),
+    chat_history JSONB DEFAULT '[]',
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS users (
+    id SERIAL PRIMARY KEY,
+    email VARCHAR(255) UNIQUE NOT NULL,
+    name VARCHAR(255),
+    auth_provider_id VARCHAR(255) UNIQUE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS user_rooms (
+    user_id INTEGER REFERENCES users(id),
+    room_id INTEGER REFERENCES rooms(id),
+    PRIMARY KEY (user_id, room_id)
+);

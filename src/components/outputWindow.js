@@ -6,9 +6,10 @@ import "react-reflex/styles.css";
 export default function OutputWindow({ output, isError, time, isMobile, stdin, setStdin }) {
     const renderStdin = () => (
         <div style={{
+            flex: 1,
             display: "flex",
             flexDirection: "column",
-            height: "100%",
+            minHeight: "150px", // Ensure it has a minimum presence
             borderBottom: isMobile ? "2px solid var(--bg-dark)" : "none",
         }}>
             <div style={{ padding: "6px 16px", backgroundColor: "var(--bg-card)", borderBottom: "1px solid var(--border-color)", color: "var(--text-muted)", fontWeight: "600", fontSize: "13px" }}>
@@ -29,6 +30,7 @@ export default function OutputWindow({ output, isError, time, isMobile, stdin, s
                     outline: "none",
                     fontFamily: "monospace",
                     fontSize: "14px",
+                    overflowY: "auto" // Explicitly allow scrolling
                 }}
             />
         </div>

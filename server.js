@@ -4,11 +4,24 @@ const http = require("http");
 const path = require("path");
 const { Server } = require("socket.io");
 const ACTIONS = require("./src/Action");
+const db = require("./src/db");
 
 const server = http.createServer(app);
 const io = new Server(server);
 
 app.use(express.static("build"));
+
+// API Routes
+app.get("/api/recent-rooms", async (req, res) => {
+  try {
+    const rooms = await db.getRecentRooms(req.query.email);
+    res.json(rooms);
+  } catch (err) {
+    console.error("API Error:", err);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+});
+
 app.use((req, res, next) => {
   res.sendFile(__dirname + "/build/index.html");
 });
@@ -29,9 +42,31 @@ const getAllClients = (roomId) => {
 
 io.on("connection", (socket) => {
   console.log("Connected Socket : ", socket.id);
-  socket.on(ACTIONS.JOIN, ({ roomId, userName }) => {
+  socket.on(ACTIONS.JOIN, async ({ roomId, userName }) => {
     userSocketMap[socket.id] = userName;
     socket.join(roomId);
+
+    // Load or Initialize Room from DB
+    let room;
+    try {
+      room = await db.getRoom(roomId);
+      if (room) {
+        // Load code into memory if not already there (optional, but good for sync)
+        if (!roomChatHistory[roomId]) {
+          roomChatHistory[roomId] = room.chat_history || [];
+        }
+        // Send existing code to the joining user
+        if (room.code) {
+          socket.emit(ACTIONS.CODE_CHANGE, { code: room.code });
+        }
+      } else {
+        // New room, create entry
+        await db.saveRoom(roomId, "", "javascript", []);
+      }
+    } catch (err) {
+      console.error("DB Join Error:", err);
+    }
+
     const clients = getAllClients(roomId);
     clients.forEach(({ socketId }) => {
       io.to(socketId).emit(ACTIONS.JOINED, {
@@ -42,15 +77,18 @@ io.on("connection", (socket) => {
     });
 
     // Sync chat history to the joining user
-    if (roomChatHistory[roomId]) {
+    const history = roomChatHistory[roomId] || (room && room.chat_history) || [];
+    if (history.length > 0) {
       socket.emit(ACTIONS.SYNC_CHAT, {
-        messages: roomChatHistory[roomId],
+        messages: history,
       });
     }
   });
 
   socket.on(ACTIONS.CODE_CHANGE, ({ roomId, code }) => {
     socket.in(roomId).emit(ACTIONS.CODE_CHANGE, { code });
+    // Save to DB asynchronously
+    db.updateRoomCode(roomId, code).catch(err => console.error("DB Code Update Error:", err));
   });
 
   socket.on(ACTIONS.SYNC_CODE, ({ socketId, code }) => {
@@ -84,6 +122,9 @@ io.on("connection", (socket) => {
     if (roomChatHistory[roomId].length > 50) roomChatHistory[roomId].shift(); // Cap history
 
     socket.in(roomId).emit(ACTIONS.RECEIVE_MESSAGE, message);
+
+    // Save to DB
+    db.updateRoomChat(roomId, roomChatHistory[roomId]).catch(err => console.error("DB Chat Update Error:", err));
   });
 
   socket.on(ACTIONS.EDIT_MESSAGE, ({ roomId, messageId, newText }) => {
