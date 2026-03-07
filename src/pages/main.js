@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from "react";
-import { v4 as uuid } from "uuid";
 import toast from "react-hot-toast";
-import { useNavigate } from "react-router-dom";
-import { Sun, Moon, Zap, Users, Code, Terminal, ChevronRight } from "lucide-react";
+import { useNavigate, useLocation } from "react-router-dom";
+import { Sun, Moon, Zap, Users, Code, Terminal, ChevronRight, Copy } from "lucide-react";
 
 function HomePage() {
   const navigate = useNavigate();
@@ -11,6 +10,17 @@ function HomePage() {
   const [isLightMode, setIsLightMode] = useState(() => {
     return localStorage.getItem("app-theme") === "light";
   });
+
+  const location = useLocation();
+
+  useEffect(() => {
+    // Check for room ID in URL params
+    const searchParams = new URLSearchParams(location.search);
+    const roomParam = searchParams.get("room");
+    if (roomParam) {
+      setRoomId(roomParam);
+    }
+  }, [location]);
 
   useEffect(() => {
     if (isLightMode) {
@@ -24,7 +34,11 @@ function HomePage() {
 
   function createNewRoom(e) {
     e.preventDefault();
-    const id = uuid();
+    const chars = "abcdefghijklmnopqrstuvwxyz0123456789";
+    let id = "";
+    for (let i = 0; i < 8; i++) {
+      id += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
     setRoomId(id);
     toast.success("New Room Created !!", { iconTheme: { primary: "var(--primary)" } });
   }

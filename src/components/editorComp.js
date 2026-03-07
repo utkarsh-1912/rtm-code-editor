@@ -1,4 +1,5 @@
 import React, { useEffect } from "react";
+import { Download } from "lucide-react";
 import CodeMirror from "@uiw/react-codemirror";
 import { javascript } from "@codemirror/lang-javascript";
 import { python } from "@codemirror/lang-python";
@@ -82,28 +83,54 @@ function EditorComp({
           </div>
         </div>
 
-        <select
-          value={language}
-          onChange={(e) => onLanguageChange(e.target.value)}
-          style={{
-            backgroundColor: "var(--secondary)",
-            border: "1px solid var(--border-color)",
-            color: "var(--text-muted)",
-            fontSize: "12px",
-            fontWeight: "500",
-            outline: "none",
-            cursor: "pointer",
-            padding: "4px 10px",
-            borderRadius: "6px",
-            transition: "all 0.2s"
-          }}
-          onMouseOver={(e) => e.target.style.borderColor = "var(--primary)"}
-          onMouseOut={(e) => e.target.style.borderColor = "var(--border-color)"}
-        >
-          {LANGUAGES.map(l => (
-            <option key={l.value} value={l.value} style={{ backgroundColor: "var(--bg-card)", color: "var(--text-main)" }}>{l.name}</option>
-          ))}
-        </select>
+        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+          {isMobile && (
+            <button
+              onClick={onDownload}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                width: "32px",
+                height: "32px",
+                color: "var(--text-muted)",
+                backgroundColor: "var(--secondary)",
+                borderRadius: "6px",
+                border: "1px solid var(--border-color)",
+                cursor: "pointer",
+                transition: "all 0.2s"
+              }}
+              onMouseOver={(e) => e.currentTarget.style.borderColor = "var(--primary)"}
+              onMouseOut={(e) => e.currentTarget.style.borderColor = "var(--border-color)"}
+              title="Download Code"
+            >
+              <Download size={16} />
+            </button>
+          )}
+
+          <select
+            value={language}
+            onChange={(e) => onLanguageChange(e.target.value)}
+            style={{
+              backgroundColor: "var(--secondary)",
+              border: "1px solid var(--border-color)",
+              color: "var(--text-muted)",
+              fontSize: "12px",
+              fontWeight: "500",
+              outline: "none",
+              cursor: "pointer",
+              padding: "4px 10px",
+              borderRadius: "6px",
+              transition: "all 0.2s"
+            }}
+            onMouseOver={(e) => e.target.style.borderColor = "var(--primary)"}
+            onMouseOut={(e) => e.target.style.borderColor = "var(--border-color)"}
+          >
+            {LANGUAGES.map(l => (
+              <option key={l.value} value={l.value} style={{ backgroundColor: "var(--bg-card)", color: "var(--text-main)" }}>{l.name}</option>
+            ))}
+          </select>
+        </div>
 
       </div>
 

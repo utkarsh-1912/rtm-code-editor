@@ -18,7 +18,8 @@ import {
   Pause,
   MessageSquare,
   Terminal,
-  Code
+  Code,
+  Share2
 } from "lucide-react";
 import { ReflexContainer, ReflexSplitter, ReflexElement } from "react-reflex";
 import "react-reflex/styles.css";
@@ -223,7 +224,7 @@ function Editor() {
   }, [activeTab, isChatCollapsed, isMobile]);
 
   if (!location.state) {
-    return <Navigate to="/" />;
+    return <Navigate to={`/?room=${roomId}`} />;
   }
 
   const copyRoomId = async () => {
@@ -240,6 +241,16 @@ function Editor() {
 
   const leaveRoom = () => {
     reactNavigator("/");
+  };
+
+  const handleShare = async () => {
+    const shareUrl = `${window.location.origin}/?room=${roomId}`;
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+      toast.success("Share link copied to clipboard!");
+    } catch (err) {
+      toast.error("Failed to copy link");
+    }
   };
 
   const handleCompile = async () => {
@@ -405,6 +416,15 @@ function Editor() {
             >
               {isLightMode ? <Sun size={18} /> : <Moon size={18} />}
             </button>
+            <button
+              onClick={handleShare}
+              style={{ width: "32px", height: "32px", color: "var(--primary)", background: "transparent", border: "none", borderRadius: "6px", cursor: "pointer", transition: "all 0.2s" }}
+              onMouseOver={(e) => (e.currentTarget.style.backgroundColor = "rgba(59, 130, 246, 0.1)")}
+              onMouseOut={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
+              title="Share Room"
+            >
+              <Share2 size={18} />
+            </button>
             {!isMobile && (
               <>
                 <div style={{ width: "1px", height: "18px", backgroundColor: "var(--border-color)", margin: "0 2px" }} />
@@ -477,6 +497,7 @@ function Editor() {
                       isExecuting={isExecuting}
                       isLightMode={isLightMode}
                       isMobile={isMobile}
+                      onDownload={downloadCode}
                     />
                   )}
                   {activeTab === "output" && (
