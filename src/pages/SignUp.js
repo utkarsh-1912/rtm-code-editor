@@ -13,7 +13,7 @@ import { useAuth } from "../context/AuthContext";
 import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 
-const Login = () => {
+const SignUp = () => {
     const { loginWithGoogle, loginWithGitHub, user, loading } = useAuth();
     const navigate = useNavigate();
     const [isHovered, setIsHovered] = useState(null);
@@ -28,7 +28,7 @@ const Login = () => {
         try {
             if (provider === "google") await loginWithGoogle();
             if (provider === "github") await loginWithGitHub();
-            toast.success("Welcome back!");
+            toast.success("Welcome to the community!");
         } catch (error) {
             toast.error(`Authentication failed: ${error.message}`);
         }
@@ -66,31 +66,31 @@ const Login = () => {
                         style={{ width: "48px", height: "48px", marginBottom: "32px", borderRadius: "12px", boxShadow: "0 10px 20px rgba(0,0,0,0.2)" }}
                     />
                     <h1 style={{ fontSize: "48px", fontWeight: "900", lineHeight: 1.1, marginBottom: "24px", letterSpacing: "-0.04em" }}>
-                        The workspace for <br />
-                        <span style={{ background: "linear-gradient(to right, #60a5fa, #a78bfa)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>modern engineers.</span>
+                        Join the <br />
+                        <span style={{ background: "linear-gradient(to right, #60a5fa, #a78bfa)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>innovation hub.</span>
                     </h1>
                     <p style={{ fontSize: "18px", color: "rgba(255,255,255,0.6)", lineHeight: 1.6, marginBottom: "48px" }}>
-                        Experience the future of collaborative coding with real-time sync, lightning-fast execution, and integrated team communication.
+                        Experience the most powerful collaborative coding platform. Build together, scale faster, and connect with global developers.
                     </p>
 
                     <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
                         <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
                             <div style={{ background: "rgba(255,255,255,0.05)", padding: "12px", borderRadius: "12px", color: "#60a5fa" }}><Zap size={20} /></div>
-                            <span style={{ fontSize: "16px", fontWeight: "600" }}>Sub-millisecond latency sync</span>
+                            <span style={{ fontSize: "16px", fontWeight: "600" }}>Limitless real-time sync</span>
                         </div>
                         <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
                             <div style={{ background: "rgba(255,255,255,0.05)", padding: "12px", borderRadius: "12px", color: "#4ade80" }}><Globe size={20} /></div>
-                            <span style={{ fontSize: "16px", fontWeight: "600" }}>Multi-language cloud execution</span>
+                            <span style={{ fontSize: "16px", fontWeight: "600" }}>Global infrastructure access</span>
                         </div>
                         <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
                             <div style={{ background: "rgba(255,255,255,0.05)", padding: "12px", borderRadius: "12px", color: "#f87171" }}><Lock size={20} /></div>
-                            <span style={{ fontSize: "16px", fontWeight: "600" }}>End-to-end encrypted sessions</span>
+                            <span style={{ fontSize: "16px", fontWeight: "600" }}>Secure, team-based workspaces</span>
                         </div>
                     </div>
                 </div>
 
                 <div style={{ position: "absolute", bottom: "40px", left: "80px", color: "rgba(255,255,255,0.3)", fontSize: "13px" }}>
-                    &copy; 2026 Utkristi Colabs. Built for high-performance teams.
+                    &copy; 2026 Utkristi Colabs. Empowering builders everywhere.
                 </div>
             </div>
 
@@ -126,8 +126,8 @@ const Login = () => {
 
                 <div style={{ maxWidth: "400px", width: "100%", margin: "0 auto" }}>
                     <div style={{ marginBottom: "40px" }}>
-                        <h2 style={{ fontSize: "32px", fontWeight: "800", marginBottom: "8px", letterSpacing: "-0.02em" }}>Welcome Back</h2>
-                        <p style={{ color: "var(--text-muted)", fontSize: "15px" }}>Login to your account to sync your work.</p>
+                        <h2 style={{ fontSize: "32px", fontWeight: "800", marginBottom: "8px", letterSpacing: "-0.02em" }}>Sign In</h2>
+                        <p style={{ color: "var(--text-muted)", fontSize: "15px" }}>Join Utkristi Colabs to sync your work across devices.</p>
                     </div>
 
                     <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
@@ -192,7 +192,7 @@ const Login = () => {
                     </div>
 
                     <p style={{ textAlign: "center", marginTop: "40px", fontSize: "14px", color: "var(--text-muted)" }}>
-                        Don't have an account? <span onClick={() => navigate("/signup")} style={{ color: "var(--primary)", fontWeight: "700", cursor: "pointer" }}>Sign In</span>
+                        Already have an account? <span onClick={() => navigate("/login")} style={{ color: "var(--primary)", fontWeight: "700", cursor: "pointer" }}>Login</span>
                     </p>
                 </div>
             </div>
@@ -216,4 +216,4 @@ const Login = () => {
     );
 };
 
-export default Login;
+export default SignUp;
