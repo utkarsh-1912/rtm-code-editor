@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import toast from "react-hot-toast";
 import { useNavigate, useLocation } from "react-router-dom";
-import { Sun, Moon, Zap, Users, Code, Terminal, ChevronRight, Copy } from "lucide-react";
+import { Sun, Moon, Zap, Users, Code, Terminal, ChevronRight } from "lucide-react";
 
 function HomePage() {
   const navigate = useNavigate();
