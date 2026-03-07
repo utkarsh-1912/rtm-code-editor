@@ -106,7 +106,7 @@ function HomePage() {
           <button
             onClick={() => navigate("/login")}
             style={{
-              padding: "10px 24px",
+              padding: "10px 12px",
               backgroundColor: "transparent",
               border: "1px solid var(--border-color)",
               borderRadius: "12px",
