@@ -59,7 +59,7 @@ function Editor() {
   const [execTime, setExecTime] = useState(undefined);
   const [isExecuting, setIsExecuting] = useState(false);
   const [socketConnected, setSocketConnected] = useState(false);
-  const [isWakingUp, setIsWakingUp] = useState(true);
+  const [showLoading, setShowLoading] = useState(false);
   const [isChatCollapsed, setIsChatCollapsed] = useState(false);
   const [isLightMode, setIsLightMode] = useState(() => {
     return localStorage.getItem("app-theme") === "light";
@@ -149,22 +149,39 @@ function Editor() {
 
   useEffect(() => {
     const init = async () => {
+      // Helper to get sanitized backend URL
+      const getBackendUrl = () => {
+        let url = process.env.REACT_APP_BACKEND_URL || window.location.origin;
+        if (url.endsWith("/")) url = url.slice(0, -1);
+        // Ensure it doesn't just result in "https:" or similar malformed strings
+        if (url === "https:" || url === "http:") url = window.location.origin;
+        return url;
+      };
+
+      const backendUrl = getBackendUrl();
+
       // Wake up the server if it's sleeping (Render)
       const wakeServer = async () => {
-        const backendUrl = process.env.REACT_APP_BACKEND_URL || window.location.origin;
+        // Fast-path: check if server is already alive without showing loader immediately
+        const loadingTimeout = setTimeout(() => setShowLoading(true), 1200);
+
         let retries = 0;
-        const maxRetries = 20; // 20s total wait
+        const maxRetries = 20;
 
         while (retries < maxRetries) {
           try {
             const resp = await fetch(`${backendUrl}/api/ping`);
-            if (resp.ok) return true;
+            if (resp.ok) {
+              clearTimeout(loadingTimeout);
+              return true;
+            }
           } catch (e) {
             // Ignore and retry
           }
           retries++;
           await new Promise(r => setTimeout(r, 1000));
         }
+        clearTimeout(loadingTimeout);
         return false;
       };
 
@@ -175,7 +192,7 @@ function Editor() {
         return;
       }
 
-      setIsWakingUp(false);
+      setShowLoading(false); // Ensure loader is gone once alive
       socketRef.current = await initSocket();
       setSocketConnected(true);
       socketRef.current.on("connect_error", (err) => handleErrors(err));
@@ -834,7 +851,9 @@ function Editor() {
             )}
           </>
         ) : (
-          <LoadingScreen isLightMode={isLightMode} />
+          showLoading ? <LoadingScreen isLightMode={isLightMode} /> : (
+            <div style={{ height: "100%", width: "100%", backgroundColor: "var(--bg-dark)" }} />
+          )
         )}
       </div>
 

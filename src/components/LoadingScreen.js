@@ -1,17 +1,17 @@
 import React, { useState, useEffect } from "react";
 import { Zap, Shield, Cpu, Globe } from "lucide-react";
 
+const statuses = [
+    "Initializing global core...",
+    "Establishing secure handshake...",
+    "Warming up distributed nodes...",
+    "Synchronizing workspace protocols...",
+    "Finalizing quantum link..."
+];
+
 const LoadingScreen = ({ isLightMode }) => {
     const [progress, setProgress] = useState(0);
     const [statusIndex, setStatusIndex] = useState(0);
-
-    const statuses = [
-        "Initializing global core...",
-        "Establishing secure handshake...",
-        "Warming up distributed nodes...",
-        "Synchronizing workspace protocols...",
-        "Finalizing quantum link..."
-    ];
 
     useEffect(() => {
         const interval = setInterval(() => {

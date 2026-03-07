@@ -21,7 +21,13 @@ import ErrorBoundary from "./components/ErrorBoundary";
 function App() {
   useEffect(() => {
     // Global Wake-up: Ping the backend to start spin-up on Render
-    const backendUrl = process.env.REACT_APP_BACKEND_URL || window.location.origin;
+    const getBackendUrl = () => {
+      let url = process.env.REACT_APP_BACKEND_URL || window.location.origin;
+      if (url.endsWith("/")) url = url.slice(0, -1);
+      if (url === "https:" || url === "http:") url = window.location.origin;
+      return url;
+    };
+    const backendUrl = getBackendUrl();
     fetch(`${backendUrl}/api/ping`).catch(() => { });
 
     const savedTheme = localStorage.getItem("app-theme");
