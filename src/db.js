@@ -51,17 +51,71 @@ async function updateRoomChat(roomId, chatHistory) {
 }
 
 /**
- * Get Recent Rooms for a User
+ * Find or Create User from Firebase profile
  */
-async function getRecentRooms(userEmail) {
-    // In a real scenario, we'd join with a user_rooms table.
-    // For now, let's fetch recently updated rooms.
-    return await sql`
-        SELECT room_id, language, updated_at 
-        FROM rooms 
-        ORDER BY updated_at DESC 
-        LIMIT 10
+async function findOrCreateUser(firebaseUser) {
+    const { uid, email, name } = firebaseUser;
+    // Check if user exists
+    const users = await sql`SELECT * FROM users WHERE auth_provider_id = ${uid}`;
+    if (users.length > 0) return users[0];
+
+    // Create new user
+    const newUser = await sql`
+        INSERT INTO users (email, name, auth_provider_id)
+        VALUES (${email}, ${name}, ${uid})
+        RETURNING *
     `;
+    return newUser[0];
+}
+
+/**
+ * Link a room to a user for persistence
+ */
+async function linkRoomToUser(userId, roomId) {
+    // Get numeric IDs
+    const user = await sql`SELECT id FROM users WHERE auth_provider_id = ${userId}`;
+    const room = await sql`SELECT id FROM rooms WHERE room_id = ${roomId}`;
+
+    if (user.length && room.length) {
+        return await sql`
+            INSERT INTO user_rooms (user_id, room_id)
+            VALUES (${user[0].id}, ${room[0].id})
+            ON CONFLICT DO NOTHING
+        `;
+    }
+}
+
+/**
+ * Get full dashboard data for a user
+ */
+async function getUserDashboard(userId) {
+    const user = await sql`SELECT id FROM users WHERE auth_provider_id = ${userId}`;
+    if (!user.length) return { rooms: [], stats: { totalRooms: 0, sessions: 0, hours: 0 } };
+
+    const rooms = await sql`
+        SELECT r.room_id, r.language, r.updated_at 
+        FROM rooms r
+        JOIN user_rooms ur ON r.id = ur.room_id
+        WHERE ur.user_id = ${user[0].id}
+        ORDER BY r.updated_at DESC
+    `;
+
+    // Mocking some stats for now, could be calculated from history
+    const stats = {
+        totalRooms: rooms.length,
+        sessions: Math.ceil(rooms.length * 1.5),
+        hours: Math.floor(rooms.length * 2.5)
+    };
+
+    return {
+        rooms: rooms.map(r => ({
+            id: r.room_id,
+            name: r.room_id,
+            lang: r.language,
+            lastActive: new Date(r.updated_at).toLocaleString()
+        })),
+        stats
+    };
 }
 
 module.exports = {
@@ -69,5 +123,7 @@ module.exports = {
     saveRoom,
     updateRoomCode,
     updateRoomChat,
-    getRecentRooms
+    findOrCreateUser,
+    linkRoomToUser,
+    getUserDashboard
 };

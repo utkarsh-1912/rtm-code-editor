@@ -8,15 +8,17 @@ export default function ContentLayout({ title, children }) {
         return localStorage.getItem("app-theme") === "light";
     });
 
-    useEffect(() => {
-        if (isLightMode) {
+    const toggleTheme = () => {
+        const newMode = !isLightMode;
+        setIsLightMode(newMode);
+        if (newMode) {
             document.documentElement.classList.add("light-theme");
             localStorage.setItem("app-theme", "light");
         } else {
             document.documentElement.classList.remove("light-theme");
             localStorage.setItem("app-theme", "dark");
         }
-    }, [isLightMode]);
+    };
 
     return (
         <div style={{
@@ -65,7 +67,7 @@ export default function ContentLayout({ title, children }) {
                 </button>
 
                 <button
-                    onClick={() => setIsLightMode(!isLightMode)}
+                    onClick={toggleTheme}
                     style={{
                         display: "flex",
                         alignItems: "center",

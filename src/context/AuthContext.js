@@ -1,8 +1,10 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-/* 
-NOTE: In a production environment, you would use Firebase or a similar Auth provider.
-This context is prepared to bridge with Firebase.
-*/
+import {
+    onAuthStateChanged,
+    signInWithPopup,
+    signOut
+} from 'firebase/auth';
+import { auth, googleProvider, githubProvider } from '../firebase';
 
 const AuthContext = createContext();
 
@@ -11,26 +13,57 @@ export const AuthProvider = ({ children }) => {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        // Prepare for Firebase onAuthStateChanged integration
-        const storedUser = localStorage.getItem('rtm_user');
-        if (storedUser) {
-            setUser(JSON.parse(storedUser));
-        }
-        setLoading(false);
+        const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+            if (firebaseUser) {
+                setUser({
+                    uid: firebaseUser.uid,
+                    name: firebaseUser.displayName,
+                    email: firebaseUser.email,
+                    photoURL: firebaseUser.photoURL
+                });
+            } else {
+                setUser(null);
+            }
+            setLoading(false);
+        });
+
+        return () => unsubscribe();
     }, []);
 
-    const login = (userData) => {
-        setUser(userData);
-        localStorage.setItem('rtm_user', JSON.stringify(userData));
+    const loginWithGoogle = async () => {
+        try {
+            await signInWithPopup(auth, googleProvider);
+        } catch (error) {
+            console.error("Google Auth Error:", error);
+            throw error;
+        }
     };
 
-    const logout = () => {
-        setUser(null);
-        localStorage.removeItem('rtm_user');
+    const loginWithGitHub = async () => {
+        try {
+            await signInWithPopup(auth, githubProvider);
+        } catch (error) {
+            console.error("GitHub Auth Error:", error);
+            throw error;
+        }
+    };
+
+    const logout = async () => {
+        try {
+            await signOut(auth);
+        } catch (error) {
+            console.error("Sign Out Error:", error);
+        }
     };
 
     return (
-        <AuthContext.Provider value={{ user, login, logout, loading }}>
+        <AuthContext.Provider value={{
+            user,
+            loginWithGoogle,
+            loginWithGitHub,
+            logout,
+            loading
+        }}>
             {children}
         </AuthContext.Provider>
     );

@@ -5,22 +5,28 @@ import { Github, Mail, Code } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 const Login = () => {
-    const { login } = useAuth();
+    const { loginWithGoogle, loginWithGitHub, user } = useAuth();
     const navigate = useNavigate();
     const [isHovered, setIsHovered] = useState(null);
 
-    const handleMockLogin = (provider) => {
-        // Mocking user data. In production, this would be Firebase auth result.
-        const mockUser = {
-            uid: '12345',
-            name: 'Demo User',
-            email: 'demo@example.com',
-            photoURL: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Demo',
-            provider
-        };
-        login(mockUser);
-        toast.success(`Signed in with ${provider}! Redirecting...`);
-        setTimeout(() => navigate('/dashboard'), 1500);
+    // Redirect if already logged in
+    React.useEffect(() => {
+        if (user) {
+            navigate('/dashboard');
+        }
+    }, [user, navigate]);
+
+    const handleLogin = async (provider) => {
+        try {
+            if (provider === 'Google') {
+                await loginWithGoogle();
+            } else if (provider === 'GitHub') {
+                await loginWithGitHub();
+            }
+            toast.success(`Signed in with ${provider}!`);
+        } catch (error) {
+            toast.error(`Authentication failed: ${error.message}`);
+        }
     };
 
     const socialButtonStyle = (id) => ({
@@ -54,12 +60,13 @@ const Login = () => {
             <div style={{
                 width: '100%',
                 maxWidth: '400px',
-                backgroundColor: 'rgba(30, 41, 59, 0.7)',
+                backgroundColor: 'var(--bg-card)',
                 padding: '40px',
                 borderRadius: '24px',
                 border: '1px solid var(--border-color)',
                 backdropFilter: 'blur(10px)',
-                textAlign: 'center'
+                textAlign: 'center',
+                boxShadow: '0 20px 40px rgba(0, 0, 0, 0.1)'
             }}>
                 <div style={{
                     display: 'inline-flex',
@@ -81,7 +88,7 @@ const Login = () => {
                 <button
                     onMouseEnter={() => setIsHovered('google')}
                     onMouseLeave={() => setIsHovered(null)}
-                    onClick={() => handleMockLogin('Google')}
+                    onClick={() => handleLogin('Google')}
                     style={socialButtonStyle('google')}
                 >
                     <Mail size={20} />
@@ -91,7 +98,7 @@ const Login = () => {
                 <button
                     onMouseEnter={() => setIsHovered('github')}
                     onMouseLeave={() => setIsHovered(null)}
-                    onClick={() => handleMockLogin('GitHub')}
+                    onClick={() => handleLogin('GitHub')}
                     style={socialButtonStyle('github')}
                 >
                     <Github size={20} />
@@ -105,7 +112,7 @@ const Login = () => {
                     fontSize: '14px',
                     color: 'var(--text-muted)'
                 }}>
-                    Don't have an account? <span style={{ color: 'var(--primary)', cursor: 'pointer' }} onClick={() => handleMockLogin('Guest')}>Join as Guest</span>
+                    Don't have an account? <span style={{ color: 'var(--primary)', cursor: 'pointer' }} onClick={() => navigate('/')}>Join as Guest</span>
                 </div>
             </div>
         </div>

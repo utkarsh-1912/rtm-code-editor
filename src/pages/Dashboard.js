@@ -15,33 +15,37 @@ import {
 import toast from 'react-hot-toast';
 
 const Dashboard = () => {
-    const { user, logout } = useAuth();
+    const { user, logout, loading } = useAuth();
     const navigate = useNavigate();
     const [recentRooms, setRecentRooms] = useState([]);
     const [loadingRooms, setLoadingRooms] = useState(true);
+    const [stats, setStats] = useState({ totalRooms: 0, sessions: 0, hours: 0 });
+
+    useEffect(() => {
+        if (!loading && !user) {
+            navigate('/login');
+        }
+    }, [user, loading, navigate]);
 
     useEffect(() => {
         if (!user) return;
 
-        const fetchRecentRooms = async () => {
+        const fetchDashboardData = async () => {
             try {
-                const response = await fetch(`/api/recent-rooms?email=${user.email}`);
+                const response = await fetch(`/api/user-dashboard?userId=${user.uid}`);
                 const data = await response.json();
-                setRecentRooms(data.map(r => ({
-                    id: r.room_id,
-                    name: r.room_id, // Default to room ID if name not stored separately
-                    lang: r.language,
-                    lastActive: new Date(r.updated_at).toLocaleString()
-                })));
+
+                setRecentRooms(data.rooms || []);
+                setStats(data.stats || { totalRooms: 0, sessions: 0, hours: 0 });
             } catch (err) {
-                console.error("Failed to fetch rooms:", err);
-                toast.error("Could not load recent rooms");
+                console.error("Dashboard Fetch Error:", err);
+                toast.error("Failed to load your workspace data.");
             } finally {
                 setLoadingRooms(false);
             }
         };
 
-        fetchRecentRooms();
+        fetchDashboardData();
     }, [user]);
 
     const handleLogout = () => {
@@ -50,9 +54,12 @@ const Dashboard = () => {
         navigate('/');
     };
 
-    if (!user) {
-        navigate('/login');
-        return null;
+    if (loading || !user) {
+        return (
+            <div style={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'var(--bg-dark)' }}>
+                <div style={{ color: 'var(--primary)', fontSize: '1.2rem', fontWeight: 'bold' }}>Loading your space...</div>
+            </div>
+        );
     }
 
     return (
@@ -69,7 +76,7 @@ const Dashboard = () => {
                 top: 0,
                 bottom: 0,
                 width: '260px',
-                backgroundColor: 'rgba(15, 23, 42, 0.95)',
+                backgroundColor: 'var(--secondary)',
                 borderRight: '1px solid var(--border-color)',
                 padding: '24px',
                 display: 'flex',
@@ -154,23 +161,24 @@ const Dashboard = () => {
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '24px', marginBottom: '40px' }}>
                     <div style={statCardStyle()}>
                         <span style={{ color: 'var(--text-muted)', fontSize: '14px' }}>Total Rooms</span>
-                        <span style={{ fontSize: '28px', fontWeight: '700' }}>12</span>
+                        <span style={{ fontSize: '28px', fontWeight: '700' }}>{stats.totalRooms}</span>
                     </div>
                     <div style={statCardStyle()}>
                         <span style={{ color: 'var(--text-muted)', fontSize: '14px' }}>Active Sessions</span>
-                        <span style={{ fontSize: '28px', fontWeight: '700' }}>3</span>
+                        <span style={{ fontSize: '28px', fontWeight: '700' }}>{stats.sessions}</span>
                     </div>
                     <div style={statCardStyle()}>
                         <span style={{ color: 'var(--text-muted)', fontSize: '14px' }}>Collaboration Hours</span>
-                        <span style={{ fontSize: '28px', fontWeight: '700' }}>48h</span>
+                        <span style={{ fontSize: '28px', fontWeight: '700' }}>{stats.hours}h</span>
                     </div>
                 </div>
 
                 <div style={{
-                    backgroundColor: 'rgba(30, 41, 59, 0.5)',
+                    backgroundColor: 'var(--bg-card)',
                     borderRadius: '20px',
                     border: '1px solid var(--border-color)',
-                    padding: '32px'
+                    padding: '32px',
+                    boxShadow: '0 4px 20px rgba(0, 0, 0, 0.05)'
                 }}>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
                         <h2 style={{ fontSize: '20px', fontWeight: '600' }}>Recent Rooms</h2>
@@ -205,7 +213,7 @@ const Dashboard = () => {
                                         alignItems: 'center',
                                         justifyContent: 'space-between',
                                         padding: '16px 20px',
-                                        backgroundColor: 'rgba(15, 23, 42, 0.5)',
+                                        backgroundColor: 'var(--bg-dark)',
                                         borderRadius: '12px',
                                         border: '1px solid var(--border-color)',
                                         cursor: 'pointer',
@@ -268,10 +276,11 @@ const navItemStyle = (active) => ({
 });
 
 const statCardStyle = () => ({
-    backgroundColor: 'rgba(30, 41, 59, 0.5)',
+    backgroundColor: 'var(--bg-card)',
     padding: '24px',
     borderRadius: '20px',
     border: '1px solid var(--border-color)',
+    boxShadow: '0 4px 12px rgba(0,0,0,0.03)',
     display: 'flex',
     flexDirection: 'column',
     gap: '8px'

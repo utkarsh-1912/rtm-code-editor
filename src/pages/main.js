@@ -22,15 +22,17 @@ function HomePage() {
     }
   }, [location]);
 
-  useEffect(() => {
-    if (isLightMode) {
+  const toggleTheme = () => {
+    const newMode = !isLightMode;
+    setIsLightMode(newMode);
+    if (newMode) {
       document.documentElement.classList.add("light-theme");
       localStorage.setItem("app-theme", "light");
     } else {
       document.documentElement.classList.remove("light-theme");
       localStorage.setItem("app-theme", "dark");
     }
-  }, [isLightMode]);
+  };
 
   function createNewRoom(e) {
     e.preventDefault();
@@ -120,7 +122,7 @@ function HomePage() {
             Sign In
           </button>
           <button
-            onClick={() => setIsLightMode(!isLightMode)}
+            onClick={toggleTheme}
             style={{
               display: "flex",
               alignItems: "center",

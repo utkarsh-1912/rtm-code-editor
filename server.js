@@ -12,12 +12,16 @@ const io = new Server(server);
 app.use(express.static("build"));
 
 // API Routes
-app.get("/api/recent-rooms", async (req, res) => {
+// API Routes
+app.get("/api/user-dashboard", async (req, res) => {
   try {
-    const rooms = await db.getRecentRooms(req.query.email);
-    res.json(rooms);
+    const { userId } = req.query;
+    if (!userId) return res.status(400).json({ error: "User ID required" });
+
+    const dashboardData = await db.getUserDashboard(userId);
+    res.json(dashboardData);
   } catch (err) {
-    console.error("API Error:", err);
+    console.error("Dashboard API Error:", err);
     res.status(500).json({ error: "Internal Server Error" });
   }
 });
@@ -42,9 +46,19 @@ const getAllClients = (roomId) => {
 
 io.on("connection", (socket) => {
   console.log("Connected Socket : ", socket.id);
-  socket.on(ACTIONS.JOIN, async ({ roomId, userName }) => {
+  socket.on(ACTIONS.JOIN, async ({ roomId, userName, userProfile }) => {
     userSocketMap[socket.id] = userName;
     socket.join(roomId);
+
+    // If logged in, handle user persistence
+    if (userProfile && userProfile.uid) {
+      try {
+        await db.findOrCreateUser(userProfile);
+        await db.linkRoomToUser(userProfile.uid, roomId);
+      } catch (err) {
+        console.error("User Persistence Error:", err);
+      }
+    }
 
     // Load or Initialize Room from DB
     let room;

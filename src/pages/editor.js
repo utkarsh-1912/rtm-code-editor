@@ -97,15 +97,17 @@ function Editor() {
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
-  useEffect(() => {
-    if (isLightMode) {
+  const toggleTheme = () => {
+    const newMode = !isLightMode;
+    setIsLightMode(newMode);
+    if (newMode) {
       document.documentElement.classList.add("light-theme");
       localStorage.setItem("app-theme", "light");
     } else {
       document.documentElement.classList.remove("light-theme");
       localStorage.setItem("app-theme", "dark");
     }
-  }, [isLightMode]);
+  };
 
   const downloadCode = () => {
     const content = codeRef.current;
@@ -156,6 +158,7 @@ function Editor() {
       socketRef.current.emit(ACTIONS.JOIN, {
         roomId,
         userName: location.state?.userName,
+        userProfile: user,
       });
 
       socketRef.current.on(
@@ -444,7 +447,7 @@ function Editor() {
               <Settings size={18} />
             </button>
             <button
-              onClick={() => setIsLightMode(!isLightMode)}
+              onClick={toggleTheme}
               style={{ display: "flex", alignItems: "center", justifyContent: "center", width: "32px", height: "32px", color: isLightMode ? "#fbbf24" : "var(--text-muted)", backgroundColor: "transparent", borderRadius: "6px", border: "none", cursor: "pointer", transition: "all 0.2s" }}
               onMouseOver={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-card)")}
               onMouseOut={(e) => (e.currentTarget.style.backgroundColor = "transparent")}

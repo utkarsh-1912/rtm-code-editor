@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import "./App.css";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import HomePage from "./pages/main";
@@ -15,6 +16,15 @@ import OfflineBanner from "./components/OfflineBanner";
 import ErrorBoundary from "./components/ErrorBoundary";
 
 function App() {
+  useEffect(() => {
+    const savedTheme = localStorage.getItem("app-theme");
+    if (savedTheme === "light") {
+      document.documentElement.classList.add("light-theme");
+    } else {
+      document.documentElement.classList.remove("light-theme");
+    }
+  }, []);
+
   return (
     <ErrorBoundary>
       <AuthProvider>
