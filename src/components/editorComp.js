@@ -199,8 +199,8 @@ function EditorComp({
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                width: "32px",
-                height: "32px",
+                width: "24px",
+                height: "24px",
                 color: "var(--text-muted)",
                 backgroundColor: "var(--secondary)",
                 borderRadius: "6px",
@@ -212,7 +212,7 @@ function EditorComp({
               onMouseOut={(e) => e.currentTarget.style.borderColor = "var(--border-color)"}
               title="Download Code"
             >
-              <Download size={16} />
+              <Download size={12} />
             </button>
           )}
 

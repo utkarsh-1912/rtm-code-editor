@@ -69,40 +69,36 @@ const Dashboard = () => {
             color: 'var(--text-main)',
             fontFamily: 'Inter, sans-serif'
         }}>
-            {/* Sidebar */}
-            <div style={{
+            {/* Sidebar / Bottom Nav */}
+            <div className="dashboard-sidebar" style={{
                 position: 'fixed',
-                left: 0,
-                top: 0,
-                bottom: 0,
-                width: '260px',
                 backgroundColor: 'var(--secondary)',
                 borderRight: '1px solid var(--border-color)',
                 padding: '24px',
                 display: 'flex',
-                flexDirection: 'column',
-                zIndex: 100
+                zIndex: 100,
+                transition: 'all 0.3s'
             }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '40px' }}>
+                <div className="sidebar-logo" style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '40px' }}>
                     <div style={{ color: 'var(--primary)' }}>
                         <Code size={28} />
                     </div>
                     <span style={{ fontWeight: '700', fontSize: '1.2rem', letterSpacing: '-0.5px' }}>Utkristi Colabs</span>
                 </div>
 
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', flex: 1 }}>
+                <div className="sidebar-nav" style={{ display: 'flex', flexDirection: 'column', gap: '8px', flex: 1 }}>
                     <button style={navItemStyle(true)}>
-                        <Clock size={18} /> Recent Rooms
+                        <Clock size={18} /> <span className="nav-text">Recent Rooms</span>
                     </button>
                     <button style={navItemStyle(false)}>
-                        <User size={18} /> My Snippets
+                        <User size={18} /> <span className="nav-text">My Snippets</span>
                     </button>
                     <button style={navItemStyle(false)}>
-                        <Settings size={18} /> Account Settings
+                        <Settings size={18} /> <span className="nav-text">Account Settings</span>
                     </button>
                 </div>
 
-                <div style={{
+                <div className="sidebar-footer" style={{
                     marginTop: 'auto',
                     paddingTop: '20px',
                     borderTop: '1px solid var(--border-color)',
@@ -112,11 +108,11 @@ const Dashboard = () => {
                 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                         <img
-                            src={user.photoURL}
+                            src={user.photoURL || `https://ui-avatars.com/api/?name=${user.name}&background=random`}
                             alt="avatar"
                             style={{ width: '32px', height: '32px', borderRadius: '50%' }}
                         />
-                        <div style={{ display: 'flex', flexDirection: 'column', maxWidth: '120px' }}>
+                        <div className="user-info" style={{ display: 'flex', flexDirection: 'column', maxWidth: '120px' }}>
                             <span style={{ fontSize: '13px', fontWeight: '600', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user.name}</span>
                             <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Pro Account</span>
                         </div>
@@ -131,7 +127,7 @@ const Dashboard = () => {
             </div>
 
             {/* Main Content */}
-            <div style={{ marginLeft: '260px', padding: '48px' }}>
+            <div className="dashboard-content" style={{ padding: '48px', transition: 'all 0.3s' }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '40px' }}>
                     <div>
                         <h1 style={{ fontSize: '32px', fontWeight: '700', marginBottom: '8px' }}>Dashboard</h1>
@@ -254,6 +250,59 @@ const Dashboard = () => {
                     </div>
                 </div>
             </div>
+            <style>{`
+                .dashboard-sidebar {
+                    left: 0;
+                    top: 0;
+                    bottom: 0;
+                    width: 260px;
+                    flex-direction: column;
+                }
+                .dashboard-content {
+                    margin-left: 260px;
+                }
+                @media (max-width: 768px) {
+                    .dashboard-sidebar {
+                        left: 0;
+                        bottom: 0;
+                        top: auto;
+                        width: 100vw;
+                        height: 70px;
+                        flex-direction: row;
+                        padding: 0 20px;
+                        border-right: none;
+                        border-top: 1px solid var(--border-color);
+                        justify-content: space-around;
+                        align-items: center;
+                    }
+                    .sidebar-logo, .user-info, .sidebar-footer {
+                        display: none !important;
+                    }
+                    .sidebar-nav {
+                        flex-direction: row !important;
+                        justify-content: space-around !important;
+                        width: 100%;
+                    }
+                    .nav-text {
+                        display: none;
+                    }
+                    .sidebar-nav button {
+                        width: auto !important;
+                        justify-content: center !important;
+                        padding: 12px !important;
+                    }
+                    .dashboard-content {
+                        margin-left: 0 !important;
+                        padding: 30px 20px 100px !important;
+                    }
+                    .dashboard-content h1 {
+                        font-size: 24px !important;
+                    }
+                    .dashboard-content > div:nth-child(2) {
+                        grid-template-columns: 1fr !important;
+                    }
+                }
+            `}</style>
         </div>
     );
 };

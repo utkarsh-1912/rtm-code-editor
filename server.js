@@ -26,6 +26,32 @@ app.get("/api/user-dashboard", async (req, res) => {
   }
 });
 
+app.delete("/api/remove-room", async (req, res) => {
+  try {
+    const { userId, roomId } = req.body;
+    if (!userId || !roomId) return res.status(400).json({ error: "Missing required fields" });
+
+    await db.unlinkRoomFromUser(userId, roomId);
+    res.json({ success: true, message: "Room removed from workspace" });
+  } catch (err) {
+    console.error("Delete API Error:", err);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+});
+
+app.put("/api/rename-room", async (req, res) => {
+  try {
+    const { roomId, newName } = req.body;
+    if (!roomId || !newName) return res.status(400).json({ error: "Missing required fields" });
+
+    await db.updateRoomName(roomId, newName);
+    res.json({ success: true, message: "Room renamed successfully" });
+  } catch (err) {
+    console.error("Rename API Error:", err);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+});
+
 app.use((req, res, next) => {
   res.sendFile(__dirname + "/build/index.html");
 });

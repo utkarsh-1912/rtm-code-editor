@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import { ArrowLeft, Sun, Moon } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 

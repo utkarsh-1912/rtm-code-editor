@@ -69,6 +69,21 @@ async function findOrCreateUser(firebaseUser) {
 }
 
 /**
+ * Unlink a room from a user (Dashboard "Delete")
+ */
+async function unlinkRoomFromUser(userId, roomId) {
+    const user = await sql`SELECT id FROM users WHERE auth_provider_id = ${userId}`;
+    const room = await sql`SELECT id FROM rooms WHERE room_id = ${roomId}`;
+
+    if (user.length && room.length) {
+        return await sql`
+            DELETE FROM user_rooms 
+            WHERE user_id = ${user[0].id} AND room_id = ${room[0].id}
+        `;
+    }
+}
+
+/**
  * Link a room to a user for persistence
  */
 async function linkRoomToUser(userId, roomId) {
@@ -86,6 +101,17 @@ async function linkRoomToUser(userId, roomId) {
 }
 
 /**
+ * Rename a room
+ */
+async function updateRoomName(roomId, newName) {
+    return await sql`
+        UPDATE rooms 
+        SET name = ${newName}, updated_at = CURRENT_TIMESTAMP 
+        WHERE room_id = ${roomId}
+    `;
+}
+
+/**
  * Get full dashboard data for a user
  */
 async function getUserDashboard(userId) {
@@ -93,7 +119,7 @@ async function getUserDashboard(userId) {
     if (!user.length) return { rooms: [], stats: { totalRooms: 0, sessions: 0, hours: 0 } };
 
     const rooms = await sql`
-        SELECT r.room_id, r.language, r.updated_at 
+        SELECT r.room_id, r.name, r.language, r.updated_at 
         FROM rooms r
         JOIN user_rooms ur ON r.id = ur.room_id
         WHERE ur.user_id = ${user[0].id}
@@ -110,7 +136,7 @@ async function getUserDashboard(userId) {
     return {
         rooms: rooms.map(r => ({
             id: r.room_id,
-            name: r.room_id,
+            name: r.name || r.room_id,
             lang: r.language,
             lastActive: new Date(r.updated_at).toLocaleString()
         })),
@@ -125,5 +151,7 @@ module.exports = {
     updateRoomChat,
     findOrCreateUser,
     linkRoomToUser,
+    unlinkRoomFromUser,
+    updateRoomName,
     getUserDashboard
 };

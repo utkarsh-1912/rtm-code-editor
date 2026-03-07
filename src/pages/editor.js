@@ -21,7 +21,8 @@ import {
   Code,
   Share2,
   Settings,
-  Users
+  Users,
+  LayoutDashboard
 } from "lucide-react";
 import { ReflexContainer, ReflexSplitter, ReflexElement } from "react-reflex";
 import "react-reflex/styles.css";
@@ -240,7 +241,7 @@ function Editor() {
         socket.off(ACTIONS.DELETE_MESSAGE);
       }
     };
-  }, [roomId, location.state?.userName, reactNavigator]);
+  }, [roomId, location.state?.userName, reactNavigator, user]);
 
   // Reset unread count when chat is viewed
   useEffect(() => {
@@ -392,7 +393,48 @@ function Editor() {
         zIndex: 100
       }}>
         <div style={{ display: "flex", alignItems: "center", gap: isMobile ? "8px" : "14px" }}>
-          <img src="/utkristi-colabs.png" alt="Logo" style={{ height: isMobile ? "24px" : "32px", objectFit: "contain" }} />
+          <div
+            onClick={() => navigate("/")}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "8px",
+              cursor: "pointer",
+              backgroundColor: "rgba(59, 130, 246, 0.1)",
+              padding: "4px 8px",
+              borderRadius: "8px",
+              color: "var(--primary)"
+            }}
+          >
+            <Code size={isMobile ? 18 : 22} strokeWidth={3} />
+            {!isMobile && <span style={{ fontSize: "14px", fontWeight: "800" }}>Colabs</span>}
+          </div>
+
+          {user && !isMobile && (
+            <button
+              onClick={() => reactNavigator("/dashboard")}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "6px",
+                padding: "6px 12px",
+                backgroundColor: "transparent",
+                border: "1px solid var(--border-color)",
+                borderRadius: "8px",
+                color: "var(--text-muted)",
+                fontSize: "12px",
+                fontWeight: "600",
+                cursor: "pointer",
+                transition: "all 0.2s"
+              }}
+              onMouseOver={(e) => { e.currentTarget.style.borderColor = "var(--primary)"; e.currentTarget.style.color = "var(--primary)"; }}
+              onMouseOut={(e) => { e.currentTarget.style.borderColor = "var(--border-color)"; e.currentTarget.style.color = "var(--text-muted)"; }}
+            >
+              <LayoutDashboard size={14} />
+              Dashboard
+            </button>
+          )}
+
           {!isMobile && <div style={{ height: "20px", width: "1px", backgroundColor: "var(--border-color)" }} />}
           {!isMobile && (
             <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
@@ -590,7 +632,7 @@ function Editor() {
                 }}>
                   {[
                     { id: "code", icon: <Code size={20} />, label: "Code" },
-                    { id: "output", icon: <Terminal size={20} />, label: "Output" },
+                    { id: "output", icon: <Terminal size={20} />, label: "I/O" },
                     { id: "chat", icon: <MessageSquare size={20} />, label: "Chat" }
                   ].map((tab) => (
                     <button

@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from "react";
 import toast from "react-hot-toast";
 import { useNavigate, useLocation } from "react-router-dom";
-import { Sun, Moon, Zap, Users, Code, Terminal, ChevronRight } from "lucide-react";
+import { Sun, Moon, Zap, Users, Code, Terminal, ChevronRight, LayoutDashboard, Globe, Shield, HelpCircle, Github, Twitter, Linkedin } from "lucide-react";
+import { useAuth } from "../context/AuthContext";
 
 function HomePage() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [roomId, setRoomId] = useState("");
   const [userName, setUserName] = useState("");
   const [isLightMode, setIsLightMode] = useState(() => {
@@ -21,6 +23,13 @@ function HomePage() {
       setRoomId(roomParam);
     }
   }, [location]);
+
+  // Pre-fill username if logged in
+  useEffect(() => {
+    if (user && user.name) {
+      setUserName(user.name);
+    }
+  }, [user]);
 
   const toggleTheme = () => {
     const newMode = !isLightMode;
@@ -88,8 +97,8 @@ function HomePage() {
     }}>
 
       {/* BACKGROUND ELEMENTS */}
-      <div style={{ position: "absolute", top: "10%", left: "-5%", width: "40vw", height: "40vw", background: "radial-gradient(circle, rgba(59,130,246,0.1) 0%, rgba(0,0,0,0) 70%)", borderRadius: "50%", filter: "blur(60px)", zIndex: 0 }}></div>
-      <div style={{ position: "absolute", bottom: "10%", right: "-5%", width: "35vw", height: "35vw", background: "radial-gradient(circle, rgba(139,92,246,0.08) 0%, rgba(0,0,0,0) 70%)", borderRadius: "50%", filter: "blur(50px)", zIndex: 0 }}></div>
+      <div style={{ position: "absolute", top: "10%", left: "-5%", width: "40vw", height: "40vw", background: "radial-gradient(circle, rgba(59,130,246,0.12) 0%, rgba(0,0,0,0) 70%)", borderRadius: "50%", filter: "blur(80px)", zIndex: 0 }}></div>
+      <div style={{ position: "absolute", bottom: "20%", right: "-5%", width: "35vw", height: "35vw", background: "radial-gradient(circle, rgba(139,92,246,0.1) 0%, rgba(0,0,0,0) 70%)", borderRadius: "50%", filter: "blur(70px)", zIndex: 0 }}></div>
 
       {/* HEADER */}
       <header style={{
@@ -100,27 +109,57 @@ function HomePage() {
         position: "relative",
         zIndex: 10
       }}>
-        <img src="/utkristi-colabs.png" alt="Logo" style={{ height: "40px", filter: "drop-shadow(0px 4px 8px rgba(0,0,0,0.1))" }} />
+        <div style={{ display: "flex", alignItems: "center", gap: "10px", cursor: "pointer" }} onClick={() => navigate("/")}>
+          <div style={{ backgroundColor: "var(--primary)", padding: "8px", borderRadius: "12px", color: "white" }}>
+            <Code size={24} strokeWidth={3} />
+          </div>
+          <span style={{ fontSize: "20px", fontWeight: "800", letterSpacing: "-0.03em" }}>Utkristi Colabs</span>
+        </div>
 
         <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
-          <button
-            onClick={() => navigate("/login")}
-            style={{
-              padding: "10px 12px",
-              backgroundColor: "transparent",
-              border: "1px solid var(--border-color)",
-              borderRadius: "12px",
-              color: "var(--text-main)",
-              fontSize: "14px",
-              fontWeight: "600",
-              cursor: "pointer",
-              transition: "all 0.2s"
-            }}
-            onMouseOver={(e) => { e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.05)"; e.currentTarget.style.borderColor = "var(--primary)"; }}
-            onMouseOut={(e) => { e.currentTarget.style.backgroundColor = "transparent"; e.currentTarget.style.borderColor = "var(--border-color)"; }}
-          >
-            Sign In
-          </button>
+          {user ? (
+            <button
+              onClick={() => navigate("/dashboard")}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "8px",
+                padding: "10px 20px",
+                backgroundColor: "rgba(59, 130, 246, 0.1)",
+                border: "1px solid rgba(59, 130, 246, 0.2)",
+                borderRadius: "12px",
+                color: "var(--primary)",
+                fontSize: "14px",
+                fontWeight: "700",
+                cursor: "pointer",
+                transition: "all 0.2s"
+              }}
+              onMouseOver={(e) => { e.currentTarget.style.backgroundColor = "rgba(59, 130, 246, 0.2)"; }}
+              onMouseOut={(e) => { e.currentTarget.style.backgroundColor = "rgba(59, 130, 246, 0.1)"; }}
+            >
+              <LayoutDashboard size={18} />
+              Dashboard
+            </button>
+          ) : (
+            <button
+              onClick={() => navigate("/login")}
+              style={{
+                padding: "10px 24px",
+                backgroundColor: "transparent",
+                border: "1px solid var(--border-color)",
+                borderRadius: "12px",
+                color: "var(--text-main)",
+                fontSize: "14px",
+                fontWeight: "600",
+                cursor: "pointer",
+                transition: "all 0.2s"
+              }}
+              onMouseOver={(e) => { e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.05)"; e.currentTarget.style.borderColor = "var(--primary)"; }}
+              onMouseOut={(e) => { e.currentTarget.style.backgroundColor = "transparent"; e.currentTarget.style.borderColor = "var(--border-color)"; }}
+            >
+              Sign In
+            </button>
+          )}
           <button
             onClick={toggleTheme}
             style={{
@@ -153,7 +192,7 @@ function HomePage() {
         flexDirection: "row",
         alignItems: "center",
         justifyContent: "space-between",
-        padding: "0 8%",
+        padding: "40px 8% 100px",
         gap: "60px",
         position: "relative",
         zIndex: 1
@@ -170,93 +209,85 @@ function HomePage() {
             padding: "8px 16px",
             borderRadius: "50px",
             fontSize: "14px",
-            fontWeight: "600",
-            marginBottom: "24px"
+            fontWeight: "700",
+            marginBottom: "24px",
+            letterSpacing: "0.02em",
+            textTransform: "uppercase"
           }}>
             <Zap size={14} fill="var(--primary)" />
-            <span>Release 1.0 is live!</span>
+            <span>Powering Real-time Teams</span>
           </div>
 
           <h1 style={{
-            fontSize: "calc(2.5rem + 1vw)",
-            fontWeight: "800",
-            lineHeight: 1.1,
+            fontSize: "calc(2.8rem + 1.2vw)",
+            fontWeight: "900",
+            lineHeight: 1.05,
             margin: "0 0 24px 0",
-            letterSpacing: "-0.02em"
+            letterSpacing: "-0.04em"
           }}>
-            Collaborate. Code. <br />
-            <span style={{ color: "var(--primary)", position: "relative" }}>
-              Conquer.
-              <svg style={{ position: "absolute", bottom: "-8px", left: 0, width: "100%", height: "12px" }} viewBox="0 0 100 12" preserveAspectRatio="none">
-                <path d="M0,10 Q50,0 100,10" stroke="var(--primary)" strokeWidth="4" fill="none" opacity="0.3" />
-              </svg>
-            </span>
+            Collaborate. <br />
+            <span style={{
+              background: "linear-gradient(to right, #3b82f6, #8b5cf6)",
+              WebkitBackgroundClip: "text",
+              WebkitTextFillColor: "transparent",
+              filter: "drop-shadow(0 0 10px rgba(59, 130, 246, 0.2))"
+            }}>Code Everywhere.</span>
           </h1>
 
           <p style={{
-            fontSize: "18px",
+            fontSize: "20px",
             lineHeight: 1.6,
             color: "var(--text-muted)",
-            marginBottom: "40px",
-            maxWidth: "500px"
+            marginBottom: "48px",
+            maxWidth: "520px",
+            fontWeight: "400"
           }}>
-            Real-time synchronization, lightning-fast execution, and seamless chat—all in one place. Experience the next generation of collaborative coding.
+            The professional workspace for modern teams. Sync your code instantly, execute in sub-milliseconds, and chat without leaving your editor.
           </p>
 
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "24px", maxWidth: "500px" }}>
-            <div style={{ display: "flex", gap: "12px", alignItems: "start" }}>
-              <div style={{ backgroundColor: "var(--secondary)", padding: "10px", borderRadius: "12px", color: "var(--primary)" }}>
-                <Code size={20} />
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "32px", maxWidth: "550px" }}>
+            {[
+              { icon: <Code size={22} />, color: "var(--primary)", title: "Live Sync", desc: "Sub-millisecond latency." },
+              { icon: <Globe size={22} />, color: "#f87171", title: "Cloud Run", desc: "Execute 20+ languages." },
+              { icon: <Users size={22} />, color: "#4ade80", title: "Team Chat", desc: "Contextual collaboration." },
+              { icon: <Shield size={22} />, color: "#a855f7", title: "Secure", desc: "Private & ephemeral rooms." }
+            ].map((feature, idx) => (
+              <div key={idx} style={{ display: "flex", gap: "16px", alignItems: "start" }}>
+                <div style={{ backgroundColor: "var(--bg-card)", padding: "12px", borderRadius: "14px", color: feature.color, border: "1px solid var(--border-color)", boxShadow: "0 10px 20px rgba(0,0,0,0.1)" }}>
+                  {feature.icon}
+                </div>
+                <div>
+                  <h4 style={{ margin: "0 0 4px 0", fontSize: "16px", fontWeight: "700" }}>{feature.title}</h4>
+                  <p style={{ margin: 0, fontSize: "13px", color: "var(--text-muted)", lineHeight: "1.4" }}>{feature.desc}</p>
+                </div>
               </div>
-              <div>
-                <h4 style={{ margin: "0 0 4px 0", fontSize: "15px", fontWeight: "700" }}>Live Editing</h4>
-                <p style={{ margin: 0, fontSize: "13px", color: "var(--text-muted)" }}>Instant sync with sub-millisecond latency.</p>
-              </div>
-            </div>
-            <div style={{ display: "flex", gap: "12px", alignItems: "start" }}>
-              <div style={{ backgroundColor: "var(--secondary)", padding: "10px", borderRadius: "12px", color: "#f87171" }}>
-                <Terminal size={20} />
-              </div>
-              <div>
-                <h4 style={{ margin: "0 0 4px 0", fontSize: "15px", fontWeight: "700" }}>Fast Execution</h4>
-                <p style={{ margin: 0, fontSize: "13px", color: "var(--text-muted)" }}>Execute in multiple languages powered by Judge0.</p>
-              </div>
-            </div>
-            <div style={{ display: "flex", gap: "12px", alignItems: "start" }}>
-              <div style={{ backgroundColor: "var(--secondary)", padding: "10px", borderRadius: "12px", color: "#4ade80" }}>
-                <Users size={20} />
-              </div>
-              <div>
-                <h4 style={{ margin: "0 0 4px 0", fontSize: "15px", fontWeight: "700" }}>Smooth Chat</h4>
-                <p style={{ margin: 0, fontSize: "13px", color: "var(--text-muted)" }}>Built-in real-time chat with emoji support.</p>
-              </div>
-            </div>
+            ))}
           </div>
         </div>
 
         {/* RIGHT SIDE: JOIN CARD */}
         <div style={{
-          flex: "0 0 440px",
+          flex: "0 0 460px",
           perspective: "1000px"
         }}>
           <div style={{
             background: "var(--bg-card)",
-            backdropFilter: "blur(24px)",
-            WebkitBackdropFilter: "blur(24px)",
+            backdropFilter: "blur(32px)",
+            WebkitBackdropFilter: "blur(32px)",
             border: "1px solid var(--border-color)",
-            padding: "28px",
-            borderRadius: "28px",
-            boxShadow: "0 30px 60px -12px rgba(0, 0, 0, 0.25), inset 0 0 0 1px rgba(255,255,255,0.05)",
+            padding: "40px",
+            borderRadius: "32px",
+            boxShadow: "0 40px 80px -20px rgba(0, 0, 0, 0.4), inset 0 0 0 1px rgba(255,255,255,0.05)",
             animation: "slideUp 0.8s cubic-bezier(0, 0.55, 0.45, 1)",
             position: "relative",
             zIndex: 1
           }}>
-            <h2 style={{ margin: "0 0 8px 0", fontSize: "24px", fontWeight: "800", color: "var(--text-main)" }}>Enter Workspace</h2>
-            <p style={{ margin: "0 0 32px 0", fontSize: "15px", color: "var(--text-muted)" }}>Join a room to start collaborating instantly.</p>
+            <h2 style={{ margin: "0 0 8px 0", fontSize: "28px", fontWeight: "800", color: "var(--text-main)", letterSpacing: "-0.02em" }}>Enter Workspace</h2>
+            <p style={{ margin: "0 0 32px 0", fontSize: "15px", color: "var(--text-muted)", lineHeight: "1.5" }}>Paste an invite link or create a new room to start coding.</p>
 
-            <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
-              <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-                <label style={{ fontSize: "13px", fontWeight: "600", color: "var(--text-muted)", marginLeft: "4px" }}>Room ID or Invite Link</label>
+            <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                <label style={{ fontSize: "13px", fontWeight: "700", color: "var(--text-muted)", marginLeft: "4px", textTransform: "uppercase", letterSpacing: "0.05em" }}>Room ID</label>
                 <input
                   type="text"
                   placeholder="Paste room ID or link..."
@@ -265,24 +296,25 @@ function HomePage() {
                   onKeyUp={handleEnterKey}
                   style={{
                     width: "100%",
-                    padding: "16px 20px",
+                    padding: "18px 24px",
                     borderRadius: "16px",
                     outline: "none",
                     border: "2px solid transparent",
                     background: "var(--secondary)",
                     color: "var(--text-main)",
-                    fontSize: "15px",
+                    fontSize: "16px",
                     fontWeight: "500",
                     boxSizing: "border-box",
-                    transition: "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)"
+                    transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+                    boxShadow: "inset 0 2px 4px rgba(0,0,0,0.05)"
                   }}
-                  onFocus={(e) => { e.target.style.borderColor = "var(--primary)"; e.target.style.background = "var(--bg-dark)"; }}
-                  onBlur={(e) => { e.target.style.borderColor = "transparent"; e.target.style.background = "var(--secondary)"; }}
+                  onFocus={(e) => { e.target.style.borderColor = "var(--primary)"; e.target.style.background = "var(--bg-dark)"; e.target.style.boxShadow = "0 0 0 4px rgba(59, 130, 246, 0.1)"; }}
+                  onBlur={(e) => { e.target.style.borderColor = "transparent"; e.target.style.background = "var(--secondary)"; e.target.style.boxShadow = "inset 0 2px 4px rgba(0,0,0,0.05)"; }}
                 />
               </div>
 
-              <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-                <label style={{ fontSize: "13px", fontWeight: "600", color: "var(--text-muted)", marginLeft: "4px" }}>Display Name</label>
+              <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                <label style={{ fontSize: "13px", fontWeight: "700", color: "var(--text-muted)", marginLeft: "4px", textTransform: "uppercase", letterSpacing: "0.05em" }}>Display Name</label>
                 <input
                   type="text"
                   placeholder="e.g. John Doe"
@@ -291,46 +323,47 @@ function HomePage() {
                   onKeyUp={handleEnterKey}
                   style={{
                     width: "100%",
-                    padding: "16px 20px",
+                    padding: "18px 24px",
                     borderRadius: "16px",
                     outline: "none",
                     border: "2px solid transparent",
                     background: "var(--secondary)",
                     color: "var(--text-main)",
-                    fontSize: "15px",
+                    fontSize: "16px",
                     fontWeight: "500",
                     boxSizing: "border-box",
-                    transition: "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)"
+                    transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+                    boxShadow: "inset 0 2px 4px rgba(0,0,0,0.05)"
                   }}
-                  onFocus={(e) => { e.target.style.borderColor = "var(--primary)"; e.target.style.background = "var(--bg-dark)"; }}
-                  onBlur={(e) => { e.target.style.borderColor = "transparent"; e.target.style.background = "var(--secondary)"; }}
+                  onFocus={(e) => { e.target.style.borderColor = "var(--primary)"; e.target.style.background = "var(--bg-dark)"; e.target.style.boxShadow = "0 0 0 4px rgba(59, 130, 246, 0.1)"; }}
+                  onBlur={(e) => { e.target.style.borderColor = "transparent"; e.target.style.background = "var(--secondary)"; e.target.style.boxShadow = "inset 0 2px 4px rgba(0,0,0,0.05)"; }}
                 />
               </div>
 
               <button
                 onClick={joinRoom}
                 style={{
-                  marginTop: "12px",
+                  marginTop: "8px",
                   width: "100%",
-                  padding: "16px",
+                  padding: "18px",
                   backgroundColor: "var(--primary)",
                   color: "white",
-                  fontSize: "16px",
-                  fontWeight: "700",
-                  borderRadius: "16px",
+                  fontSize: "17px",
+                  fontWeight: "800",
+                  borderRadius: "18px",
                   border: "none",
                   cursor: "pointer",
-                  transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
-                  boxShadow: "0 10px 25px -5px rgba(59, 130, 246, 0.5)",
+                  transition: "all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)",
+                  boxShadow: "0 12px 28px -6px rgba(59, 130, 246, 0.5)",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
-                  gap: "8px"
+                  gap: "10px"
                 }}
-                onMouseOver={(e) => { e.currentTarget.style.backgroundColor = "var(--primary-hover)"; e.currentTarget.style.transform = "translateY(-2px)"; e.currentTarget.style.boxShadow = "0 15px 30px -5px rgba(59, 130, 246, 0.6)"; }}
-                onMouseOut={(e) => { e.currentTarget.style.backgroundColor = "var(--primary)"; e.currentTarget.style.transform = "none"; e.currentTarget.style.boxShadow = "0 10px 25px -5px rgba(59, 130, 246, 0.5)"; }}
+                onMouseOver={(e) => { e.currentTarget.style.backgroundColor = "var(--primary-hover)"; e.currentTarget.style.transform = "translateY(-3px)"; e.currentTarget.style.boxShadow = "0 20px 40px -8px rgba(59, 130, 246, 0.6)"; }}
+                onMouseOut={(e) => { e.currentTarget.style.backgroundColor = "var(--primary)"; e.currentTarget.style.transform = "none"; e.currentTarget.style.boxShadow = "0 12px 28px -6px rgba(59, 130, 246, 0.5)"; }}
               >
-                Join Workspace <ChevronRight size={18} />
+                Launch Editor <ChevronRight size={20} strokeWidth={3} />
               </button>
 
               <div style={{
@@ -338,28 +371,29 @@ function HomePage() {
                 alignItems: "center",
                 justifyContent: "center",
                 gap: "8px",
-                padding: "16px",
-                backgroundColor: "rgba(255, 255, 255, 0.03)",
-                borderRadius: "16px",
-                fontSize: "14px",
-                color: "var(--text-muted)"
+                padding: "18px",
+                backgroundColor: "rgba(255, 255, 255, 0.02)",
+                borderRadius: "18px",
+                fontSize: "15px",
+                color: "var(--text-muted)",
+                border: "1px solid var(--border-color)"
               }}>
-                New here? {" "}
+                Need a new session? {" "}
                 <button
                   onClick={createNewRoom}
                   style={{
                     background: "none",
                     border: "none",
                     color: "var(--primary)",
-                    fontWeight: "700",
+                    fontWeight: "800",
                     cursor: "pointer",
                     padding: 0,
-                    textDecoration: "none"
+                    textDecoration: "none",
+                    transition: "all 0.2s"
                   }}
-                  onMouseOver={(e) => e.target.style.textDecoration = "underline"}
-                  onMouseOut={(e) => e.target.style.textDecoration = "none"}
+                  onMouseOver={(e) => e.target.style.color = "var(--primary-hover)"}
                 >
-                  Create your own room
+                  Create Room
                 </button>
               </div>
             </div>
@@ -369,39 +403,86 @@ function HomePage() {
 
       {/* FOOTER */}
       <footer className="landing-footer" style={{
-        padding: "32px 8%",
+        padding: "80px 8% 40px",
         borderTop: "1px solid var(--border-color)",
-        backgroundColor: "rgba(0,0,0,0.02)",
+        backgroundColor: "rgba(0,0,0,0.03)",
         position: "relative",
         zIndex: 10
       }}>
         <div style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+          gap: "48px",
+          marginBottom: "60px"
+        }}>
+          {/* Brand Col */}
+          <div style={{ maxWidth: "300px" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "20px" }}>
+              <div style={{ backgroundColor: "var(--primary)", padding: "6px", borderRadius: "8px", color: "white" }}>
+                <Code size={18} strokeWidth={4} />
+              </div>
+              <span style={{ fontSize: "18px", fontWeight: "800", letterSpacing: "-0.02em" }}>Utkristi Colabs</span>
+            </div>
+            <p style={{ fontSize: "14px", color: "var(--text-muted)", lineHeight: "1.6", marginBottom: "24px" }}>
+              The modern collaboration platform for engineers to build, test, and ship code together in real-time.
+            </p>
+            <div style={{ display: "flex", gap: "16px" }}>
+              <Github size={20} style={{ cursor: "pointer", color: "var(--text-muted)" }} />
+              <Twitter size={20} style={{ cursor: "pointer", color: "var(--text-muted)" }} />
+              <Linkedin size={20} style={{ cursor: "pointer", color: "var(--text-muted)" }} />
+            </div>
+          </div>
+
+          {/* Links Col 1 */}
+          <div>
+            <h4 style={{ fontSize: "14px", fontWeight: "800", color: "var(--text-main)", marginBottom: "20px", textTransform: "uppercase", letterSpacing: "0.05em" }}>Product</h4>
+            <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+              <a href="/" style={footerLinkStyle}>Editor</a>
+              <a href="/dashboard" style={footerLinkStyle}>Dashboard</a>
+              <a href="/about" style={footerLinkStyle}>Features</a>
+              <a href="#" style={footerLinkStyle}>Enterprise</a>
+            </div>
+          </div>
+
+          {/* Links Col 2 */}
+          <div>
+            <h4 style={{ fontSize: "14px", fontWeight: "800", color: "var(--text-main)", marginBottom: "20px", textTransform: "uppercase", letterSpacing: "0.05em" }}>Support</h4>
+            <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+              <a href="/about" style={footerLinkStyle}>Documentation</a>
+              <a href="/about" style={footerLinkStyle}>API Reference</a>
+              <a href="/about" style={footerLinkStyle}>Contact</a>
+              <a href="/about" style={footerLinkStyle}>Status</a>
+            </div>
+          </div>
+
+          {/* Links Col 3 */}
+          <div>
+            <h4 style={{ fontSize: "14px", fontWeight: "800", color: "var(--text-main)", marginBottom: "20px", textTransform: "uppercase", letterSpacing: "0.05em" }}>Legal</h4>
+            <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+              <a href="/privacy" style={footerLinkStyle}>Privacy Policy</a>
+              <a href="/terms" style={footerLinkStyle}>Terms of Service</a>
+              <a href="/privacy" style={footerLinkStyle}>Cookie Policy</a>
+            </div>
+          </div>
+        </div>
+
+        <div style={{
+          paddingTop: "40px",
+          borderTop: "1px solid var(--border-color)",
           display: "flex",
           justifyContent: "space-between",
           alignItems: "center",
           flexWrap: "wrap",
-          gap: "24px"
+          gap: "24px",
+          fontSize: "14px",
+          color: "var(--text-muted)"
         }}>
-          {/* Logo & Copyright */}
-          <div style={{
-            display: "flex",
-            alignItems: "center",
-            gap: "12px",
-            color: "var(--text-muted)",
-            fontSize: "14px",
-            fontWeight: "500"
-          }}>
-            <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-              Created with <span style={{ color: "#ef4444" }}>💙</span> by <a href="http://utkristi-io.netlify.app/" style={{ color: "var(--primary)", textDecoration: "none", fontWeight: "700" }}>Utkristi.io</a>
-            </div>
-            <div style={{ width: "1px", height: "12px", backgroundColor: "var(--border-color)" }} />
+          <div>
+            © {new Date().getFullYear()} Utkristi Colabs. Created by <a href="http://utkristi-io.netlify.app/" style={{ color: "var(--primary)", textDecoration: "none", fontWeight: "700" }}>Utkristi.io</a>
           </div>
-
-          <div style={{ color: "var(--text-muted)", fontSize: "14px", fontWeight: "600", display: "flex", alignItems: "center", gap: "16px" }} className="footer-links">
-            <a href="/about" style={{ color: "var(--text-muted)", textDecoration: "none", fontSize: "14px", transition: "all 0.2s" }} onMouseOver={(e) => e.target.style.color = "var(--primary)"} onMouseOut={(e) => e.target.style.color = "var(--text-muted)"}>About</a>
-            <a href="/privacy" style={{ color: "var(--text-muted)", textDecoration: "none", fontSize: "14px", transition: "all 0.2s" }} onMouseOver={(e) => e.target.style.color = "var(--primary)"} onMouseOut={(e) => e.target.style.color = "var(--text-muted)"}>Privacy</a>
-            <a href="/terms" style={{ color: "var(--text-muted)", textDecoration: "none", fontSize: "14px", transition: "all 0.2s" }} onMouseOver={(e) => e.target.style.color = "var(--primary)"} onMouseOut={(e) => e.target.style.color = "var(--text-muted)"}>Terms</a>
-            <a href="http://utkristi-io.netlify.app/" style={{ color: "var(--text-muted)", textDecoration: "none", fontSize: "14px", transition: "all 0.2s" }} onMouseOver={(e) => e.target.style.color = "var(--primary)"} onMouseOut={(e) => e.target.style.color = "var(--text-muted)"}>Author</a>
+          <div style={{ display: "flex", gap: "24px" }}>
+            <span style={{ display: "flex", alignItems: "center", gap: "6px" }}><Globe size={14} /> Global / English</span>
+            <span style={{ display: "flex", alignItems: "center", gap: "6px" }}><HelpCircle size={14} /> Help Center</span>
           </div>
         </div>
       </footer>
@@ -413,10 +494,10 @@ function HomePage() {
         }
         @media (max-width: 1024px) {
           main {
-            flex-direction: column-reverse !important;
+            flex-direction: column !important;
             text-align: center !important;
-            padding: 40px 8% !important;
-            gap: 48px !important;
+            padding: 40px 5% 80px !important;
+            gap: 60px !important;
           }
           div[style*="hero"] {
             max-width: 100% !important;
@@ -425,27 +506,32 @@ function HomePage() {
             flex: none !important;
             width: 100% !important;
             max-width: 480px !important;
+            margin: 0 auto;
           }
           div[style*="hero"] p {
             margin-left: auto !important;
             margin-right: auto !important;
           }
-        }
-        @media (max-width: 768px) {
-          .landing-footer > div {
-            flex-direction: column !important;
-            text-align: center !important;
-            gap: 24px !important;
-          }
-          .footer-links {
+          div[style*="grid"] {
+            margin: 0 auto !important;
             justify-content: center !important;
-            flex-direction: column !important;
-            gap: 12px !important;
           }
         }
       `}</style>
     </div>
   );
 }
+
+const footerLinkStyle = {
+  fontSize: "14px",
+  color: "var(--text-muted)",
+  textDecoration: "none",
+  transition: "all 0.2s",
+  cursor: "pointer"
+};
+
+// Handle Hover for footer links after render
+// (In a real app we'd use a styled component or className, but for this direct style approach):
+// We'll use a simple className and global CSS in the style tag for cleaner hover handling.
 
 export default HomePage;
