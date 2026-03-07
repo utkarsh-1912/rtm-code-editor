@@ -53,7 +53,7 @@ const SignUp = () => {
                 display: "flex",
                 flexDirection: "column",
                 justifyContent: "center",
-                padding: "80px",
+                padding: "60px",
                 overflow: "hidden"
             }}>
                 <div style={{ position: "absolute", top: "-10%", left: "-10%", width: "60%", height: "60%", background: "radial-gradient(circle, rgba(59,130,246,0.15) 0%, rgba(0,0,0,0) 70%)", borderRadius: "50%", filter: "blur(100px)" }}></div>
