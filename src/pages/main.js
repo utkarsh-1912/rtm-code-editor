@@ -163,18 +163,13 @@ function HomePage() {
               </div>
             </div>
 
-            <h1 className="staggered-entry" style={{ animationDelay: "0.2s", fontSize: "calc(2.5rem + 1.8vw)", fontWeight: "950", marginBottom: "28px", letterSpacing: "-0.04em", lineHeight: 1.1 }}>
+            <h1 style={{ fontSize: "calc(2.5rem + 1vw)", fontWeight: "800", lineHeight: "1.1", margin: "0px 0px 24px", letterSpacing: "-0.02em" }} className="staggered-entry">
               Collaborate. Code. <br />
-              <span style={{
-                background: "linear-gradient(135deg, #60a5fa 0%, #3b82f6 50%, #8b5cf6 100%)",
-                WebkitBackgroundClip: "text",
-                WebkitTextFillColor: "transparent",
-                position: "relative",
-                display: "inline-flex",
-                alignItems: "center",
-                gap: "12px"
-              }}>
-                Conquer. <Zap size={32} fill="var(--primary)" style={{ marginTop: "4px" }} />
+              <span style={{ color: "var(--primary)", position: "relative" }}>
+                Conquer.
+                <svg viewBox="0 0 100 12" preserveAspectRatio="none" style={{ position: "absolute", bottom: "-8px", left: "0px", width: "100%", height: "12px" }}>
+                  <path d="M0,10 Q50,0 100,10" stroke="var(--primary)" strokeWidth="4" fill="none" opacity="0.3"></path>
+                </svg>
               </span>
             </h1>
 
