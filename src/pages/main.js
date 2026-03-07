@@ -206,7 +206,7 @@ function HomePage() {
             WebkitBackdropFilter: "blur(24px)",
             border: "1px solid var(--border-color)",
             padding: "28px",
-            borderRadius: "32px",
+            borderRadius: "28px",
             boxShadow: "0 30px 60px -12px rgba(0, 0, 0, 0.25), inset 0 0 0 1px rgba(255,255,255,0.05)",
             animation: "slideUp 0.8s cubic-bezier(0, 0.55, 0.45, 1)",
             position: "relative",
@@ -295,7 +295,6 @@ function HomePage() {
               </button>
 
               <div style={{
-                marginTop: "18px",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
