@@ -9,6 +9,37 @@ const Settings = () => {
     const { user } = useAuth();
     const [activeTab, setActiveTab] = useState('profile');
     const [saving, setSaving] = useState(false);
+    const [sessions, setSessions] = useState([]);
+
+    const fetchSessions = useCallback(async () => {
+        if (!user) return;
+        try {
+            const response = await fetch(`${getBackendUrl()}/api/sessions?userId=${user.uid}`);
+            const data = await response.json();
+            setSessions(data);
+        } catch (error) {
+            console.error('Failed to fetch sessions:', error);
+        }
+    }, [user]);
+
+    useEffect(() => {
+        if (activeTab === 'security') {
+            fetchSessions();
+        }
+    }, [activeTab, fetchSessions]);
+
+    const handleSignOutOthers = async () => {
+        const currentId = localStorage.getItem('rtm_db_session_id');
+        try {
+            await fetch(`${getBackendUrl()}/api/sessions/others?userId=${user.uid}&currentSessionId=${currentId || -1}`, {
+                method: 'DELETE'
+            });
+            toast.success('Signed out other devices');
+            fetchSessions();
+        } catch (error) {
+            toast.error('Failed to sign out other devices');
+        }
+    };
 
     // Profile State
     const [profile, setProfile] = useState({
@@ -192,6 +223,7 @@ const Settings = () => {
                     </div>
                 );
             case 'security':
+                const currentSessionId = localStorage.getItem('rtm_db_session_id');
                 return (
                     <div>
                         <div style={sectionHeaderStyle}>
@@ -200,12 +232,49 @@ const Settings = () => {
                         </div>
 
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-                            <div style={dangerZoneItemStyle}>
-                                <div>
-                                    <h4 style={{ margin: '0 0 4px', fontSize: '14px', fontWeight: '600' }}>Active Sessions</h4>
-                                    <p style={{ margin: 0, fontSize: '12px', color: 'var(--text-muted)' }}>Sign out from all other devices and browser sessions.</p>
+                            <div style={{ ...dangerZoneItemStyle, flexDirection: 'column', alignItems: 'flex-start', gap: '16px' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center' }}>
+                                    <div>
+                                        <h4 style={{ margin: '0 0 4px', fontSize: '14px', fontWeight: '600' }}>Active Sessions</h4>
+                                        <p style={{ margin: 0, fontSize: '12px', color: 'var(--text-muted)' }}>Devices currently logged into your account.</p>
+                                    </div>
+                                    <button
+                                        style={ghostButtonStyle}
+                                        onClick={handleSignOutOthers}
+                                        disabled={sessions.length <= 1}
+                                    >
+                                        Sign out others
+                                    </button>
                                 </div>
-                                <button style={ghostButtonStyle} onClick={() => toast("Feature coming soon")}>Sign out others</button>
+
+                                <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                    {sessions.map(s => (
+                                        <div key={s.id} style={{
+                                            padding: '12px',
+                                            backgroundColor: 'rgba(255,255,255,0.02)',
+                                            borderRadius: '8px',
+                                            border: '1px solid var(--border-color)',
+                                            display: 'flex',
+                                            justifyContent: 'space-between',
+                                            alignItems: 'center'
+                                        }}>
+                                            <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                                                <div style={{ width: '32px', height: '32px', borderRadius: '6px', backgroundColor: 'var(--bg-card)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)' }}>
+                                                    <Monitor size={16} />
+                                                </div>
+                                                <div>
+                                                    <div style={{ fontSize: '13px', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                        {s.device || 'Unknown Device'}
+                                                        {String(s.id) === String(currentSessionId) && (
+                                                            <span style={{ fontSize: '10px', padding: '2px 6px', backgroundColor: 'rgba(59, 130, 246, 0.1)', color: 'var(--primary)', borderRadius: '4px' }}>Current</span>
+                                                        )}
+                                                    </div>
+                                                    <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{s.ip} • Last active {new Date(s.last_active).toLocaleString()}</div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
                             </div>
 
                             <div style={{ ...dangerZoneItemStyle, border: '1px solid rgba(239, 68, 68, 0.2)', backgroundColor: 'rgba(239, 68, 68, 0.02)' }}>

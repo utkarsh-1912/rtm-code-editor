@@ -124,6 +124,85 @@ app.get("/api/search", async (req, res) => {
   }
 });
 
+/**
+ * Notifications API
+ */
+app.get("/api/notifications", async (req, res) => {
+  try {
+    const { userId } = req.query;
+    if (!userId) return res.status(400).json({ error: "User ID required" });
+    const notifications = await db.getNotifications(userId);
+    res.json(notifications);
+  } catch (err) {
+    res.status(500).json({ error: "Failed to fetch notifications" });
+  }
+});
+
+app.put("/api/notifications/read", async (req, res) => {
+  try {
+    const { userId } = req.body;
+    await db.markNotificationsRead(userId);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: "Failed to mark notifications as read" });
+  }
+});
+
+app.delete("/api/notifications", async (req, res) => {
+  try {
+    const { userId } = req.query;
+    await db.clearNotifications(userId);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: "Failed to clear notifications" });
+  }
+});
+
+app.delete("/api/notifications/:id", async (req, res) => {
+  try {
+    await db.deleteNotification(req.params.id);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: "Failed to delete notification" });
+  }
+});
+
+/**
+ * Sessions API
+ */
+app.get("/api/sessions", async (req, res) => {
+  try {
+    const { userId } = req.query;
+    if (!userId) return res.status(400).json({ error: "User ID required" });
+    const sessions = await db.getSessions(userId);
+    res.json(sessions);
+  } catch (err) {
+    res.status(500).json({ error: "Failed to fetch sessions" });
+  }
+});
+
+app.post("/api/sessions", async (req, res) => {
+  try {
+    const { userId, device, ip, userAgent } = req.body;
+    if (!userId) return res.status(400).json({ error: "User ID required" });
+    const session = await db.createSession(userId, { device, ip, userAgent });
+    res.json(session);
+  } catch (err) {
+    res.status(500).json({ error: "Failed to create session" });
+  }
+});
+
+app.delete("/api/sessions/others", async (req, res) => {
+  try {
+    const { userId, currentSessionId } = req.query;
+    if (!userId) return res.status(400).json({ error: "User ID required" });
+    await db.deleteOtherSessions(userId, currentSessionId);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: "Failed to sign out other devices" });
+  }
+});
+
 app.use((req, res, next) => {
   res.sendFile(__dirname + "/build/index.html");
 });

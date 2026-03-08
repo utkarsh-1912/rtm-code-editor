@@ -236,6 +236,57 @@ AND(r.name ILIKE ${searchTerm} OR r.room_id ILIKE ${searchTerm})
 }
 
 /**
+ * Notifications Management
+ */
+async function getNotifications(userId) {
+    const user = await sql`SELECT id FROM users WHERE auth_provider_id = ${userId}`;
+    if (!user.length) return [];
+
+    return await sql`
+        SELECT * FROM notifications 
+        WHERE user_id = ${user[0].id} 
+        ORDER BY created_at DESC 
+        LIMIT 50
+    `;
+}
+
+async function createNotification(userId, type, message, data = {}) {
+    const user = await sql`SELECT id FROM users WHERE auth_provider_id = ${userId}`;
+    if (!user.length) return null;
+
+    return await sql`
+        INSERT INTO notifications (user_id, type, message, data)
+        VALUES (${user[0].id}, ${type}, ${message}, ${JSON.stringify(data)})
+        RETURNING *
+    `;
+}
+
+async function markNotificationsRead(userId) {
+    const user = await sql`SELECT id FROM users WHERE auth_provider_id = ${userId}`;
+    if (!user.length) return;
+
+    return await sql`
+        UPDATE notifications 
+        SET is_read = TRUE 
+        WHERE user_id = ${user[0].id} AND is_read = FALSE
+    `;
+}
+
+async function clearNotifications(userId) {
+    const user = await sql`SELECT id FROM users WHERE auth_provider_id = ${userId}`;
+    if (!user.length) return;
+
+    return await sql`
+        DELETE FROM notifications 
+        WHERE user_id = ${user[0].id}
+    `;
+}
+
+async function deleteNotification(notificationId) {
+    return await sql`DELETE FROM notifications WHERE id = ${notificationId}`;
+}
+
+/**
  * Initialize Schema if tables don't exist
  */
 async function initializeSchema() {
@@ -291,11 +342,61 @@ async function initializeSchema() {
     )
     `;
 
+        // Notifications Table
+        await sql`
+            CREATE TABLE IF NOT EXISTS notifications(
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        type VARCHAR(50) NOT NULL,
+        message TEXT NOT NULL,
+        data JSONB DEFAULT '{}',
+        is_read BOOLEAN DEFAULT FALSE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+    `;
+
+        // Sessions Table
+        await sql`
+            CREATE TABLE IF NOT EXISTS sessions(
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        device VARCHAR(255),
+        ip VARCHAR(50),
+        user_agent TEXT,
+        last_active TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+    `;
+
         console.log("Database schema initialized successfully.");
     } catch (err) {
         console.error("Database Initialization Error:", err);
         throw err;
     }
+}
+
+/**
+ * Sessions Management
+ */
+async function getSessions(userId) {
+    const user = await sql`SELECT id FROM users WHERE auth_provider_id = ${userId}`;
+    if (!user.length) return [];
+    return await sql`SELECT * FROM sessions WHERE user_id = ${user[0].id} ORDER BY last_active DESC`;
+}
+
+async function createSession(userId, { device, ip, userAgent }) {
+    const user = await sql`SELECT id FROM users WHERE auth_provider_id = ${userId}`;
+    if (!user.length) return null;
+    return await sql`
+        INSERT INTO sessions (user_id, device, ip, user_agent)
+        VALUES (${user[0].id}, ${device}, ${ip}, ${userAgent})
+        RETURNING *
+    `;
+}
+
+async function deleteOtherSessions(userId, currentSessionId) {
+    const user = await sql`SELECT id FROM users WHERE auth_provider_id = ${userId}`;
+    if (!user.length) return;
+    return await sql`DELETE FROM sessions WHERE user_id = ${user[0].id} AND id != ${currentSessionId}`;
 }
 
 module.exports = {
@@ -315,5 +416,13 @@ module.exports = {
     updateSnippet,
     deleteSnippet,
     updateProfile,
-    searchAll
+    searchAll,
+    getNotifications,
+    createNotification,
+    markNotificationsRead,
+    clearNotifications,
+    deleteNotification,
+    getSessions,
+    createSession,
+    deleteOtherSessions
 };

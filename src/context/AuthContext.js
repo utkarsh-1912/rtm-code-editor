@@ -13,14 +13,43 @@ export const AuthProvider = ({ children }) => {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+        const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
             if (firebaseUser) {
-                setUser({
+                const userData = {
                     uid: firebaseUser.uid,
                     name: firebaseUser.displayName,
                     email: firebaseUser.email,
                     photoURL: firebaseUser.photoURL
-                });
+                };
+                setUser(userData);
+
+                // Track session
+                let sessionId = localStorage.getItem('rtm_session_id');
+                if (!sessionId) {
+                    sessionId = Math.random().toString(36).substring(2, 15);
+                    localStorage.setItem('rtm_session_id', sessionId);
+                }
+
+                try {
+                    const { getBackendUrl } = await import('../utils/api');
+                    const response = await fetch(`${getBackendUrl()}/api/sessions`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            userId: firebaseUser.uid,
+                            device: navigator.platform,
+                            ip: 'Auto',
+                            userAgent: navigator.userAgent
+                        })
+                    });
+                    const sessionData = await response.json();
+                    if (sessionData && sessionData[0] && sessionData[0].id) {
+                        localStorage.setItem('rtm_db_session_id', sessionData[0].id);
+                    }
+                } catch (e) {
+                    console.error("Session tracking failed", e);
+                }
+
             } else {
                 setUser(null);
             }

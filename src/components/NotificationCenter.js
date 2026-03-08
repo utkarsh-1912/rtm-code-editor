@@ -1,33 +1,109 @@
-import React, { useState, useEffect } from 'react';
-import { UserPlus, FileEdit, Info, CheckCircle2 } from 'lucide-react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { UserPlus, FileEdit, Info, CheckCircle2, Trash2 } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
+import { getBackendUrl } from '../utils/api';
+import toast from 'react-hot-toast';
 
 const NotificationCenter = ({ isOpen, onClose }) => {
+    const { user } = useAuth();
     const [notifications, setNotifications] = useState([]);
     const [loading, setLoading] = useState(false);
+    const containerRef = useRef(null);
 
-    // Mock notifications for now - in a real app, these would come from an API or Socket
+    const fetchNotifications = useCallback(async () => {
+        if (!user) return;
+        setLoading(true);
+        try {
+            const response = await fetch(`${getBackendUrl()}/api/notifications?userId=${user.uid}`);
+            const data = await response.json();
+            setNotifications(data);
+        } catch (error) {
+            console.error('Failed to fetch notifications:', error);
+        } finally {
+            setLoading(false);
+        }
+    }, [user]);
+
     useEffect(() => {
         if (isOpen) {
-            setLoading(true);
-            setTimeout(() => {
-                setNotifications([
-                    { id: 1, type: 'join', user: 'FJ', message: 'FJ joined your workspace', time: '2m ago', icon: <UserPlus size={14} />, color: '#3b82f6' },
-                    { id: 2, type: 'edit', user: 'System', message: 'Workspace "Project Alpha" was renamed', time: '1h ago', icon: <FileEdit size={14} />, color: '#a855f7' },
-                    { id: 3, type: 'system', user: 'Admin', message: 'Server maintenance scheduled for 12:00 PM', time: '3h ago', icon: <Info size={14} />, color: '#fbbf24' },
-                ]);
-                setLoading(false);
-            }, 500);
+            fetchNotifications();
+            // Mark all as read when opening
+            fetch(`${getBackendUrl()}/api/notifications/read`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ userId: user?.uid })
+            }).catch(console.error);
         }
-    }, [isOpen]);
+    }, [isOpen, fetchNotifications, user]);
+
+    // Click outside logic
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (containerRef.current && !containerRef.current.contains(event.target)) {
+                onClose();
+            }
+        };
+
+        if (isOpen) {
+            // Delay adding the listener to avoid immediate triggering from the button click
+            const timeoutId = setTimeout(() => {
+                document.addEventListener('mousedown', handleClickOutside);
+            }, 0);
+            return () => {
+                clearTimeout(timeoutId);
+                document.removeEventListener('mousedown', handleClickOutside);
+            };
+        }
+    }, [isOpen, onClose]);
+
+    const handleClearAll = async () => {
+        try {
+            await fetch(`${getBackendUrl()}/api/notifications?userId=${user.uid}`, {
+                method: 'DELETE'
+            });
+            setNotifications([]);
+            toast.success('Notifications cleared');
+        } catch (error) {
+            toast.error('Failed to clear notifications');
+        }
+    };
+
+    const handleDelete = async (id, e) => {
+        e.stopPropagation();
+        try {
+            await fetch(`${getBackendUrl()}/api/notifications/${id}`, {
+                method: 'DELETE'
+            });
+            setNotifications(prev => prev.filter(n => n.id !== id));
+        } catch (error) {
+            toast.error('Failed to delete notification');
+        }
+    };
+
+    const getIcon = (type) => {
+        switch (type) {
+            case 'join': return <UserPlus size={14} />;
+            case 'edit': return <FileEdit size={14} />;
+            default: return <Info size={14} />;
+        }
+    };
+
+    const getColor = (type) => {
+        switch (type) {
+            case 'join': return '#3b82f6';
+            case 'edit': return '#a855f7';
+            default: return '#fbbf24';
+        }
+    };
 
     if (!isOpen) return null;
 
     return (
-        <div style={dropdownStyle}>
+        <div style={dropdownStyle} className="notification-center-dropdown" ref={containerRef}>
             <div style={headerStyle}>
                 <h3 style={{ margin: 0, fontSize: '14px', fontWeight: '700' }}>Notifications</h3>
                 <button
-                    onClick={() => setNotifications([])}
+                    onClick={handleClearAll}
                     style={clearButtonStyle}
                 >
                     Clear all
@@ -39,14 +115,22 @@ const NotificationCenter = ({ isOpen, onClose }) => {
                     <div style={statusTextStyle}>Loading...</div>
                 ) : notifications.length > 0 ? (
                     notifications.map((n) => (
-                        <div key={n.id} style={notificationItemStyle}>
-                            <div style={{ ...iconWrapperStyle, backgroundColor: `${n.color}15`, color: n.color }}>
-                                {n.icon}
+                        <div key={n.id} style={notificationItemStyle} className="notification-item">
+                            <div style={{ ...iconWrapperStyle, backgroundColor: `${getColor(n.type)}15`, color: getColor(n.type) }}>
+                                {getIcon(n.type)}
                             </div>
                             <div style={{ flex: 1 }}>
                                 <div style={messageStyle}>{n.message}</div>
-                                <div style={timeStyle}>{n.time}</div>
+                                <div style={timeStyle}>{new Date(n.created_at).toLocaleString()}</div>
                             </div>
+                            <button
+                                onClick={(e) => handleDelete(n.id, e)}
+                                style={deleteItemButtonStyle}
+                                className="delete-btn"
+                                title="Delete"
+                            >
+                                <Trash2 size={12} />
+                            </button>
                         </div>
                     ))
                 ) : (
@@ -64,7 +148,7 @@ const NotificationCenter = ({ isOpen, onClose }) => {
             )}
 
             {/* Pointer for the dropdown */}
-            <div style={pointerStyle}></div>
+            <div style={pointerStyle} className="dropdown-pointer"></div>
         </div>
     );
 };
@@ -113,6 +197,7 @@ const notificationItemStyle = {
     borderBottom: '1px solid var(--border-color)',
     cursor: 'pointer',
     transition: 'background 0.2s',
+    position: 'relative',
     '&:hover': {
         backgroundColor: 'rgba(255,255,255,0.03)'
     }
@@ -180,4 +265,52 @@ const pointerStyle = {
     transform: 'rotate(45deg)'
 };
 
-export default NotificationCenter;
+const deleteItemButtonStyle = {
+    background: 'rgba(239, 68, 68, 0.1)',
+    border: 'none',
+    color: '#ef4444',
+    padding: '4px',
+    borderRadius: '4px',
+    cursor: 'pointer',
+    opacity: 0,
+    transition: 'opacity 0.2s',
+    marginLeft: '8px'
+};
+
+const CustomStyles = () => (
+    <style>{`
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .notification-item:hover {
+            background-color: rgba(255, 255, 255, 0.03);
+        }
+        .notification-item:hover .delete-btn {
+            opacity: 1 !important;
+        }
+        @media (max-width: 480px) {
+            .notification-center-dropdown {
+                position: fixed !important;
+                top: 64px !important;
+                left: 10px !important;
+                right: 10px !important;
+                width: calc(100% - 20px) !important;
+                max-height: 80vh !important;
+                border-radius: 16px !important;
+            }
+            .dropdown-pointer {
+                display: none !important;
+            }
+        }
+    `}</style>
+);
+
+export default function NotificationCenterWithStyles(props) {
+    return (
+        <>
+            <CustomStyles />
+            <NotificationCenter {...props} />
+        </>
+    );
+}
