@@ -168,24 +168,33 @@ function Editor() {
 
       // Wake up the server if it's sleeping (Render)
       const wakeServer = async () => {
-        // Fast-path: check if server is already alive without showing loader immediately
-        const loadingTimeout = setTimeout(() => setShowLoading(true), 1200);
+        // Reduced timeout for better UX
+        const loadingTimeout = setTimeout(() => setShowLoading(true), 800);
+
+        try {
+          const resp = await fetch(`${backendUrl}/api/ping`);
+          if (resp.ok) {
+            clearTimeout(loadingTimeout);
+            setShowLoading(false);
+            return true;
+          }
+        } catch (e) {
+          // Fallback to retry loop if immediate ping fails
+        }
 
         let retries = 0;
-        const maxRetries = 20;
-
+        const maxRetries = 15;
         while (retries < maxRetries) {
           try {
             const resp = await fetch(`${backendUrl}/api/ping`);
             if (resp.ok) {
               clearTimeout(loadingTimeout);
+              setShowLoading(false);
               return true;
             }
-          } catch (e) {
-            // Ignore and retry
-          }
+          } catch (e) { }
           retries++;
-          await new Promise(r => setTimeout(r, 1000));
+          await new Promise(r => setTimeout(r, 800));
         }
         clearTimeout(loadingTimeout);
         return false;
@@ -193,12 +202,11 @@ function Editor() {
 
       const isAlive = await wakeServer();
       if (!isAlive) {
-        toast.error("Global system is currently unreachable. Please try again later.");
+        toast.error("System unreachable. Please try again.");
         reactNavigator("/");
         return;
       }
 
-      setShowLoading(false); // Ensure loader is gone once alive
       socketRef.current = await initSocket();
       setSocketConnected(true);
       socketRef.current.on("connect_error", (err) => handleErrors(err));
@@ -324,6 +332,7 @@ function Editor() {
   };
 
   const leaveRoom = () => {
+    socketRef.current?.emit(ACTIONS.LEAVE, { roomId });
     reactNavigator("/");
   };
 

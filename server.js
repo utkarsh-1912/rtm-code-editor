@@ -206,24 +206,39 @@ io.on("connection", (socket) => {
     io.to(socketId).emit(ACTIONS.CODE_CHANGE, { code });
   });
 
+  socket.on(ACTIONS.LEAVE, ({ roomId }) => {
+    socket.in(roomId).emit(ACTIONS.DISCONNECTED, {
+      socketId: socket.id,
+      userName: userSocketMap[socket.id],
+    });
+    socket.leave(roomId);
+
+    // Clean up memory if room is empty
+    const remaining = getAllClients(roomId);
+    if (remaining.length === 0) {
+      delete roomChatHistory[roomId];
+    }
+  });
+
   socket.on("disconnecting", () => {
     const rooms = [...socket.rooms];
     rooms.forEach((roomId) => {
+      // socket.rooms includes the socket.id itself, skip it
+      if (roomId === socket.id) return;
+
       socket.in(roomId).emit(ACTIONS.DISCONNECTED, {
         socketId: socket.id,
         userName: userSocketMap[socket.id],
       });
-    });
-    delete userSocketMap[socket.id];
-    socket.leave();
 
-    // Clean up room history if empty
-    rooms.forEach((roomId) => {
+      // Clean up room history if empty
       const remaining = getAllClients(roomId);
-      if (remaining.length === 0) {
+      if (remaining.length <= 1) { // 1 because current socket hasn't fully left yet
         delete roomChatHistory[roomId];
       }
     });
+
+    delete userSocketMap[socket.id];
   });
 
   // Handle chat messages

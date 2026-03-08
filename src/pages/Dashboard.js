@@ -112,268 +112,270 @@ const Dashboard = () => {
     }
 
     return (
-        <div className="dashboard-container">
-            <div style={{
-                marginBottom: '32px',
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                flexWrap: 'wrap',
-                gap: '20px'
-            }}>
-                <div>
-                    <h1 style={{
-                        fontSize: '28px',
-                        fontWeight: '700',
-                        marginBottom: '4px',
-                        color: 'var(--text-main)'
-                    }}>
-                        Dashboard
-                    </h1>
-                    <p style={{ color: 'var(--text-muted)', fontSize: '14px' }}>
-                        Welcome back, {user.name}
-                    </p>
-                </div>
-                <button
-                    onClick={() => navigate('/')}
-                    style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '8px',
-                        padding: '10px 20px',
-                        backgroundColor: 'var(--primary)',
-                        color: 'white',
-                        border: 'none',
-                        borderRadius: '8px',
-                        fontWeight: '600',
-                        fontSize: '14px',
-                        cursor: 'pointer',
-                        transition: 'opacity 0.2s'
-                    }}
-                >
-                    <Plus size={18} /> New Room
-                </button>
-            </div>
-
-            {/* Industry Standard Stats Area */}
-            <div style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
-                gap: '20px',
-                marginBottom: '40px'
-            }}>
-                {[
-                    { label: 'Active Projects', value: stats.totalRooms || 0, icon: <Terminal size={20} /> },
-                    { label: 'Total Sessions', value: stats.sessions || 0, icon: <Users size={20} /> },
-                    { label: 'Coding Hours', value: `${stats.hours || 0}h`, icon: <Zap size={20} /> }
-                ].map((stat, i) => (
-                    <div key={i} style={{
-                        padding: '24px',
-                        backgroundColor: 'var(--bg-card)',
-                        border: '1px solid var(--border-color)',
-                        borderRadius: '12px'
-                    }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
-                            <div style={{ color: 'var(--primary)' }}>{stat.icon}</div>
-                            <span style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-muted)', textTransform: 'uppercase' }}>{stat.label}</span>
-                        </div>
-                        <div style={{ fontSize: '24px', fontWeight: '700', color: 'var(--text-main)' }}>{stat.value}</div>
-                    </div>
-                ))}
-            </div>
-
-            <div style={{
-                backgroundColor: 'var(--bg-card)',
-                border: '1px solid var(--border-color)',
-                borderRadius: '12px',
-                overflow: 'hidden'
-            }}>
+        <AppLayout>
+            <div className="dashboard-container">
                 <div style={{
-                    padding: '20px 24px',
-                    borderBottom: '1px solid var(--border-color)',
+                    marginBottom: '32px',
                     display: 'flex',
                     justifyContent: 'space-between',
-                    alignItems: 'center'
+                    alignItems: 'center',
+                    flexWrap: 'wrap',
+                    gap: '20px'
                 }}>
-                    <h2 style={{ fontSize: '16px', fontWeight: '600', margin: 0 }}>Recent Workspaces</h2>
+                    <div>
+                        <h1 style={{
+                            fontSize: '28px',
+                            fontWeight: '700',
+                            marginBottom: '4px',
+                            color: 'var(--text-main)'
+                        }}>
+                            Dashboard
+                        </h1>
+                        <p style={{ color: 'var(--text-muted)', fontSize: '14px' }}>
+                            Welcome back, {user.name}
+                        </p>
+                    </div>
+                    <button
+                        onClick={() => navigate('/')}
+                        style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                            padding: '10px 20px',
+                            backgroundColor: 'var(--primary)',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '8px',
+                            fontWeight: '600',
+                            fontSize: '14px',
+                            cursor: 'pointer',
+                            transition: 'opacity 0.2s'
+                        }}
+                    >
+                        <Plus size={18} /> New Room
+                    </button>
+                </div>
+
+                {/* Industry Standard Stats Area */}
+                <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
+                    gap: '20px',
+                    marginBottom: '40px'
+                }}>
+                    {[
+                        { label: 'Active Projects', value: stats.totalRooms || 0, icon: <Terminal size={20} /> },
+                        { label: 'Total Sessions', value: stats.sessions || 0, icon: <Users size={20} /> },
+                        { label: 'Coding Hours', value: `${stats.hours || 0}h`, icon: <Zap size={20} /> }
+                    ].map((stat, i) => (
+                        <div key={i} style={{
+                            padding: '24px',
+                            backgroundColor: 'var(--bg-card)',
+                            border: '1px solid var(--border-color)',
+                            borderRadius: '12px'
+                        }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
+                                <div style={{ color: 'var(--primary)' }}>{stat.icon}</div>
+                                <span style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-muted)', textTransform: 'uppercase' }}>{stat.label}</span>
+                            </div>
+                            <div style={{ fontSize: '24px', fontWeight: '700', color: 'var(--text-main)' }}>{stat.value}</div>
+                        </div>
+                    ))}
+                </div>
+
+                <div style={{
+                    backgroundColor: 'var(--bg-card)',
+                    border: '1px solid var(--border-color)',
+                    borderRadius: '12px',
+                    overflow: 'hidden'
+                }}>
                     <div style={{
+                        padding: '20px 24px',
+                        borderBottom: '1px solid var(--border-color)',
                         display: 'flex',
-                        alignItems: 'center',
-                        gap: '10px',
-                        padding: '8px 12px',
-                        backgroundColor: 'var(--bg-dark)',
-                        borderRadius: '6px',
-                        border: '1px solid var(--border-color)',
-                        width: '240px'
+                        justifyContent: 'space-between',
+                        alignItems: 'center'
                     }}>
-                        <Search size={14} color="var(--text-muted)" />
-                        <input
-                            type="text"
-                            placeholder="Filter rooms..."
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                            style={{
-                                background: 'transparent',
-                                border: 'none',
-                                color: 'white',
-                                fontSize: '13px',
-                                width: '100%',
-                                outline: 'none'
-                            }}
-                        />
+                        <h2 style={{ fontSize: '16px', fontWeight: '600', margin: 0 }}>Recent Workspaces</h2>
+                        <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '10px',
+                            padding: '8px 12px',
+                            backgroundColor: 'var(--bg-dark)',
+                            borderRadius: '6px',
+                            border: '1px solid var(--border-color)',
+                            width: '240px'
+                        }}>
+                            <Search size={14} color="var(--text-muted)" />
+                            <input
+                                type="text"
+                                placeholder="Filter rooms..."
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                                style={{
+                                    background: 'transparent',
+                                    border: 'none',
+                                    color: 'white',
+                                    fontSize: '13px',
+                                    width: '100%',
+                                    outline: 'none'
+                                }}
+                            />
+                        </div>
+                    </div>
+
+                    <div style={{ padding: '24px' }}>
+                        {loadingRooms ? (
+                            <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>Loading...</div>
+                        ) : filteredRooms.length > 0 ? (
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '16px' }}>
+                                {filteredRooms.map((room) => (
+                                    <div
+                                        key={room.id}
+                                        style={{
+                                            padding: '20px',
+                                            backgroundColor: 'var(--bg-dark)',
+                                            borderRadius: '8px',
+                                            border: '1px solid var(--border-color)',
+                                            display: 'flex',
+                                            flexDirection: 'column',
+                                            justifyContent: 'space-between'
+                                        }}
+                                    >
+                                        <div>
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                                                <span style={{
+                                                    fontSize: '10px',
+                                                    fontWeight: '700',
+                                                    padding: '4px 8px',
+                                                    backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                                                    color: 'var(--primary)',
+                                                    borderRadius: '4px',
+                                                    textTransform: 'uppercase'
+                                                }}>
+                                                    {room.lang}
+                                                </span>
+                                                <div style={{ position: 'relative' }}>
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            setShowActionMenu(showActionMenu === room.id ? null : room.id);
+                                                        }}
+                                                        style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}
+                                                    >
+                                                        <MoreVertical size={16} />
+                                                    </button>
+
+                                                    {showActionMenu === room.id && (
+                                                        <div style={{
+                                                            position: 'absolute',
+                                                            right: 0,
+                                                            top: '24px',
+                                                            backgroundColor: 'var(--bg-card)',
+                                                            border: '1px solid var(--border-color)',
+                                                            borderRadius: '6px',
+                                                            padding: '4px',
+                                                            zIndex: 10,
+                                                            minWidth: '120px',
+                                                            boxShadow: '0 4px 12px rgba(0,0,0,0.3)'
+                                                        }}>
+                                                            <button
+                                                                onClick={() => { setShowRenameModal(room); setShowActionMenu(null); }}
+                                                                style={menuButtonStyle}
+                                                            >
+                                                                <Edit2 size={13} /> Rename
+                                                            </button>
+                                                            <button
+                                                                onClick={() => { setShowDeleteModal(room); setShowActionMenu(null); }}
+                                                                style={{ ...menuButtonStyle, color: '#f87171' }}
+                                                            >
+                                                                <Trash2 size={13} /> Delete
+                                                            </button>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+
+                                            <h4 style={{ fontSize: '15px', fontWeight: '600', marginBottom: '4px', color: 'var(--text-main)' }}>{room.name}</h4>
+                                            <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '20px' }}>ID: {room.id}</p>
+                                        </div>
+
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                            <div style={{ color: 'var(--text-muted)', fontSize: '11px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                                <Calendar size={12} /> {room.lastActive.split(',')[0]}
+                                            </div>
+                                            <button
+                                                onClick={() => navigate(`/editor/${room.id}`)}
+                                                style={{
+                                                    padding: '6px 12px',
+                                                    borderRadius: '6px',
+                                                    border: '1px solid var(--border-color)',
+                                                    backgroundColor: 'transparent',
+                                                    color: 'var(--text-main)',
+                                                    fontWeight: '600',
+                                                    fontSize: '12px',
+                                                    cursor: 'pointer',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    gap: '6px'
+                                                }}
+                                            >
+                                                Open <ExternalLink size={12} />
+                                            </button>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        ) : (
+                            <div style={{ padding: '60px 0', textAlign: 'center' }}>
+                                <p style={{ color: 'var(--text-muted)', marginBottom: '20px' }}>No workspaces found.</p>
+                                <button
+                                    onClick={() => navigate('/')}
+                                    style={{ padding: '8px 16px', backgroundColor: 'var(--primary)', color: 'white', border: 'none', borderRadius: '6px', fontWeight: '600', cursor: 'pointer' }}
+                                >
+                                    Create New Room
+                                </button>
+                            </div>
+                        )}
                     </div>
                 </div>
 
-                <div style={{ padding: '24px' }}>
-                    {loadingRooms ? (
-                        <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>Loading...</div>
-                    ) : filteredRooms.length > 0 ? (
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '16px' }}>
-                            {filteredRooms.map((room) => (
-                                <div
-                                    key={room.id}
-                                    style={{
-                                        padding: '20px',
-                                        backgroundColor: 'var(--bg-dark)',
-                                        borderRadius: '8px',
-                                        border: '1px solid var(--border-color)',
-                                        display: 'flex',
-                                        flexDirection: 'column',
-                                        justifyContent: 'space-between'
-                                    }}
-                                >
-                                    <div>
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                                            <span style={{
-                                                fontSize: '10px',
-                                                fontWeight: '700',
-                                                padding: '4px 8px',
-                                                backgroundColor: 'rgba(59, 130, 246, 0.1)',
-                                                color: 'var(--primary)',
-                                                borderRadius: '4px',
-                                                textTransform: 'uppercase'
-                                            }}>
-                                                {room.lang}
-                                            </span>
-                                            <div style={{ position: 'relative' }}>
-                                                <button
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        setShowActionMenu(showActionMenu === room.id ? null : room.id);
-                                                    }}
-                                                    style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}
-                                                >
-                                                    <MoreVertical size={16} />
-                                                </button>
-
-                                                {showActionMenu === room.id && (
-                                                    <div style={{
-                                                        position: 'absolute',
-                                                        right: 0,
-                                                        top: '24px',
-                                                        backgroundColor: 'var(--bg-card)',
-                                                        border: '1px solid var(--border-color)',
-                                                        borderRadius: '6px',
-                                                        padding: '4px',
-                                                        zIndex: 10,
-                                                        minWidth: '120px',
-                                                        boxShadow: '0 4px 12px rgba(0,0,0,0.3)'
-                                                    }}>
-                                                        <button
-                                                            onClick={() => { setShowRenameModal(room); setShowActionMenu(null); }}
-                                                            style={menuButtonStyle}
-                                                        >
-                                                            <Edit2 size={13} /> Rename
-                                                        </button>
-                                                        <button
-                                                            onClick={() => { setShowDeleteModal(room); setShowActionMenu(null); }}
-                                                            style={{ ...menuButtonStyle, color: '#f87171' }}
-                                                        >
-                                                            <Trash2 size={13} /> Delete
-                                                        </button>
-                                                    </div>
-                                                )}
-                                            </div>
-                                        </div>
-
-                                        <h4 style={{ fontSize: '15px', fontWeight: '600', marginBottom: '4px', color: 'var(--text-main)' }}>{room.name}</h4>
-                                        <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '20px' }}>ID: {room.id}</p>
-                                    </div>
-
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                        <div style={{ color: 'var(--text-muted)', fontSize: '11px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                            <Calendar size={12} /> {room.lastActive.split(',')[0]}
-                                        </div>
-                                        <button
-                                            onClick={() => navigate(`/editor/${room.id}`)}
-                                            style={{
-                                                padding: '6px 12px',
-                                                borderRadius: '6px',
-                                                border: '1px solid var(--border-color)',
-                                                backgroundColor: 'transparent',
-                                                color: 'var(--text-main)',
-                                                fontWeight: '600',
-                                                fontSize: '12px',
-                                                cursor: 'pointer',
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                gap: '6px'
-                                            }}
-                                        >
-                                            Open <ExternalLink size={12} />
-                                        </button>
-                                    </div>
+                {/* Modals - Clean Overlays */}
+                {(showRenameModal || showDeleteModal) && (
+                    <div style={modalOverlayStyle}>
+                        {showRenameModal && (
+                            <div style={modalContentStyle}>
+                                <h3 style={{ fontSize: '18px', fontWeight: '700', marginBottom: '8px' }}>Rename Workspace</h3>
+                                <p style={{ color: 'var(--text-muted)', marginBottom: '20px', fontSize: '13px' }}>Enter a new name for this collaborative space.</p>
+                                <input
+                                    style={modalInputStyle}
+                                    value={newName}
+                                    onChange={(e) => setNewName(e.target.value)}
+                                    placeholder="Workspace name"
+                                    autoFocus
+                                />
+                                <div style={{ display: 'flex', gap: '10px', marginTop: '24px', justifyContent: 'flex-end' }}>
+                                    <button onClick={() => setShowRenameModal(null)} style={cancelButtonStyle}>Cancel</button>
+                                    <button onClick={() => handleRenameRoom(showRenameModal.id)} style={confirmButtonStyle}>Rename</button>
                                 </div>
-                            ))}
-                        </div>
-                    ) : (
-                        <div style={{ padding: '60px 0', textAlign: 'center' }}>
-                            <p style={{ color: 'var(--text-muted)', marginBottom: '20px' }}>No workspaces found.</p>
-                            <button
-                                onClick={() => navigate('/')}
-                                style={{ padding: '8px 16px', backgroundColor: 'var(--primary)', color: 'white', border: 'none', borderRadius: '6px', fontWeight: '600', cursor: 'pointer' }}
-                            >
-                                Create New Room
-                            </button>
-                        </div>
-                    )}
-                </div>
+                            </div>
+                        )}
+
+                        {showDeleteModal && (
+                            <div style={modalContentStyle}>
+                                <h3 style={{ fontSize: '18px', fontWeight: '700', marginBottom: '8px', color: '#f87171' }}>Delete Workspace</h3>
+                                <p style={{ color: 'var(--text-muted)', marginBottom: '20px', fontSize: '13px' }}>Are you sure you want to delete this workspace? This action cannot be undone.</p>
+                                <div style={{ display: 'flex', gap: '10px', marginTop: '24px', justifyContent: 'flex-end' }}>
+                                    <button onClick={() => setShowDeleteModal(null)} style={cancelButtonStyle}>Cancel</button>
+                                    <button onClick={() => handleDeleteRoom(showDeleteModal.id)} style={{ ...confirmButtonStyle, backgroundColor: '#ef4444' }}>Delete Permanently</button>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                )}
             </div>
-
-            {/* Modals - Clean Overlays */}
-            {(showRenameModal || showDeleteModal) && (
-                <div style={modalOverlayStyle}>
-                    {showRenameModal && (
-                        <div style={modalContentStyle}>
-                            <h3 style={{ fontSize: '18px', fontWeight: '700', marginBottom: '8px' }}>Rename Workspace</h3>
-                            <p style={{ color: 'var(--text-muted)', marginBottom: '20px', fontSize: '13px' }}>Enter a new name for this collaborative space.</p>
-                            <input
-                                style={modalInputStyle}
-                                value={newName}
-                                onChange={(e) => setNewName(e.target.value)}
-                                placeholder="Workspace name"
-                                autoFocus
-                            />
-                            <div style={{ display: 'flex', gap: '10px', marginTop: '24px', justifyContent: 'flex-end' }}>
-                                <button onClick={() => setShowRenameModal(null)} style={cancelButtonStyle}>Cancel</button>
-                                <button onClick={() => handleRenameRoom(showRenameModal.id)} style={confirmButtonStyle}>Rename</button>
-                            </div>
-                        </div>
-                    )}
-
-                    {showDeleteModal && (
-                        <div style={modalContentStyle}>
-                            <h3 style={{ fontSize: '18px', fontWeight: '700', marginBottom: '8px', color: '#f87171' }}>Delete Workspace</h3>
-                            <p style={{ color: 'var(--text-muted)', marginBottom: '20px', fontSize: '13px' }}>Are you sure you want to delete this workspace? This action cannot be undone.</p>
-                            <div style={{ display: 'flex', gap: '10px', marginTop: '24px', justifyContent: 'flex-end' }}>
-                                <button onClick={() => setShowDeleteModal(null)} style={cancelButtonStyle}>Cancel</button>
-                                <button onClick={() => handleDeleteRoom(showDeleteModal.id)} style={{ ...confirmButtonStyle, backgroundColor: '#ef4444' }}>Delete Permanently</button>
-                            </div>
-                        </div>
-                    )}
-                </div>
-            )}
-        </div>
+        </AppLayout>
     );
 };
 
