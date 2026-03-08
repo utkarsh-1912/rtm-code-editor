@@ -3,12 +3,9 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import {
     Clock,
     Settings,
-    LogOut,
     Code,
     Database,
-    Plus,
-    Menu,
-    ChevronRight
+    Menu
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import toast from 'react-hot-toast';
