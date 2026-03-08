@@ -18,6 +18,14 @@ const AppLayout = ({ children }) => {
         return document.documentElement.classList.contains('light-theme');
     });
 
+    React.useEffect(() => {
+        if (isLightMode) {
+            document.documentElement.classList.add('light-theme');
+        } else {
+            document.documentElement.classList.remove('light-theme');
+        }
+    }, [isLightMode]);
+
     const toggleTheme = () => {
         const newMode = !isLightMode;
         setIsLightMode(newMode);

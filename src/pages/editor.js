@@ -72,6 +72,14 @@ function Editor() {
   const [isLightMode, setIsLightMode] = useState(() => {
     return localStorage.getItem("app-theme") === "light";
   });
+
+  useEffect(() => {
+    if (isLightMode) {
+      document.documentElement.classList.add("light-theme");
+    } else {
+      document.documentElement.classList.remove("light-theme");
+    }
+  }, [isLightMode]);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const [activeTab, setActiveTab] = useState("code"); // "code" | "output" | "chat"
 

@@ -37,8 +37,18 @@ function HomePage() {
   useEffect(() => {
     if (user && user.name) {
       setUserName(user.name);
+    } else {
+      setUserName("");
     }
   }, [user]);
+
+  useEffect(() => {
+    if (isLightMode) {
+      document.documentElement.classList.add("light-theme");
+    } else {
+      document.documentElement.classList.remove("light-theme");
+    }
+  }, [isLightMode]);
 
   const toggleTheme = () => {
     const newMode = !isLightMode;

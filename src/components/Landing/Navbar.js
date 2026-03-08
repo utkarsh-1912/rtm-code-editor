@@ -1,10 +1,17 @@
 import React, { useState, useEffect } from "react";
 import { Sun, Moon, LayoutDashboard, LogOut } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
+import toast from "react-hot-toast";
 
 const Navbar = ({ user, isLightMode, toggleTheme, navigate }) => {
     const { logout } = useAuth();
     const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+
+    const handleLogout = () => {
+        logout();
+        toast.success("Signed out successfully");
+        navigate("/");
+    };
 
     useEffect(() => {
         const handleResize = () => setIsMobile(window.innerWidth < 768);
@@ -64,7 +71,7 @@ const Navbar = ({ user, isLightMode, toggleTheme, navigate }) => {
                             {!isMobile && <span>Dashboard</span>}
                         </button>
                         <button
-                            onClick={logout}
+                            onClick={handleLogout}
                             title="Sign Out"
                             style={{
                                 width: "44px", height: "44px",
