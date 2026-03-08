@@ -100,10 +100,15 @@ async function updateLastRoom(userId, roomId) {
  * Unlink a room from a user (Dashboard "Delete")
  */
 async function unlinkRoomFromUser(userId, roomId) {
-    const user = await sql`SELECT id FROM users WHERE auth_provider_id = ${userId}`;
+    const user = await sql`SELECT id, last_room_id FROM users WHERE auth_provider_id = ${userId}`;
     const room = await sql`SELECT id FROM rooms WHERE room_id = ${roomId}`;
 
     if (user.length && room.length) {
+        // If the room being unlinked is the last_room_id, clear it
+        if (user[0].last_room_id === roomId) {
+            await sql`UPDATE users SET last_room_id = NULL WHERE id = ${user[0].id}`;
+        }
+
         return await sql`
             DELETE FROM user_rooms 
             WHERE user_id = ${user[0].id} AND room_id = ${room[0].id}

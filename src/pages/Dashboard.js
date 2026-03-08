@@ -454,7 +454,7 @@ const modalOverlayStyle = {
 
 const modalContentStyle = {
     backgroundColor: 'var(--bg-card)',
-    padding: '16px',
+    padding: '8px 24px',
     borderRadius: '12px',
     border: '1px solid var(--border-color)',
     width: '100%',
