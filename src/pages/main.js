@@ -24,7 +24,7 @@ function HomePage() {
     if (user?.uid) {
       refreshProfile(user.uid);
     }
-  }, []);
+  }, [user?.uid, refreshProfile]);
 
   useEffect(() => {
     const searchParams = new URLSearchParams(location.search);
@@ -175,7 +175,7 @@ function HomePage() {
                   marginBottom: "32px", textTransform: "uppercase", letterSpacing: "0.08em",
                   border: "1px solid rgba(59, 130, 246, 0.15)", position: "relative", overflow: "hidden"
                 }}>
-                  <Zap size={14} fill="var(--primary)" /> Personalized Workspace Ready
+                  <Zap size={14} fill="var(--primary)" /> Personalized Codespace Ready
                 </div>
 
                 <h1 style={{ fontSize: "calc(2.5rem + 1.2vw)", fontWeight: "900", lineHeight: "1.1", margin: "0px 0px 16px", letterSpacing: "-0.03em" }}>
@@ -187,7 +187,7 @@ function HomePage() {
                   Your workspaces and snippets are synced and ready. Pick up right where you left off.
                 </p>
 
-                <div style={{ display: "flex", flexWrap: "wrap", gap: "16px", marginBottom: "48px" }}>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: "16px", marginBottom: "48px" }} className="hero-buttons">
                   <button
                     onClick={() => navigate("/dashboard")}
                     style={{
@@ -432,6 +432,8 @@ function HomePage() {
           .features-grid { grid-template-columns: 1fr !important; text-align: left; max-width: 340px !important; margin: 0 auto !important; }
           .footer-right { gap: 20px !important; }
           .landing-footer { flex-direction: column; gap: 24px; text-align: center; }
+          .hero-buttons { flex-direction: column !important; align-items: stretch !important; width: 100% !important; max-width: 400px; margin: 0 auto; }
+          .hero-buttons button { width: 100% !important; justify-content: center !important; }
         }
       `}</style>
     </div>
