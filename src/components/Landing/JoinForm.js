@@ -57,10 +57,20 @@ const JoinForm = ({ roomId, setRoomId, userName, setUserName, handleEnterKey, jo
                 <button
                     onClick={joinRoom}
                     style={{
-                        width: "100%", padding: "20px", backgroundColor: "var(--primary)", color: "white",
-                        fontSize: "17px", fontWeight: "900", borderRadius: "18px", border: "none", cursor: "pointer",
+                        width: "100%", padding: "20px",
+                        background: "linear-gradient(135deg, var(--primary) 0%, #2563eb 100%)",
+                        color: "white",
+                        fontSize: "17px", fontWeight: "900", borderRadius: "20px", border: "none", cursor: "pointer",
                         transition: "all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)", display: "flex", alignItems: "center", justifyContent: "center", gap: "12px",
                         boxShadow: "0 15px 30px -5px rgba(59, 130, 246, 0.4)"
+                    }}
+                    onMouseOver={e => {
+                        e.currentTarget.style.transform = "translateY(-3px) scale(1.02)";
+                        e.currentTarget.style.boxShadow = "0 20px 40px -10px rgba(59, 130, 246, 0.5)";
+                    }}
+                    onMouseOut={e => {
+                        e.currentTarget.style.transform = "translateY(0) scale(1)";
+                        e.currentTarget.style.boxShadow = "0 15px 30px -5px rgba(59, 130, 246, 0.4)";
                     }}
                     className="launch-btn"
                 >

@@ -185,27 +185,60 @@ function HomePage() {
                   <button
                     onClick={() => navigate("/dashboard")}
                     style={{
-                      padding: "16px 28px", backgroundColor: "var(--primary)", color: "white",
-                      borderRadius: "14px", fontWeight: "700", border: "none", cursor: "pointer",
-                      display: "flex", alignItems: "center", gap: "10px", boxShadow: "0 10px 20px -5px rgba(59, 130, 246, 0.4)",
-                      transition: "transform 0.2s"
+                      padding: "16px 32px",
+                      background: "linear-gradient(135deg, var(--primary) 0%, #2563eb 100%)",
+                      color: "white",
+                      borderRadius: "16px",
+                      fontWeight: "800",
+                      border: "none",
+                      cursor: "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "12px",
+                      boxShadow: "0 10px 25px -5px rgba(59, 130, 246, 0.5)",
+                      transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+                      fontSize: "15px"
                     }}
-                    onMouseOver={e => e.currentTarget.style.transform = "translateY(-2px)"}
-                    onMouseOut={e => e.currentTarget.style.transform = "translateY(0)"}
+                    onMouseOver={e => {
+                      e.currentTarget.style.transform = "translateY(-3px)";
+                      e.currentTarget.style.boxShadow = "0 15px 30px -5px rgba(59, 130, 246, 0.6)";
+                    }}
+                    onMouseOut={e => {
+                      e.currentTarget.style.transform = "translateY(0)";
+                      e.currentTarget.style.boxShadow = "0 10px 25px -5px rgba(59, 130, 246, 0.5)";
+                    }}
                   >
-                    <LayoutDashboard size={20} /> Open Dashboard
+                    <LayoutDashboard size={20} strokeWidth={2.5} /> Open Dashboard
                   </button>
                   <button
                     onClick={createNewRoom}
                     style={{
-                      padding: "16px 28px", backgroundColor: "var(--bg-card)", color: "var(--text-main)",
-                      borderRadius: "14px", fontWeight: "700", border: "1px solid var(--border-color)", cursor: "pointer",
-                      display: "flex", alignItems: "center", gap: "10px", transition: "all 0.2s"
+                      padding: "16px 32px",
+                      backgroundColor: "var(--bg-card-transparent)",
+                      color: "var(--text-main)",
+                      borderRadius: "16px",
+                      fontWeight: "800",
+                      border: "1px solid var(--border-color-glass)",
+                      cursor: "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "12px",
+                      transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+                      fontSize: "15px",
+                      backdropFilter: "blur(10px)"
                     }}
-                    onMouseOver={e => { e.currentTarget.style.backgroundColor = "var(--bg-dark)"; e.currentTarget.style.borderColor = "var(--primary)"; }}
-                    onMouseOut={e => { e.currentTarget.style.backgroundColor = "var(--bg-card)"; e.currentTarget.style.borderColor = "var(--border-color)"; }}
+                    onMouseOver={e => {
+                      e.currentTarget.style.transform = "translateY(-3px)";
+                      e.currentTarget.style.borderColor = "var(--primary)";
+                      e.currentTarget.style.backgroundColor = "var(--bg-card)";
+                    }}
+                    onMouseOut={e => {
+                      e.currentTarget.style.transform = "translateY(0)";
+                      e.currentTarget.style.borderColor = "var(--border-color-glass)";
+                      e.currentTarget.style.backgroundColor = "var(--bg-card-transparent)";
+                    }}
                   >
-                    <Code size={20} /> New Workspace
+                    <Code size={20} strokeWidth={2.5} /> New Workspace
                   </button>
                 </div>
 
@@ -296,7 +329,11 @@ function HomePage() {
           </div>
 
           {/* Right Form Card */}
-          <div style={{ flex: "0 0 460px", minWidth: "320px" }} className="hero-right staggered-entry">
+          <div style={{ flex: "0 0 460px", minWidth: "320px", marginTop: "20px" }} className="hero-right staggered-entry">
+            <div style={{ marginBottom: "20px", textAlign: "center" }}>
+              <h2 style={{ fontSize: "20px", fontWeight: "800", color: "var(--text-main)" }}>Fast Access</h2>
+              <p style={{ fontSize: "14px", color: "var(--text-muted)" }}>Join a room instantly</p>
+            </div>
             <JoinForm
               roomId={roomId}
               setRoomId={setRoomId}

@@ -37,8 +37,17 @@ export const AuthProvider = ({ children }) => {
                     const profileRes = await fetch(`${getBackendUrl()}/api/user/profile?userId=${firebaseUser.uid}`);
                     const profileData = await profileRes.json();
 
+                    console.log("AuthContext: Raw Profile Data", profileData);
+
                     if (profileData) {
-                        userData.last_room_id = profileData.last_room_id;
+                        // DB might return an object or an array depending on query
+                        const data = Array.isArray(profileData) ? profileData[0] : profileData;
+                        console.log("AuthContext: Parsed Profile Data", data);
+
+                        if (data && data.last_room_id) {
+                            userData.last_room_id = data.last_room_id;
+                            console.log("AuthContext: Setting last_room_id", data.last_room_id);
+                        }
                         setUser({ ...userData }); // Update with real DB data
                     }
 

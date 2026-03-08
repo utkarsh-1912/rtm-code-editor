@@ -10,7 +10,27 @@ const AppLayout = ({ children }) => {
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
     const [isSearchOpen, setIsSearchOpen] = useState(false);
     const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
-    const [hasUnread, setHasUnread] = useState(true); // Default to true for demo
+    const [hasUnread, setHasUnread] = useState(false);
+
+    // Fetch unread status
+    const checkNotifications = React.useCallback(async () => {
+        if (!user?.uid) return;
+        try {
+            const { getBackendUrl } = await import('../utils/api');
+            const response = await fetch(`${getBackendUrl()}/api/notifications?userId=${user.uid}`);
+            const notifications = await response.json();
+            const unread = notifications.some(n => !n.is_read);
+            setHasUnread(unread);
+        } catch (error) {
+            console.error('Failed to check notifications:', error);
+        }
+    }, [user?.uid]);
+
+    React.useEffect(() => {
+        checkNotifications();
+        const interval = setInterval(checkNotifications, 60000); // Check every minute
+        return () => clearInterval(interval);
+    }, [checkNotifications]);
 
     // Keyboard shortcut for search
     React.useEffect(() => {
