@@ -1,11 +1,27 @@
-import React, { useState } from 'react';
 import Sidebar from './Sidebar';
 import { Menu, Search, Bell, User } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import SearchModal from './SearchModal';
+import NotificationCenter from './NotificationCenter';
 
 const AppLayout = ({ children }) => {
     const { user } = useAuth();
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+    const [isSearchOpen, setIsSearchOpen] = useState(false);
+    const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
+    const [hasUnread, setHasUnread] = useState(true); // Default to true for demo
+
+    // Keyboard shortcut for search
+    React.useEffect(() => {
+        const handleKeyDown = (e) => {
+            if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+                e.preventDefault();
+                setIsSearchOpen(true);
+            }
+        };
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, []);
 
     return (
         <div style={{
@@ -57,28 +73,52 @@ const AppLayout = ({ children }) => {
                     zIndex: 90
                 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                        <button
-                            className="mobile-only"
-                            onClick={() => setIsSidebarOpen(true)}
-                            style={{
-                                background: 'transparent',
-                                border: 'none',
-                                color: 'var(--text-muted)',
-                                cursor: 'pointer',
-                                padding: '8px',
-                                display: 'none'
-                            }}
-                        >
-                            <Menu size={20} />
-                        </button>
-                        <div className="mobile-only" style={{ fontWeight: '800', fontSize: '18px', color: 'var(--text-main)', display: 'none' }}>RTM Editor</div>
+                        <img
+                            src="/utkristi-colabs.png"
+                            alt="Utkristi Colabs"
+                            style={{ height: '28px', cursor: 'pointer' }}
+                            onClick={() => window.location.href = '/'}
+                        />
                     </div>
 
                     <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
-                        <button style={headerIconStyle}><Search size={18} /></button>
-                        <button style={headerIconStyle}><Bell size={18} /></button>
+                        <button
+                            style={headerIconStyle}
+                            onClick={() => setIsSearchOpen(true)}
+                            title="Search (Ctrl+K)"
+                        >
+                            <Search size={18} />
+                        </button>
+                        <div style={{ position: 'relative' }}>
+                            <button
+                                style={headerIconStyle}
+                                onClick={() => {
+                                    setIsNotificationsOpen(!isNotificationsOpen);
+                                    setHasUnread(false);
+                                }}
+                            >
+                                <Bell size={18} />
+                                {hasUnread && <span style={unreadBadgeStyle}></span>}
+                            </button>
+                            <NotificationCenter
+                                isOpen={isNotificationsOpen}
+                                onClose={() => setIsNotificationsOpen(false)}
+                            />
+                        </div>
                         <div style={{ width: '1px', height: '24px', backgroundColor: 'var(--border-color)', margin: '0 4px' }}></div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <div
+                            onClick={() => {
+                                if (window.innerWidth <= 992) {
+                                    setIsSidebarOpen(true);
+                                }
+                            }}
+                            style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '10px',
+                                cursor: window.innerWidth <= 992 ? 'pointer' : 'default'
+                            }}
+                        >
                             <span style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-main)', display: 'none' }} className="desktop-inline">
                                 {user?.name}
                             </span>
@@ -91,12 +131,22 @@ const AppLayout = ({ children }) => {
                                 display: 'flex',
                                 alignItems: 'center',
                                 justifyContent: 'center',
-                                overflow: 'hidden'
-                            }}>
+                                overflow: 'hidden',
+                                transition: 'transform 0.2s'
+                            }}
+                                onMouseEnter={(e) => {
+                                    if (window.innerWidth <= 992) e.currentTarget.style.transform = 'scale(1.1)';
+                                }}
+                                onMouseLeave={(e) => {
+                                    if (window.innerWidth <= 992) e.currentTarget.style.transform = 'scale(1)';
+                                }}
+                            >
                                 {user?.photoURL ? (
                                     <img src={user.photoURL} alt="pfp" style={{ width: '100%', height: '100%' }} />
                                 ) : (
-                                    <User size={16} color="var(--text-muted)" />
+                                    <div style={{ backgroundColor: 'var(--primary)', width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: '800', fontSize: '12px' }}>
+                                        {user?.name?.charAt(0) || 'U'}
+                                    </div>
                                 )}
                             </div>
                         </div>
@@ -113,6 +163,11 @@ const AppLayout = ({ children }) => {
                     {children}
                 </main>
             </div>
+
+            <SearchModal
+                isOpen={isSearchOpen}
+                onClose={() => setIsSearchOpen(false)}
+            />
 
             <style>{`
                 :root {
@@ -139,7 +194,22 @@ const headerIconStyle = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    transition: 'all 0.2s'
+    transition: 'all 0.2s',
+    '&:hover': {
+        color: 'var(--text-main)',
+        backgroundColor: 'rgba(255,255,255,0.05)'
+    }
+};
+
+const unreadBadgeStyle = {
+    position: 'absolute',
+    top: '8px',
+    right: '8px',
+    width: '8px',
+    height: '8px',
+    backgroundColor: '#ef4444',
+    borderRadius: '50%',
+    border: '2px solid var(--bg-card)'
 };
 
 export default AppLayout;

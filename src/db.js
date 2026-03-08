@@ -126,7 +126,7 @@ async function updateRoomName(roomId, newName) {
  * Get full dashboard data for a user
  */
 async function getUserDashboard(userId) {
-    const user = await sql`SELECT id FROM users WHERE auth_provider_id = ${userId}`;
+    const user = await sql`SELECT * FROM users WHERE auth_provider_id = ${userId}`;
     if (!user.length) return { rooms: [], stats: { totalRooms: 0, sessions: 0, hours: 0 } };
 
     const rooms = await sql`
@@ -207,6 +207,35 @@ async function updateProfile(userId, { name, bio, social_links }) {
 }
 
 /**
+ * Global Search
+ */
+async function searchAll(userId, query) {
+    const user = await sql`SELECT id FROM users WHERE auth_provider_id = ${userId} `;
+    if (!user.length) return { rooms: [], snippets: [] };
+
+    const searchTerm = `% ${query}% `;
+
+    const rooms = await sql`
+        SELECT r.room_id as id, r.name, r.language as lang 
+        FROM rooms r
+        JOIN user_rooms ur ON r.id = ur.room_id
+        WHERE ur.user_id = ${user[0].id}
+AND(r.name ILIKE ${searchTerm} OR r.room_id ILIKE ${searchTerm})
+        LIMIT 5
+    `;
+
+    const snippets = await sql`
+        SELECT id, title as name, language as lang
+        FROM snippets
+        WHERE user_id = ${user[0].id}
+        AND title ILIKE ${searchTerm}
+        LIMIT 5
+    `;
+
+    return { rooms, snippets };
+}
+
+/**
  * Initialize Schema if tables don't exist
  */
 async function initializeSchema() {
@@ -215,52 +244,52 @@ async function initializeSchema() {
 
         // Rooms Table
         await sql`
-            CREATE TABLE IF NOT EXISTS rooms (
-                id SERIAL PRIMARY KEY,
-                room_id VARCHAR(255) UNIQUE NOT NULL,
-                name VARCHAR(255),
-                code TEXT,
-                language VARCHAR(50) DEFAULT 'javascript',
-                chat_history JSONB DEFAULT '[]',
-                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        `;
+            CREATE TABLE IF NOT EXISTS rooms(
+        id SERIAL PRIMARY KEY,
+        room_id VARCHAR(255) UNIQUE NOT NULL,
+        name VARCHAR(255),
+        code TEXT,
+        language VARCHAR(50) DEFAULT 'javascript',
+        chat_history JSONB DEFAULT '[]',
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+    `;
 
         // Users Table
         await sql`
-            CREATE TABLE IF NOT EXISTS users (
-                id SERIAL PRIMARY KEY,
-                email VARCHAR(255),
-                name VARCHAR(255),
-                bio TEXT,
-                social_links JSONB DEFAULT '{}',
-                auth_provider_id VARCHAR(255) UNIQUE NOT NULL,
-                joined_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        `;
+            CREATE TABLE IF NOT EXISTS users(
+        id SERIAL PRIMARY KEY,
+        email VARCHAR(255),
+        name VARCHAR(255),
+        bio TEXT,
+        social_links JSONB DEFAULT '{}',
+        auth_provider_id VARCHAR(255) UNIQUE NOT NULL,
+        joined_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+    `;
 
         // User Rooms Mapping Table
         await sql`
-            CREATE TABLE IF NOT EXISTS user_rooms (
-                user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
-                room_id INTEGER REFERENCES rooms(id) ON DELETE CASCADE,
-                linked_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                PRIMARY KEY (user_id, room_id)
-            )
-        `;
+            CREATE TABLE IF NOT EXISTS user_rooms(
+        user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        room_id INTEGER REFERENCES rooms(id) ON DELETE CASCADE,
+        linked_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY(user_id, room_id)
+    )
+    `;
 
         // Snippets Table
         await sql`
-            CREATE TABLE IF NOT EXISTS snippets (
-                id SERIAL PRIMARY KEY,
-                user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
-                title VARCHAR(255) NOT NULL,
-                code TEXT,
-                language VARCHAR(50) DEFAULT 'javascript',
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        `;
+            CREATE TABLE IF NOT EXISTS snippets(
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        title VARCHAR(255) NOT NULL,
+        code TEXT,
+        language VARCHAR(50) DEFAULT 'javascript',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+    `;
 
         console.log("Database schema initialized successfully.");
     } catch (err) {
@@ -285,5 +314,6 @@ module.exports = {
     createSnippet,
     updateSnippet,
     deleteSnippet,
-    updateProfile
+    updateProfile,
+    searchAll
 };

@@ -108,15 +108,19 @@ app.delete("/api/snippets/:id", async (req, res) => {
 });
 
 /**
- * Profile API
+ * Search API
  */
-app.put("/api/user/profile", async (req, res) => {
+app.get("/api/search", async (req, res) => {
   try {
-    const { userId, profileData } = req.body;
-    const updatedUser = await db.updateProfile(userId, profileData);
-    res.json(updatedUser[0]);
+    const { q, userId } = req.query;
+    if (!userId) return res.status(400).json({ error: "User ID required" });
+    if (!q) return res.json({ rooms: [], snippets: [] });
+
+    const results = await db.searchAll(userId, q);
+    res.json(results);
   } catch (err) {
-    res.status(500).json({ error: "Failed to update profile" });
+    console.error("Search API Error:", err);
+    res.status(500).json({ error: "Failed to search" });
   }
 });
 

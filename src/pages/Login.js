@@ -57,16 +57,19 @@ const Login = () => {
                 borderRight: "1px solid var(--border-color)"
             }}>
                 <div style={{ position: "relative", zIndex: 2, maxWidth: "480px" }}>
-                    <div style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '10px',
-                        color: 'var(--primary)',
-                        marginBottom: '32px',
-                        fontWeight: '800',
-                        fontSize: '20px'
-                    }}>
-                        <Zap fill="currentColor" size={24} /> COLABS
+                    <div
+                        onClick={() => navigate("/")}
+                        style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            cursor: 'pointer',
+                            marginBottom: '32px'
+                        }}>
+                        <img
+                            src="/utkristi-colabs.png"
+                            alt="Utkristi Colabs"
+                            style={{ height: '32px' }}
+                        />
                     </div>
                     <h1 style={{ fontSize: "40px", fontWeight: "700", lineHeight: 1.2, marginBottom: "24px", color: 'white' }}>
                         The professional workspace for engineers.

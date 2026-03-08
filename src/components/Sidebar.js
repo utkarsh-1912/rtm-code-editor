@@ -5,7 +5,9 @@ import {
     Settings,
     Code,
     Database,
-    X
+    X,
+    LogOut,
+    ExternalLink
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import toast from 'react-hot-toast';
@@ -49,19 +51,11 @@ const Sidebar = ({ isOpen, onClose, isMobile }) => {
                     style={{ display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer' }}
                     onClick={() => { navigate('/'); if (isMobile) onClose(); }}
                 >
-                    <div style={{
-                        width: '32px',
-                        height: '32px',
-                        backgroundColor: 'var(--primary)',
-                        borderRadius: '8px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        color: 'white'
-                    }}>
-                        <Code size={18} strokeWidth={2.5} />
-                    </div>
-                    <span style={{ fontWeight: '800', fontSize: '18px', letterSpacing: '-0.5px', color: 'var(--text-main)' }}>RTM Editor</span>
+                    <img
+                        src="/utkristi-colabs.png"
+                        alt="Utkristi Colabs"
+                        style={{ width: 'auto', height: '32px', objectFit: 'contain' }}
+                    />
                 </div>
                 {isMobile && (
                     <button onClick={onClose} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}>
@@ -101,28 +95,66 @@ const Sidebar = ({ isOpen, onClose, isMobile }) => {
                 marginTop: 'auto',
                 paddingTop: '20px',
                 borderTop: '1px solid var(--border-color)',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '12px'
             }}>
-                <img
-                    src={user?.photoURL || `https://ui-avatars.com/api/?name=${user?.name || 'User'}&background=3b82f6&color=fff`}
-                    alt="avatar"
-                    style={{ width: '36px', height: '36px', borderRadius: '8px' }}
-                />
-                <div style={{ flex: 1, overflow: 'hidden' }}>
-                    <p style={{ margin: 0, fontSize: '13px', fontWeight: '700', color: 'var(--text-main)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                        {user?.name || 'User'}
-                    </p>
-                    <button onClick={handleLogout} style={{
-                        background: 'transparent',
-                        border: 'none',
-                        padding: 0,
-                        color: 'var(--text-muted)',
-                        fontSize: '11px',
-                        fontWeight: '500',
-                        cursor: 'pointer'
-                    }}>Sign Out</button>
+                <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '12px',
+                    padding: '12px',
+                    backgroundColor: 'rgba(0,0,0,0.15)',
+                    borderRadius: '12px',
+                    border: '1px solid var(--border-color)',
+                }}>
+                    <img
+                        src={user?.photoURL || `https://ui-avatars.com/api/?name=${user?.name || 'User'}&background=3b82f6&color=fff`}
+                        alt="avatar"
+                        style={{ width: '36px', height: '36px', borderRadius: '8px' }}
+                    />
+                    <div style={{ flex: 1, overflow: 'hidden' }}>
+                        <p style={{
+                            margin: 0,
+                            fontSize: '13px',
+                            fontWeight: '700',
+                            color: 'var(--text-main)',
+                            whiteSpace: 'nowrap',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis'
+                        }}>
+                            {user?.name || 'User'}
+                        </p>
+                        <p style={{
+                            margin: 0,
+                            fontSize: '11px',
+                            color: 'var(--text-muted)',
+                            whiteSpace: 'nowrap',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis'
+                        }}>
+                            Pro Account
+                        </p>
+                    </div>
+                    <button
+                        onClick={handleLogout}
+                        title="Sign Out"
+                        style={{
+                            background: 'rgba(239, 68, 68, 0.1)',
+                            border: '1px solid rgba(239, 68, 68, 0.2)',
+                            padding: '8px',
+                            color: '#ef4444',
+                            borderRadius: '8px',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            transition: 'all 0.2s'
+                        }}
+                        onMouseEnter={(e) => {
+                            e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.2)';
+                        }}
+                        onMouseLeave={(e) => {
+                            e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.1)';
+                        }}
+                    >
+                        <LogOut size={16} />
+                    </button>
                 </div>
             </div>
         </div>
