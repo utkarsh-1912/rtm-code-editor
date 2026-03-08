@@ -330,10 +330,6 @@ function HomePage() {
 
           {/* Right Form Card */}
           <div style={{ flex: "0 0 460px", minWidth: "320px", marginTop: "20px" }} className="hero-right staggered-entry">
-            <div style={{ marginBottom: "20px", textAlign: "center" }}>
-              <h2 style={{ fontSize: "20px", fontWeight: "800", color: "var(--text-main)" }}>Fast Access</h2>
-              <p style={{ fontSize: "14px", color: "var(--text-muted)" }}>Join a room instantly</p>
-            </div>
             <JoinForm
               roomId={roomId}
               setRoomId={setRoomId}
