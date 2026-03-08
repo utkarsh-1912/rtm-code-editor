@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import toast from "react-hot-toast";
 import { useNavigate, useLocation } from "react-router-dom";
-import { Zap, Code, Globe, Users, Shield } from "lucide-react";
+import { Zap, Code, Globe, Users, Shield, LayoutDashboard, ChevronRight } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 
 // Modular Components
@@ -159,77 +159,140 @@ function HomePage() {
 
           {/* Left Content */}
           <div style={{ flex: 1, minWidth: "320px", textAlign: "left", maxWidth: "600px" }} className="hero-left">
-            <div className="staggered-entry" style={{ animationDelay: "0.1s" }}>
-              <div className="shimmer-badge" style={{
-                display: "inline-flex", alignItems: "center", gap: "10px",
-                backgroundColor: "rgba(59, 130, 246, 0.08)", color: "var(--primary)",
-                padding: "8px 18px", borderRadius: "50px", fontSize: "13px", fontWeight: "700",
-                marginBottom: "32px", textTransform: "uppercase", letterSpacing: "0.08em",
-                border: "1px solid rgba(59, 130, 246, 0.15)", position: "relative", overflow: "hidden"
-              }}>
-                <Zap size={14} fill="var(--primary)" /> Powering High-Performance Teams
+            {user ? (
+              /* Authenticated User View */
+              <div className="staggered-entry" style={{ animationDelay: "0.1s" }}>
+                <div className="shimmer-badge" style={{
+                  display: "inline-flex", alignItems: "center", gap: "10px",
+                  backgroundColor: "rgba(59, 130, 246, 0.08)", color: "var(--primary)",
+                  padding: "8px 18px", borderRadius: "50px", fontSize: "13px", fontWeight: "700",
+                  marginBottom: "32px", textTransform: "uppercase", letterSpacing: "0.08em",
+                  border: "1px solid rgba(59, 130, 246, 0.15)", position: "relative", overflow: "hidden"
+                }}>
+                  <Zap size={14} fill="var(--primary)" /> Personalized Workspace Ready
+                </div>
+
+                <h1 style={{ fontSize: "calc(2.5rem + 1.2vw)", fontWeight: "900", lineHeight: "1.1", margin: "0px 0px 16px", letterSpacing: "-0.03em" }}>
+                  Welcome back, <br />
+                  <span style={{ color: "var(--primary)" }}>{user.name || "Developer"}</span>
+                </h1>
+
+                <p style={{ fontSize: "18px", color: "var(--text-muted)", lineHeight: 1.6, marginBottom: "40px", maxWidth: "500px" }}>
+                  Your workspaces and snippets are synced and ready. Pick up right where you left off.
+                </p>
+
+                <div style={{ display: "flex", flexWrap: "wrap", gap: "16px", marginBottom: "48px" }}>
+                  <button
+                    onClick={() => navigate("/dashboard")}
+                    style={{
+                      padding: "16px 28px", backgroundColor: "var(--primary)", color: "white",
+                      borderRadius: "14px", fontWeight: "700", border: "none", cursor: "pointer",
+                      display: "flex", alignItems: "center", gap: "10px", boxShadow: "0 10px 20px -5px rgba(59, 130, 246, 0.4)",
+                      transition: "transform 0.2s"
+                    }}
+                    onMouseOver={e => e.currentTarget.style.transform = "translateY(-2px)"}
+                    onMouseOut={e => e.currentTarget.style.transform = "translateY(0)"}
+                  >
+                    <LayoutDashboard size={20} /> Open Dashboard
+                  </button>
+                  <button
+                    onClick={createNewRoom}
+                    style={{
+                      padding: "16px 28px", backgroundColor: "var(--bg-card)", color: "var(--text-main)",
+                      borderRadius: "14px", fontWeight: "700", border: "1px solid var(--border-color)", cursor: "pointer",
+                      display: "flex", alignItems: "center", gap: "10px", transition: "all 0.2s"
+                    }}
+                    onMouseOver={e => { e.currentTarget.style.backgroundColor = "var(--bg-dark)"; e.currentTarget.style.borderColor = "var(--primary)"; }}
+                    onMouseOut={e => { e.currentTarget.style.backgroundColor = "var(--bg-card)"; e.currentTarget.style.borderColor = "var(--border-color)"; }}
+                  >
+                    <Code size={20} /> New Workspace
+                  </button>
+                </div>
+
+                {user.last_room_id && (
+                  <div className="staggered-entry" style={{ animationDelay: "0.5s" }}>
+                    <div style={{
+                      padding: "24px",
+                      backgroundColor: "rgba(168, 85, 247, 0.04)",
+                      borderRadius: "20px",
+                      border: "1px solid rgba(168, 85, 247, 0.15)",
+                      display: "inline-block",
+                      boxShadow: "0 10px 30px -10px rgba(168, 85, 247, 0.2)",
+                      position: "relative",
+                      overflow: "hidden"
+                    }}>
+                      <div style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "2px", background: "linear-gradient(90deg, transparent, #a855f7, transparent)" }}></div>
+                      <div style={{ fontSize: "11px", color: "#a855f7", fontWeight: "800", marginBottom: "12px", textTransform: "uppercase", letterSpacing: "0.1em" }}>Continue Session</div>
+                      <button
+                        onClick={revisitLastRoom}
+                        style={{
+                          display: "flex", alignItems: "center", gap: "12px", background: "none", border: "none",
+                          color: "var(--text-main)", fontWeight: "700", cursor: "pointer", padding: 0,
+                          fontSize: "16px", transition: "all 0.2s"
+                        }}
+                        onMouseOver={e => e.currentTarget.style.color = "#a855f7"}
+                        onMouseOut={e => e.currentTarget.style.color = "var(--text-main)"}
+                      >
+                        <div style={{ backgroundColor: "rgba(168, 85, 247, 0.1)", padding: "8px", borderRadius: "10px" }}>
+                          <Globe size={18} color="#a855f7" />
+                        </div>
+                        <span>Revisit Room: <span style={{ opacity: 0.6 }}>{user.last_room_id}</span></span>
+                        <ChevronRight size={18} />
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
-
-              {user?.last_room_id && (
-                <button
-                  onClick={revisitLastRoom}
-                  className="revisit-btn"
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "8px",
-                    backgroundColor: "rgba(168, 85, 247, 0.1)",
-                    color: "#a855f7",
-                    padding: "8px 16px",
-                    borderRadius: "12px",
-                    fontSize: "13px",
-                    fontWeight: "600",
-                    border: "1px solid rgba(168, 85, 247, 0.2)",
-                    marginTop: "24px",
-                    cursor: "pointer",
-                    transition: "all 0.2s"
-                  }}
-                  onMouseOver={(e) => { e.currentTarget.style.backgroundColor = "rgba(168, 85, 247, 0.15)"; e.currentTarget.style.transform = "translateY(-1px)" }}
-                  onMouseOut={(e) => { e.currentTarget.style.backgroundColor = "rgba(168, 85, 247, 0.1)"; e.currentTarget.style.transform = "translateY(0)" }}
-                >
-                  <Globe size={14} /> Revisit Last Room ({user.last_room_id})
-                </button>
-              )}
-            </div>
-
-            <h1 style={{ fontSize: "calc(2.5rem + 1vw)", fontWeight: "800", lineHeight: "1.1", margin: "0px 0px 24px", letterSpacing: "-0.02em" }} className="staggered-entry">
-              Collaborate. Code. <br />
-              <span style={{ color: "var(--primary)", position: "relative" }}>
-                Conquer.
-                <svg viewBox="0 0 100 12" preserveAspectRatio="none" style={{ position: "absolute", bottom: "-8px", left: "0px", width: "100%", height: "12px" }}>
-                  <path d="M0,10 Q50,0 100,10" stroke="var(--primary)" strokeWidth="4" fill="none" opacity="0.3"></path>
-                </svg>
-              </span>
-            </h1>
-
-            <p className="staggered-entry" style={{ animationDelay: "0.3s", fontSize: "18px", color: "var(--text-muted)", lineHeight: 1.7, maxWidth: "580px", marginBottom: "48px" }}>
-              Real-time synchronization, lightning-fast execution, and seamless chat—all in one place. Experience the next generation of collaborative coding.
-            </p>
-
-            <div className="features-grid staggered-entry" style={{ animationDelay: "0.4s", display: "grid", gridTemplateColumns: "1fr 1fr", gap: "32px" }}>
-              {[
-                { icon: <Code size={22} />, title: "Precision Sync", desc: "Conflict-free real-time edits." },
-                { icon: <Globe size={22} />, title: "Cloud Engine", desc: "Instant multi-lang execution." },
-                { icon: <Users size={22} />, title: "Team Protocol", desc: "Integrated context-aware chat." },
-                { icon: <Shield size={22} />, title: "Secure Vault", desc: "Ephemeral, encrypted rooms." }
-              ].map((f, idx) => (
-                <div key={idx} style={{ display: "flex", gap: "16px", alignItems: "start" }}>
-                  <div style={{
-                    color: "var(--primary)", marginTop: "4px", backgroundColor: "rgba(59, 130, 246, 0.08)",
-                    padding: "10px", borderRadius: "12px", border: "1px solid rgba(59, 130, 246, 0.1)"
-                  }}>{f.icon}</div>
-                  <div>
-                    <div style={{ fontWeight: "800", fontSize: "15px", marginBottom: "4px" }}>{f.title}</div>
-                    <div style={{ fontSize: "13px", color: "var(--text-muted)", lineHeight: 1.4 }}>{f.desc}</div>
+            ) : (
+              /* Guest/Landing View */
+              <>
+                <div className="staggered-entry" style={{ animationDelay: "0.1s" }}>
+                  <div className="shimmer-badge" style={{
+                    display: "inline-flex", alignItems: "center", gap: "10px",
+                    backgroundColor: "rgba(59, 130, 246, 0.08)", color: "var(--primary)",
+                    padding: "8px 18px", borderRadius: "50px", fontSize: "13px", fontWeight: "700",
+                    marginBottom: "32px", textTransform: "uppercase", letterSpacing: "0.08em",
+                    border: "1px solid rgba(59, 130, 246, 0.15)", position: "relative", overflow: "hidden"
+                  }}>
+                    <Zap size={14} fill="var(--primary)" /> Powering High-Performance Teams
                   </div>
                 </div>
-              ))}
-            </div>
+
+                <h1 style={{ fontSize: "calc(2.5rem + 1vw)", fontWeight: "800", lineHeight: "1.1", margin: "0px 0px 24px", letterSpacing: "-0.02em" }} className="staggered-entry">
+                  Collaborate. Code. <br />
+                  <span style={{ color: "var(--primary)", position: "relative" }}>
+                    Conquer.
+                    <svg viewBox="0 0 100 12" preserveAspectRatio="none" style={{ position: "absolute", bottom: "-8px", left: "0px", width: "100%", height: "12px" }}>
+                      <path d="M0,10 Q50,0 100,10" stroke="var(--primary)" strokeWidth="4" fill="none" opacity="0.3"></path>
+                    </svg>
+                  </span>
+                </h1>
+
+                <p className="staggered-entry" style={{ animationDelay: "0.3s", fontSize: "18px", color: "var(--text-muted)", lineHeight: 1.7, maxWidth: "580px", marginBottom: "48px" }}>
+                  Real-time synchronization, lightning-fast execution, and seamless chat—all in one place. Experience the next generation of collaborative coding.
+                </p>
+
+                <div className="features-grid staggered-entry" style={{ animationDelay: "0.4s", display: "grid", gridTemplateColumns: "1fr 1fr", gap: "32px" }}>
+                  {[
+                    { icon: <Code size={22} />, title: "Precision Sync", desc: "Conflict-free real-time edits." },
+                    { icon: <Globe size={22} />, title: "Cloud Engine", desc: "Instant multi-lang execution." },
+                    { icon: <Users size={22} />, title: "Team Protocol", desc: "Integrated context-aware chat." },
+                    { icon: <Shield size={22} />, title: "Secure Vault", desc: "Ephemeral, encrypted rooms." }
+                  ].map((f, idx) => (
+                    <div key={idx} style={{ display: "flex", gap: "16px", alignItems: "start" }}>
+                      <div style={{
+                        color: "var(--primary)", marginTop: "4px", backgroundColor: "rgba(59, 130, 246, 0.08)",
+                        padding: "10px", borderRadius: "12px", border: "1px solid rgba(59, 130, 246, 0.1)"
+                      }}>{f.icon}</div>
+                      <div>
+                        <div style={{ fontWeight: "800", fontSize: "15px", marginBottom: "4px" }}>{f.title}</div>
+                        <div style={{ fontSize: "13px", color: "var(--text-muted)", lineHeight: 1.4 }}>{f.desc}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
           </div>
 
           {/* Right Form Card */}
