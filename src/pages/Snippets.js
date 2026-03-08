@@ -15,6 +15,13 @@ const Snippets = () => {
     const [showModal, setShowModal] = useState(null); // 'create' | 'edit' | 'delete' | 'view'
     const [activeSnippet, setActiveSnippet] = useState(null);
     const [formData, setFormData] = useState({ title: '', code: '', language: 'javascript' });
+    const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+
+    useEffect(() => {
+        const handleResize = () => setIsMobile(window.innerWidth < 768);
+        window.addEventListener("resize", handleResize);
+        return () => window.removeEventListener("resize", handleResize);
+    }, []);
 
     const fetchSnippets = useCallback(async () => {
         if (!user) return;
@@ -107,7 +114,7 @@ const Snippets = () => {
                 }}>
                     <div>
                         <h1 style={{
-                            fontSize: '28px',
+                            fontSize: isMobile ? '24px' : '28px',
                             fontWeight: '700',
                             margin: '0 0 4px',
                             color: 'var(--text-main)'
@@ -132,7 +139,9 @@ const Snippets = () => {
                             alignItems: 'center',
                             gap: '8px',
                             cursor: 'pointer',
-                            transition: 'opacity 0.2s'
+                            transition: 'opacity 0.2s',
+                            width: isMobile ? '100%' : 'auto',
+                            justifyContent: 'center'
                         }}
                     >
                         <Plus size={18} /> New Snippet
@@ -162,7 +171,7 @@ const Snippets = () => {
                             padding: '8px 12px',
                             borderRadius: '6px',
                             width: '100%',
-                            maxWidth: '300px',
+                            maxWidth: isMobile ? '100%' : '300px',
                             border: '1px solid var(--border-color)',
                             backgroundColor: 'var(--bg-dark)'
                         }}>
@@ -292,39 +301,39 @@ const Snippets = () => {
             {/* Modals */}
             {showModal === 'view' && activeSnippet && (
                 <div style={modalOverlayStyle} onClick={closeModal}>
-                    <div className="glass-effect premium-card" style={{ ...modalContentStyle, maxWidth: '900px', padding: '0' }} onClick={e => e.stopPropagation()}>
-                        <div style={{ padding: '32px', display: 'flex', flexDirection: 'column', gap: '24px', height: '100%' }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                                    <h3 style={{ fontSize: '24px', fontWeight: '900', margin: 0 }}>{activeSnippet.title}</h3>
+                    <div className="glass-effect premium-card" style={{ ...modalContentStyle, maxWidth: '900px', padding: '0', margin: isMobile ? '10px' : '0' }} onClick={e => e.stopPropagation()}>
+                        <div style={{ padding: isMobile ? '20px' : '32px', display: 'flex', flexDirection: 'column', gap: '24px', height: '100%' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: isMobile ? 'flex-start' : 'center', flexDirection: isMobile ? 'column' : 'row', gap: '16px' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+                                    <h3 style={{ fontSize: isMobile ? '20px' : '24px', fontWeight: '900', margin: 0 }}>{activeSnippet.title}</h3>
                                     <span style={{
                                         padding: '4px 10px', borderRadius: '6px',
                                         backgroundColor: 'rgba(59, 130, 246, 0.1)', color: 'var(--primary)',
                                         fontSize: '11px', fontWeight: '800', textTransform: 'uppercase'
                                     }}>{activeSnippet.language}</span>
                                 </div>
-                                <div style={{ display: 'flex', gap: '12px' }}>
-                                    <button onClick={() => copyToClipboard(activeSnippet.id, activeSnippet.code)} style={{ ...premiumButtonStyle, backgroundColor: 'rgba(255,255,255,0.05)', color: 'white' }}>
-                                        {copiedId === activeSnippet.id ? <Check size={18} /> : <Copy size={18} />} Copy
+                                <div style={{ display: 'flex', gap: '12px', width: isMobile ? '100%' : 'auto', justifyContent: isMobile ? 'flex-start' : 'flex-end' }}>
+                                    <button onClick={() => copyToClipboard(activeSnippet.id, activeSnippet.code)} style={{ ...premiumButtonStyle, backgroundColor: 'rgba(255,255,255,0.05)', color: 'white', flex: isMobile ? 1 : 'none', padding: isMobile ? '8px 12px' : '10px 16px' }}>
+                                        {copiedId === activeSnippet.id ? <Check size={18} /> : <Copy size={18} />} {isMobile ? '' : 'Copy'}
                                     </button>
-                                    <button onClick={() => openModal('edit', activeSnippet)} style={premiumButtonStyle}>
-                                        <Edit2 size={18} /> Edit
+                                    <button onClick={() => openModal('edit', activeSnippet)} style={{ ...premiumButtonStyle, flex: isMobile ? 1 : 'none', padding: isMobile ? '8px 12px' : '10px 16px' }}>
+                                        <Edit2 size={18} /> {isMobile ? '' : 'Edit'}
                                     </button>
-                                    <button onClick={closeModal} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}>
+                                    <button onClick={closeModal} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: isMobile ? '4px' : '8px' }}>
                                         <X size={24} />
                                     </button>
                                 </div>
                             </div>
                             <div style={{
                                 flex: 1, backgroundColor: 'rgba(0,0,0,0.3)', borderRadius: '16px',
-                                border: '1px solid var(--border-color)', padding: '24px',
+                                border: '1px solid var(--border-color)', padding: isMobile ? '16px' : '24px',
                                 overflow: 'auto', maxHeight: '60vh'
                             }}>
-                                <pre style={{ margin: 0, fontSize: '14px', fontFamily: 'monospace', color: 'rgba(255,255,255,0.8)', whiteSpace: 'pre-wrap' }}>
+                                <pre style={{ margin: 0, fontSize: isMobile ? '13px' : '14px', fontFamily: 'monospace', color: 'rgba(255,255,255,0.8)', whiteSpace: 'pre-wrap' }}>
                                     <code>{activeSnippet.code}</code>
                                 </pre>
                             </div>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '13px', color: 'var(--text-muted)' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: isMobile ? 'flex-start' : 'center', flexDirection: isMobile ? 'column' : 'row', gap: '8px', fontSize: '11px', color: 'var(--text-muted)' }}>
                                 <span>Vault Fragment ID: {activeSnippet.id}</span>
                                 <span>Last Secured: {new Date(activeSnippet.updated_at || activeSnippet.created_at).toLocaleString()}</span>
                             </div>

@@ -1,20 +1,28 @@
+import React, { useState, useEffect } from "react";
 import { Sun, Moon, LayoutDashboard, LogOut } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 
 const Navbar = ({ user, isLightMode, toggleTheme, navigate }) => {
     const { logout } = useAuth();
+    const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+
+    useEffect(() => {
+        const handleResize = () => setIsMobile(window.innerWidth < 768);
+        window.addEventListener("resize", handleResize);
+        return () => window.removeEventListener("resize", handleResize);
+    }, []);
 
     return (
         <header style={{
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
-            padding: "24px 5%",
+            padding: isMobile ? "16px 5%" : "24px 5%",
             position: "relative",
             zIndex: 10
         }}>
             <div
-                style={{ cursor: "pointer", transition: "transform 0.2s", width: "160px" }}
+                style={{ cursor: "pointer", transition: "transform 0.2s", width: isMobile ? "130px" : "160px" }}
                 onClick={() => navigate("/")}
                 onMouseOver={(e) => e.currentTarget.style.transform = "scale(1.02)"}
                 onMouseOut={(e) => e.currentTarget.style.transform = "scale(1)"}
@@ -22,13 +30,16 @@ const Navbar = ({ user, isLightMode, toggleTheme, navigate }) => {
                 <img src="/utkristi-colabs.png" alt="Logo" style={{ width: "100%", height: "auto", display: "block" }} />
             </div>
 
-            <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: isMobile ? "8px" : "12px" }}>
                 {user ? (
                     <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                         <button
                             onClick={() => navigate("/dashboard")}
+                            title="Dashboard"
                             style={{
-                                display: "flex", alignItems: "center", gap: "10px", padding: "0 20px",
+                                display: "flex", alignItems: "center", justifyContent: "center",
+                                gap: "10px", padding: isMobile ? "0" : "0 20px",
+                                width: isMobile ? "44px" : "auto",
                                 height: "44px",
                                 background: "linear-gradient(135deg, var(--primary) 0%, #2563eb 100%)",
                                 border: "none",
@@ -45,7 +56,8 @@ const Navbar = ({ user, isLightMode, toggleTheme, navigate }) => {
                                 e.currentTarget.style.boxShadow = "0 4px 15px -3px rgba(59, 130, 246, 0.4)";
                             }}
                         >
-                            <LayoutDashboard size={18} /> Dashboard
+                            <LayoutDashboard size={18} />
+                            {!isMobile && <span>Dashboard</span>}
                         </button>
                         <button
                             onClick={logout}

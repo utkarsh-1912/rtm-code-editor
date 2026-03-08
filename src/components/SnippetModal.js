@@ -63,6 +63,35 @@ const SnippetModal = ({ isOpen, onClose, onImport, userId, code: currentCode, la
         }
     };
 
+    const handleSync = async (snippet) => {
+        if (!currentCode) return toast.error("No code to sync");
+
+        setIsSaving(true);
+        try {
+            const backendUrl = getBackendUrl();
+            const response = await fetch(`${backendUrl}/api/snippets/${snippet.id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    title: snippet.title,
+                    code: currentCode,
+                    language: snippet.language
+                })
+            });
+
+            if (response.ok) {
+                toast.success(`Synced with ${snippet.title}`);
+                fetchSnippets();
+            } else {
+                throw new Error("Failed to sync");
+            }
+        } catch (err) {
+            toast.error("Sync failed");
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
     const filteredSnippets = snippets.filter(s =>
         s.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
         s.language.toLowerCase().includes(searchTerm.toLowerCase())
@@ -153,7 +182,7 @@ const SnippetModal = ({ isOpen, onClose, onImport, userId, code: currentCode, la
                                                 <span style={langBadgeStyle}>{snippet.language}</span>
                                             </div>
                                             <div style={previewStyle}>
-                                                <code>{snippet.code.slice(0, 100)}{snippet.code.length > 100 ? '...' : ''}</code>
+                                                <code>{snippet.code.slice(0, 80)}{snippet.code.length > 80 ? '...' : ''}</code>
                                             </div>
                                         </div>
                                         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -161,13 +190,14 @@ const SnippetModal = ({ isOpen, onClose, onImport, userId, code: currentCode, la
                                                 onClick={() => onImport(snippet.code, 'insert')}
                                                 style={actionButtonStyle(true)}
                                             >
-                                                <Import size={14} /> Insert
+                                                Add Snippet
                                             </button>
                                             <button
-                                                onClick={() => onImport(snippet.code, 'replace')}
+                                                onClick={() => handleSync(snippet)}
+                                                disabled={isSaving}
                                                 style={actionButtonStyle(false)}
                                             >
-                                                Full Replace
+                                                Sync Changes
                                             </button>
                                         </div>
                                     </div>
