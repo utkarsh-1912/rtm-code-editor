@@ -12,14 +12,14 @@ const Settings = () => {
 
     return (
         <AppLayout>
-            <div style={{ maxWidth: '1000px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '40px' }}>
+            <div className="settings-container" style={{ maxWidth: '1000px', width: '100%' }}>
+                <div className="settings-header" style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '40px' }}>
                     <SettingsIcon size={32} style={{ color: 'var(--primary)' }} />
-                    <h1 style={{ fontSize: '32px', fontWeight: '700' }}>Account Settings</h1>
+                    <h1 className="settings-title" style={{ fontSize: '32px', fontWeight: '700' }}>Account Settings</h1>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '32px' }}>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <div className="settings-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '32px' }}>
+                    <div className="settings-nav" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                         {sections.map(section => (
                             <button
                                 key={section.id}
@@ -43,8 +43,8 @@ const Settings = () => {
                         ))}
                     </div>
 
-                    <div style={{ backgroundColor: 'var(--bg-card)', padding: '40px', borderRadius: '20px', border: '1px solid var(--border-color)', flex: 1 }}>
-                        <h3 style={{ fontSize: '20px', fontWeight: '700', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <div className="settings-content" style={{ backgroundColor: 'var(--bg-card)', padding: '40px', borderRadius: '20px', border: '1px solid var(--border-color)', flex: 1 }}>
+                        <h3 className="section-title" style={{ fontSize: '20px', fontWeight: '700', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '12px' }}>
                             Personal Information
                         </h3>
                         <p style={{ color: 'var(--text-muted)', marginBottom: '32px' }}>Manage your profile details and preference settings here.</p>
@@ -60,6 +60,31 @@ const Settings = () => {
                     </div>
                 </div>
             </div>
+
+            <style>{`
+                @media (max-width: 768px) {
+                    .settings-container {
+                        padding: 0 4px !important;
+                    }
+                    .settings-header {
+                        margin-bottom: 30px !important;
+                    }
+                    .settings-title {
+                        font-size: 24px !important;
+                    }
+                    .settings-grid {
+                        grid-template-columns: 1fr !important;
+                        gap: 20px !important;
+                    }
+                    .settings-nav {
+                        order: 2;
+                    }
+                    .settings-content {
+                        padding: 24px !important;
+                        order: 1;
+                    }
+                }
+            `}</style>
         </AppLayout>
     );
 };

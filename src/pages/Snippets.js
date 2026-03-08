@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Code, Database, Search, Filter, Plus, Terminal, Trash2, Edit2, Copy, Check, MoreVertical } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Database, Search, Plus, Trash2, Edit2, Copy, Check } from 'lucide-react';
 import AppLayout from '../components/AppLayout';
 import { useAuth } from '../context/AuthContext';
 import { getBackendUrl } from '../utils/api';
@@ -17,7 +17,7 @@ const Snippets = () => {
     const [activeSnippet, setActiveSnippet] = useState(null);
     const [formData, setFormData] = useState({ title: '', code: '', language: 'javascript' });
 
-    const fetchSnippets = async () => {
+    const fetchSnippets = useCallback(async () => {
         if (!user) return;
         try {
             const backendUrl = getBackendUrl();
@@ -29,11 +29,11 @@ const Snippets = () => {
         } finally {
             setLoading(false);
         }
-    };
+    }, [user]);
 
     useEffect(() => {
         fetchSnippets();
-    }, [user]);
+    }, [fetchSnippets]);
 
     const handleAction = async (e) => {
         e.preventDefault();
@@ -97,20 +97,21 @@ const Snippets = () => {
 
     return (
         <AppLayout>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '40px' }}>
+            <div className="snippets-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '40px' }}>
                 <div>
-                    <h1 style={{ fontSize: '32px', fontWeight: '800', marginBottom: '8px', letterSpacing: '-0.5px' }}>My Library</h1>
+                    <h1 className="library-title" style={{ fontSize: '32px', fontWeight: '800', marginBottom: '8px', letterSpacing: '-0.5px' }}>My Library</h1>
                     <p style={{ color: 'var(--text-muted)' }}>Store and manage your most used code fragments.</p>
                 </div>
                 <button
                     onClick={() => openModal('create')}
+                    className="new-snippet-btn"
                     style={primaryButtonStyle}
                 >
                     <Plus size={20} /> New Snippet
                 </button>
             </div>
 
-            <div style={{
+            <div className="library-container" style={{
                 backgroundColor: 'var(--bg-card)',
                 borderRadius: '24px',
                 border: '1px solid var(--border-color)',
@@ -120,7 +121,7 @@ const Snippets = () => {
                 flexDirection: 'column'
             }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '32px', gap: '20px' }}>
-                    <div style={searchContainerStyle}>
+                    <div className="search-box" style={searchContainerStyle}>
                         <Search size={18} color="var(--text-muted)" />
                         <input
                             placeholder="Search in snippets..."
@@ -136,13 +137,13 @@ const Snippets = () => {
                         Organizing your collection...
                     </div>
                 ) : filteredSnippets.length > 0 ? (
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))', gap: '16px' }}>
+                    <div className="snippets-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))', gap: '16px' }}>
                         {filteredSnippets.map((snippet) => (
-                            <div key={snippet.id} style={snippetCardStyle}>
+                            <div key={snippet.id} className="snippet-card" style={snippetCardStyle}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', maxWidth: '70%' }}>
                                         <div style={langBadgeStyle}>{snippet.language}</div>
-                                        <h4 style={{ fontWeight: '700', fontSize: '16px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '180px' }}>{snippet.title}</h4>
+                                        <h4 style={{ fontWeight: '700', fontSize: '16px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{snippet.title}</h4>
                                     </div>
                                     <div style={{ display: 'flex', gap: '8px' }}>
                                         <button onClick={() => copyToClipboard(snippet.id, snippet.code)} style={iconButtonStyle}>
@@ -176,7 +177,7 @@ const Snippets = () => {
             {/* Modals */}
             {(showModal === 'create' || showModal === 'edit') && (
                 <div style={modalOverlayStyle}>
-                    <div style={modalContentStyle}>
+                    <div className="snippet-modal" style={modalContentStyle}>
                         <h3 style={{ fontSize: '24px', fontWeight: '800', marginBottom: '32px' }}>
                             {showModal === 'create' ? 'Create New Snippet' : 'Edit Snippet'}
                         </h3>
@@ -230,7 +231,7 @@ const Snippets = () => {
 
             {showModal === 'delete' && (
                 <div style={modalOverlayStyle}>
-                    <div style={{ ...modalContentStyle, maxWidth: '420px', textAlign: 'center' }}>
+                    <div className="snippet-modal" style={{ ...modalContentStyle, maxWidth: '420px', textAlign: 'center' }}>
                         <div style={{ color: '#f87171', marginBottom: '20px' }}><Trash2 size={48} /></div>
                         <h3 style={{ fontSize: '20px', fontWeight: '800', marginBottom: '12px' }}>Remove Snippet?</h3>
                         <p style={{ color: 'var(--text-muted)', marginBottom: '32px', lineHeight: '1.6' }}>
@@ -243,6 +244,37 @@ const Snippets = () => {
                     </div>
                 </div>
             )}
+
+            <style>{`
+                @media (max-width: 768px) {
+                    .snippets-header {
+                        flex-direction: column !important;
+                        align-items: flex-start !important;
+                        gap: 20px;
+                    }
+                    .library-title {
+                        font-size: 26px !important;
+                    }
+                    .new-snippet-btn {
+                        width: 100% !important;
+                        justify-content: center;
+                    }
+                    .library-container {
+                        padding: 24px !important;
+                    }
+                    .search-box {
+                        max-width: 100% !important;
+                    }
+                    .snippets-grid {
+                        grid-template-columns: 1fr !important;
+                    }
+                    .snippet-modal {
+                        padding: 24px !important;
+                        max-height: 90vh;
+                        overflow-y: auto;
+                    }
+                }
+            `}</style>
         </AppLayout>
     );
 };

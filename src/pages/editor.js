@@ -51,6 +51,12 @@ function Editor() {
 
   const [clients, setClients] = useState([]);
   const [language, setLanguage] = useState(LANGUAGES[0].value);
+  const languageRef = useRef(language);
+
+  useEffect(() => {
+    languageRef.current = language;
+  }, [language]);
+
   const [theme] = useState(THEMES[0]);
   const [currentCode, setCurrentCode] = useState(codeRef.current);
 
@@ -222,6 +228,11 @@ function Editor() {
             socketRef.current.emit(ACTIONS.SYNC_CODE, {
               socketId,
               code: codeRef.current,
+            });
+            // Also sync current language to the newly joined peer
+            socketRef.current.emit(ACTIONS.SYNC_LANGUAGE, {
+              roomId,
+              language: languageRef.current,
             });
           }
         }

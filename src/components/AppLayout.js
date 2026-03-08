@@ -13,19 +13,26 @@ const AppLayout = ({ children }) => {
             <Sidebar />
             <main className="dashboard-content" style={{
                 flex: 1,
-                marginLeft: '260px',
+                marginLeft: 'var(--sidebar-width, 260px)',
                 padding: '48px',
-                transition: 'all 0.3s',
-                minWidth: 0 // Prevent flex children from overflowing
+                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                minWidth: 0,
+                position: 'relative',
+                zIndex: 1
             }}>
                 {children}
             </main>
 
             <style>{`
+                :root {
+                    --sidebar-width: 260px;
+                }
                 @media (max-width: 768px) {
+                    :root {
+                        --sidebar-width: 0px;
+                    }
                     .dashboard-content {
-                        margin-left: 0 !important;
-                        padding: 30px 20px 100px !important;
+                        padding: 24px 16px 100px !important;
                     }
                 }
             `}</style>

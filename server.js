@@ -153,9 +153,12 @@ io.on("connection", (socket) => {
         if (!roomChatHistory[roomId]) {
           roomChatHistory[roomId] = dbRoom.chat_history || [];
         }
-        // Send existing code to the joining user
-        if (dbRoom.code) {
+        // Send existing code and language to the joining user
+        if (dbRoom.code !== null) {
           socket.emit(ACTIONS.CODE_CHANGE, { code: dbRoom.code });
+        }
+        if (dbRoom.language) {
+          socket.emit(ACTIONS.SYNC_LANGUAGE, { language: dbRoom.language });
         }
       } else {
         // New room, create entry
@@ -262,6 +265,8 @@ io.on("connection", (socket) => {
 
   socket.on(ACTIONS.SYNC_LANGUAGE, ({ roomId, language }) => {
     socket.in(roomId).emit(ACTIONS.SYNC_LANGUAGE, { language });
+    // Save to DB
+    db.updateRoomLanguage(roomId, language).catch(err => console.error("DB Language Update Error:", err));
   });
 
   socket.on(ACTIONS.CURSOR_MOVE, ({ roomId, cursor, userName }) => {

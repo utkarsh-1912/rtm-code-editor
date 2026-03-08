@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import {
@@ -37,7 +37,7 @@ const Dashboard = () => {
         }
     }, [user, loading, navigate]);
 
-    const fetchDashboardData = async () => {
+    const fetchDashboardData = useCallback(async () => {
         if (!user) return;
         try {
             const backendUrl = getBackendUrl();
@@ -52,11 +52,11 @@ const Dashboard = () => {
         } finally {
             setLoadingRooms(false);
         }
-    };
+    }, [user]);
 
     useEffect(() => {
         fetchDashboardData();
-    }, [user]);
+    }, [fetchDashboardData]);
 
     const handleDeleteRoom = async (roomId) => {
         try {
@@ -113,16 +113,16 @@ const Dashboard = () => {
 
     return (
         <AppLayout>
-            {/* Header */}
-            <div style={{ marginBottom: '48px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+            <div className="dashboard-header" style={{ marginBottom: '48px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
                 <div>
-                    <h1 style={{ fontSize: '36px', fontWeight: '800', marginBottom: '8px', letterSpacing: '-0.02em' }}>
-                        Welcome back, <span style={{ color: 'var(--primary)' }}>{user.name.split('')[0]}</span>
+                    <h1 className="welcome-text" style={{ fontSize: '36px', fontWeight: '800', marginBottom: '8px', letterSpacing: '-0.02em' }}>
+                        Welcome back, <span style={{ color: 'var(--primary)' }}>{user.name.split(' ')[0]}</span>
                     </h1>
                     <p style={{ color: 'var(--text-muted)', fontSize: '16px' }}>Manage your collaborative codebases and rooms.</p>
                 </div>
                 <button
                     onClick={() => navigate('/')}
+                    className="create-room-btn"
                     style={{
                         display: 'flex',
                         alignItems: 'center',
@@ -136,7 +136,8 @@ const Dashboard = () => {
                         fontSize: '15px',
                         cursor: 'pointer',
                         boxShadow: '0 8px 24px rgba(0, 59, 251, 0.25)',
-                        transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
+                        transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                        whiteSpace: 'nowrap'
                     }}
                     onMouseOver={(e) => e.currentTarget.style.transform = 'translateY(-3px)'}
                     onMouseOut={(e) => e.currentTarget.style.transform = 'translateY(0)'}
@@ -146,7 +147,7 @@ const Dashboard = () => {
             </div>
 
             {/* Stats Section */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '24px', marginBottom: '56px' }}>
+            <div className="stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '24px', marginBottom: '56px' }}>
                 <div style={statCardStyle('rgba(59, 130, 246, 0.1)')}>
                     <div style={iconBoxStyle('var(--primary)')}><Terminal size={22} /></div>
                     <div>
@@ -178,9 +179,9 @@ const Dashboard = () => {
                 overflow: 'hidden',
                 boxShadow: '0 4px 30px rgba(0, 0, 0, 0.03)'
             }}>
-                <div style={{ padding: '32px', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '20px' }}>
+                <div className="list-toolbar" style={{ padding: '32px', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '20px' }}>
                     <h3 style={{ fontSize: '20px', fontWeight: '700' }}>Recent Experience</h3>
-                    <div style={{
+                    <div className="search-container" style={{
                         position: 'relative',
                         width: '100%',
                         maxWidth: '360px'
@@ -211,10 +212,11 @@ const Dashboard = () => {
                     {loadingRooms ? (
                         <div style={{ padding: '80px', textAlign: 'center', color: 'var(--text-muted)' }}>Synchronizing with cloud...</div>
                     ) : filteredRooms.length > 0 ? (
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))', gap: '12px', padding: '16px' }}>
+                        <div className="room-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))', gap: '12px', padding: '16px' }}>
                             {filteredRooms.map((room) => (
                                 <div
                                     key={room.id}
+                                    className="room-card"
                                     style={{
                                         padding: '24px',
                                         backgroundColor: 'var(--bg-dark)',
@@ -225,14 +227,18 @@ const Dashboard = () => {
                                         cursor: 'default'
                                     }}
                                     onMouseOver={(e) => {
-                                        e.currentTarget.style.transform = 'translateY(-4px)';
-                                        e.currentTarget.style.borderColor = 'rgba(59, 130, 246, 0.3)';
-                                        e.currentTarget.style.boxShadow = '0 12px 24px rgba(0,0,0,0.1)';
+                                        if (window.innerWidth > 768) {
+                                            e.currentTarget.style.transform = 'translateY(-4px)';
+                                            e.currentTarget.style.borderColor = 'rgba(59, 130, 246, 0.3)';
+                                            e.currentTarget.style.boxShadow = '0 12px 24px rgba(0,0,0,0.1)';
+                                        }
                                     }}
                                     onMouseOut={(e) => {
-                                        e.currentTarget.style.transform = 'translateY(0)';
-                                        e.currentTarget.style.borderColor = 'var(--border-color)';
-                                        e.currentTarget.style.boxShadow = 'none';
+                                        if (window.innerWidth > 768) {
+                                            e.currentTarget.style.transform = 'translateY(0)';
+                                            e.currentTarget.style.borderColor = 'var(--border-color)';
+                                            e.currentTarget.style.boxShadow = 'none';
+                                        }
                                     }}
                                 >
                                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '20px' }}>
@@ -385,6 +391,36 @@ const Dashboard = () => {
                     </div>
                 </div>
             )}
+
+            <style>{`
+                @media (max-width: 768px) {
+                    .dashboard-header {
+                        flex-direction: column !important;
+                        align-items: flex-start !important;
+                        gap: 24px;
+                    }
+                    .welcome-text {
+                        font-size: 28px !important;
+                    }
+                    .create-room-btn {
+                        width: 100% !important;
+                        justify-content: center;
+                    }
+                    .stats-grid {
+                        grid-template-columns: 1fr !important;
+                    }
+                    .list-toolbar {
+                        padding: 24px !important;
+                    }
+                    .search-container {
+                        max-width: 100% !important;
+                    }
+                    .room-grid {
+                        grid-template-columns: 1fr !important;
+                        padding: 12px !important;
+                    }
+                }
+            `}</style>
         </AppLayout>
     );
 };

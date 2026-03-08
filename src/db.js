@@ -40,6 +40,17 @@ async function updateRoomCode(roomId, code) {
 }
 
 /**
+ * Update just the language
+ */
+async function updateRoomLanguage(roomId, language) {
+    return await sql`
+        UPDATE rooms 
+        SET language = ${language}, updated_at = CURRENT_TIMESTAMP 
+        WHERE room_id = ${roomId}
+    `;
+}
+
+/**
  * Update just the chat
  */
 async function updateRoomChat(roomId, chatHistory) {
@@ -263,6 +274,7 @@ module.exports = {
     getRoom,
     saveRoom,
     updateRoomCode,
+    updateRoomLanguage,
     updateRoomChat,
     findOrCreateUser,
     linkRoomToUser,
