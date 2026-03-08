@@ -49,9 +49,9 @@ const Footer = ({ isLightMode }) => {
                         backgroundColor: isOnline ? "#4ade80" : "#f87171",
                         boxShadow: `0 0 10px ${isOnline ? "#4ade80" : "#f87171"}`
                     }}></div>
-                    <span style={{ fontWeight: "600" }}>
+                    {/* <span style={{ fontWeight: "600" }}>
                         {isOnline ? "System Online" : "System Offline"}
-                    </span>
+                    </span> */}
                 </div>
                 <span>&copy; 2026 Utkristi Colabs. All rights reserved.</span>
             </div>
