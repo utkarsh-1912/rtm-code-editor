@@ -8,27 +8,30 @@ export default function Privacy() {
 
             <h2 style={{ color: "var(--text-main)", marginTop: "40px", marginBottom: "20px" }}>1. Information We Collect</h2>
             <p>
-                Utkristi Colabs is designed to be a privacy-focused tool. We do not require account creation to use the core features. We only collect minimal information necessary to facilitate real-time collaboration:
+                Utkristi Colabs collects minimal information to provide a professional collaborative experience:
             </p>
             <ul>
-                <li><strong>Display Name:</strong> The name you choose when joining a room, visible only to participants in that room.</li>
-                <li><strong>Socket ID:</strong> A temporary identifier used to route messages and code updates.</li>
-                <li><strong>Room ID:</strong> A unique identifier for your collaboration session.</li>
+                <li><strong>Account Data:</strong> If you sign in via Google or GitHub, we store your email, name, and profile picture to manage your workspaces.</li>
+                <li><strong>User Profiles:</strong> Information about your bio, social links, and editor preferences (theme, font size) is stored securely.</li>
+                <li><strong>Session Metadata:</strong> We track active sessions (device type, user agent) to allow you to manage and remotely sign out of other devices for security.</li>
             </ul>
 
             <h2 style={{ color: "var(--text-main)", marginTop: "40px", marginBottom: "20px" }}>2. Data Persistence</h2>
             <p>
-                <strong>Your Code:</strong> We do not store your code in a permanent database. Code is synchronized across participants in real-time. We use local storage on your device to help you recover work if you accidentally refresh the page, but this data never leaves your machine unless shared through the socket connection.
+                <strong>Your Code & Workspaces:</strong> Unlike ephemeral editors, Utkristi Colabs uses a PostgreSQL backend to persist your rooms, code, and chat history. This allows you to revisit your work across different devices seamlessly.
+            </p>
+            <p>
+                <strong>Snippets:</strong> Any code you save to your personal "Snippets Library" is stored permanently until you choose to delete it.
             </p>
 
             <h2 style={{ color: "var(--text-main)", marginTop: "40px", marginBottom: "20px" }}>3. Third-Party Services</h2>
             <p>
-                We use <strong>Judge0 (via RapidAPI)</strong> to provide code execution features. When you click "Run Code", your source code and selected language are sent to their servers for processing. Please refer to their respective privacy policies regarding how they handle execution data.
+                We use <strong>Judge0</strong> for code execution and <strong>Neon DB (PostgreSQL)</strong> for data persistence. Authentication is handled via <strong>Firebase Auth</strong>. Please refer to their respective policies for further details.
             </p>
 
             <h2 style={{ color: "var(--text-main)", marginTop: "40px", marginBottom: "20px" }}>4. Security</h2>
             <p>
-                While we use industry-standard WebSocket protocols (Socket.io), please be aware that URLs containing Room IDs serve as invitation tokens. Sharing these links gives anyone access to your live session.
+                We provide a dedicated <strong>Security</strong> dashboard where you can see all devices currently logged into your account and remotely terminate any unrecognized sessions.
             </p>
         </ContentLayout>
     );

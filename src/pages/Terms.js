@@ -11,25 +11,24 @@ export default function Terms() {
                 By accessing Utkristi Colabs, you agree to be bound by these terms. If you do not agree, please do not use the service.
             </p>
 
-            <h2 style={{ color: "var(--text-main)", marginTop: "40px", marginBottom: "20px" }}>2. Proper Use</h2>
+            <h2 style={{ color: "var(--text-main)", marginTop: "40px", marginBottom: "20px" }}>2. User Accounts</h2>
             <p>
-                You are responsible for your own conduct and any code you share or execute using our platform. You agree NOT to:
-            </p>
-            <ul>
-                <li>Use the service for any illegal or unauthorized purpose.</li>
-                <li>Attempt to circumvent any code execution limits or bandwidth restrictions.</li>
-                <li>Share sensitive, private, or proprietary information that you do not have the right to distribute.</li>
-                <li>Use the code execution environment to launch attacks, mine cryptocurrency, or perform any malicious activities.</li>
-            </ul>
-
-            <h2 style={{ color: "var(--text-main)", marginTop: "40px", marginBottom: "20px" }}>3. Termination</h2>
-            <p>
-                We reserve the right to terminate access to any room or the service entirely if we detect abuse or violations of these terms.
+                You are responsible for maintaining the security of your account and any activities that occur under your session. You must notify us immediately of any unauthorized use of your account.
             </p>
 
-            <h2 style={{ color: "var(--text-main)", marginTop: "40px", marginBottom: "20px" }}>4. Disclaimer of Warranty</h2>
+            <h2 style={{ color: "var(--text-main)", marginTop: "40px", marginBottom: "20px" }}>3. Proper Use</h2>
             <p>
-                Utkristi Colabs is provided "as is" and "as available" without any warranty of any kind. We do not guarantee that the service will be uninterrupted or error-free. Your use of the service is at your own risk.
+                You are responsible for your own conduct and any code you save, share, or execute using our platform. You agree NOT to use the code execution environment to launch attacks, mine cryptocurrency, or perform any malicious activities.
+            </p>
+
+            <h2 style={{ color: "var(--text-main)", marginTop: "40px", marginBottom: "20px" }}>4. Persistent Data</h2>
+            <p>
+                While we strive for 100% data availability, Utkristi Colabs is not intended as a primary backup service. You are encouraged to maintain local copies of your critical code snippets and room data.
+            </p>
+
+            <h2 style={{ color: "var(--text-main)", marginTop: "40px", marginBottom: "20px" }}>5. Disclaimer of Warranty</h2>
+            <p>
+                Utkristi Colabs is provided "as is" and "as available" without any warranty of any kind. Your use of the service is at your own risk.
             </p>
         </ContentLayout>
     );

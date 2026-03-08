@@ -13,15 +13,15 @@ export default function About() {
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "30px", marginTop: "20px" }}>
                 <div>
                     <h3 style={{ display: "flex", alignItems: "center", gap: "10px", fontSize: "18px", color: "var(--primary)" }}>
-                        <Code size={20} /> Real-time Sync
+                        <Code size={20} /> Persistent Workspaces
                     </h3>
-                    <p>Experience sub-millisecond latency with our advanced WebSocket integration. What you type is what they see, instantly.</p>
+                    <p>Sub-millisecond latency for real-time sync, now backed by PostgreSQL. Your code and chat history are saved automatically, letting you resume work anytime.</p>
                 </div>
                 <div>
                     <h3 style={{ display: "flex", alignItems: "center", gap: "10px", fontSize: "18px", color: "#f87171" }}>
-                        <Zap size={20} /> Instant Execution
+                        <Zap size={20} /> Professional Dashboard
                     </h3>
-                    <p>Run your code across multiple languages including Python, C++, Java, and JavaScript, powered by the Judge0 API.</p>
+                    <p>Manage all your collaborative rooms in one place. Rename, delete, or revisit your workspaces with our one-click "Revisit Last Room" feature.</p>
                 </div>
                 <div>
                     <h3 style={{ display: "flex", alignItems: "center", gap: "10px", fontSize: "18px", color: "#fbbf24" }}>
@@ -31,15 +31,15 @@ export default function About() {
                 </div>
                 <div>
                     <h3 style={{ display: "flex", alignItems: "center", gap: "10px", fontSize: "18px", color: "#a855f7" }}>
-                        <Terminal size={20} /> Custom Stdin
+                        <Terminal size={20} /> Snippets Library
                     </h3>
-                    <p>Test your logic with custom standard input. Essential for competitive programming and complex data-driven debugging.</p>
+                    <p>Build your personal vault of reusable code. Save, organize, and search through your code snippets with our built-in Snippets Library.</p>
                 </div>
                 <div>
                     <h3 style={{ display: "flex", alignItems: "center", gap: "10px", fontSize: "18px", color: "#ec4899" }}>
                         <Settings size={20} /> Tailored Editor
                     </h3>
-                    <p>Make the workspace yours. Customize font size, tab spacing, and word wrap settings that persist across your sessions.</p>
+                    <p>Make the workspace yours. Customize font size, tab spacing, and word wrap settings that persist across your sessions through your Profile.</p>
                 </div>
                 <div>
                     <h3 style={{ display: "flex", alignItems: "center", gap: "10px", fontSize: "18px", color: "#60a5fa" }}>
@@ -51,13 +51,13 @@ export default function About() {
                     <h3 style={{ display: "flex", alignItems: "center", gap: "10px", fontSize: "18px", color: "#4ade80" }}>
                         <Users size={20} /> Collaborative Chat
                     </h3>
-                    <p>Communicate effectively with built-in chat support for emojis and real-time status updates, keeping communication in-context.</p>
+                    <p>Communicate effectively with built-in chat support and persistent history, keeping communication in-context across device reboots.</p>
                 </div>
                 <div>
                     <h3 style={{ display: "flex", alignItems: "center", gap: "10px", fontSize: "18px", color: "var(--text-muted)" }}>
-                        <Shield size={20} /> Privacy First
+                        <Shield size={20} /> Security & Privacy
                     </h3>
-                    <p>Your code is shared only with those you invite. We do not persist your code on our servers longer than necessary for the session.</p>
+                    <p>Manage your account security with ease. Track active sessions across devices and remotely sign out for complete control over your data.</p>
                 </div>
             </div>
 
