@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Search, X, Import, Library } from 'lucide-react';
+import { Search, X, Import, ImportIcon } from 'lucide-react';
 import { getBackendUrl } from '../utils/api';
 import toast from 'react-hot-toast';
 
@@ -79,7 +79,7 @@ const SnippetModal = ({ isOpen, onClose, onImport, userId }) => {
                             justifyContent: 'center',
                             color: 'var(--primary)'
                         }}>
-                            <Library size={22} />
+                            <ImportIcon size={22} />
                         </div>
                         <div>
                             <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '700', color: 'var(--text-main)' }}>Import Snippet</h3>
