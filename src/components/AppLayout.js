@@ -100,14 +100,16 @@ const AppLayout = ({ children }) => {
                 onToggleCollapse={toggleSidebarCollapse}
             />
 
-            <div style={{
-                flex: 1,
-                display: 'flex',
-                flexDirection: 'column',
-                marginLeft: isSidebarCollapsed ? '72px' : 'var(--sidebar-width)',
-                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                width: '100%'
-            }}>
+            <div
+                className="main-layout-container"
+                style={{
+                    flex: 1,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                    width: '100%'
+                }}
+            >
                 {/* Industry Standard Header */}
                 <header style={{
                     height: '64px',
@@ -227,10 +229,14 @@ const AppLayout = ({ children }) => {
 
             <style>{`
                 :root {
-                    --sidebar-width: 240px;
+                    --sidebar-width: ${isSidebarCollapsed ? '72px' : '240px'};
+                }
+                .main-layout-container {
+                    margin-left: var(--sidebar-width);
                 }
                 @media (max-width: 992px) {
-                    :root { --sidebar-width: 0px; }
+                    :root { --sidebar-width: 0px !important; }
+                    .main-layout-container { margin-left: 0 !important; }
                     .mobile-only { display: flex !important; }
                     .desktop-inline { display: none !important; }
                     .sidebar-desktop { display: none !important; }
