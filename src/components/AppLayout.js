@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import Sidebar from './Sidebar';
-import { Search, Bell } from 'lucide-react';
+import { Search, Bell, Sun, Moon } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import SearchModal from './SearchModal';
 import NotificationCenter from './NotificationCenter';
@@ -8,9 +8,33 @@ import NotificationCenter from './NotificationCenter';
 const AppLayout = ({ children }) => {
     const { user } = useAuth();
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+    const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
+        return localStorage.getItem('sidebar-collapsed') === 'true';
+    });
     const [isSearchOpen, setIsSearchOpen] = useState(false);
     const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
     const [hasUnread, setHasUnread] = useState(false);
+    const [isLightMode, setIsLightMode] = useState(() => {
+        return document.documentElement.classList.contains('light-theme');
+    });
+
+    const toggleTheme = () => {
+        const newMode = !isLightMode;
+        setIsLightMode(newMode);
+        if (newMode) {
+            document.documentElement.classList.add('light-theme');
+            localStorage.setItem('app-theme', 'light');
+        } else {
+            document.documentElement.classList.remove('light-theme');
+            localStorage.setItem('app-theme', 'dark');
+        }
+    };
+
+    const toggleSidebarCollapse = () => {
+        const newState = !isSidebarCollapsed;
+        setIsSidebarCollapsed(newState);
+        localStorage.setItem('sidebar-collapsed', newState);
+    };
 
     // Fetch unread status
     const checkNotifications = React.useCallback(async () => {
@@ -70,14 +94,18 @@ const AppLayout = ({ children }) => {
                 onClose={() => setIsSidebarOpen(false)}
             />
 
-            <Sidebar isMobile={false} />
+            <Sidebar
+                isMobile={false}
+                isCollapsed={isSidebarCollapsed}
+                onToggleCollapse={toggleSidebarCollapse}
+            />
 
             <div style={{
                 flex: 1,
                 display: 'flex',
                 flexDirection: 'column',
-                marginLeft: 'var(--sidebar-width)',
-                transition: 'margin 0.3s ease',
+                marginLeft: isSidebarCollapsed ? '72px' : 'var(--sidebar-width)',
+                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
                 width: '100%'
             }}>
                 {/* Industry Standard Header */}
@@ -127,23 +155,37 @@ const AppLayout = ({ children }) => {
                                 onClose={() => setIsNotificationsOpen(false)}
                             />
                         </div>
-                        <div style={{ width: '1px', height: '24px', backgroundColor: 'var(--border-color)', margin: '0 4px' }}></div>
+
+                        {/* Theme Toggle for Large Screens (Replaces PFP) */}
+                        <div className="desktop-inline" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                            <div style={{ width: '1px', height: '24px', backgroundColor: 'var(--border-color)', margin: '0 4px' }}></div>
+                            <button
+                                onClick={toggleTheme}
+                                style={{
+                                    ...headerIconStyle,
+                                    color: isLightMode ? '#f59e0b' : 'var(--text-muted)',
+                                    backgroundColor: isLightMode ? 'rgba(245, 158, 11, 0.1)' : 'transparent'
+                                }}
+                                title={isLightMode ? "Switch to Dark Mode" : "Switch to Light Mode"}
+                            >
+                                {isLightMode ? <Sun size={20} /> : <Moon size={20} />}
+                            </button>
+                        </div>
+
                         <div
                             onClick={() => {
                                 if (window.innerWidth <= 992) {
                                     setIsSidebarOpen(true);
                                 }
                             }}
+                            className="mobile-only"
                             style={{
-                                display: 'flex',
+                                display: 'none',
                                 alignItems: 'center',
                                 gap: '10px',
-                                cursor: window.innerWidth <= 992 ? 'pointer' : 'default'
+                                cursor: 'pointer'
                             }}
                         >
-                            <span style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-main)', display: 'none' }} className="desktop-inline">
-                                {user?.name}
-                            </span>
                             <div style={{
                                 width: '32px',
                                 height: '32px',
@@ -153,16 +195,8 @@ const AppLayout = ({ children }) => {
                                 display: 'flex',
                                 alignItems: 'center',
                                 justifyContent: 'center',
-                                overflow: 'hidden',
-                                transition: 'transform 0.2s'
-                            }}
-                                onMouseEnter={(e) => {
-                                    if (window.innerWidth <= 992) e.currentTarget.style.transform = 'scale(1.1)';
-                                }}
-                                onMouseLeave={(e) => {
-                                    if (window.innerWidth <= 992) e.currentTarget.style.transform = 'scale(1)';
-                                }}
-                            >
+                                overflow: 'hidden'
+                            }}>
                                 {user?.photoURL ? (
                                     <img src={user.photoURL} alt="pfp" style={{ width: '100%', height: '100%' }} />
                                 ) : (
