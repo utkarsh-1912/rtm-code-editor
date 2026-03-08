@@ -16,6 +16,7 @@ const io = new Server(server, {
 });
 
 app.use(cors());
+app.use(express.json());
 app.use(express.static("build"));
 
 // API Routes
@@ -60,6 +61,62 @@ app.put("/api/rename-room", async (req, res) => {
   } catch (err) {
     console.error("Rename API Error:", err);
     res.status(500).json({ error: "Internal Server Error" });
+  }
+});
+
+/**
+ * Snippets API
+ */
+app.get("/api/snippets", async (req, res) => {
+  try {
+    const { userId } = req.query;
+    if (!userId) return res.status(400).json({ error: "User ID required" });
+    const snippets = await db.getSnippets(userId);
+    res.json(snippets);
+  } catch (err) {
+    res.status(500).json({ error: "Failed to fetch snippets" });
+  }
+});
+
+app.post("/api/snippets", async (req, res) => {
+  try {
+    const { userId, title, code, language } = req.body;
+    const snippet = await db.createSnippet(userId, title, code, language);
+    res.json(snippet[0]);
+  } catch (err) {
+    res.status(500).json({ error: "Failed to create snippet" });
+  }
+});
+
+app.put("/api/snippets/:id", async (req, res) => {
+  try {
+    const { title, code, language } = req.body;
+    const snippet = await db.updateSnippet(req.params.id, title, code, language);
+    res.json(snippet[0]);
+  } catch (err) {
+    res.status(500).json({ error: "Failed to update snippet" });
+  }
+});
+
+app.delete("/api/snippets/:id", async (req, res) => {
+  try {
+    await db.deleteSnippet(req.params.id);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: "Failed to delete snippet" });
+  }
+});
+
+/**
+ * Profile API
+ */
+app.put("/api/user/profile", async (req, res) => {
+  try {
+    const { userId, profileData } = req.body;
+    const updatedUser = await db.updateProfile(userId, profileData);
+    res.json(updatedUser[0]);
+  } catch (err) {
+    res.status(500).json({ error: "Failed to update profile" });
   }
 });
 

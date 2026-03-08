@@ -140,8 +140,59 @@ async function getUserDashboard(userId) {
             lang: r.language,
             lastActive: new Date(r.updated_at).toLocaleString()
         })),
-        stats
+        stats,
+        user: user[0]
     };
+}
+
+/**
+ * Snippets Management
+ */
+async function getSnippets(userId) {
+    const user = await sql`SELECT id FROM users WHERE auth_provider_id = ${userId}`;
+    if (!user.length) return [];
+
+    return await sql`
+        SELECT * FROM snippets 
+        WHERE user_id = ${user[0].id} 
+        ORDER BY updated_at DESC
+    `;
+}
+
+async function createSnippet(userId, title, code, language) {
+    const user = await sql`SELECT id FROM users WHERE auth_provider_id = ${userId}`;
+    if (!user.length) throw new Error("User not found");
+
+    return await sql`
+        INSERT INTO snippets (user_id, title, code, language)
+        VALUES (${user[0].id}, ${title}, ${code}, ${language})
+        RETURNING *
+    `;
+}
+
+async function updateSnippet(snippetId, title, code, language) {
+    return await sql`
+        UPDATE snippets 
+        SET title = ${title}, code = ${code}, language = ${language}, updated_at = CURRENT_TIMESTAMP 
+        WHERE id = ${snippetId}
+        RETURNING *
+    `;
+}
+
+async function deleteSnippet(snippetId) {
+    return await sql`DELETE FROM snippets WHERE id = ${snippetId}`;
+}
+
+/**
+ * User Profile Management
+ */
+async function updateProfile(userId, { name, bio, social_links }) {
+    return await sql`
+        UPDATE users 
+        SET name = ${name}, bio = ${bio}, social_links = ${JSON.stringify(social_links)}
+        WHERE auth_provider_id = ${userId}
+        RETURNING *
+    `;
 }
 
 /**
@@ -170,6 +221,8 @@ async function initializeSchema() {
                 id SERIAL PRIMARY KEY,
                 email VARCHAR(255),
                 name VARCHAR(255),
+                bio TEXT,
+                social_links JSONB DEFAULT '{}',
                 auth_provider_id VARCHAR(255) UNIQUE NOT NULL,
                 joined_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
@@ -182,6 +235,19 @@ async function initializeSchema() {
                 room_id INTEGER REFERENCES rooms(id) ON DELETE CASCADE,
                 linked_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 PRIMARY KEY (user_id, room_id)
+            )
+        `;
+
+        // Snippets Table
+        await sql`
+            CREATE TABLE IF NOT EXISTS snippets (
+                id SERIAL PRIMARY KEY,
+                user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+                title VARCHAR(255) NOT NULL,
+                code TEXT,
+                language VARCHAR(50) DEFAULT 'javascript',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         `;
 
@@ -202,5 +268,10 @@ module.exports = {
     linkRoomToUser,
     unlinkRoomFromUser,
     updateRoomName,
-    getUserDashboard
+    getUserDashboard,
+    getSnippets,
+    createSnippet,
+    updateSnippet,
+    deleteSnippet,
+    updateProfile
 };
