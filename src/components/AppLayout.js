@@ -6,33 +6,40 @@ const AppLayout = ({ children }) => {
         <div style={{
             minHeight: '100vh',
             backgroundColor: 'var(--bg-dark)',
-            color: 'var(--text-main)',
-            fontFamily: 'Inter, sans-serif',
-            display: 'flex'
+            display: 'flex',
+            flexDirection: 'column'
         }}>
             <Sidebar />
-            <main className="dashboard-content" style={{
+            <main className="main-content" style={{
                 flex: 1,
-                marginLeft: 'var(--sidebar-width, 260px)',
-                padding: '48px',
+                marginLeft: 'var(--sidebar-width, 0px)',
                 transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
                 minWidth: 0,
-                position: 'relative',
-                zIndex: 1
+                position: 'relative'
             }}>
-                {children}
+                <div style={{
+                    maxWidth: '1400px',
+                    margin: '0 auto',
+                    padding: '40px 32px'
+                }}>
+                    {children}
+                </div>
             </main>
 
             <style>{`
                 :root {
-                    --sidebar-width: 260px;
+                    --sidebar-width: 280px;
+                }
+                @media (max-width: 1024px) {
+                    :root { --sidebar-width: 240px; }
                 }
                 @media (max-width: 768px) {
-                    :root {
-                        --sidebar-width: 0px;
+                    :root { --sidebar-width: 0px; }
+                    .main-content {
+                        padding-bottom: var(--mobile-nav-height, 80px) !important;
                     }
-                    .dashboard-content {
-                        padding: 24px 16px 100px !important;
+                    .main-content > div {
+                        padding: 24px 16px !important;
                     }
                 }
             `}</style>

@@ -97,131 +97,297 @@ const Snippets = () => {
 
     return (
         <AppLayout>
-            <div className="snippets-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '40px' }}>
-                <div>
-                    <h1 className="library-title" style={{ fontSize: '32px', fontWeight: '800', marginBottom: '8px', letterSpacing: '-0.5px' }}>My Library</h1>
-                    <p style={{ color: 'var(--text-muted)' }}>Store and manage your most used code fragments.</p>
-                </div>
-                <button
-                    onClick={() => openModal('create')}
-                    className="new-snippet-btn"
-                    style={primaryButtonStyle}
-                >
-                    <Plus size={20} /> New Snippet
-                </button>
-            </div>
-
-            <div className="library-container" style={{
-                backgroundColor: 'var(--bg-card)',
-                borderRadius: '24px',
-                border: '1px solid var(--border-color)',
-                padding: '32px',
-                minHeight: '500px',
-                display: 'flex',
-                flexDirection: 'column'
-            }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '32px', gap: '20px' }}>
-                    <div className="search-box" style={searchContainerStyle}>
-                        <Search size={18} color="var(--text-muted)" />
-                        <input
-                            placeholder="Search in snippets..."
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                            style={searchInputStyle}
-                        />
-                    </div>
-                </div>
-
-                {loading ? (
-                    <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)' }}>
-                        Organizing your collection...
-                    </div>
-                ) : filteredSnippets.length > 0 ? (
-                    <div className="snippets-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))', gap: '16px' }}>
-                        {filteredSnippets.map((snippet) => (
-                            <div key={snippet.id} className="snippet-card" style={snippetCardStyle}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', maxWidth: '70%' }}>
-                                        <div style={langBadgeStyle}>{snippet.language}</div>
-                                        <h4 style={{ fontWeight: '700', fontSize: '16px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{snippet.title}</h4>
-                                    </div>
-                                    <div style={{ display: 'flex', gap: '8px' }}>
-                                        <button onClick={() => copyToClipboard(snippet.id, snippet.code)} style={iconButtonStyle}>
-                                            {copiedId === snippet.id ? <Check size={16} color="#10b981" /> : <Copy size={16} />}
-                                        </button>
-                                        <button onClick={() => openModal('edit', snippet)} style={iconButtonStyle}><Edit2 size={16} /></button>
-                                        <button onClick={() => openModal('delete', snippet)} style={{ ...iconButtonStyle, color: '#f87171' }}><Trash2 size={16} /></button>
-                                    </div>
-                                </div>
-                                <div style={codePreviewStyle}>
-                                    <code>{snippet.code.substring(0, 150)}{snippet.code.length > 150 ? '...' : ''}</code>
-                                </div>
-                                <div style={{ marginTop: '16px', fontSize: '11px', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                    <Clock size={12} /> Last updated: {new Date(snippet.updated_at).toLocaleDateString()}
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                ) : (
-                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center' }}>
-                        <div style={emptyIconContainerStyle}><Database size={40} /></div>
-                        <h3 style={{ fontSize: '20px', fontWeight: '700', marginBottom: '12px' }}>Your library is empty</h3>
-                        <p style={{ color: 'var(--text-muted)', maxWidth: '400px', marginBottom: '32px' }}>
-                            Start saving reusable logic to speed up your development workflow.
+            <div className="snippets-page" style={{ padding: '0 20px', maxWidth: '1400px', margin: '0 auto' }}>
+                <div className="snippets-header" style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    marginBottom: '64px',
+                    padding: '20px 0',
+                    borderBottom: '1px solid var(--border-color)',
+                    flexWrap: 'wrap',
+                    gap: '24px'
+                }}>
+                    <div>
+                        <h1 style={{
+                            fontSize: 'clamp(32px, 5vw, 42px)',
+                            fontWeight: '900',
+                            margin: '0 0 12px',
+                            background: 'linear-gradient(135deg, #fff 0%, var(--text-muted) 100%)',
+                            WebkitBackgroundClip: 'text',
+                            WebkitTextFillColor: 'transparent',
+                            letterSpacing: '-1px'
+                        }}>
+                            Snippet Library
+                        </h1>
+                        <p style={{ color: 'var(--text-muted)', fontSize: '16px', fontWeight: '500' }}>
+                            Store and manage your reusable logic blocks.
                         </p>
-                        <button onClick={() => openModal('create')} style={secondaryButtonStyle}>Create First Snippet</button>
                     </div>
-                )}
+                    <button
+                        onClick={() => openModal('create')}
+                        className="glass-effect premium-button"
+                        style={{
+                            padding: '14px 28px',
+                            backgroundColor: 'var(--primary)',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '16px',
+                            fontWeight: '750',
+                            fontSize: '15px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '12px',
+                            cursor: 'pointer',
+                            boxShadow: '0 8px 30px rgba(59, 130, 246, 0.4)',
+                            transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)'
+                        }}
+                    >
+                        <Plus size={20} strokeWidth={3} />
+                        New Snippet
+                    </button>
+                </div>
+
+                <div className="glass-effect" style={{
+                    borderRadius: '32px',
+                    border: '1px solid var(--border-color)',
+                    padding: '40px',
+                    minHeight: '600px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    boxShadow: '0 30px 60px rgba(0,0,0,0.1)'
+                }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '40px', flexWrap: 'wrap', gap: '20px' }}>
+                        <h2 style={{ fontSize: '24px', fontWeight: '800', margin: 0 }}>All Fragments</h2>
+                        <div className="glass-effect" style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '14px',
+                            padding: '14px 24px',
+                            borderRadius: '18px',
+                            width: '100%',
+                            maxWidth: '440px',
+                            border: '1px solid var(--border-color)',
+                            backgroundColor: 'rgba(255, 255, 255, 0.02)'
+                        }}>
+                            <Search size={20} color="var(--text-muted)" />
+                            <input
+                                type="text"
+                                placeholder="Search by title, code or language..."
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                                style={{
+                                    background: 'transparent',
+                                    border: 'none',
+                                    color: 'white',
+                                    fontSize: '15px',
+                                    width: '100%',
+                                    outline: 'none',
+                                    fontWeight: '500'
+                                }}
+                            />
+                        </div>
+                    </div>
+
+                    {loading ? (
+                        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)' }}>
+                            <div className="loader" style={{ marginBottom: '20px' }}></div>
+                            <p style={{ fontWeight: '600' }}>Organizing your collection...</p>
+                        </div>
+                    ) : filteredSnippets.length > 0 ? (
+                        <div className="snippets-grid" style={{
+                            display: 'grid',
+                            gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))',
+                            gap: '32px'
+                        }}>
+                            {filteredSnippets.map((snippet) => (
+                                <div key={snippet.id} className="premium-card glass-effect" style={{
+                                    padding: '28px',
+                                    position: 'relative',
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    gap: '20px'
+                                }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                            <div style={{
+                                                padding: '6px 12px',
+                                                backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                                                color: 'var(--primary)',
+                                                borderRadius: '8px',
+                                                fontSize: '11px',
+                                                fontWeight: '800',
+                                                textTransform: 'uppercase',
+                                                letterSpacing: '0.05em'
+                                            }}>
+                                                {snippet.language}
+                                            </div>
+                                            <h4 style={{
+                                                margin: 0,
+                                                fontWeight: '800',
+                                                fontSize: '18px',
+                                                maxWidth: '180px',
+                                                overflow: 'hidden',
+                                                textOverflow: 'ellipsis',
+                                                whiteSpace: 'nowrap'
+                                            }}>
+                                                {snippet.title}
+                                            </h4>
+                                        </div>
+                                        <div style={{ display: 'flex', gap: '4px' }}>
+                                            <button onClick={() => copyToClipboard(snippet.id, snippet.code)} style={iconButtonStyle} title="Copy Code">
+                                                {copiedId === snippet.id ? <Check size={18} color="#10b981" /> : <Copy size={18} />}
+                                            </button>
+                                            <button onClick={() => openModal('edit', snippet)} style={iconButtonStyle} title="Edit Snippet"><Edit2 size={18} /></button>
+                                            <button onClick={() => openModal('delete', snippet)} style={{ ...iconButtonStyle, color: '#f43f5e' }} title="Delete Snippet"><Trash2 size={18} /></button>
+                                        </div>
+                                    </div>
+
+                                    <div className="glass-effect" style={{
+                                        backgroundColor: 'rgba(0,0,0,0.4)',
+                                        borderRadius: '16px',
+                                        padding: '20px',
+                                        fontSize: '13px',
+                                        fontFamily: 'monospace',
+                                        color: 'rgba(255,255,255,0.7)',
+                                        height: '140px',
+                                        overflow: 'hidden',
+                                        position: 'relative'
+                                    }}>
+                                        <code style={{ whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>
+                                            {snippet.code.substring(0, 200)}{snippet.code.length > 200 ? '...' : ''}
+                                        </code>
+                                        <div style={{
+                                            position: 'absolute',
+                                            bottom: 0,
+                                            left: 0,
+                                            right: 0,
+                                            height: '40px',
+                                            background: 'linear-gradient(transparent, rgba(0,0,0,0.6))',
+                                            pointerEvents: 'none'
+                                        }}></div>
+                                    </div>
+
+                                    <div style={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'space-between',
+                                        fontSize: '12px',
+                                        color: 'var(--text-muted)',
+                                        fontWeight: '600'
+                                    }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                            <div style={{ width: '14px', height: '14px' }}>
+                                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>
+                                            </div>
+                                            {new Date(snippet.updated_at || snippet.created_at).toLocaleDateString()}
+                                        </div>
+                                        <div style={{ color: 'var(--primary)', cursor: 'pointer', fontWeight: '800' }} onClick={() => openModal('edit', snippet)}>
+                                            View Full Content
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    ) : (
+                        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center' }}>
+                            <div style={{
+                                width: '100px',
+                                height: '100px',
+                                borderRadius: '32px',
+                                backgroundColor: 'rgba(59, 130, 246, 0.05)',
+                                color: 'var(--text-muted)',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                marginBottom: '32px'
+                            }}>
+                                <Database size={48} />
+                            </div>
+                            <h3 style={{ fontSize: '26px', fontWeight: '900', marginBottom: '16px' }}>Library is empty</h3>
+                            <p style={{ color: 'var(--text-muted)', maxWidth: '420px', margin: '0 auto 40px', fontSize: '16px', lineHeight: 1.6 }}>
+                                Start building your personal vault of reusable code fragments to accelerate your daily workflow.
+                            </p>
+                            <button onClick={() => openModal('create')} className="premium-button" style={{
+                                padding: '14px 32px',
+                                backgroundColor: 'transparent',
+                                border: '1px solid var(--border-color)',
+                                borderRadius: '14px',
+                                color: 'var(--text-main)',
+                                fontWeight: '700',
+                                cursor: 'pointer',
+                                transition: 'all 0.2s'
+                            }}>
+                                Create First Snippet
+                            </button>
+                        </div>
+                    )}
+                </div>
             </div>
 
             {/* Modals */}
             {(showModal === 'create' || showModal === 'edit') && (
-                <div style={modalOverlayStyle}>
-                    <div className="snippet-modal" style={modalContentStyle}>
-                        <h3 style={{ fontSize: '24px', fontWeight: '800', marginBottom: '32px' }}>
-                            {showModal === 'create' ? 'Create New Snippet' : 'Edit Snippet'}
-                        </h3>
-                        <form onSubmit={handleAction} style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-                            <div>
-                                <label style={labelStyle}>Title</label>
-                                <input
-                                    required
-                                    style={modalInputStyle}
-                                    placeholder="e.g. Auth Guard Middleware"
-                                    value={formData.title}
-                                    onChange={e => setFormData({ ...formData, title: e.target.value })}
-                                />
-                            </div>
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '24px' }}>
+                <div style={modalOverlayStyle} onClick={closeModal}>
+                    <div className="glass-effect premium-card" style={{ ...modalContentStyle, maxWidth: '800px' }} onClick={e => e.stopPropagation()}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '32px' }}>
+                            <h3 style={{ fontSize: '26px', fontWeight: '900', margin: 0 }}>
+                                {showModal === 'create' ? 'Create Snippet' : 'Update Content'}
+                            </h3>
+                            <div style={{ color: 'var(--primary)' }}><Plus size={28} /></div>
+                        </div>
+
+                        <form onSubmit={handleAction} style={{ display: 'flex', flexDirection: 'column', gap: '28px' }}>
+                            <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 2fr) minmax(0, 1fr)', gap: '24px' }}>
+                                <div>
+                                    <label style={labelStyle}>Snippet Title</label>
+                                    <input
+                                        required
+                                        style={modalInputStyle}
+                                        placeholder="e.g. JWT Authentication Hook"
+                                        value={formData.title}
+                                        onChange={e => setFormData({ ...formData, title: e.target.value })}
+                                    />
+                                </div>
                                 <div>
                                     <label style={labelStyle}>Language</label>
-                                    <select
-                                        style={modalInputStyle}
-                                        value={formData.language}
-                                        onChange={e => setFormData({ ...formData, language: e.target.value })}
-                                    >
-                                        <option value="javascript">JavaScript</option>
-                                        <option value="python">Python</option>
-                                        <option value="css">CSS</option>
-                                        <option value="html">HTML</option>
-                                        <option value="cpp">C++</option>
-                                    </select>
+                                    <div className="glass-effect" style={{ borderRadius: '12px', overflow: 'hidden', border: '1px solid var(--border-color)' }}>
+                                        <select
+                                            style={{ ...modalInputStyle, border: 'none' }}
+                                            value={formData.language}
+                                            onChange={e => setFormData({ ...formData, language: e.target.value })}
+                                        >
+                                            <option value="javascript">JavaScript</option>
+                                            <option value="python">Python</option>
+                                            <option value="css">CSS</option>
+                                            <option value="html">HTML</option>
+                                            <option value="cpp">C++</option>
+                                        </select>
+                                    </div>
                                 </div>
                             </div>
+
                             <div>
                                 <label style={labelStyle}>Code Block</label>
                                 <textarea
                                     required
-                                    style={{ ...modalInputStyle, height: '200px', fontFamily: 'monospace', fontSize: '13px' }}
-                                    placeholder="Paste your code here..."
+                                    style={{
+                                        ...modalInputStyle,
+                                        height: '320px',
+                                        fontFamily: 'monospace',
+                                        fontSize: '14px',
+                                        lineHeight: 1.6,
+                                        resize: 'none'
+                                    }}
+                                    placeholder="// Paste your code fragment here..."
                                     value={formData.code}
                                     onChange={e => setFormData({ ...formData, code: e.target.value })}
                                 />
                             </div>
-                            <div style={{ display: 'flex', gap: '16px', justifyContent: 'flex-end', marginTop: '16px' }}>
-                                <button type="button" onClick={closeModal} style={cancelButtonStyle}>Discard</button>
-                                <button type="submit" style={confirmButtonStyle}>
-                                    {showModal === 'create' ? 'Save Snippet' : 'Update Content'}
+
+                            <div style={{ display: 'flex', gap: '16px', justifyContent: 'flex-end', marginTop: '12px' }}>
+                                <button type="button" onClick={closeModal} style={secondaryButtonStyle}>Discard</button>
+                                <button type="submit" style={primaryButtonStyle}>
+                                    {showModal === 'create' ? 'Save to Vault' : 'Sync Changes'}
                                 </button>
                             </div>
                         </form>
@@ -230,49 +396,55 @@ const Snippets = () => {
             )}
 
             {showModal === 'delete' && (
-                <div style={modalOverlayStyle}>
-                    <div className="snippet-modal" style={{ ...modalContentStyle, maxWidth: '420px', textAlign: 'center' }}>
-                        <div style={{ color: '#f87171', marginBottom: '20px' }}><Trash2 size={48} /></div>
-                        <h3 style={{ fontSize: '20px', fontWeight: '800', marginBottom: '12px' }}>Remove Snippet?</h3>
-                        <p style={{ color: 'var(--text-muted)', marginBottom: '32px', lineHeight: '1.6' }}>
-                            Are you sure you want to delete <b>{activeSnippet.title}</b>? This cannot be undone.
+                <div style={modalOverlayStyle} onClick={closeModal}>
+                    <div className="glass-effect premium-card" style={{ ...modalContentStyle, maxWidth: '420px', textAlign: 'center' }} onClick={e => e.stopPropagation()}>
+                        <div style={{ color: '#f43f5e', marginBottom: '24px' }}>
+                            <div style={{
+                                width: '80px',
+                                height: '80px',
+                                borderRadius: '50%',
+                                backgroundColor: 'rgba(244, 63, 94, 0.1)',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                justifyContent: 'center'
+                            }}>
+                                <Trash2 size={40} />
+                            </div>
+                        </div>
+                        <h3 style={{ fontSize: '22px', fontWeight: '900', marginBottom: '12px' }}>Remove Snippet?</h3>
+                        <p style={{ color: 'var(--text-muted)', marginBottom: '40px', fontSize: '15px', lineHeight: 1.6 }}>
+                            Are you certain about deleting <b>{activeSnippet?.title}</b>? This action is irreversible.
                         </p>
                         <div style={{ display: 'flex', gap: '12px' }}>
-                            <button onClick={closeModal} style={{ ...cancelButtonStyle, flex: 1 }}>Cancel</button>
-                            <button onClick={handleAction} style={{ ...confirmButtonStyle, backgroundColor: '#f87171', flex: 1 }}>Delete</button>
+                            <button onClick={closeModal} style={{ ...secondaryButtonStyle, flex: 1 }}>Not Now</button>
+                            <button onClick={handleAction} style={{ ...primaryButtonStyle, backgroundColor: '#f43f5e', flex: 1, boxShadow: '0 8px 25px rgba(244, 63, 94, 0.3)' }}>Delete Legacy</button>
                         </div>
                     </div>
                 </div>
             )}
 
             <style>{`
-                @media (max-width: 768px) {
-                    .snippets-header {
-                        flex-direction: column !important;
-                        align-items: flex-start !important;
-                        gap: 20px;
-                    }
-                    .library-title {
-                        font-size: 26px !important;
-                    }
-                    .new-snippet-btn {
-                        width: 100% !important;
-                        justify-content: center;
-                    }
-                    .library-container {
-                        padding: 24px !important;
-                    }
-                    .search-box {
-                        max-width: 100% !important;
-                    }
-                    .snippets-grid {
-                        grid-template-columns: 1fr !important;
-                    }
-                    .snippet-modal {
-                        padding: 24px !important;
-                        max-height: 90vh;
-                        overflow-y: auto;
-                    }
+                @keyframes fadeIn {
+                    from { opacity: 0; transform: translateY(10px); }
+                    to { opacity: 1; transform: translateY(0); }
+                }
+                .loader {
+                    width: 40px;
+                    height: 40px;
+                    border: 3px solid rgba(59, 130, 246, 0.1);
+                    border-top: 3px solid var(--primary);
+                    border-radius: 50%;
+                    animation: spin 1s linear infinite;
+                    margin: 0 auto;
+                }
+                @keyframes spin {
+                    0% { transform: rotate(0deg); }
+                    100% { transform: rotate(360deg); }
+                }
+                @media (max-width: 640px) {
+                    .snippets-header { margin-bottom: 32px !important; }
+                    .snippets-grid { grid-template-columns: 1fr !important; gap: 24px !important; }
+                    .premium-card { padding: 24px !important; }
                 }
             `}</style>
         </AppLayout>
@@ -281,103 +453,27 @@ const Snippets = () => {
 
 // Styles
 const primaryButtonStyle = {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '10px',
-    padding: '12px 24px',
+    padding: '14px 28px',
     backgroundColor: 'var(--primary)',
     color: 'white',
     border: 'none',
-    borderRadius: '12px',
-    fontWeight: '700',
+    borderRadius: '16px',
+    fontWeight: '800',
+    fontSize: '15px',
     cursor: 'pointer',
-    boxShadow: '0 8px 16px rgba(0, 59, 251, 0.2)'
+    boxShadow: '0 8px 25px rgba(59, 130, 246, 0.3)',
+    transition: 'all 0.2s'
 };
 
 const secondaryButtonStyle = {
-    padding: '12px 24px',
-    backgroundColor: 'var(--bg-dark)',
+    padding: '14px 28px',
+    backgroundColor: 'transparent',
     color: 'var(--text-main)',
     border: '1px solid var(--border-color)',
-    borderRadius: '12px',
-    fontWeight: '700',
-    cursor: 'pointer'
-};
-
-const searchContainerStyle = {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '12px',
-    backgroundColor: 'var(--bg-dark)',
-    padding: '10px 16px',
-    borderRadius: '12px',
-    border: '1px solid var(--border-color)',
-    width: '100%',
-    maxWidth: '400px'
-};
-
-const searchInputStyle = {
-    background: 'transparent',
-    border: 'none',
-    outline: 'none',
-    color: 'var(--text-main)',
-    fontSize: '14px',
-    width: '100%'
-};
-
-const snippetCardStyle = {
-    padding: '20px',
-    backgroundColor: 'var(--bg-dark)',
     borderRadius: '16px',
-    border: '1px solid var(--border-color)',
-    display: 'flex',
-    flexDirection: 'column'
-};
-
-const langBadgeStyle = {
-    padding: '4px 8px',
-    backgroundColor: 'rgba(59, 130, 246, 0.1)',
-    color: 'var(--primary)',
-    borderRadius: '6px',
-    fontSize: '10px',
-    fontWeight: '800',
-    textTransform: 'uppercase'
-};
-
-const iconButtonStyle = {
-    background: 'transparent',
-    border: 'none',
-    color: 'var(--text-muted)',
-    cursor: 'pointer',
-    padding: '4px',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    transition: 'color 0.2s'
-};
-
-const codePreviewStyle = {
-    backgroundColor: 'rgba(0,0,0,0.3)',
-    padding: '16px',
-    borderRadius: '12px',
-    color: 'var(--text-muted)',
-    fontSize: '12px',
-    fontFamily: 'monospace',
-    whiteSpace: 'pre-wrap',
-    overflow: 'hidden',
-    marginTop: '4px'
-};
-
-const emptyIconContainerStyle = {
-    width: '80px',
-    height: '80px',
-    borderRadius: '24px',
-    backgroundColor: 'rgba(59, 130, 246, 0.05)',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: '24px',
-    color: 'var(--border-color)'
+    fontWeight: '700',
+    fontSize: '15px',
+    cursor: 'pointer'
 };
 
 const modalOverlayStyle = {
@@ -386,8 +482,8 @@ const modalOverlayStyle = {
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(0,0,0,0.9)',
-    backdropFilter: 'blur(8px)',
+    backgroundColor: 'rgba(0,0,0,0.85)',
+    backdropFilter: 'blur(12px)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
@@ -397,54 +493,45 @@ const modalOverlayStyle = {
 
 const modalContentStyle = {
     backgroundColor: 'var(--bg-card)',
-    padding: '40px',
-    borderRadius: '24px',
+    padding: '48px',
+    borderRadius: '32px',
     border: '1px solid var(--border-color)',
     width: '100%',
-    maxWidth: '600px'
-};
-
-const labelStyle = {
-    display: 'block',
-    fontSize: '13px',
-    fontWeight: '700',
-    color: 'var(--text-muted)',
-    marginBottom: '8px',
-    textTransform: 'uppercase'
+    boxShadow: '0 30px 60px rgba(0,0,0,0.5)'
 };
 
 const modalInputStyle = {
     width: '100%',
-    padding: '14px 16px',
+    padding: '16px 20px',
     backgroundColor: 'var(--bg-dark)',
     border: '1px solid var(--border-color)',
-    borderRadius: '12px',
+    borderRadius: '16px',
     color: 'var(--text-main)',
-    fontSize: '15px'
+    fontSize: '15px',
+    outline: 'none'
 };
 
-const cancelButtonStyle = {
-    padding: '12px 20px',
-    backgroundColor: 'transparent',
-    border: '1px solid var(--border-color)',
-    borderRadius: '12px',
+const labelStyle = {
+    display: 'block',
+    fontSize: '12px',
+    fontWeight: '800',
     color: 'var(--text-muted)',
-    fontWeight: '600',
-    cursor: 'pointer'
+    marginBottom: '10px',
+    textTransform: 'uppercase',
+    letterSpacing: '0.05em'
 };
 
-const confirmButtonStyle = {
-    padding: '12px 24px',
-    backgroundColor: 'var(--primary)',
+const iconButtonStyle = {
+    background: 'transparent',
     border: 'none',
-    borderRadius: '12px',
-    color: 'white',
-    fontWeight: '700',
-    cursor: 'pointer'
+    color: 'var(--text-muted)',
+    cursor: 'pointer',
+    padding: '8px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: '10px',
+    transition: 'all 0.2s'
 };
-
-const Clock = ({ size }) => (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>
-);
 
 export default Snippets;
