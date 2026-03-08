@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Search, X, Import, Save, Shield, Code, ChevronRight } from 'lucide-react';
+import { Search, X, Import, Save, Shield, Code } from 'lucide-react';
 import { getBackendUrl } from '../utils/api';
 import toast from 'react-hot-toast';
 
