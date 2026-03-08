@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Bell, UserPlus, FileEdit, Info, Trash2, CheckCircle2 } from 'lucide-react';
+import { UserPlus, FileEdit, Info, CheckCircle2 } from 'lucide-react';
 
 const NotificationCenter = ({ isOpen, onClose }) => {
     const [notifications, setNotifications] = useState([]);

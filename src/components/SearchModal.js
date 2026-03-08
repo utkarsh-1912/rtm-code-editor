@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Search, Clock, Database, ArrowRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { getBackendUrl } from '../utils/api';
@@ -13,8 +13,12 @@ const SearchModal = ({ isOpen, onClose }) => {
     const navigate = useNavigate();
     const { user } = useAuth();
 
-    const allResults = [...results.rooms.map(r => ({ ...r, type: 'room' })), ...results.snippets.map(s => ({ ...s, type: 'snippet' }))];
-    const totalResults = allResults.length;
+    const allResults = useMemo(() => [
+        ...results.rooms.map(r => ({ ...r, type: 'room' })),
+        ...results.snippets.map(s => ({ ...s, type: 'snippet' }))
+    ], [results]);
+
+    const totalResults = useMemo(() => allResults.length, [allResults]);
 
     const handleSelect = useCallback((item) => {
         if (item.type === 'room') {
