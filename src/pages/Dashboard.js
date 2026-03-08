@@ -5,6 +5,7 @@ import {
     Plus,
     Terminal,
     Search,
+    ExternalLink,
     MoreVertical,
     Edit2,
     Trash2,
