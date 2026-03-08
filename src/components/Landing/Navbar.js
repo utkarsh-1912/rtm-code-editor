@@ -27,7 +27,11 @@ const Navbar = ({ user, isLightMode, toggleTheme, navigate }) => {
                 onMouseOver={(e) => e.currentTarget.style.transform = "scale(1.02)"}
                 onMouseOut={(e) => e.currentTarget.style.transform = "scale(1)"}
             >
-                <img src="/utkristi-colabs.png" alt="Logo" style={{ width: "100%", height: "auto", display: "block" }} />
+                <img
+                    src={isLightMode ? "/utkristi-colabs.png" : "/utkristi-colabs-dark.png"}
+                    alt="Logo"
+                    style={{ width: "100%", height: "auto", display: "block" }}
+                />
             </div>
 
             <div style={{ display: "flex", alignItems: "center", gap: isMobile ? "8px" : "12px" }}>

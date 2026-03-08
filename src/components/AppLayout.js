@@ -92,12 +92,14 @@ const AppLayout = ({ children }) => {
                 isMobile={true}
                 isOpen={isSidebarOpen}
                 onClose={() => setIsSidebarOpen(false)}
+                isLightMode={isLightMode}
             />
 
             <Sidebar
                 isMobile={false}
                 isCollapsed={isSidebarCollapsed}
                 onToggleCollapse={toggleSidebarCollapse}
+                isLightMode={isLightMode}
             />
 
             <div
@@ -126,7 +128,7 @@ const AppLayout = ({ children }) => {
                     <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
                         <img
                             className="header-logo"
-                            src="/utkristi-colabs.png"
+                            src={isLightMode ? "/utkristi-colabs.png" : "/utkristi-colabs-dark.png"}
                             alt="Utkristi Colabs"
                             style={{ height: '28px', cursor: 'pointer' }}
                             onClick={() => window.location.href = '/'}

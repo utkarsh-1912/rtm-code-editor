@@ -489,7 +489,10 @@ function Editor() {
       }}>
         <div style={{ display: "flex", alignItems: "center", gap: isMobile ? "8px" : "14px" }}>
           <img
-            src={isMobile ? "/utkristi-labs.png" : "/utkristi-colabs.png"}
+            src={isMobile
+              ? (isLightMode ? "/utkristi-labs.png" : "/utkristi-labs-dark.png")
+              : (isLightMode ? "/utkristi-colabs.png" : "/utkristi-colabs-dark.png")
+            }
             alt="Utkristi Colabs"
             onClick={() => reactNavigator("/")}
             style={{ height: isMobile ? "24px" : "32px", cursor: "pointer", objectFit: "contain" }}

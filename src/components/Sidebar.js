@@ -13,7 +13,7 @@ import {
 import { useAuth } from '../context/AuthContext';
 import toast from 'react-hot-toast';
 
-const Sidebar = ({ isOpen, onClose, isMobile, isCollapsed, onToggleCollapse }) => {
+const Sidebar = ({ isOpen, onClose, isMobile, isCollapsed, onToggleCollapse, isLightMode }) => {
     const { user, logout } = useAuth();
     const navigate = useNavigate();
     const location = useLocation();
@@ -62,7 +62,10 @@ const Sidebar = ({ isOpen, onClose, isMobile, isCollapsed, onToggleCollapse }) =
                     onClick={() => { navigate('/'); if (isMobile) onClose(); }}
                 >
                     <img
-                        src={isCollapsed && !isMobile ? "/utkristi-labs.png" : "/utkristi-colabs.png"}
+                        src={isCollapsed && !isMobile
+                            ? (isLightMode ? "/utkristi-labs.png" : "/utkristi-labs-dark.png")
+                            : (isLightMode ? "/utkristi-colabs.png" : "/utkristi-colabs-dark.png")
+                        }
                         alt="Logo"
                         style={{
                             width: 'auto',
