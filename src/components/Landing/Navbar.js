@@ -20,7 +20,7 @@ const Navbar = ({ user, isLightMode, toggleTheme, navigate }) => {
                 <img src="/utkristi-colabs.png" alt="Logo" style={{ width: "100%", height: "auto", display: "block" }} />
             </div>
 
-            <div style={{ display: "flex", alignItems: "center", gap: "20px" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
                 {user ? (
                     <button
                         onClick={() => navigate("/dashboard")}

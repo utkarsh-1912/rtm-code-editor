@@ -167,6 +167,17 @@ app.delete("/api/notifications/:id", async (req, res) => {
   }
 });
 
+app.get("/api/user/profile", async (req, res) => {
+  try {
+    const { userId } = req.query;
+    if (!userId) return res.status(400).json({ error: "User ID required" });
+    const user = await db.getUser(userId);
+    res.json(user);
+  } catch (err) {
+    res.status(500).json({ error: "Failed to fetch profile" });
+  }
+});
+
 /**
  * Sessions API
  */
@@ -256,6 +267,7 @@ io.on("connection", (socket) => {
       try {
         await db.findOrCreateUser(userProfile);
         await db.linkRoomToUser(userProfile.uid, roomId);
+        await db.updateLastRoom(userProfile.uid, roomId);
       } catch (err) {
         console.error("User Persistence Error:", err);
       }

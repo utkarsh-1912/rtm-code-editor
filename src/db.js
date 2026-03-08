@@ -62,6 +62,14 @@ async function updateRoomChat(roomId, chatHistory) {
 }
 
 /**
+ * Get user profile
+ */
+async function getUser(userId) {
+    const users = await sql`SELECT * FROM users WHERE auth_provider_id = ${userId}`;
+    return users[0] || null;
+}
+
+/**
  * Find or Create User from Firebase profile
  */
 async function findOrCreateUser(firebaseUser) {
@@ -77,6 +85,14 @@ async function findOrCreateUser(firebaseUser) {
         RETURNING *
     `;
     return newUser[0];
+}
+
+async function updateLastRoom(userId, roomId) {
+    return await sql`
+        UPDATE users 
+        SET last_room_id = ${roomId} 
+        WHERE auth_provider_id = ${userId}
+    `;
 }
 
 /**
@@ -315,6 +331,7 @@ async function initializeSchema() {
         bio TEXT,
         social_links JSONB DEFAULT '{}',
         auth_provider_id VARCHAR(255) UNIQUE NOT NULL,
+        last_room_id VARCHAR(255),
         joined_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
     `;
@@ -406,6 +423,7 @@ module.exports = {
     updateRoomCode,
     updateRoomLanguage,
     updateRoomChat,
+    getUser,
     findOrCreateUser,
     linkRoomToUser,
     unlinkRoomFromUser,
@@ -424,5 +442,6 @@ module.exports = {
     deleteNotification,
     getSessions,
     createSession,
-    deleteOtherSessions
+    deleteOtherSessions,
+    updateLastRoom
 };

@@ -32,6 +32,16 @@ export const AuthProvider = ({ children }) => {
 
                 try {
                     const { getBackendUrl } = await import('../utils/api');
+
+                    // Fetch profile including last_room_id
+                    const profileRes = await fetch(`${getBackendUrl()}/api/user/profile?userId=${firebaseUser.uid}`);
+                    const profileData = await profileRes.json();
+
+                    if (profileData) {
+                        userData.last_room_id = profileData.last_room_id;
+                        setUser({ ...userData }); // Update with real DB data
+                    }
+
                     const response = await fetch(`${getBackendUrl()}/api/sessions`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
@@ -47,7 +57,7 @@ export const AuthProvider = ({ children }) => {
                         localStorage.setItem('rtm_db_session_id', sessionData[0].id);
                     }
                 } catch (e) {
-                    console.error("Session tracking failed", e);
+                    console.error("User Context Initialization failed", e);
                 }
 
             } else {

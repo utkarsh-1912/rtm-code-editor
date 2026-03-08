@@ -154,6 +154,29 @@ const Dashboard = () => {
                     >
                         <Plus size={18} /> New Room
                     </button>
+                    {user?.last_room_id && (
+                        <button
+                            onClick={() => navigate(`/editor/${user.last_room_id}`, { state: { userName: user.name, role: 'editor' } })}
+                            style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '8px',
+                                backgroundColor: 'rgba(168, 85, 247, 0.1)',
+                                color: '#a855f7',
+                                border: '1px solid rgba(168, 85, 247, 0.2)',
+                                padding: '10px 20px',
+                                borderRadius: '8px',
+                                fontWeight: '600',
+                                fontSize: '14px',
+                                cursor: 'pointer',
+                                transition: 'all 0.2s'
+                            }}
+                            onMouseOver={(e) => e.currentTarget.style.backgroundColor = 'rgba(168, 85, 247, 0.15)'}
+                            onMouseOut={(e) => e.currentTarget.style.backgroundColor = 'rgba(168, 85, 247, 0.1)'}
+                        >
+                            <ExternalLink size={16} /> Continue: {user.last_room_id}
+                        </button>
+                    )}
                 </div>
 
                 {/* Industry Standard Stats Area */}

@@ -74,6 +74,14 @@ function HomePage() {
     });
   };
 
+  const revisitLastRoom = () => {
+    if (user?.last_room_id) {
+      navigate(`/editor/${user.last_room_id}`, {
+        state: { userName: user.name, role: "editor" },
+      });
+    }
+  };
+
   const handleEnterKey = (e) => {
     if (e.code === "Enter") {
       joinRoom();
@@ -161,6 +169,32 @@ function HomePage() {
               }}>
                 <Zap size={14} fill="var(--primary)" /> Powering High-Performance Teams
               </div>
+
+              {user?.last_room_id && (
+                <button
+                  onClick={revisitLastRoom}
+                  className="revisit-btn"
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "8px",
+                    backgroundColor: "rgba(168, 85, 247, 0.1)",
+                    color: "#a855f7",
+                    padding: "8px 16px",
+                    borderRadius: "12px",
+                    fontSize: "13px",
+                    fontWeight: "600",
+                    border: "1px solid rgba(168, 85, 247, 0.2)",
+                    marginTop: "24px",
+                    cursor: "pointer",
+                    transition: "all 0.2s"
+                  }}
+                  onMouseOver={(e) => { e.currentTarget.style.backgroundColor = "rgba(168, 85, 247, 0.15)"; e.currentTarget.style.transform = "translateY(-1px)" }}
+                  onMouseOut={(e) => { e.currentTarget.style.backgroundColor = "rgba(168, 85, 247, 0.1)"; e.currentTarget.style.transform = "translateY(0)" }}
+                >
+                  <Globe size={14} /> Revisit Last Room ({user.last_room_id})
+                </button>
+              )}
             </div>
 
             <h1 style={{ fontSize: "calc(2.5rem + 1vw)", fontWeight: "800", lineHeight: "1.1", margin: "0px 0px 24px", letterSpacing: "-0.02em" }} className="staggered-entry">
