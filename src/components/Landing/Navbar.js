@@ -39,7 +39,7 @@ const Navbar = ({ user, isLightMode, toggleTheme, navigate }) => {
                     <button
                         onClick={() => navigate("/signup")}
                         style={{
-                            padding: "0 28px", height: "44px", backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)",
+                            padding: "0 16px", height: "44px", backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)",
                             borderRadius: "12px", color: "var(--text-main)", fontSize: "14px", fontWeight: "600", cursor: "pointer",
                             transition: "all 0.3s ease"
                         }}

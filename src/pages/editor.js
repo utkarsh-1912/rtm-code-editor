@@ -675,6 +675,30 @@ function Editor() {
                       setMessages={setMessages}
                     />
                   )}
+                  {activeTab === "people" && (
+                    <div style={{ height: "100%", width: "100%", backgroundColor: "var(--bg-dark)", padding: "20px", display: "flex", flexDirection: "column", gap: "10px", overflowY: "auto" }}>
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "10px" }}>
+                        <h3 style={{ margin: 0, fontSize: "16px", fontWeight: "700", color: "var(--text-main)" }}>Collaborators</h3>
+                        <span style={{ fontSize: "12px", color: "var(--text-muted)", backgroundColor: "rgba(59, 130, 246, 0.1)", padding: "2px 8px", borderRadius: "100px" }}>{clients.length} online</span>
+                      </div>
+                      <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
+                        {clients.map((client) => (
+                          <div key={client.socketId} style={{
+                            backgroundColor: "var(--bg-card)",
+                            borderRadius: "12px",
+                            border: "1px solid var(--border-color)",
+                            transition: "all 0.2s"
+                          }}>
+                            <Client
+                              userName={client.userName}
+                              isCompact={false}
+                              isCurrentUser={client.userName === location.state?.userName}
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* MOBILE BOTTOM NAV */}
@@ -690,7 +714,8 @@ function Editor() {
                   {[
                     { id: "code", icon: <Code size={20} />, label: "Code" },
                     { id: "output", icon: <Terminal size={20} />, label: "I/O" },
-                    { id: "chat", icon: <MessageSquare size={20} />, label: "Chat" }
+                    { id: "chat", icon: <MessageSquare size={20} />, label: "Chat" },
+                    { id: "people", icon: <Users size={20} />, label: "People" }
                   ].map((tab) => (
                     <button
                       key={tab.id}
