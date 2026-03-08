@@ -3,11 +3,9 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import {
     Clock,
     Settings,
-    Code,
     Database,
     X,
-    LogOut,
-    ExternalLink
+    LogOut
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import toast from 'react-hot-toast';

@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { Settings as SettingsIcon, User, Bell, Shield, Palette, Save, Trash2, LogOut, Check, Moon, Sun, Monitor } from 'lucide-react';
+import { Settings as SettingsIcon, User, Bell, Shield, Palette, Save, Check, Moon, Sun, Monitor } from 'lucide-react';
 import AppLayout from '../components/AppLayout';
 import { useAuth } from '../context/AuthContext';
 import { getBackendUrl } from '../utils/api';
 import toast from 'react-hot-toast';
 
 const Settings = () => {
-    const { user, logout } = useAuth();
+    const { user } = useAuth();
     const [activeTab, setActiveTab] = useState('profile');
     const [saving, setSaving] = useState(false);
 

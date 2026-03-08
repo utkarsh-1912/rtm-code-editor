@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Search, X, Clock, Database, ArrowRight } from 'lucide-react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { Search, Clock, Database, ArrowRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { getBackendUrl } from '../utils/api';
 import { useAuth } from '../context/AuthContext';
@@ -12,6 +12,18 @@ const SearchModal = ({ isOpen, onClose }) => {
     const modalRef = useRef(null);
     const navigate = useNavigate();
     const { user } = useAuth();
+
+    const allResults = [...results.rooms.map(r => ({ ...r, type: 'room' })), ...results.snippets.map(s => ({ ...s, type: 'snippet' }))];
+    const totalResults = allResults.length;
+
+    const handleSelect = useCallback((item) => {
+        if (item.type === 'room') {
+            navigate(`/editor/${item.id}`);
+        } else {
+            navigate('/snippets');
+        }
+        onClose();
+    }, [navigate, onClose]);
 
     useEffect(() => {
         const handleKeyDown = (e) => {
@@ -43,7 +55,7 @@ const SearchModal = ({ isOpen, onClose }) => {
             window.removeEventListener('keydown', handleKeyDown);
             document.body.style.overflow = 'auto';
         };
-    }, [isOpen, selectedIndex, results]);
+    }, [isOpen, selectedIndex, results, allResults, handleSelect, onClose, totalResults]);
 
     useEffect(() => {
         if (!query.trim()) {
@@ -69,17 +81,6 @@ const SearchModal = ({ isOpen, onClose }) => {
         return () => clearTimeout(timeoutId);
     }, [query, user]);
 
-    const handleSelect = (item) => {
-        if (item.type === 'room') {
-            navigate(`/editor/${item.id}`);
-        } else {
-            navigate('/snippets');
-        }
-        onClose();
-    };
-
-    const allResults = [...results.rooms.map(r => ({ ...r, type: 'room' })), ...results.snippets.map(s => ({ ...s, type: 'snippet' }))];
-    const totalResults = allResults.length;
 
     if (!isOpen) return null;
 
