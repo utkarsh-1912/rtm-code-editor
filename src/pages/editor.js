@@ -39,6 +39,8 @@ import Client from "../components/clients";
 import { LANGUAGES, THEMES } from "../config";
 import { useAuth } from "../context/AuthContext";
 import LoadingScreen from "../components/LoadingScreen";
+import SnippetModal from "../components/SnippetModal";
+import { ClipboardList } from "lucide-react";
 
 function Editor() {
   const socketRef = useRef(null);
@@ -92,6 +94,8 @@ function Editor() {
     return saved ? JSON.parse(saved) : { fontSize: 16, tabSize: 4, wordWrap: false };
   });
 
+  const [showSnippetModal, setShowSnippetModal] = useState(false);
+
   useEffect(() => {
     localStorage.setItem("app-editor-settings", JSON.stringify(settings));
   }, [settings]);
@@ -141,6 +145,31 @@ function Editor() {
     a.click();
     URL.revokeObjectURL(url);
     toast.success("Code downloaded successfully!");
+  };
+
+  const handleSnippetImport = (snippetCode, mode) => {
+    let newCode = "";
+    if (mode === 'replace') {
+      newCode = snippetCode;
+    } else {
+      // For 'insert', we could try to find cursor position, but simpler for now is to append 
+      // since the editor component handles its own internal cursor state.
+      // We'll append with a newline if current code isn't empty.
+      newCode = codeRef.current ? `${codeRef.current}\n\n${snippetCode}` : snippetCode;
+    }
+
+    codeRef.current = newCode;
+    setCurrentCode(newCode);
+    localStorage.setItem(`code-${roomId}`, newCode);
+
+    // Emit to others
+    socketRef.current?.emit(ACTIONS.CODE_CHANGE, {
+      roomId,
+      code: newCode,
+    });
+
+    toast.success(`Snippet ${mode === 'replace' ? 'imported' : 'inserted'}`);
+    setShowSnippetModal(false);
   };
 
   const activeTabRef = useRef(activeTab);
@@ -596,6 +625,15 @@ function Editor() {
                   <Download size={18} />
                 </button>
                 <button
+                  onClick={() => setShowSnippetModal(true)}
+                  style={{ width: "32px", height: "32px", color: "var(--text-muted)", background: "transparent", border: "none", borderRadius: "6px", cursor: "pointer", transition: "all 0.2s" }}
+                  onMouseOver={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-card)")}
+                  onMouseOut={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
+                  title="Import Snippet"
+                >
+                  <ClipboardList size={18} />
+                </button>
+                <button
                   onClick={copyRoomId}
                   style={{ width: "32px", height: "32px", color: "var(--text-muted)", background: "transparent", border: "none", borderRadius: "6px", cursor: "pointer", transition: "all 0.2s" }}
                   onMouseOver={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-card)")}
@@ -899,14 +937,24 @@ function Editor() {
         settings={settings}
         onSettingsChange={setSettings}
       />
+      {showGistModal && (
+        <GistModal
+          isOpen={showGistModal}
+          onClose={() => setShowGistModal(false)}
+          code={codeRef.current}
+          language={language}
+          fileName={`${roomId}.${language === 'javascript' ? 'js' : language === 'python' ? 'py' : 'txt'}`}
+        />
+      )}
 
-      <GistModal
-        isOpen={showGistModal}
-        onClose={() => setShowGistModal(false)}
-        code={codeRef.current}
-        language={language}
-        fileName={`${roomId}.${language === 'javascript' ? 'js' : language === 'python' ? 'py' : 'txt'}`}
-      />
+      {showSnippetModal && (
+        <SnippetModal
+          isOpen={showSnippetModal}
+          onClose={() => setShowSnippetModal(false)}
+          onImport={handleSnippetImport}
+          userId={user?.uid}
+        />
+      )}
     </div>
   );
 }
