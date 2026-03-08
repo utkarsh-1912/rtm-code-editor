@@ -12,8 +12,7 @@ const Snippets = () => {
     const [searchTerm, setSearchTerm] = useState('');
     const [copiedId, setCopiedId] = useState(null);
 
-    // Modal States
-    const [showModal, setShowModal] = useState(null); // 'create' | 'edit' | 'delete'
+    const [showModal, setShowModal] = useState(null); // 'create' | 'edit' | 'delete' | 'view'
     const [activeSnippet, setActiveSnippet] = useState(null);
     const [formData, setFormData] = useState({ title: '', code: '', language: 'javascript' });
 
@@ -36,7 +35,7 @@ const Snippets = () => {
     }, [fetchSnippets]);
 
     const handleAction = async (e) => {
-        e.preventDefault();
+        if (e) e.preventDefault();
         const backendUrl = getBackendUrl();
         try {
             if (showModal === 'create') {
@@ -263,7 +262,7 @@ const Snippets = () => {
                                             color: 'var(--text-muted)'
                                         }}>
                                             <span>{new Date(snippet.updated_at || snippet.created_at).toLocaleDateString()}</span>
-                                            <span style={{ color: 'var(--primary)', cursor: 'pointer', fontWeight: '600' }} onClick={() => openModal('edit', snippet)}>
+                                            <span style={{ color: 'var(--primary)', cursor: 'pointer', fontWeight: '600' }} onClick={() => openModal('view', snippet)}>
                                                 Expand
                                             </span>
                                         </div>
@@ -291,6 +290,49 @@ const Snippets = () => {
             </div>
 
             {/* Modals */}
+            {showModal === 'view' && activeSnippet && (
+                <div style={modalOverlayStyle} onClick={closeModal}>
+                    <div className="glass-effect premium-card" style={{ ...modalContentStyle, maxWidth: '900px', padding: '0' }} onClick={e => e.stopPropagation()}>
+                        <div style={{ padding: '32px', display: 'flex', flexDirection: 'column', gap: '24px', height: '100%' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                    <h3 style={{ fontSize: '24px', fontWeight: '900', margin: 0 }}>{activeSnippet.title}</h3>
+                                    <span style={{
+                                        padding: '4px 10px', borderRadius: '6px',
+                                        backgroundColor: 'rgba(59, 130, 246, 0.1)', color: 'var(--primary)',
+                                        fontSize: '11px', fontWeight: '800', textTransform: 'uppercase'
+                                    }}>{activeSnippet.language}</span>
+                                </div>
+                                <div style={{ display: 'flex', gap: '12px' }}>
+                                    <button onClick={() => copyToClipboard(activeSnippet.id, activeSnippet.code)} style={{ ...premiumButtonStyle, backgroundColor: 'rgba(255,255,255,0.05)', color: 'white' }}>
+                                        {copiedId === activeSnippet.id ? <Check size={18} /> : <Copy size={18} />} Copy
+                                    </button>
+                                    <button onClick={() => openModal('edit', activeSnippet)} style={premiumButtonStyle}>
+                                        <Edit2 size={18} /> Edit
+                                    </button>
+                                    <button onClick={closeModal} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}>
+                                        <X size={24} />
+                                    </button>
+                                </div>
+                            </div>
+                            <div style={{
+                                flex: 1, backgroundColor: 'rgba(0,0,0,0.3)', borderRadius: '16px',
+                                border: '1px solid var(--border-color)', padding: '24px',
+                                overflow: 'auto', maxHeight: '60vh'
+                            }}>
+                                <pre style={{ margin: 0, fontSize: '14px', fontFamily: 'monospace', color: 'rgba(255,255,255,0.8)', whiteSpace: 'pre-wrap' }}>
+                                    <code>{activeSnippet.code}</code>
+                                </pre>
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '13px', color: 'var(--text-muted)' }}>
+                                <span>Vault Fragment ID: {activeSnippet.id}</span>
+                                <span>Last Secured: {new Date(activeSnippet.updated_at || activeSnippet.created_at).toLocaleString()}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {(showModal === 'create' || showModal === 'edit') && (
                 <div style={modalOverlayStyle} onClick={closeModal}>
                     <div className="glass-effect premium-card" style={{ ...modalContentStyle, maxWidth: '800px' }} onClick={e => e.stopPropagation()}>
@@ -494,6 +536,21 @@ const iconButtonStyle = {
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: '10px',
+    transition: 'all 0.2s'
+};
+
+const premiumButtonStyle = {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    padding: '10px 16px',
+    borderRadius: '10px',
+    border: 'none',
+    backgroundColor: 'var(--primary)',
+    color: 'white',
+    fontSize: '14px',
+    fontWeight: '700',
+    cursor: 'pointer',
     transition: 'all 0.2s'
 };
 

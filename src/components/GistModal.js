@@ -16,13 +16,19 @@ const GistModal = ({ isOpen, onClose, code, language, fileName }) => {
             toast.error("GitHub Personal Access Token is required.");
             return;
         }
+        if (!code || code.trim() === "") {
+            toast.error("Code content cannot be empty for Gist export.");
+            setIsExporting(false);
+            return;
+        }
 
         setIsExporting(true);
         const octokit = new Octokit({ auth: token });
 
         try {
             const ext = language === 'javascript' ? 'js' : language === 'python' ? 'py' : 'txt';
-            const finalFileName = fileName || `snippet.${ext}`;
+            const safeFileName = (fileName || `snippet`).replace(/[^a-zA-Z0-9.-]/g, '_');
+            const finalFileName = safeFileName.includes('.') ? safeFileName : `${safeFileName}.${ext}`;
 
             const response = await octokit.rest.gists.create({
                 description: description || 'Exported from Utkristi Colabs',

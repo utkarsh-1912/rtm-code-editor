@@ -1,7 +1,9 @@
-import React from "react";
-import { Sun, Moon, LayoutDashboard } from "lucide-react";
+import { Sun, Moon, LayoutDashboard, LogOut } from "lucide-react";
+import { useAuth } from "../../context/AuthContext";
 
 const Navbar = ({ user, isLightMode, toggleTheme, navigate }) => {
+    const { logout } = useAuth();
+
     return (
         <header style={{
             display: "flex",
@@ -22,19 +24,52 @@ const Navbar = ({ user, isLightMode, toggleTheme, navigate }) => {
 
             <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
                 {user ? (
-                    <button
-                        onClick={() => navigate("/dashboard")}
-                        style={{
-                            display: "flex", alignItems: "center", gap: "10px", padding: "0 12px",
-                            height: "44px",
-                            backgroundColor: isLightMode ? "rgba(59, 130, 246, 0.1)" : "rgba(59, 130, 246, 0.12)",
-                            border: "1px solid rgba(59, 130, 246, 0.25)",
-                            borderRadius: "12px", color: "var(--primary)", fontSize: "14px", fontWeight: "700", cursor: "pointer",
-                            transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)", backdropFilter: "blur(8px)"
-                        }}
-                    >
-                        <LayoutDashboard size={18} /> Dashboard
-                    </button>
+                    <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                        <button
+                            onClick={() => navigate("/dashboard")}
+                            style={{
+                                display: "flex", alignItems: "center", gap: "10px", padding: "0 20px",
+                                height: "44px",
+                                background: "linear-gradient(135deg, var(--primary) 0%, #2563eb 100%)",
+                                border: "none",
+                                borderRadius: "12px", color: "white", fontSize: "14px", fontWeight: "700", cursor: "pointer",
+                                transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)", backdropFilter: "blur(8px)",
+                                boxShadow: "0 4px 15px -3px rgba(59, 130, 246, 0.4)"
+                            }}
+                            onMouseOver={(e) => {
+                                e.currentTarget.style.transform = "translateY(-2px)";
+                                e.currentTarget.style.boxShadow = "0 8px 20px -3px rgba(59, 130, 246, 0.5)";
+                            }}
+                            onMouseOut={(e) => {
+                                e.currentTarget.style.transform = "translateY(0)";
+                                e.currentTarget.style.boxShadow = "0 4px 15px -3px rgba(59, 130, 246, 0.4)";
+                            }}
+                        >
+                            <LayoutDashboard size={18} /> Dashboard
+                        </button>
+                        <button
+                            onClick={logout}
+                            title="Sign Out"
+                            style={{
+                                width: "44px", height: "44px",
+                                backgroundColor: isLightMode ? "rgba(244, 63, 94, 0.05)" : "rgba(244, 63, 94, 0.08)",
+                                border: "1px solid rgba(244, 63, 94, 0.2)",
+                                borderRadius: "12px", color: "#f43f5e",
+                                display: "flex", alignItems: "center", justifyContent: "center",
+                                cursor: "pointer", transition: "all 0.3s ease"
+                            }}
+                            onMouseOver={(e) => {
+                                e.currentTarget.style.backgroundColor = "rgba(244, 63, 94, 0.15)";
+                                e.currentTarget.style.borderColor = "rgba(244, 63, 94, 0.4)";
+                            }}
+                            onMouseOut={(e) => {
+                                e.currentTarget.style.backgroundColor = isLightMode ? "rgba(244, 63, 94, 0.05)" : "rgba(244, 63, 94, 0.08)";
+                                e.currentTarget.style.borderColor = "rgba(244, 63, 94, 0.2)";
+                            }}
+                        >
+                            <LogOut size={18} />
+                        </button>
+                    </div>
                 ) : (
                     <button
                         onClick={() => navigate("/signup")}

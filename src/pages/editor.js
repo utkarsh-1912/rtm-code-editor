@@ -955,6 +955,8 @@ function Editor() {
           onClose={() => setShowSnippetModal(false)}
           onImport={handleSnippetImport}
           userId={user?.uid}
+          code={currentCode}
+          language={language}
         />
       )}
     </div>
