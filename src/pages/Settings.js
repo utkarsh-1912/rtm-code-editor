@@ -12,19 +12,17 @@ const Settings = () => {
 
     return (
         <AppLayout>
-            <div className="settings-page" style={{ padding: '0 20px', maxWidth: '1400px', margin: '0 auto', animation: 'fadeIn 0.6s ease-out' }}>
+            <div className="settings-page">
                 <div className="settings-header" style={{
                     display: 'flex',
                     alignItems: 'center',
-                    gap: '20px',
-                    marginBottom: '64px',
-                    padding: '20px 0',
-                    borderBottom: '1px solid var(--border-color)'
+                    gap: '16px',
+                    marginBottom: '32px'
                 }}>
                     <div style={{
-                        width: '56px',
-                        height: '56px',
-                        borderRadius: '16px',
+                        width: '40px',
+                        height: '40px',
+                        borderRadius: '8px',
                         backgroundColor: 'rgba(59, 130, 246, 0.1)',
                         display: 'flex',
                         alignItems: 'center',
@@ -32,96 +30,106 @@ const Settings = () => {
                         color: 'var(--primary)',
                         border: '1px solid var(--border-color)'
                     }}>
-                        <SettingsIcon size={28} />
+                        <SettingsIcon size={20} />
                     </div>
                     <div>
                         <h1 style={{
-                            fontSize: 'clamp(28px, 5vw, 36px)',
-                            fontWeight: '900',
+                            fontSize: '24px',
+                            fontWeight: '700',
                             margin: 0,
-                            letterSpacing: '-1px'
+                            color: 'var(--text-main)'
                         }}>
                             Account Settings
                         </h1>
-                        <p style={{ color: 'var(--text-muted)', fontSize: '15px', fontWeight: '500', marginTop: '4px' }}>
-                            Configure your workspace and global preferences.
+                        <p style={{ color: 'var(--text-muted)', fontSize: '13px', margin: 0 }}>
+                            Manage your personal preferences and workspace configuration.
                         </p>
                     </div>
                 </div>
 
                 <div className="settings-grid" style={{
                     display: 'grid',
-                    gridTemplateColumns: 'minmax(280px, 1fr) 3fr',
-                    gap: '48px',
+                    gridTemplateColumns: '260px 1fr',
+                    gap: '32px',
                     alignItems: 'start'
                 }}>
-                    <div className="settings-nav" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    <div className="settings-nav" style={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '4px',
+                        backgroundColor: 'var(--bg-card)',
+                        padding: '12px',
+                        borderRadius: '12px',
+                        border: '1px solid var(--border-color)'
+                    }}>
                         {sections.map(section => (
                             <button
                                 key={section.id}
-                                className={section.active ? 'glass-effect' : ''}
                                 style={{
                                     display: 'flex',
                                     alignItems: 'center',
-                                    gap: '16px',
-                                    padding: '18px 24px',
-                                    backgroundColor: section.active ? 'rgba(59, 130, 246, 0.1)' : 'transparent',
-                                    border: `1px solid ${section.active ? 'var(--primary)' : 'transparent'}`,
-                                    borderRadius: '18px',
+                                    gap: '12px',
+                                    padding: '10px 16px',
+                                    backgroundColor: section.active ? 'rgba(59, 130, 246, 0.08)' : 'transparent',
+                                    border: 'none',
+                                    borderRadius: '6px',
                                     color: section.active ? 'var(--primary)' : 'var(--text-muted)',
-                                    fontWeight: '700',
-                                    fontSize: '15px',
+                                    fontWeight: section.active ? '600' : '500',
+                                    fontSize: '14px',
                                     textAlign: 'left',
                                     cursor: 'pointer',
-                                    transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)'
+                                    transition: 'all 0.2s'
                                 }}
                             >
                                 <div style={{ color: section.active ? 'var(--primary)' : 'var(--text-muted)' }}>
-                                    {section.icon}
+                                    {React.cloneElement(section.icon, { size: 18 })}
                                 </div>
                                 {section.title}
                             </button>
                         ))}
                     </div>
 
-                    <div className="settings-content glass-effect premium-card" style={{
-                        padding: '48px',
-                        minHeight: '600px',
-                        boxShadow: '0 30px 60px rgba(0,0,0,0.1)'
+                    <div className="settings-content" style={{
+                        backgroundColor: 'var(--bg-card)',
+                        padding: '32px',
+                        borderRadius: '12px',
+                        border: '1px solid var(--border-color)',
+                        minHeight: '500px'
                     }}>
-                        <div style={{ marginBottom: '48px' }}>
-                            <h2 style={{ fontSize: '26px', fontWeight: '900', margin: '0 0 12px' }}>
+                        <div style={{ marginBottom: '32px', borderBottom: '1px solid var(--border-color)', paddingBottom: '20px' }}>
+                            <h2 style={{ fontSize: '18px', fontWeight: '700', margin: '0 0 8px' }}>
                                 Personal Information
                             </h2>
-                            <p style={{ color: 'var(--text-muted)', fontSize: '16px', lineHeight: 1.6 }}>
-                                This information is used to personalize your collaborative experience and room identify.
+                            <p style={{ color: 'var(--text-muted)', fontSize: '14px', margin: 0 }}>
+                                Your public profile and identification across collaborative rooms.
                             </p>
                         </div>
 
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '40px' }}>
-                            <div className="glass-effect" style={{
-                                padding: '40px',
-                                backgroundColor: 'rgba(0,0,0,0.2)',
-                                borderRadius: '24px',
-                                border: '1px dashed var(--border-color)',
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
+                            <div style={{
+                                padding: '32px',
+                                backgroundColor: 'var(--bg-dark)',
+                                borderRadius: '12px',
+                                border: '1px solid var(--border-color)',
                                 textAlign: 'center'
                             }}>
                                 <div style={{
-                                    width: '64px',
-                                    height: '64px',
+                                    width: '48px',
+                                    height: '48px',
                                     borderRadius: '50%',
                                     backgroundColor: 'rgba(255, 255, 255, 0.03)',
                                     display: 'inline-flex',
                                     alignItems: 'center',
                                     justifyContent: 'center',
                                     color: 'var(--text-muted)',
-                                    marginBottom: '20px'
+                                    marginBottom: '16px',
+                                    border: '1px solid var(--border-color)'
                                 }}>
-                                    <User size={32} />
+                                    <User size={24} />
                                 </div>
-                                <h3 style={{ fontSize: '18px', fontWeight: '800', marginBottom: '8px' }}>Profile Management Incoming</h3>
-                                <p style={{ color: 'var(--text-muted)', maxWidth: '300px', margin: '0 auto', fontSize: '14px', lineHeight: 1.6 }}>
-                                    We're building a comprehensive profile system. You'll be able to edit your details in the next major update.
+                                <h3 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '8px' }}>Module Under Construction</h3>
+                                <p style={{ color: 'var(--text-muted)', maxWidth: '340px', margin: '0 auto', fontSize: '13px', lineHeight: 1.6 }}>
+                                    Profile editing capabilities are being refined. You'll be able to manage your details in an upcoming update.
                                 </p>
                             </div>
                         </div>
@@ -130,15 +138,16 @@ const Settings = () => {
             </div>
 
             <style>{`
-                @keyframes fadeIn {
-                    from { opacity: 0; transform: translateY(10px); }
-                    to { opacity: 1; transform: translateY(0); }
-                }
                 @media (max-width: 992px) {
-                    .settings-grid { grid-template-columns: 1fr !important; gap: 32px !important; }
-                    .settings-nav { order: 2; flex-direction: row !important; overflow-x: auto; padding-bottom: 12px; }
-                    .settings-nav button { white-space: nowrap; flex-shrink: 0; }
-                    .settings-content { order: 1; padding: 32px !important; }
+                    .settings-grid { grid-template-columns: 1fr !important; gap: 24px !important; }
+                    .settings-nav { 
+                        flex-direction: row !important; 
+                        overflow-x: auto; 
+                        padding: 8px !important;
+                        white-space: nowrap;
+                    }
+                    .settings-nav button { flex: 0 0 auto; }
+                    .settings-content { padding: 24px !important; }
                 }
             `}</style>
         </AppLayout>

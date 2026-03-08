@@ -45,58 +45,66 @@ const SignUp = () => {
     return (
         <div style={{ height: "100vh", width: "100vw", display: "flex", backgroundColor: "var(--bg-dark)", color: "var(--text-main)", overflowX: "hidden" }}>
 
-            {/* LEFT PANEL: BRAND & GRADIENT (Hidden on mobile) */}
+            {/* LEFT PANEL: BRAND & INFO (Hidden on mobile) */}
             <div className="login-left-panel" style={{
                 flex: 1,
-                background: "linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%)",
+                backgroundColor: '#0f172a',
                 position: "relative",
                 display: "flex",
                 flexDirection: "column",
                 justifyContent: "center",
-                padding: "60px",
-                overflow: "hidden"
+                padding: "80px",
+                borderRight: "1px solid var(--border-color)"
             }}>
-                <div style={{ position: "absolute", top: "-10%", left: "-10%", width: "60%", height: "60%", background: "radial-gradient(circle, rgba(59,130,246,0.15) 0%, rgba(0,0,0,0) 70%)", borderRadius: "50%", filter: "blur(100px)" }}></div>
-                <div style={{ position: "absolute", bottom: "-10%", right: "-10%", width: "60%", height: "60%", background: "radial-gradient(circle, rgba(139,92,246,0.12) 0%, rgba(0,0,0,0) 70%)", borderRadius: "50%", filter: "blur(100px)" }}></div>
-
-                <div style={{ position: "relative", zIndex: 2, maxWidth: "500px" }}>
-                    <h1 style={{ fontSize: "48px", fontWeight: "900", lineHeight: 1.1, marginBottom: "24px", letterSpacing: "-0.04em" }}>
-                        Join the <br />
-                        <span style={{ background: "linear-gradient(to right, #60a5fa, #a78bfa)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>innovation hub.</span>
+                <div style={{ position: "relative", zIndex: 2, maxWidth: "480px" }}>
+                    <div style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '10px',
+                        color: 'var(--primary)',
+                        marginBottom: '32px',
+                        fontWeight: '800',
+                        fontSize: '20px'
+                    }}>
+                        <Zap fill="currentColor" size={24} /> COLABS
+                    </div>
+                    <h1 style={{ fontSize: "40px", fontWeight: "700", lineHeight: 1.2, marginBottom: "24px", color: 'white' }}>
+                        Build your next big idea together.
                     </h1>
-                    <p style={{ fontSize: "18px", color: "rgba(255,255,255,0.6)", lineHeight: 1.6, marginBottom: "48px" }}>
-                        Experience the most powerful collaborative coding platform. Build together, scale faster, and connect with global developers.
+                    <p style={{ fontSize: "16px", color: "var(--text-muted)", lineHeight: 1.6, marginBottom: "48px" }}>
+                        Join the most robust collaborative coding platform for high-performance engineering teams.
                     </p>
 
-                    <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
-                            <div style={{ background: "rgba(255,255,255,0.05)", padding: "12px", borderRadius: "12px", color: "#60a5fa" }}><Zap size={20} /></div>
-                            <span style={{ fontSize: "16px", fontWeight: "600", color: "#ffffffff" }}>Limitless real-time sync</span>
+                    <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                            <div style={{ color: "var(--primary)" }}><Zap size={18} /></div>
+                            <span style={{ fontSize: "14px", fontWeight: "500", color: 'rgba(255,255,255,0.8)' }}>Limitless real-time sync</span>
                         </div>
-                        <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
-                            <div style={{ background: "rgba(255,255,255,0.05)", padding: "12px", borderRadius: "12px", color: "#4ade80" }}><Globe size={20} /></div>
-                            <span style={{ fontSize: "16px", fontWeight: "600", color: "#ffffffff" }}>Global infrastructure access</span>
+                        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                            <div style={{ color: "#4ade80" }}><Globe size={18} /></div>
+                            <span style={{ fontSize: "14px", fontWeight: "500", color: 'rgba(255,255,255,0.8)' }}>Global infrastructure access</span>
                         </div>
-                        <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
-                            <div style={{ background: "rgba(255,255,255,0.05)", padding: "12px", borderRadius: "12px", color: "#f87171" }}><Lock size={20} /></div>
-                            <span style={{ fontSize: "16px", fontWeight: "600", color: "#ffffffff" }}>Secure, team-based workspaces</span>
+                        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                            <div style={{ color: "#f87171" }}><Lock size={18} /></div>
+                            <span style={{ fontSize: "14px", fontWeight: "500", color: 'rgba(255,255,255,0.8)' }}>Secure team-based workspaces</span>
                         </div>
                     </div>
                 </div>
 
-                <div style={{ position: "absolute", bottom: "40px", left: "80px", color: "rgba(255,255,255,0.3)", fontSize: "13px" }}>
-                    &copy; 2026 Utkristi Colabs. Empowering builders everywhere.
+                <div style={{ position: "absolute", bottom: "40px", left: "80px", color: "rgba(255,255,255,0.2)", fontSize: "12px" }}>
+                    &copy; 2026 Utkristi Colabs. Built for high-performance teams.
                 </div>
             </div>
 
             {/* RIGHT PANEL: AUTH FORM */}
             <div className="login-right-panel" style={{
-                width: "600px",
+                width: "540px",
                 display: "flex",
                 flexDirection: "column",
                 justifyContent: "center",
                 padding: "60px",
-                position: "relative"
+                position: "relative",
+                backgroundColor: 'var(--bg-dark)'
             }}>
                 <div
                     onClick={() => navigate("/")}
@@ -107,39 +115,35 @@ const SignUp = () => {
                         display: "flex",
                         alignItems: "center",
                         gap: "8px",
-                        fontSize: "14px",
+                        fontSize: "13px",
                         color: "var(--text-muted)",
                         cursor: "pointer",
-                        fontWeight: "600",
-                        transition: "all 0.2s"
+                        fontWeight: "600"
                     }}
-                    onMouseOver={(e) => e.target.style.color = "var(--primary)"}
-                    onMouseOut={(e) => e.target.style.color = "var(--text-muted)"}
                 >
-                    <ArrowLeft size={16} /> Back to Home
+                    <ArrowLeft size={14} /> Back
                 </div>
 
-                <div style={{ maxWidth: "400px", width: "100%", margin: "0 auto" }}>
-                    <div style={{ marginBottom: "40px" }}>
-                        <h2 style={{ fontSize: "32px", fontWeight: "800", marginBottom: "8px", letterSpacing: "-0.02em" }}>Sign In</h2>
-                        <p style={{ color: "var(--text-muted)", fontSize: "15px" }}>Join Utkristi Colabs to sync your work across devices.</p>
+                <div style={{ maxWidth: "360px", width: "100%", margin: "0 auto" }}>
+                    <div style={{ marginBottom: "32px" }}>
+                        <h2 style={{ fontSize: "28px", fontWeight: "700", marginBottom: "8px" }}>Join the Vault</h2>
+                        <p style={{ color: "var(--text-muted)", fontSize: "14px" }}>Start collaborating in professional workspaces.</p>
                     </div>
 
-                    <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+                    <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
                         <button
                             onClick={() => handleLogin("google")}
                             onMouseEnter={() => setIsHovered('google')}
                             onMouseLeave={() => setIsHovered(null)}
                             style={{
-                                display: "flex", alignItems: "center", justifyContent: "center", gap: "12px",
-                                width: "100%", padding: "16px", borderRadius: "14px", border: "1px solid var(--border-color)",
-                                backgroundColor: isHovered === 'google' ? "rgba(255,255,255,0.05)" : "var(--bg-card)",
-                                color: "var(--text-main)", fontSize: "16px", fontWeight: "700",
-                                cursor: "pointer", transition: "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
-                                boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.1)"
+                                display: "flex", alignItems: "center", justifyContent: "center", gap: "10px",
+                                width: "100%", padding: "12px", borderRadius: "8px", border: "1px solid var(--border-color)",
+                                backgroundColor: isHovered === 'google' ? "var(--bg-card)" : "transparent",
+                                color: "var(--text-main)", fontSize: "14px", fontWeight: "600",
+                                cursor: "pointer", transition: "all 0.2s"
                             }}
                         >
-                            <Mail size={20} color="#ea4335" /> Continue with Google
+                            <Mail size={18} color="#ea4335" /> Continue with Google
                         </button>
 
                         <button
@@ -147,59 +151,57 @@ const SignUp = () => {
                             onMouseEnter={() => setIsHovered('github')}
                             onMouseLeave={() => setIsHovered(null)}
                             style={{
-                                display: "flex", alignItems: "center", justifyContent: "center", gap: "12px",
-                                width: "100%", padding: "16px", borderRadius: "14px", border: "1px solid var(--border-color)",
-                                backgroundColor: isHovered === 'github' ? "rgba(255,255,255,0.05)" : "var(--bg-card)",
-                                color: "var(--text-main)", fontSize: "16px", fontWeight: "700",
-                                cursor: "pointer", transition: "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
-                                boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.1)"
+                                display: "flex", alignItems: "center", justifyContent: "center", gap: "10px",
+                                width: "100%", padding: "12px", borderRadius: "8px", border: "1px solid var(--border-color)",
+                                backgroundColor: isHovered === 'github' ? "var(--bg-card)" : "transparent",
+                                color: "var(--text-main)", fontSize: "14px", fontWeight: "600",
+                                cursor: "pointer", transition: "all 0.2s"
                             }}
                         >
-                            <Github size={20} /> Continue with GitHub
+                            <Github size={18} /> Continue with GitHub
                         </button>
                     </div>
 
-                    <div style={{ display: "flex", alignItems: "center", gap: "12px", margin: "32px 0", color: "var(--border-color)" }}>
-                        <div style={{ flex: 1, height: "1px", backgroundColor: "currentcolor" }}></div>
-                        <span style={{ fontSize: "12px", fontWeight: "700", textTransform: "uppercase", letterSpacing: "0.1em", color: "var(--text-muted)" }}>or access as guest</span>
-                        <div style={{ flex: 1, height: "1px", backgroundColor: "currentcolor" }}></div>
+                    <div style={{ display: "flex", alignItems: "center", gap: "12px", margin: "24px 0" }}>
+                        <div style={{ flex: 1, height: "1px", backgroundColor: "var(--border-color)" }}></div>
+                        <span style={{ fontSize: "11px", fontWeight: "600", textTransform: "uppercase", color: "var(--text-muted)" }}>or guest</span>
+                        <div style={{ flex: 1, height: "1px", backgroundColor: "var(--border-color)" }}></div>
                     </div>
 
                     <div style={{
-                        backgroundColor: "rgba(59, 130, 246, 0.03)",
-                        border: "1px dashed var(--primary)",
+                        backgroundColor: "var(--bg-card)",
+                        border: "1px solid var(--border-color)",
                         padding: "24px",
-                        borderRadius: "20px",
+                        borderRadius: "12px",
                         textAlign: "center"
                     }}>
-                        <ShieldCheck size={24} style={{ color: "var(--primary)", marginBottom: "12px" }} />
-                        <h4 style={{ fontSize: "16px", fontWeight: "700", marginBottom: "8px" }}>Continue as Guest</h4>
+                        <ShieldCheck size={20} style={{ color: "var(--primary)", marginBottom: "8px" }} />
+                        <h4 style={{ fontSize: "14px", fontWeight: "600", marginBottom: "4px" }}>Quick Access</h4>
+                        <p style={{ color: "var(--text-muted)", fontSize: "12px", marginBottom: "16px" }}>Join as a guest to use the core editor.</p>
                         <button
                             onClick={() => navigate("/")}
                             style={{
-                                width: "100%", padding: "12px", borderRadius: "12px", border: "none",
-                                backgroundColor: "var(--primary)", color: "white", fontSize: "14px", fontWeight: "800",
-                                cursor: "pointer", transition: "all 0.2s", display: "flex", alignItems: "center", justifyContent: "center", gap: "8px"
+                                width: "100%", padding: "10px", borderRadius: "6px", border: "none",
+                                backgroundColor: "var(--primary)", color: "white", fontSize: "13px", fontWeight: "600",
+                                cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: "6px"
                             }}
                         >
-                            Launch Editor <ChevronRight size={16} />
+                            Launch Editor <ChevronRight size={14} />
                         </button>
                     </div>
 
-                    <p style={{ textAlign: "center", marginTop: "40px", fontSize: "14px", color: "var(--text-muted)" }}>
-                        Already have an account? <span onClick={() => navigate("/login")} style={{ color: "var(--primary)", fontWeight: "700", cursor: "pointer" }}>Login</span>
+                    <p style={{ textAlign: "center", marginTop: "32px", fontSize: "13px", color: "var(--text-muted)" }}>
+                        Already have an account? <span onClick={() => navigate("/login")} style={{ color: "var(--primary)", fontWeight: "600", cursor: "pointer" }}>Sign In</span>
                     </p>
                 </div>
             </div>
 
             <style>{`
-        @media (max-width: 1024px) {
+        @media (max-width: 900px) {
           .login-left-panel { display: none !important; }
           .login-right-panel { 
             width: 100% !important; 
-            padding: 40px 20px !important; 
-            justify-content: center !important;
-            align-items: center !important;
+            padding: 32px 20px !important; 
           }
           .login-right-panel > div:first-of-type {
             left: 20px !important;

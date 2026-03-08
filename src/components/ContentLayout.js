@@ -30,19 +30,15 @@ export default function ContentLayout({ title, children }) {
             display: "flex",
             flexDirection: "column"
         }}>
-            {/* BACKGROUND ELEMENTS */}
-            <div style={{ position: "absolute", top: "10%", left: "-5%", width: "40vw", height: "40vw", background: "radial-gradient(circle, rgba(59,130,246,0.05) 0%, rgba(0,0,0,0) 70%)", borderRadius: "50%", filter: "blur(60px)", zIndex: 0 }}></div>
-
             {/* HEADER */}
             <header style={{
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "space-between",
-                padding: "24px 8%",
+                padding: "16px 8%",
                 position: "sticky",
                 top: 0,
-                backgroundColor: "rgba(var(--bg-dark-rgb), 0.8)",
-                backdropFilter: "blur(12px)",
+                backgroundColor: "var(--bg-dark)",
                 zIndex: 100,
                 borderBottom: "1px solid var(--border-color)"
             }}>
@@ -56,14 +52,11 @@ export default function ContentLayout({ title, children }) {
                         border: "none",
                         color: "var(--text-muted)",
                         cursor: "pointer",
-                        fontSize: "15px",
-                        fontWeight: "600",
-                        transition: "color 0.2s"
+                        fontSize: "14px",
+                        fontWeight: "600"
                     }}
-                    onMouseOver={(e) => e.target.style.color = "var(--primary)"}
-                    onMouseOut={(e) => e.target.style.color = "var(--text-muted)"}
                 >
-                    <ArrowLeft size={18} /> Back to Home
+                    <ArrowLeft size={16} /> Back
                 </button>
 
                 <button
@@ -72,17 +65,17 @@ export default function ContentLayout({ title, children }) {
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "center",
-                        width: "38px",
-                        height: "38px",
+                        width: "32px",
+                        height: "32px",
                         backgroundColor: "var(--bg-card)",
                         border: "1px solid var(--border-color)",
-                        borderRadius: "10px",
+                        borderRadius: "6px",
                         cursor: "pointer",
                         color: isLightMode ? "#fbbf24" : "var(--text-muted)",
                         transition: "all 0.2s"
                     }}
                 >
-                    {isLightMode ? <Sun size={18} /> : <Moon size={18} />}
+                    {isLightMode ? <Sun size={14} /> : <Moon size={14} />}
                 </button>
             </header>
 
@@ -90,14 +83,14 @@ export default function ContentLayout({ title, children }) {
             <main style={{
                 flex: 1,
                 width: "100%",
-                maxWidth: "800px",
+                maxWidth: "760px",
                 margin: "0 auto",
-                padding: "60px 24px",
+                padding: "48px 24px",
                 position: "relative",
                 zIndex: 1
             }}>
-                <h1 style={{ fontSize: "3rem", fontWeight: "800", marginBottom: "40px", letterSpacing: "-0.02em" }}>{title}</h1>
-                <div style={{ fontSize: "17px", lineHeight: "1.8", color: "var(--text-muted)" }}>
+                <h1 style={{ fontSize: "2.5rem", fontWeight: "700", marginBottom: "32px" }}>{title}</h1>
+                <div style={{ fontSize: "15px", lineHeight: "1.6", color: "var(--text-muted)" }}>
                     {children}
                 </div>
             </main>
