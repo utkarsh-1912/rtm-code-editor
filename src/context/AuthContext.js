@@ -110,6 +110,7 @@ export const AuthProvider = ({ children }) => {
             loginWithGoogle,
             loginWithGitHub,
             logout,
+            refreshProfile,
             loading
         }}>
             {children}

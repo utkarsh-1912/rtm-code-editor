@@ -11,7 +11,7 @@ import Footer from "../components/Landing/Footer";
 
 function HomePage() {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, refreshProfile } = useAuth();
   const [roomId, setRoomId] = useState("");
   const [userName, setUserName] = useState("");
   const [isLightMode, setIsLightMode] = useState(() => {
@@ -19,6 +19,12 @@ function HomePage() {
   });
 
   const location = useLocation();
+
+  useEffect(() => {
+    if (user?.uid) {
+      refreshProfile(user.uid);
+    }
+  }, []);
 
   useEffect(() => {
     const searchParams = new URLSearchParams(location.search);
