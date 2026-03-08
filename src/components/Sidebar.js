@@ -5,7 +5,6 @@ import {
     Settings,
     LogOut,
     Code,
-    User,
     Database
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
