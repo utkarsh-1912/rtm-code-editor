@@ -459,22 +459,12 @@ function Editor() {
         zIndex: 100
       }}>
         <div style={{ display: "flex", alignItems: "center", gap: isMobile ? "8px" : "14px" }}>
-          <div
+          <img
+            src={isMobile ? "/utkristi-labs.png" : "/utkristi-colabs.png"}
+            alt="Utkristi Colabs"
             onClick={() => reactNavigator("/")}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "8px",
-              cursor: "pointer",
-              backgroundColor: "rgba(59, 130, 246, 0.1)",
-              padding: "4px 8px",
-              borderRadius: "8px",
-              color: "var(--primary)"
-            }}
-          >
-            <Code size={isMobile ? 18 : 22} strokeWidth={3} />
-            {!isMobile && <span style={{ fontSize: "14px", fontWeight: "800" }}>Colabs</span>}
-          </div>
+            style={{ height: isMobile ? "24px" : "32px", cursor: "pointer", objectFit: "contain" }}
+          />
 
           {user && !isMobile && (
             <button
@@ -483,7 +473,7 @@ function Editor() {
                 display: "flex",
                 alignItems: "center",
                 gap: "6px",
-                padding: "6px 12px",
+                padding: "6px",
                 backgroundColor: "transparent",
                 border: "1px solid var(--border-color)",
                 borderRadius: "8px",
@@ -565,6 +555,7 @@ function Editor() {
             >
               {isLightMode ? <Sun size={18} /> : <Moon size={18} />}
             </button>
+            {!isMobile && <div style={{ width: "1px", height: "18px", backgroundColor: "var(--border-color)", margin: "0 2px" }} />}
             <button
               onClick={() => handleShare("editor")}
               style={{ width: "32px", height: "32px", color: "var(--primary)", background: "transparent", border: "none", borderRadius: "6px", cursor: "pointer", transition: "all 0.2s" }}
