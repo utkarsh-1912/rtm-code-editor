@@ -57,20 +57,6 @@ const SignUp = () => {
                 borderRight: "1px solid var(--border-color)"
             }}>
                 <div style={{ position: "relative", zIndex: 2, maxWidth: "480px" }}>
-                    <div
-                        onClick={() => navigate("/")}
-                        style={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            cursor: 'pointer',
-                            marginBottom: '32px'
-                        }}>
-                        <img
-                            src="/utkristi-colabs.png"
-                            alt="Utkristi Colabs"
-                            style={{ height: '32px' }}
-                        />
-                    </div>
                     <h1 style={{ fontSize: "40px", fontWeight: "700", lineHeight: 1.2, marginBottom: "24px", color: 'white' }}>
                         Build your next big idea together.
                     </h1>
@@ -146,7 +132,7 @@ const SignUp = () => {
                                 cursor: "pointer", transition: "all 0.2s"
                             }}
                         >
-                            <Mail size={18} color="#ea4335" /> Continue with Google
+                            <Mail size={18} color="var(--primary)" /> Continue with Google
                         </button>
 
                         <button
