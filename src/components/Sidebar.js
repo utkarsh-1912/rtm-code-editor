@@ -46,6 +46,7 @@ const Sidebar = ({ isOpen, onClose, isMobile }) => {
                 padding: '0 8px'
             }}>
                 <div
+                    className="sidebar-logo"
                     style={{ display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer' }}
                     onClick={() => { navigate('/'); if (isMobile) onClose(); }}
                 >
@@ -177,14 +178,16 @@ const Sidebar = ({ isOpen, onClose, isMobile }) => {
     }
 
     return (
-        <aside style={{
-            position: 'fixed',
-            left: 0,
-            top: 0,
-            bottom: 0,
-            width: '240px',
-            zIndex: 100
-        }}>
+        <aside
+            className="sidebar-desktop"
+            style={{
+                position: 'fixed',
+                left: 0,
+                top: 0,
+                bottom: 0,
+                width: '240px',
+                zIndex: 100
+            }}>
             {sidebarContent}
         </aside>
     );

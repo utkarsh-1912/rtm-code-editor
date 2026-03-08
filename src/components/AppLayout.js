@@ -75,6 +75,7 @@ const AppLayout = ({ children }) => {
                 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
                         <img
+                            className="header-logo"
                             src="/utkristi-colabs.png"
                             alt="Utkristi Colabs"
                             style={{ height: '28px', cursor: 'pointer' }}
@@ -178,7 +179,13 @@ const AppLayout = ({ children }) => {
                     :root { --sidebar-width: 0px; }
                     .mobile-only { display: flex !important; }
                     .desktop-inline { display: none !important; }
+                    .sidebar-desktop { display: none !important; }
+                    .header-logo { display: block !important; }
                     main { padding: 24px 16px !important; }
+                }
+                @media (min-width: 993px) {
+                    .header-logo { display: none !important; }
+                    .sidebar-desktop { display: block !important; }
                 }
             `}</style>
         </div>
