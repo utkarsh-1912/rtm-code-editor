@@ -88,11 +88,15 @@ async function findOrCreateUser(firebaseUser) {
 }
 
 async function updateLastRoom(userId, roomId) {
-    return await sql`
+    console.log(`DB: Updating last_room_id to ${roomId} for user ${userId}`);
+    const result = await sql`
         UPDATE users 
         SET last_room_id = ${roomId} 
         WHERE auth_provider_id = ${userId}
+        RETURNING *
     `;
+    console.log(`DB: Update result:`, result.length > 0 ? "Success" : "No user found");
+    return result;
 }
 
 /**

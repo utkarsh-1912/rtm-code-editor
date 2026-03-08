@@ -45,16 +45,6 @@ const SpaceLoader = () => {
                     marginBottom: '24px'
                 }}>
                     <Loader2 size={48} className="spin-animation" color="var(--primary)" />
-                    <Sparkles
-                        size={20}
-                        style={{
-                            position: 'absolute',
-                            top: '-8px',
-                            right: '-8px',
-                            color: '#fbbf24',
-                            animation: 'bounce 2s infinite'
-                        }}
-                    />
                 </div>
 
                 <h3 style={{
