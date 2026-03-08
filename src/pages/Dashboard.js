@@ -2,20 +2,17 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import {
-    Clock,
     Plus,
-    Settings,
-    LogOut,
-    Code,
     Terminal,
-    User,
     Search,
     ExternalLink
 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import AppLayout from '../components/AppLayout';
+import { getBackendUrl } from '../utils/api';
 
 const Dashboard = () => {
-    const { user, logout, loading } = useAuth();
+    const { user, loading } = useAuth();
     const navigate = useNavigate();
     const [recentRooms, setRecentRooms] = useState([]);
     const [loadingRooms, setLoadingRooms] = useState(true);
@@ -32,7 +29,8 @@ const Dashboard = () => {
 
         const fetchDashboardData = async () => {
             try {
-                const response = await fetch(`/api/user-dashboard?userId=${user.uid}`);
+                const backendUrl = getBackendUrl();
+                const response = await fetch(`${backendUrl}/api/user-dashboard?userId=${user.uid}`);
                 const data = await response.json();
 
                 setRecentRooms(data.rooms || []);
@@ -48,281 +46,154 @@ const Dashboard = () => {
         fetchDashboardData();
     }, [user]);
 
-    const handleLogout = () => {
-        logout();
-        toast.success("Signed out successfully");
-        navigate('/');
-    };
-
     if (loading || !user) {
         return (
             <div style={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'var(--bg-dark)' }}>
-                <div style={{ color: 'var(--primary)', fontSize: '1.2rem', fontWeight: 'bold' }}>Loading your space...</div>
+                <div className="pulse-animation" style={{ color: 'var(--primary)', fontSize: '1.2rem', fontWeight: 'bold' }}>Loading your space...</div>
             </div>
         );
     }
 
     return (
-        <div style={{
-            minHeight: '100vh',
-            backgroundColor: 'var(--bg-dark)',
-            color: 'var(--text-main)',
-            fontFamily: 'Inter, sans-serif'
-        }}>
-            {/* Sidebar / Bottom Nav */}
-            <div className="dashboard-sidebar" style={{
-                position: 'fixed',
-                backgroundColor: 'var(--secondary)',
-                borderRight: '1px solid var(--border-color)',
-                padding: '24px',
-                display: 'flex',
-                zIndex: 100,
-                transition: 'all 0.3s'
-            }}>
-                <div className="sidebar-logo" style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '40px' }}>
-                    <div style={{ color: 'var(--primary)' }}>
-                        <Code size={28} />
-                    </div>
-                    <span style={{ fontWeight: '700', fontSize: '1.2rem', letterSpacing: '-0.5px' }}>Utkristi Colabs</span>
+        <AppLayout>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '40px' }}>
+                <div>
+                    <h1 style={{ fontSize: '32px', fontWeight: '700', marginBottom: '8px' }}>Dashboard</h1>
+                    <p style={{ color: 'var(--text-muted)' }}>Welcome back, {user.name}. Here's what's happening.</p>
                 </div>
+                <button
+                    onClick={() => navigate('/')}
+                    style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        padding: '12px 24px',
+                        backgroundColor: 'var(--primary)',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '10px',
+                        fontWeight: '600',
+                        cursor: 'pointer',
+                        boxShadow: '0 4px 14px rgba(0, 59, 251, 0.3)',
+                        transition: 'all 0.2s'
+                    }}
+                    onMouseOver={(e) => e.currentTarget.style.transform = 'translateY(-2px)'}
+                    onMouseOut={(e) => e.currentTarget.style.transform = 'translateY(0)'}
+                >
+                    <Plus size={20} /> Create New Room
+                </button>
+            </div>
 
-                <div className="sidebar-nav" style={{ display: 'flex', flexDirection: 'column', gap: '8px', flex: 1 }}>
-                    <button style={navItemStyle(true)}>
-                        <Clock size={18} /> <span className="nav-text">Recent Rooms</span>
-                    </button>
-                    <button style={navItemStyle(false)} onClick={() => navigate('/snippets')}>
-                        <User size={18} /> <span className="nav-text">My Snippets</span>
-                    </button>
-                    <button style={navItemStyle(false)} onClick={() => navigate('/settings')}>
-                        <Settings size={18} /> <span className="nav-text">Account Settings</span>
-                    </button>
+            {/* Stats */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '24px', marginBottom: '40px' }}>
+                <div style={statCardStyle()}>
+                    <span style={{ color: 'var(--text-muted)', fontSize: '14px' }}>Total Rooms</span>
+                    <span style={{ fontSize: '28px', fontWeight: '700' }}>{stats.totalRooms}</span>
                 </div>
-
-                <div className="sidebar-footer" style={{
-                    marginTop: 'auto',
-                    paddingTop: '20px',
-                    borderTop: '1px solid var(--border-color)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between'
-                }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                        <img
-                            src={user.photoURL || `https://ui-avatars.com/api/?name=${user.name}&background=random`}
-                            alt="avatar"
-                            style={{ width: '32px', height: '32px', borderRadius: '50%' }}
-                        />
-                        <div className="user-info" style={{ display: 'flex', flexDirection: 'column', maxWidth: '120px' }}>
-                            <span style={{ fontSize: '13px', fontWeight: '600', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user.name}</span>
-                            <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Pro Account</span>
-                        </div>
-                    </div>
-                    <button
-                        onClick={handleLogout}
-                        style={{ background: 'transparent', border: 'none', color: '#f87171', cursor: 'pointer', padding: '5px' }}
-                    >
-                        <LogOut size={18} />
-                    </button>
+                <div style={statCardStyle()}>
+                    <span style={{ color: 'var(--text-muted)', fontSize: '14px' }}>Active Sessions</span>
+                    <span style={{ fontSize: '28px', fontWeight: '700' }}>{stats.sessions}</span>
+                </div>
+                <div style={statCardStyle()}>
+                    <span style={{ color: 'var(--text-muted)', fontSize: '14px' }}>Collaboration Hours</span>
+                    <span style={{ fontSize: '28px', fontWeight: '700' }}>{stats.hours}h</span>
                 </div>
             </div>
 
-            {/* Main Content */}
-            <div className="dashboard-content" style={{ padding: '48px', transition: 'all 0.3s' }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '40px' }}>
-                    <div>
-                        <h1 style={{ fontSize: '32px', fontWeight: '700', marginBottom: '8px' }}>Dashboard</h1>
-                        <p style={{ color: 'var(--text-muted)' }}>Welcome back, {user.name}. Here's what's happening.</p>
-                    </div>
-                    <button
-                        onClick={() => navigate('/')}
-                        style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '8px',
-                            padding: '12px 24px',
-                            backgroundColor: 'var(--primary)',
-                            color: 'white',
-                            border: 'none',
-                            borderRadius: '10px',
-                            fontWeight: '600',
-                            cursor: 'pointer',
-                            boxShadow: '0 4px 14px rgba(0, 59, 251, 0.3)'
-                        }}
-                    >
-                        <Plus size={20} /> Create New Room
-                    </button>
-                </div>
-
-                {/* Stats */}
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '24px', marginBottom: '40px' }}>
-                    <div style={statCardStyle()}>
-                        <span style={{ color: 'var(--text-muted)', fontSize: '14px' }}>Total Rooms</span>
-                        <span style={{ fontSize: '28px', fontWeight: '700' }}>{stats.totalRooms}</span>
-                    </div>
-                    <div style={statCardStyle()}>
-                        <span style={{ color: 'var(--text-muted)', fontSize: '14px' }}>Active Sessions</span>
-                        <span style={{ fontSize: '28px', fontWeight: '700' }}>{stats.sessions}</span>
-                    </div>
-                    <div style={statCardStyle()}>
-                        <span style={{ color: 'var(--text-muted)', fontSize: '14px' }}>Collaboration Hours</span>
-                        <span style={{ fontSize: '28px', fontWeight: '700' }}>{stats.hours}h</span>
+            <div style={{
+                backgroundColor: 'var(--bg-card)',
+                borderRadius: '20px',
+                border: '1px solid var(--border-color)',
+                padding: '32px',
+                boxShadow: '0 4px 20px rgba(0, 0, 0, 0.05)'
+            }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px', flexWrap: 'wrap', gap: '16px' }}>
+                    <h2 style={{ fontSize: '20px', fontWeight: '600' }}>Recent Rooms</h2>
+                    <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '10px',
+                        backgroundColor: 'var(--bg-dark)',
+                        padding: '8px 16px',
+                        borderRadius: '8px',
+                        border: '1px solid var(--border-color)',
+                        width: '100%',
+                        maxWidth: '300px'
+                    }}>
+                        <Search size={16} color="var(--text-muted)" />
+                        <input
+                            placeholder="Search rooms..."
+                            style={{ background: 'transparent', border: 'none', outline: 'none', color: 'var(--text-main)', fontSize: '14px', width: '100%' }}
+                        />
                     </div>
                 </div>
 
-                <div style={{
-                    backgroundColor: 'var(--bg-card)',
-                    borderRadius: '20px',
-                    border: '1px solid var(--border-color)',
-                    padding: '32px',
-                    boxShadow: '0 4px 20px rgba(0, 0, 0, 0.05)'
-                }}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
-                        <h2 style={{ fontSize: '20px', fontWeight: '600' }}>Recent Rooms</h2>
-                        <div style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '10px',
-                            backgroundColor: 'var(--bg-dark)',
-                            padding: '8px 16px',
-                            borderRadius: '8px',
-                            border: '1px solid var(--border-color)',
-                            width: '300px'
-                        }}>
-                            <Search size={16} color="var(--text-muted)" />
-                            <input
-                                placeholder="Search rooms..."
-                                style={{ background: 'transparent', border: 'none', outline: 'none', color: 'var(--text-main)', fontSize: '14px', width: '100%' }}
-                            />
-                        </div>
-                    </div>
-
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                        {loadingRooms ? (
-                            <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>Loading your rooms...</div>
-                        ) : recentRooms.length > 0 ? (
-                            recentRooms.map((room) => (
-                                <div
-                                    key={room.id}
-                                    onClick={() => navigate(`/editor/${room.id}`)}
-                                    style={{
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    {loadingRooms ? (
+                        <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>Loading your rooms...</div>
+                    ) : recentRooms.length > 0 ? (
+                        recentRooms.map((room) => (
+                            <div
+                                key={room.id}
+                                onClick={() => navigate(`/editor/${room.id}`)}
+                                style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'space-between',
+                                    padding: '16px 20px',
+                                    backgroundColor: 'var(--bg-dark)',
+                                    borderRadius: '12px',
+                                    border: '1px solid var(--border-color)',
+                                    cursor: 'pointer',
+                                    transition: 'all 0.2s',
+                                    gap: '12px'
+                                }}
+                                onMouseOver={(e) => {
+                                    e.currentTarget.style.borderColor = 'var(--primary)';
+                                    e.currentTarget.style.backgroundColor = 'rgba(59, 130, 246, 0.02)';
+                                }}
+                                onMouseOut={(e) => {
+                                    e.currentTarget.style.borderColor = 'var(--border-color)';
+                                    e.currentTarget.style.backgroundColor = 'var(--bg-dark)';
+                                }}
+                            >
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '20px', minWidth: 0 }}>
+                                    <div style={{
+                                        width: '44px',
+                                        height: '44px',
+                                        borderRadius: '10px',
+                                        backgroundColor: 'rgba(0, 59, 251, 0.1)',
                                         display: 'flex',
                                         alignItems: 'center',
-                                        justifyContent: 'space-between',
-                                        padding: '16px 20px',
-                                        backgroundColor: 'var(--bg-dark)',
-                                        borderRadius: '12px',
-                                        border: '1px solid var(--border-color)',
-                                        cursor: 'pointer',
-                                        transition: 'all 0.2s'
-                                    }}
-                                    onMouseOver={(e) => e.currentTarget.style.borderColor = 'var(--primary)'}
-                                    onMouseOut={(e) => e.currentTarget.style.borderColor = 'var(--border-color)'}
-                                >
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
-                                        <div style={{
-                                            width: '44px',
-                                            height: '44px',
-                                            borderRadius: '10px',
-                                            backgroundColor: 'rgba(0, 59, 251, 0.1)',
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            justifyContent: 'center',
-                                            color: 'var(--primary)'
-                                        }}>
-                                            <Terminal size={20} />
-                                        </div>
-                                        <div>
-                                            <div style={{ fontWeight: '600', marginBottom: '2px' }}>{room.name}</div>
-                                            <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Room ID: {room.id} • {room.lang}</div>
-                                        </div>
+                                        justifyContent: 'center',
+                                        color: 'var(--primary)',
+                                        flexShrink: 0
+                                    }}>
+                                        <Terminal size={20} />
                                     </div>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
-                                        <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>{room.lastActive}</span>
-                                        <div style={{ color: 'var(--text-muted)' }}>
-                                            <ExternalLink size={18} />
-                                        </div>
+                                    <div style={{ minWidth: 0 }}>
+                                        <div style={{ fontWeight: '600', marginBottom: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{room.name}</div>
+                                        <div style={{ fontSize: '12px', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>Room ID: {room.id} • {room.lang}</div>
                                     </div>
                                 </div>
-                            ))
-                        ) : (
-                            <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>No recent rooms found.</div>
-                        )}
-                    </div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '24px', flexShrink: 0 }}>
+                                    <span style={{ fontSize: '13px', color: 'var(--text-muted)', display: 'none' }}>{room.lastActive}</span>
+                                    <div style={{ color: 'var(--text-muted)' }}>
+                                        <ExternalLink size={18} />
+                                    </div>
+                                </div>
+                            </div>
+                        ))
+                    ) : (
+                        <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)', border: '1px dashed var(--border-color)', borderRadius: '12px' }}>
+                            No recent rooms found. Start by creating one!
+                        </div>
+                    )}
                 </div>
             </div>
-            <style>{`
-                .dashboard-sidebar {
-                    left: 0;
-                    top: 0;
-                    bottom: 0;
-                    width: 260px;
-                    flex-direction: column;
-                }
-                .dashboard-content {
-                    margin-left: 260px;
-                }
-                @media (max-width: 768px) {
-                    .dashboard-sidebar {
-                        left: 0;
-                        bottom: 0;
-                        top: auto;
-                        width: 100vw;
-                        height: 70px;
-                        flex-direction: row;
-                        padding: 0 20px;
-                        border-right: none;
-                        border-top: 1px solid var(--border-color);
-                        justify-content: space-around;
-                        align-items: center;
-                    }
-                    .sidebar-logo, .user-info, .sidebar-footer {
-                        display: none !important;
-                    }
-                    .sidebar-nav {
-                        flex-direction: row !important;
-                        justify-content: space-around !important;
-                        width: 100%;
-                    }
-                    .nav-text {
-                        display: none;
-                    }
-                    .sidebar-nav button {
-                        width: auto !important;
-                        justify-content: center !important;
-                        padding: 12px !important;
-                    }
-                    .dashboard-content {
-                        margin-left: 0 !important;
-                        padding: 30px 20px 100px !important;
-                    }
-                    .dashboard-content h1 {
-                        font-size: 24px !important;
-                    }
-                    .dashboard-content > div:nth-child(2) {
-                        grid-template-columns: 1fr !important;
-                    }
-                }
-            `}</style>
-        </div>
+        </AppLayout>
     );
 };
-
-const navItemStyle = (active) => ({
-    display: 'flex',
-    alignItems: 'center',
-    gap: '12px',
-    width: '100%',
-    padding: '12px 16px',
-    borderRadius: '10px',
-    backgroundColor: active ? 'rgba(0, 59, 251, 0.1)' : 'transparent',
-    color: active ? 'var(--primary)' : 'var(--text-muted)',
-    border: 'none',
-    fontSize: '14px',
-    fontWeight: '600',
-    cursor: 'pointer',
-    textAlign: 'left',
-    transition: 'all 0.2s'
-});
 
 const statCardStyle = () => ({
     backgroundColor: 'var(--bg-card)',

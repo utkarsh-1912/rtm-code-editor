@@ -144,7 +144,56 @@ async function getUserDashboard(userId) {
     };
 }
 
+/**
+ * Initialize Schema if tables don't exist
+ */
+async function initializeSchema() {
+    try {
+        console.log("Initializing database schema...");
+
+        // Rooms Table
+        await sql`
+            CREATE TABLE IF NOT EXISTS rooms (
+                id SERIAL PRIMARY KEY,
+                room_id VARCHAR(255) UNIQUE NOT NULL,
+                name VARCHAR(255),
+                code TEXT,
+                language VARCHAR(50) DEFAULT 'javascript',
+                chat_history JSONB DEFAULT '[]',
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        `;
+
+        // Users Table
+        await sql`
+            CREATE TABLE IF NOT EXISTS users (
+                id SERIAL PRIMARY KEY,
+                email VARCHAR(255),
+                name VARCHAR(255),
+                auth_provider_id VARCHAR(255) UNIQUE NOT NULL,
+                joined_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        `;
+
+        // User Rooms Mapping Table
+        await sql`
+            CREATE TABLE IF NOT EXISTS user_rooms (
+                user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+                room_id INTEGER REFERENCES rooms(id) ON DELETE CASCADE,
+                linked_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (user_id, room_id)
+            )
+        `;
+
+        console.log("Database schema initialized successfully.");
+    } catch (err) {
+        console.error("Database Initialization Error:", err);
+        throw err;
+    }
+}
+
 module.exports = {
+    initializeSchema,
     getRoom,
     saveRoom,
     updateRoomCode,

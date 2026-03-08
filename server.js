@@ -128,7 +128,7 @@ io.on("connection", (socket) => {
     });
 
     // Sync chat history to the joining user
-    const history = roomChatHistory[roomId] || (room && room.chat_history) || [];
+    const history = roomChatHistory[roomId] || (dbRoom && dbRoom.chat_history) || [];
     if (history.length > 0) {
       socket.emit(ACTIONS.SYNC_CHAT, {
         messages: history,
@@ -212,9 +212,19 @@ io.on("connection", (socket) => {
   });
 });
 
-const PORT = process.env.PORT || 5000;
-server.listen(PORT, (err) => {
-  if (!err) {
-    console.log(`Running at port ${PORT}`);
+// Initialize Database & Start Server
+const startServer = async () => {
+  try {
+    await db.initializeSchema();
+
+    const PORT = process.env.PORT || 5000;
+    server.listen(PORT, () => {
+      console.log(`Running at port ${PORT}`);
+    });
+  } catch (err) {
+    console.error("CRITICAL: Failed to initialize server:", err);
+    process.exit(1);
   }
-});
+};
+
+startServer();
