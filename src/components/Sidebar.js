@@ -7,7 +7,8 @@ import {
     X,
     LogOut,
     ChevronLeft,
-    ChevronRight
+    ChevronRight,
+    Home
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import toast from 'react-hot-toast';
@@ -61,7 +62,7 @@ const Sidebar = ({ isOpen, onClose, isMobile, isCollapsed, onToggleCollapse }) =
                     onClick={() => { navigate('/'); if (isMobile) onClose(); }}
                 >
                     <img
-                        src={isCollapsed && !isMobile ? "/logo192.png" : "/utkristi-colabs.png"}
+                        src={isCollapsed && !isMobile ? "/utkristi-labs.png" : "/utkristi-colabs.png"}
                         alt="Logo"
                         style={{
                             width: 'auto',
@@ -183,29 +184,28 @@ const Sidebar = ({ isOpen, onClose, isMobile, isCollapsed, onToggleCollapse }) =
                     )}
                 </div>
 
-                {/* Collapse Toggle for Desktop */}
+                {/* Back to Home Button for Desktop */}
                 {!isMobile && (
                     <button
-                        onClick={onToggleCollapse}
+                        onClick={() => navigate('/')}
                         style={{
                             display: 'flex',
                             alignItems: 'center',
-                            justifyContent: 'center',
+                            justifyContent: isCollapsed ? 'center' : 'flex-start',
                             width: '100%',
-                            padding: '10px',
+                            padding: '12px',
                             backgroundColor: 'transparent',
                             color: 'var(--text-muted)',
                             border: '1px solid var(--border-color)',
-                            borderRadius: '10px',
+                            borderRadius: '12px',
                             cursor: 'pointer',
-                            transition: 'all 0.2s'
+                            transition: 'all 0.2s',
+                            gap: '12px'
                         }}
-                        title={isCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}
+                        title="Back to Home"
                     >
-                        {isCollapsed ? <ChevronRight size={18} /> : <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <ChevronLeft size={18} />
-                            <span style={{ fontSize: '12px', fontWeight: '600' }}>Collapse</span>
-                        </div>}
+                        <Home size={20} />
+                        {!isCollapsed && <span style={{ fontSize: '14px', fontWeight: '600' }}>Back Home</span>}
                     </button>
                 )}
             </div>
@@ -243,6 +243,35 @@ const Sidebar = ({ isOpen, onClose, isMobile, isCollapsed, onToggleCollapse }) =
                 transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
             }}>
             {sidebarContent}
+
+            {/* Notch Toggle */}
+            <button
+                onClick={onToggleCollapse}
+                style={{
+                    position: 'absolute',
+                    right: '-12px',
+                    top: '84px',
+                    width: '24px',
+                    height: '24px',
+                    backgroundColor: 'var(--bg-card)',
+                    border: '1px solid var(--border-color)',
+                    borderRadius: '50%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: 'pointer',
+                    zIndex: 110,
+                    color: 'var(--text-muted)',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
+                    transition: 'all 0.2s',
+                    padding: 0
+                }}
+                onMouseEnter={e => e.currentTarget.style.color = 'var(--primary)'}
+                onMouseLeave={e => e.currentTarget.style.color = 'var(--text-muted)'}
+                title={isCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}
+            >
+                {isCollapsed ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
+            </button>
         </aside>
     );
 };
