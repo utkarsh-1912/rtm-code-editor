@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Search, Plus, Trash2, Edit2, Copy, Check } from 'lucide-react';
+import { Search, Plus, Trash2, Edit2, Copy, Check, X } from 'lucide-react';
 import AppLayout from '../components/AppLayout';
 import { useAuth } from '../context/AuthContext';
 import { getBackendUrl } from '../utils/api';
