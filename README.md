@@ -4,7 +4,7 @@ Utkristi Colabs is a **real-time collaborative code editor** designed for high-p
 
 ![Utkristi Colabs Logo](https://raw.githubusercontent.com/utkarsh-1912/rtm-code-editor/main/public/utkristi-colabs.png)
 
-## ✨ key Features
+## ✨ Key Features
 
 - **⚡ Real-time Collaboration**: Sub-millisecond latency powered by Socket.io. See cursors, selections, and code changes instantly.
 - **💾 Persistent Workspaces**: Built on PostgreSQL (Neon DB), your rooms, code, and chat history are saved automatically.
