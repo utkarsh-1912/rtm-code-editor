@@ -624,15 +624,17 @@ function Editor() {
                 >
                   <Download size={18} />
                 </button>
-                <button
-                  onClick={() => setShowSnippetModal(true)}
-                  style={{ width: "32px", height: "32px", color: "var(--text-muted)", background: "transparent", border: "none", borderRadius: "6px", cursor: "pointer", transition: "all 0.2s" }}
-                  onMouseOver={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-card)")}
-                  onMouseOut={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
-                  title="Import Snippet"
-                >
-                  <ImportIcon size={18} />
-                </button>
+                {user && (
+                  <button
+                    onClick={() => setShowSnippetModal(true)}
+                    style={{ width: "32px", height: "32px", color: "var(--text-muted)", background: "transparent", border: "none", borderRadius: "6px", cursor: "pointer", transition: "all 0.2s" }}
+                    onMouseOver={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-card)")}
+                    onMouseOut={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
+                    title="Import Snippet"
+                  >
+                    <ImportIcon size={18} />
+                  </button>
+                )}
                 <button
                   onClick={copyRoomId}
                   style={{ width: "32px", height: "32px", color: "var(--text-muted)", background: "transparent", border: "none", borderRadius: "6px", cursor: "pointer", transition: "all 0.2s" }}
