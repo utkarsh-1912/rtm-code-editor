@@ -16,6 +16,7 @@ import {
 import toast from 'react-hot-toast';
 import AppLayout from '../components/AppLayout';
 import { getBackendUrl } from '../utils/api';
+import SpaceLoader from '../components/SpaceLoader';
 
 const Dashboard = () => {
     const { user, loading } = useAuth();
@@ -104,11 +105,7 @@ const Dashboard = () => {
     );
 
     if (loading || !user) {
-        return (
-            <div style={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'var(--bg-dark)' }}>
-                <div style={{ color: 'var(--primary)', fontSize: '1.2rem', fontWeight: 'bold' }}>Loading your space...</div>
-            </div>
-        );
+        return <SpaceLoader />;
     }
 
     return (
