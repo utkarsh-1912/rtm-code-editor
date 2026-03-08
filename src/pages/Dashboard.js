@@ -145,7 +145,7 @@ const Dashboard = () => {
                                     backgroundColor: 'rgba(168, 85, 247, 0.08)',
                                     color: '#a855f7',
                                     border: '1px solid rgba(168, 85, 247, 0.2)',
-                                    padding: '12px 24px',
+                                    padding: '12px',
                                     borderRadius: '12px',
                                     fontWeight: '700',
                                     fontSize: '14px',
