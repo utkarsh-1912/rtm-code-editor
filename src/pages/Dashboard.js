@@ -112,68 +112,88 @@ const Dashboard = () => {
         <AppLayout>
             <div className="dashboard-container">
                 <div style={{
-                    marginBottom: '32px',
+                    marginBottom: '40px',
                     display: 'flex',
                     justifyContent: 'space-between',
-                    alignItems: 'center',
+                    alignItems: 'flex-start',
                     flexWrap: 'wrap',
-                    gap: '20px'
+                    gap: '24px'
                 }}>
                     <div>
                         <h1 style={{
-                            fontSize: '28px',
-                            fontWeight: '700',
-                            marginBottom: '4px',
-                            color: 'var(--text-main)'
+                            fontSize: '32px',
+                            fontWeight: '800',
+                            marginBottom: '8px',
+                            color: 'var(--text-main)',
+                            letterSpacing: '-0.02em'
                         }}>
                             Dashboard
                         </h1>
-                        <p style={{ color: 'var(--text-muted)', fontSize: '14px' }}>
-                            Welcome back, {user.name}
+                        <p style={{ color: 'var(--text-muted)', fontSize: '15px', fontWeight: '500' }}>
+                            Welcome back, <span style={{ color: 'var(--primary)' }}>{user.name}</span>
                         </p>
                     </div>
-                    <button
-                        onClick={() => navigate('/')}
-                        style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '8px',
-                            padding: '10px 20px',
-                            backgroundColor: 'var(--primary)',
-                            color: 'white',
-                            border: 'none',
-                            borderRadius: '8px',
-                            fontWeight: '600',
-                            fontSize: '14px',
-                            cursor: 'pointer',
-                            transition: 'opacity 0.2s'
-                        }}
-                    >
-                        <Plus size={18} /> New Room
-                    </button>
-                    {user?.last_room_id && (
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+                        {user?.last_room_id && (
+                            <button
+                                onClick={() => navigate(`/editor/${user.last_room_id}`, { state: { userName: user.name, role: 'editor' } })}
+                                style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '10px',
+                                    backgroundColor: 'rgba(168, 85, 247, 0.08)',
+                                    color: '#a855f7',
+                                    border: '1px solid rgba(168, 85, 247, 0.2)',
+                                    padding: '12px 24px',
+                                    borderRadius: '12px',
+                                    fontWeight: '700',
+                                    fontSize: '14px',
+                                    cursor: 'pointer',
+                                    transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                                    boxShadow: '0 4px 12px rgba(168, 85, 247, 0.1)'
+                                }}
+                                onMouseOver={(e) => {
+                                    e.currentTarget.style.backgroundColor = 'rgba(168, 85, 247, 0.12)';
+                                    e.currentTarget.style.transform = 'translateY(-2px)';
+                                }}
+                                onMouseOut={(e) => {
+                                    e.currentTarget.style.backgroundColor = 'rgba(168, 85, 247, 0.08)';
+                                    e.currentTarget.style.transform = 'translateY(0)';
+                                }}
+                            >
+                                <Zap size={18} fill="#a855f7" /> Resume: {user.last_room_id}
+                            </button>
+                        )}
                         <button
-                            onClick={() => navigate(`/editor/${user.last_room_id}`, { state: { userName: user.name, role: 'editor' } })}
+                            onClick={() => navigate('/')}
                             style={{
                                 display: 'flex',
                                 alignItems: 'center',
-                                gap: '8px',
-                                backgroundColor: 'rgba(168, 85, 247, 0.1)',
-                                color: '#a855f7',
-                                border: '1px solid rgba(168, 85, 247, 0.2)',
-                                padding: '10px 20px',
-                                borderRadius: '8px',
-                                fontWeight: '600',
+                                gap: '10px',
+                                padding: '12px 24px',
+                                background: 'linear-gradient(135deg, var(--primary) 0%, #2563eb 100%)',
+                                color: 'white',
+                                border: 'none',
+                                borderRadius: '12px',
+                                fontWeight: '700',
                                 fontSize: '14px',
                                 cursor: 'pointer',
-                                transition: 'all 0.2s'
+                                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                                boxShadow: '0 10px 20px -5px rgba(59, 130, 246, 0.4)'
                             }}
-                            onMouseOver={(e) => e.currentTarget.style.backgroundColor = 'rgba(168, 85, 247, 0.15)'}
-                            onMouseOut={(e) => e.currentTarget.style.backgroundColor = 'rgba(168, 85, 247, 0.1)'}
+                            onMouseOver={(e) => {
+                                e.currentTarget.style.transform = 'translateY(-2px)';
+                                e.currentTarget.style.boxShadow = '0 15px 25px -5px rgba(59, 130, 246, 0.5)';
+                            }}
+                            onMouseOut={(e) => {
+                                e.currentTarget.style.transform = 'translateY(0)';
+                                e.currentTarget.style.boxShadow = '0 10px 20px -5px rgba(59, 130, 246, 0.4)';
+                            }}
                         >
-                            <ExternalLink size={16} /> Continue: {user.last_room_id}
+                            <Plus size={20} strokeWidth={2.5} /> New Room
                         </button>
-                    )}
+                    </div>
                 </div>
 
                 {/* Industry Standard Stats Area */}

@@ -187,10 +187,12 @@ function HomePage() {
                   Your workspaces and snippets are synced and ready. Pick up right where you left off.
                 </p>
 
-                <div style={{ display: "flex", flexWrap: "wrap", gap: "16px", marginBottom: "48px" }} className="hero-buttons">
+                <div style={{ display: "flex", flexWrap: "wrap", gap: "16px", marginBottom: "24px" }} className="hero-buttons">
                   <button
                     onClick={() => navigate("/dashboard")}
                     style={{
+                      flex: 1,
+                      minWidth: "240px",
                       padding: "16px 32px",
                       background: "linear-gradient(135deg, var(--primary) 0%, #2563eb 100%)",
                       color: "white",
@@ -200,6 +202,7 @@ function HomePage() {
                       cursor: "pointer",
                       display: "flex",
                       alignItems: "center",
+                      justifyContent: "center",
                       gap: "12px",
                       boxShadow: "0 10px 25px -5px rgba(59, 130, 246, 0.5)",
                       transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
@@ -219,6 +222,8 @@ function HomePage() {
                   <button
                     onClick={createNewRoom}
                     style={{
+                      flex: 1,
+                      minWidth: "240px",
                       padding: "16px 32px",
                       backgroundColor: "var(--bg-card-transparent)",
                       color: "var(--text-main)",
@@ -228,6 +233,7 @@ function HomePage() {
                       cursor: "pointer",
                       display: "flex",
                       alignItems: "center",
+                      justifyContent: "center",
                       gap: "12px",
                       transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
                       fontSize: "15px",
@@ -249,13 +255,14 @@ function HomePage() {
                 </div>
 
                 {user.last_room_id && (
-                  <div className="staggered-entry" style={{ animationDelay: "0.5s" }}>
+                  <div className="staggered-entry" style={{ animationDelay: "0.5s", width: "100%", marginBottom: "48px" }}>
                     <div style={{
                       padding: "24px",
                       backgroundColor: "rgba(168, 85, 247, 0.04)",
                       borderRadius: "20px",
                       border: "1px solid rgba(168, 85, 247, 0.15)",
-                      display: "inline-block",
+                      display: "block",
+                      width: "100%",
                       boxShadow: "0 10px 30px -10px rgba(168, 85, 247, 0.2)",
                       position: "relative",
                       overflow: "hidden"
@@ -267,15 +274,17 @@ function HomePage() {
                         style={{
                           display: "flex", alignItems: "center", gap: "12px", background: "none", border: "none",
                           color: "var(--text-main)", fontWeight: "700", cursor: "pointer", padding: 0,
-                          fontSize: "16px", transition: "all 0.2s"
+                          fontSize: "16px", transition: "all 0.2s", width: "100%", justifyContent: "flex-start"
                         }}
                         onMouseOver={e => e.currentTarget.style.color = "#a855f7"}
                         onMouseOut={e => e.currentTarget.style.color = "var(--text-main)"}
                       >
-                        <div style={{ backgroundColor: "rgba(168, 85, 247, 0.1)", padding: "8px", borderRadius: "10px" }}>
-                          <Globe size={18} color="#a855f7" />
+                        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                          <div style={{ backgroundColor: "rgba(168, 85, 247, 0.1)", padding: "8px", borderRadius: "10px" }}>
+                            <Globe size={18} color="#a855f7" />
+                          </div>
+                          <span>Revisit Room: <span style={{ opacity: 0.6 }}>{user.last_room_id}</span></span>
                         </div>
-                        <span>Revisit Room: <span style={{ opacity: 0.6 }}>{user.last_room_id}</span></span>
                         <ChevronRight size={18} />
                       </button>
                     </div>
