@@ -12,7 +12,7 @@ const Navbar = ({ user, isLightMode, toggleTheme, navigate }) => {
             zIndex: 10
         }}>
             <div
-                style={{ cursor: "pointer", transition: "transform 0.2s", width: "120px" }}
+                style={{ cursor: "pointer", transition: "transform 0.2s", width: "160px" }}
                 onClick={() => navigate("/")}
                 onMouseOver={(e) => e.currentTarget.style.transform = "scale(1.02)"}
                 onMouseOut={(e) => e.currentTarget.style.transform = "scale(1)"}
@@ -25,7 +25,7 @@ const Navbar = ({ user, isLightMode, toggleTheme, navigate }) => {
                     <button
                         onClick={() => navigate("/dashboard")}
                         style={{
-                            display: "flex", alignItems: "center", gap: "10px", padding: "0 24px",
+                            display: "flex", alignItems: "center", gap: "10px", padding: "0 12px",
                             height: "44px",
                             backgroundColor: isLightMode ? "rgba(59, 130, 246, 0.1)" : "rgba(59, 130, 246, 0.12)",
                             border: "1px solid rgba(59, 130, 246, 0.25)",
