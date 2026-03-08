@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Settings as SettingsIcon, User, Bell, Shield, Palette, Save, Check, Moon, Sun, Monitor } from 'lucide-react';
 import AppLayout from '../components/AppLayout';
 import { useAuth } from '../context/AuthContext';
