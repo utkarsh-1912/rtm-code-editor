@@ -88,15 +88,12 @@ async function findOrCreateUser(firebaseUser) {
 }
 
 async function updateLastRoom(userId, roomId) {
-    console.log(`DB: Updating last_room_id to ${roomId} for user ${userId}`);
-    const result = await sql`
+    return await sql`
         UPDATE users 
         SET last_room_id = ${roomId} 
         WHERE auth_provider_id = ${userId}
         RETURNING *
     `;
-    console.log(`DB: Update result:`, result.length > 0 ? "Success" : "No user found");
-    return result;
 }
 
 /**
@@ -339,6 +336,9 @@ async function initializeSchema() {
         joined_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
     `;
+
+        // Migration: Add last_room_id if missing (for existing tables)
+        await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS last_room_id VARCHAR(255)`;
 
         // User Rooms Mapping Table
         await sql`

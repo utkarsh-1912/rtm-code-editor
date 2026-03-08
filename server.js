@@ -264,7 +264,6 @@ io.on("connection", (socket) => {
 
     // Now that we're sure the room exists in DB, handle user link
     if (userProfile && userProfile.uid) {
-      console.log(`SERVER: JOIN with profile - UID: ${userProfile.uid}, Room: ${roomId}`);
       try {
         await db.findOrCreateUser(userProfile);
         await db.linkRoomToUser(userProfile.uid, roomId);
@@ -272,8 +271,6 @@ io.on("connection", (socket) => {
       } catch (err) {
         console.error("User Persistence Error:", err);
       }
-    } else {
-      console.log("SERVER: JOIN without profile or UID", { userProfile });
     }
 
     const clients = getAllClients(roomId);
