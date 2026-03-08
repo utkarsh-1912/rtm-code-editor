@@ -40,7 +40,7 @@ import { LANGUAGES, THEMES } from "../config";
 import { useAuth } from "../context/AuthContext";
 import LoadingScreen from "../components/LoadingScreen";
 import SnippetModal from "../components/SnippetModal";
-import { ClipboardList } from "lucide-react";
+import { Library } from "lucide-react";
 
 function Editor() {
   const socketRef = useRef(null);
@@ -631,7 +631,7 @@ function Editor() {
                   onMouseOut={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
                   title="Import Snippet"
                 >
-                  <ClipboardList size={18} />
+                  <Library size={18} />
                 </button>
                 <button
                   onClick={copyRoomId}
