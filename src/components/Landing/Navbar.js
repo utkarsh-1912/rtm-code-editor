@@ -10,7 +10,7 @@ const Navbar = ({ user, isLightMode, toggleTheme, navigate }) => {
     const handleLogout = () => {
         logout();
         toast.success("Signed out successfully");
-        navigate("/");
+        window.location.href = "/";
     };
 
     useEffect(() => {
@@ -29,7 +29,7 @@ const Navbar = ({ user, isLightMode, toggleTheme, navigate }) => {
             zIndex: 10
         }}>
             <div
-                style={{ cursor: "pointer", transition: "transform 0.2s", width: isMobile ? "130px" : "160px" }}
+                style={{ cursor: "pointer", transition: "transform 0.2s", width: isMobile ? "160px" : "180px" }}
                 onClick={() => navigate("/")}
                 onMouseOver={(e) => e.currentTarget.style.transform = "scale(1.02)"}
                 onMouseOut={(e) => e.currentTarget.style.transform = "scale(1)"}
