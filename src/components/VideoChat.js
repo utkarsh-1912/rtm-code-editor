@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { PhoneOff, Video, VideoOff, Mic, MicOff } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -37,6 +37,55 @@ const VideoChat = ({ socketRef, projectId, user }) => {
         setRemoteStreams({});
         socketRef.current.emit('leave-video-chat', { projectId });
     };
+
+    const addPeer = useCallback((userId, myId, localStream) => {
+        const peer = new RTCPeerConnection({
+            iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+        });
+
+        peersRef.current[userId] = peer;
+
+        localStream.getTracks().forEach(track => peer.addTrack(track, localStream));
+
+        peer.onicecandidate = (event) => {
+            if (event.candidate) {
+                socketRef.current.emit('new-ice-candidate', { to: userId, candidate: event.candidate });
+            }
+        };
+
+        peer.ontrack = (event) => {
+            setRemoteStreams(prev => ({ ...prev, [userId]: event.streams[0] }));
+        };
+
+        return peer;
+    }, [socketRef, setRemoteStreams]);
+
+    const createPeer = useCallback((userId, myId, localStream) => {
+        const peer = new RTCPeerConnection({
+            iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+        });
+
+        peersRef.current[userId] = peer;
+
+        localStream.getTracks().forEach(track => peer.addTrack(track, localStream));
+
+        peer.onicecandidate = (event) => {
+            if (event.candidate) {
+                socketRef.current.emit('new-ice-candidate', { to: userId, candidate: event.candidate });
+            }
+        };
+
+        peer.ontrack = (event) => {
+            setRemoteStreams(prev => ({ ...prev, [userId]: event.streams[0] }));
+        };
+
+        peer.createOffer().then(offer => {
+            peer.setLocalDescription(offer);
+            socketRef.current.emit('video-offer', { to: userId, offer });
+        });
+
+        return peer;
+    }, [socketRef, setRemoteStreams]);
 
     useEffect(() => {
         if (!socketRef.current) return;
@@ -95,55 +144,6 @@ const VideoChat = ({ socketRef, projectId, user }) => {
             socket.off('user-left-video');
         };
     }, [stream, socketRef, projectId, createPeer, addPeer]);
-
-    const createPeer = React.useCallback((userId, myId, localStream) => {
-        const peer = new RTCPeerConnection({
-            iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
-        });
-
-        peersRef.current[userId] = peer;
-
-        localStream.getTracks().forEach(track => peer.addTrack(track, localStream));
-
-        peer.onicecandidate = (event) => {
-            if (event.candidate) {
-                socketRef.current.emit('new-ice-candidate', { to: userId, candidate: event.candidate });
-            }
-        };
-
-        peer.ontrack = (event) => {
-            setRemoteStreams(prev => ({ ...prev, [userId]: event.streams[0] }));
-        };
-
-        peer.createOffer().then(offer => {
-            peer.setLocalDescription(offer);
-            socketRef.current.emit('video-offer', { to: userId, offer });
-        });
-
-        return peer;
-    }, [socketRef, setRemoteStreams]);
-
-    const addPeer = React.useCallback((userId, myId, localStream) => {
-        const peer = new RTCPeerConnection({
-            iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
-        });
-
-        peersRef.current[userId] = peer;
-
-        localStream.getTracks().forEach(track => peer.addTrack(track, localStream));
-
-        peer.onicecandidate = (event) => {
-            if (event.candidate) {
-                socketRef.current.emit('new-ice-candidate', { to: userId, candidate: event.candidate });
-            }
-        };
-
-        peer.ontrack = (event) => {
-            setRemoteStreams(prev => ({ ...prev, [userId]: event.streams[0] }));
-        };
-
-        return peer;
-    }, [socketRef, setRemoteStreams]);
 
     return (
         <div style={containerStyle}>
