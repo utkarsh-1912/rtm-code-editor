@@ -300,7 +300,7 @@ async function searchAll(userId, query) {
     const user = await sql`SELECT id FROM users WHERE auth_provider_id = ${userId} `;
     if (!user.length) return { rooms: [], snippets: [] };
 
-    const searchTerm = `% ${query}% `;
+    const searchTerm = `%${query}%`;
 
     const rooms = await sql`
         SELECT r.room_id as id, r.name, r.language as lang 
@@ -473,17 +473,31 @@ async function initializeSchema() {
     )
     `;
 
-        // Sessions Table
+        // Projects Table
         await sql`
-            CREATE TABLE IF NOT EXISTS sessions(
-        id SERIAL PRIMARY KEY,
-        user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
-        device VARCHAR(255),
-        ip VARCHAR(50),
-        user_agent TEXT,
-        last_active TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    )
-    `;
+            CREATE TABLE IF NOT EXISTS projects(
+                id SERIAL PRIMARY KEY,
+                user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+                name VARCHAR(255) NOT NULL,
+                description TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        `;
+
+        // Project Files Table
+        await sql`
+            CREATE TABLE IF NOT EXISTS project_files(
+                id SERIAL PRIMARY KEY,
+                project_id INTEGER REFERENCES projects(id) ON DELETE CASCADE,
+                name VARCHAR(255) NOT NULL,
+                path TEXT NOT NULL,
+                content TEXT,
+                is_directory BOOLEAN DEFAULT FALSE,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(project_id, path)
+            )
+        `;
 
         console.log("Database schema initialized successfully.");
     } catch (err) {
@@ -515,6 +529,72 @@ async function deleteOtherSessions(userId, currentSessionId) {
     const user = await sql`SELECT id FROM users WHERE auth_provider_id = ${userId}`;
     if (!user.length) return;
     return await sql`DELETE FROM sessions WHERE user_id = ${user[0].id} AND id != ${currentSessionId}`;
+}
+
+/**
+ * Projects Management
+ */
+async function createProject(userId, name, description = "") {
+    const user = await sql`SELECT id FROM users WHERE auth_provider_id = ${userId}`;
+    if (!user.length) throw new Error("User not found");
+
+    const project = await sql`
+        INSERT INTO projects (user_id, name, description)
+        VALUES (${user[0].id}, ${name}, ${description})
+        RETURNING *
+    `;
+
+    // Create a default file
+    await sql`
+        INSERT INTO project_files (project_id, name, path, content)
+        VALUES (${project[0].id}, 'index.html', 'index.html', '<h1>Hello World</h1>')
+    `;
+
+    return project[0];
+}
+
+async function getProjects(userId) {
+    const user = await sql`SELECT id FROM users WHERE auth_provider_id = ${userId}`;
+    if (!user.length) return [];
+
+    return await sql`
+        SELECT * FROM projects 
+        WHERE user_id = ${user[0].id} 
+        ORDER BY updated_at DESC
+    `;
+}
+
+async function getProject(projectId) {
+    const project = await sql`SELECT * FROM projects WHERE id = ${projectId}`;
+    return project[0] || null;
+}
+
+async function getProjectFiles(projectId) {
+    return await sql`
+        SELECT * FROM project_files 
+        WHERE project_id = ${projectId} 
+        ORDER BY is_directory DESC, path ASC
+    `;
+}
+
+async function upsertProjectFile(projectId, name, path, content, isDirectory = false) {
+    return await sql`
+        INSERT INTO project_files (project_id, name, path, content, is_directory)
+        VALUES (${projectId}, ${name}, ${path}, ${content}, ${isDirectory})
+        ON CONFLICT (project_id, path) 
+        DO UPDATE SET 
+            content = EXCLUDED.content, 
+            updated_at = CURRENT_TIMESTAMP
+        RETURNING *
+    `;
+}
+
+async function deleteProjectFile(projectId, path) {
+    return await sql`DELETE FROM project_files WHERE project_id = ${projectId} AND path = ${path}`;
+}
+
+async function deleteProject(projectId) {
+    return await sql`DELETE FROM projects WHERE id = ${projectId}`;
 }
 
 module.exports = {
@@ -549,5 +629,12 @@ module.exports = {
     getOrganizations,
     getOrgSnippets,
     addOrgMember,
-    getOrgMembers
+    getOrgMembers,
+    createProject,
+    getProjects,
+    getProject,
+    getProjectFiles,
+    upsertProjectFile,
+    deleteProjectFile,
+    deleteProject
 };

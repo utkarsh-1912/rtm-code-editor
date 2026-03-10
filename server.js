@@ -260,6 +260,76 @@ app.delete("/api/sessions/others", async (req, res) => {
   }
 });
 
+/**
+ * Projects API
+ */
+app.post("/api/projects", async (req, res) => {
+  try {
+    const { userId, name, description } = req.body;
+    const project = await db.createProject(userId, name, description);
+    res.json(project);
+  } catch (err) {
+    res.status(500).json({ error: "Failed to create project" });
+  }
+});
+
+app.get("/api/projects", async (req, res) => {
+  try {
+    const { userId } = req.query;
+    const projects = await db.getProjects(userId);
+    res.json(projects);
+  } catch (err) {
+    res.status(500).json({ error: "Failed to fetch projects" });
+  }
+});
+
+app.get("/api/projects/:id", async (req, res) => {
+  try {
+    const project = await db.getProject(req.params.id);
+    res.json(project);
+  } catch (err) {
+    res.status(500).json({ error: "Failed to fetch project" });
+  }
+});
+
+app.get("/api/projects/:id/files", async (req, res) => {
+  try {
+    const files = await db.getProjectFiles(req.params.id);
+    res.json(files);
+  } catch (err) {
+    res.status(500).json({ error: "Failed to fetch project files" });
+  }
+});
+
+app.post("/api/projects/:id/files", async (req, res) => {
+  try {
+    const { name, path, content, isDirectory } = req.body;
+    const file = await db.upsertProjectFile(req.params.id, name, path, content, isDirectory);
+    res.json(file[0]);
+  } catch (err) {
+    res.status(500).json({ error: "Failed to save file" });
+  }
+});
+
+app.delete("/api/projects/:id/files", async (req, res) => {
+  try {
+    const { path } = req.query;
+    await db.deleteProjectFile(req.params.id, path);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: "Failed to delete file" });
+  }
+});
+
+app.delete("/api/projects/:id", async (req, res) => {
+  try {
+    await db.deleteProject(req.params.id);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: "Failed to delete project" });
+  }
+});
+
 app.use((req, res, next) => {
   res.sendFile(__dirname + "/build/index.html");
 });
@@ -333,6 +403,18 @@ io.on("connection", (socket) => {
     if (history.length > 0) {
       socket.emit(ACTIONS.SYNC_CHAT, {
         messages: history,
+      });
+    }
+
+    // Create Notification for others
+    if (userName && userName !== "Guest") {
+      const clients = getAllClients(roomId);
+      clients.forEach(client => {
+        if (client.socketId !== socket.id) {
+          db.getUser(userSocketMap[client.socketId]).then(u => {
+            if (u) db.createNotification(u.auth_provider_id, 'join', `${userName} joined the workspace`);
+          }).catch(() => { });
+        }
       });
     }
   });
@@ -429,6 +511,18 @@ io.on("connection", (socket) => {
     socket.in(roomId).emit(ACTIONS.CURSOR_MOVE, { cursor, userName, socketId: socket.id });
   });
 
+  socket.on(ACTIONS.MOUSE_MOVE, ({ roomId, mouse, userName }) => {
+    socket.in(roomId).emit(ACTIONS.MOUSE_MOVE, { mouse, userName, socketId: socket.id });
+  });
+
+  socket.on(ACTIONS.FILE_CHANGE, ({ roomId, fileId, path, content }) => {
+    socket.in(roomId).emit(ACTIONS.FILE_CHANGE, { fileId, path, content });
+  });
+
+  socket.on(ACTIONS.FOLLOW_MODE, ({ roomId, viewState, userName }) => {
+    socket.in(roomId).emit(ACTIONS.FOLLOW_MODE, { viewState, userName });
+  });
+
   socket.on(ACTIONS.WHITEBOARD_DRAW, (data) => {
     const { roomId } = data;
     socket.in(roomId).emit(ACTIONS.WHITEBOARD_DRAW, data);
@@ -436,6 +530,35 @@ io.on("connection", (socket) => {
 
   socket.on(ACTIONS.WHITEBOARD_CLEAR, ({ roomId }) => {
     socket.in(roomId).emit(ACTIONS.WHITEBOARD_CLEAR);
+  });
+
+  socket.on(ACTIONS.WHITEBOARD_CURSOR, ({ roomId, x, y, userName }) => {
+    socket.in(roomId).emit(ACTIONS.WHITEBOARD_CURSOR, { x, y, userName, socketId: socket.id });
+  });
+
+  socket.on(ACTIONS.SYNC_SCROLL, ({ roomId, scrollPos, userName }) => {
+    socket.in(roomId).emit(ACTIONS.SYNC_SCROLL, { scrollPos, userName });
+  });
+
+  // WebRTC Signaling
+  socket.on('join-video-chat', ({ projectId, userId, name }) => {
+    socket.to(projectId).emit('user-joined-video', { userId, name });
+  });
+
+  socket.on('video-offer', ({ to, offer }) => {
+    io.to(to).emit('video-offer', { from: socket.id, offer });
+  });
+
+  socket.on('video-answer', ({ to, answer }) => {
+    io.to(to).emit('video-answer', { from: socket.id, answer });
+  });
+
+  socket.on('new-ice-candidate', ({ to, candidate }) => {
+    io.to(to).emit('new-ice-candidate', { from: socket.id, candidate });
+  });
+
+  socket.on('leave-video-chat', ({ projectId }) => {
+    socket.to(projectId).emit('user-left-video', { userId: socket.id });
   });
 });
 

@@ -16,6 +16,12 @@ const ACTIONS = {
   CURSOR_MOVE: "cursor-move",
   WHITEBOARD_DRAW: "whiteboard-draw",
   WHITEBOARD_CLEAR: "whiteboard-clear",
+  PROJECT_JOIN: "project-join",
+  FILE_CHANGE: "file-change",
+  MOUSE_MOVE: "mouse-move",
+  FOLLOW_MODE: "follow-mode",
+  WHITEBOARD_CURSOR: "whiteboard-cursor",
+  SYNC_SCROLL: "sync-scroll",
 };
 
 module.exports = ACTIONS;

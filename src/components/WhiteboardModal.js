@@ -4,133 +4,228 @@ import ACTIONS from "../Action";
 
 const WhiteboardModal = ({ isOpen, onClose, socketRef, roomId }) => {
     const canvasRef = useRef(null);
+    const topCanvasRef = useRef(null);
     const contextRef = useRef(null);
+    const topContextRef = useRef(null);
     const [isDrawing, setIsDrawing] = useState(false);
-    const [tool, setTool] = useState("pencil"); // pencil, eraser, square, circle, line
+    const [tool, setTool] = useState("pencil");
     const [color, setColor] = useState("#3b82f6");
     const [brushSize, setBrushSize] = useState(3);
+    const [cursors, setCursors] = useState({}); // { socketId: { x, y, name } }
 
-    // For shapes
     const [startPos, setStartPos] = useState({ x: 0, y: 0 });
-    const [tempCanvasData, setTempCanvasData] = useState(null);
+    const lastPos = useRef({ x: 0, y: 0 });
 
     useEffect(() => {
         if (!isOpen) return;
 
-        const canvas = canvasRef.current;
-        // Set display size
-        canvas.style.width = '100%';
-        canvas.style.height = '100%';
+        const initCanvas = () => {
+            const canvas = canvasRef.current;
+            const topCanvas = topCanvasRef.current;
+            if (!canvas || !topCanvas) return;
 
-        // Set actual resolution
-        canvas.width = canvas.offsetWidth * 2;
-        canvas.height = canvas.offsetHeight * 2;
+            const parent = canvas.parentElement;
+            const width = parent.clientWidth;
+            const height = parent.clientHeight;
 
-        const context = canvas.getContext("2d");
-        context.scale(2, 2);
-        context.lineCap = "round";
-        context.strokeStyle = color;
-        context.lineWidth = brushSize;
-        contextRef.current = context;
+            canvas.width = width * 2;
+            canvas.height = height * 2;
+            canvas.style.width = `${width}px`;
+            canvas.style.height = `${height}px`;
+
+            topCanvas.width = width * 2;
+            topCanvas.height = height * 2;
+            topCanvas.style.width = `${width}px`;
+            topCanvas.style.height = `${height}px`;
+
+            const ctx = canvas.getContext("2d");
+            ctx.scale(2, 2);
+            ctx.lineCap = "round";
+            ctx.lineJoin = "round";
+            contextRef.current = ctx;
+
+            const topCtx = topCanvas.getContext("2d");
+            topCtx.scale(2, 2);
+            topCtx.lineCap = "round";
+            topCtx.lineJoin = "round";
+            topContextRef.current = topCtx;
+        };
+
+        initCanvas();
+        window.addEventListener("resize", initCanvas);
 
         const socket = socketRef.current;
-        // Socket listener for drawing
         if (socket) {
             socket.on(ACTIONS.WHITEBOARD_DRAW, (data) => {
                 drawFromSocket(data);
             });
 
             socket.on(ACTIONS.WHITEBOARD_CLEAR, () => {
-                const canvas = canvasRef.current;
-                const context = canvas.getContext("2d");
-                context.clearRect(0, 0, canvas.width, canvas.height);
+                const ctx = contextRef.current;
+                if (ctx) {
+                    const canvas = canvasRef.current;
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+                }
+            });
+
+            socket.on(ACTIONS.WHITEBOARD_CURSOR, ({ x, y, userName, socketId }) => {
+                setCursors(prev => ({ ...prev, [socketId]: { x, y, userName } }));
+            });
+
+            socket.on(ACTIONS.DISCONNECTED, ({ socketId }) => {
+                setCursors(prev => {
+                    const next = { ...prev };
+                    delete next[socketId];
+                    return next;
+                });
             });
         }
 
         return () => {
+            window.removeEventListener("resize", initCanvas);
             if (socket) {
                 socket.off(ACTIONS.WHITEBOARD_DRAW);
                 socket.off(ACTIONS.WHITEBOARD_CLEAR);
+                socket.off(ACTIONS.WHITEBOARD_CURSOR);
             }
         };
-    }, [isOpen, color, brushSize, socketRef]); // eslint-disable-line react-hooks/exhaustive-deps
+    }, [isOpen, socketRef]);
 
+    // Update tool settings
     useEffect(() => {
-        if (contextRef.current) {
-            contextRef.current.strokeStyle = tool === "eraser" ? "var(--bg-card)" : color;
-            contextRef.current.lineWidth = brushSize;
+        if (!contextRef.current || !topContextRef.current) return;
+
+        const ctx = contextRef.current;
+        const topCtx = topContextRef.current;
+
+        if (tool === "eraser") {
+            ctx.globalCompositeOperation = "destination-out";
+            topCtx.globalCompositeOperation = "destination-out";
+            ctx.lineWidth = brushSize * 2;
+            topCtx.lineWidth = brushSize * 2;
+        } else {
+            ctx.globalCompositeOperation = "source-over";
+            topCtx.globalCompositeOperation = "source-over";
+            ctx.strokeStyle = color;
+            topCtx.strokeStyle = color;
+            ctx.lineWidth = brushSize;
+            topCtx.lineWidth = brushSize;
         }
     }, [color, tool, brushSize]);
 
-    const startDrawing = ({ nativeEvent }) => {
-        const { offsetX, offsetY } = nativeEvent;
+    const getCoords = (e) => {
+        const canvas = canvasRef.current;
+        const rect = canvas.getBoundingClientRect();
+        return {
+            x: e.clientX - rect.left,
+            y: e.clientY - rect.top
+        };
+    };
+
+    const startDrawing = (e) => {
+        const { x, y } = getCoords(e);
+        lastPos.current = { x, y };
 
         if (tool === "square" || tool === "circle" || tool === "line") {
-            setStartPos({ x: offsetX, y: offsetY });
-            setTempCanvasData(contextRef.current.getImageData(0, 0, canvasRef.current.width, canvasRef.current.height));
+            setStartPos({ x, y });
         } else {
             contextRef.current.beginPath();
-            contextRef.current.moveTo(offsetX, offsetY);
+            contextRef.current.moveTo(x, y);
         }
         setIsDrawing(true);
     };
 
-    const draw = ({ nativeEvent }) => {
+    const draw = (e) => {
+        const { x, y } = getCoords(e);
+
+        // Emit cursor position
+        socketRef.current?.emit(ACTIONS.WHITEBOARD_CURSOR, {
+            roomId, x, y, userName: socketRef.current.userName || "Guest"
+        });
+
         if (!isDrawing) return;
-        const { offsetX, offsetY } = nativeEvent;
 
         if (tool === "square" || tool === "circle" || tool === "line") {
-            // Restore canvas to before shape started
-            contextRef.current.putImageData(tempCanvasData, 0, 0);
-
-            contextRef.current.beginPath();
+            const topCtx = topContextRef.current;
+            topCtx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+            topCtx.beginPath();
             if (tool === "square") {
-                contextRef.current.rect(startPos.x, startPos.y, offsetX - startPos.x, offsetY - startPos.y);
+                topCtx.rect(startPos.x, startPos.y, x - startPos.x, y - startPos.y);
             } else if (tool === "circle") {
-                const radius = Math.sqrt(Math.pow(offsetX - startPos.x, 2) + Math.pow(offsetY - startPos.y, 2));
-                contextRef.current.arc(startPos.x, startPos.y, radius, 0, 2 * Math.PI);
+                const radius = Math.sqrt(Math.pow(x - startPos.x, 2) + Math.pow(y - startPos.y, 2));
+                topCtx.arc(startPos.x, startPos.y, radius, 0, 2 * Math.PI);
             } else if (tool === "line") {
-                contextRef.current.moveTo(startPos.x, startPos.y);
-                contextRef.current.lineTo(offsetX, offsetY);
+                topCtx.moveTo(startPos.x, startPos.y);
+                topCtx.lineTo(x, y);
             }
-            contextRef.current.stroke();
+            topCtx.stroke();
         } else {
-            contextRef.current.lineTo(offsetX, offsetY);
+            contextRef.current.lineTo(x, y);
             contextRef.current.stroke();
 
             // Emit drawing data
             socketRef.current?.emit(ACTIONS.WHITEBOARD_DRAW, {
                 roomId,
-                x: offsetX,
-                y: offsetY,
-                prevX: nativeEvent.movementX ? offsetX - nativeEvent.movementX : offsetX,
-                prevY: nativeEvent.movementY ? offsetY - nativeEvent.movementY : offsetY,
-                color: tool === "eraser" ? "var(--bg-card)" : color,
-                brushSize,
-                tool: "pencil"
+                x, y,
+                prevX: lastPos.current.x,
+                prevY: lastPos.current.y,
+                color: tool === "eraser" ? "white" : color,
+                brushSize: tool === "eraser" ? brushSize * 2 : brushSize,
+                tool
             });
+            lastPos.current = { x, y };
         }
     };
 
-    const stopDrawing = ({ nativeEvent }) => {
+    const stopDrawing = (e) => {
         if (!isDrawing) return;
+        const { x, y } = getCoords(e);
 
         if (tool === "square" || tool === "circle" || tool === "line") {
-            const { offsetX, offsetY } = nativeEvent;
+            topContextRef.current.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+
+            const ctx = contextRef.current;
+            ctx.beginPath();
+            if (tool === "square") {
+                ctx.rect(startPos.x, startPos.y, x - startPos.x, y - startPos.y);
+            } else if (tool === "circle") {
+                const radius = Math.sqrt(Math.pow(x - startPos.x, 2) + Math.pow(y - startPos.y, 2));
+                ctx.arc(startPos.x, startPos.y, radius, 0, 2 * Math.PI);
+            } else if (tool === "line") {
+                ctx.moveTo(startPos.x, startPos.y);
+                ctx.lineTo(x, y);
+            }
+            ctx.stroke();
+            ctx.closePath();
+
             // Emit shape data
             socketRef.current?.emit(ACTIONS.WHITEBOARD_DRAW, {
                 roomId,
                 startPos,
-                x: offsetX,
-                y: offsetY,
+                x, y,
                 color,
                 brushSize,
                 tool
             });
+        } else {
+            contextRef.current.closePath();
         }
-
-        contextRef.current.closePath();
         setIsDrawing(false);
+    };
+
+    const handleTouchStart = (e) => {
+        e.preventDefault();
+        startDrawing(e.touches[0]);
+    };
+
+    const handleTouchMove = (e) => {
+        e.preventDefault();
+        draw(e.touches[0]);
+    };
+
+    const handleTouchEnd = (e) => {
+        e.preventDefault();
+        stopDrawing(e.changedTouches[0]);
     };
 
     const drawFromSocket = (data) => {
@@ -138,10 +233,21 @@ const WhiteboardModal = ({ isOpen, onClose, socketRef, roomId }) => {
         const ctx = contextRef.current;
         if (!ctx) return;
 
-        ctx.strokeStyle = color;
-        ctx.lineWidth = brushSize;
-        ctx.beginPath();
+        // Save current style
+        const oldGCO = ctx.globalCompositeOperation;
+        const oldStroke = ctx.strokeStyle;
+        const oldLineWidth = ctx.lineWidth;
 
+        if (tool === "eraser") {
+            ctx.globalCompositeOperation = "destination-out";
+            ctx.lineWidth = brushSize;
+        } else {
+            ctx.globalCompositeOperation = "source-over";
+            ctx.strokeStyle = color;
+            ctx.lineWidth = brushSize;
+        }
+
+        ctx.beginPath();
         if (tool === "pencil" || tool === "eraser") {
             ctx.moveTo(prevX, prevY);
             ctx.lineTo(x, y);
@@ -154,13 +260,13 @@ const WhiteboardModal = ({ isOpen, onClose, socketRef, roomId }) => {
             ctx.moveTo(startPos.x, startPos.y);
             ctx.lineTo(x, y);
         }
-
         ctx.stroke();
         ctx.closePath();
 
-        // Reset current local styles
-        ctx.strokeStyle = tool === "eraser" ? "var(--bg-card)" : color;
-        ctx.lineWidth = brushSize;
+        // Restore style
+        ctx.globalCompositeOperation = oldGCO;
+        ctx.strokeStyle = oldStroke;
+        ctx.lineWidth = oldLineWidth;
     };
 
     const clearCanvas = () => {
@@ -319,15 +425,51 @@ const WhiteboardModal = ({ isOpen, onClose, socketRef, roomId }) => {
                 </div>
 
                 {/* Canvas Area */}
-                <div style={{ flex: 1, position: "relative", backgroundColor: "var(--bg-dark)" }}>
+                <div style={{ flex: 1, position: "relative", backgroundColor: "var(--bg-dark)", overflow: "hidden" }}>
                     <canvas
                         ref={canvasRef}
+                        style={{ position: "absolute", top: 0, left: 0 }}
+                    />
+                    <canvas
+                        ref={topCanvasRef}
                         onMouseDown={startDrawing}
                         onMouseMove={draw}
                         onMouseUp={stopDrawing}
                         onMouseLeave={stopDrawing}
-                        style={{ cursor: tool === "pencil" ? "crosshair" : tool === "eraser" ? "default" : "crosshair" }}
+                        onTouchStart={handleTouchStart}
+                        onTouchMove={handleTouchMove}
+                        onTouchEnd={handleTouchEnd}
+                        style={{ position: "absolute", top: 0, left: 0, cursor: tool === "pencil" ? "crosshair" : tool === "eraser" ? "default" : "crosshair", touchAction: "none" }}
                     />
+
+                    {/* Collaborative Cursors */}
+                    {Object.entries(cursors).map(([id, cur]) => (
+                        <div key={id} style={{
+                            position: "absolute",
+                            left: cur.x,
+                            top: cur.y,
+                            pointerEvents: "none",
+                            zIndex: 10,
+                            display: "flex",
+                            flexDirection: "column",
+                            alignItems: "center",
+                            transition: "all 0.1s linear"
+                        }}>
+                            <div style={{ width: "12px", height: "12px", borderRadius: "50%", backgroundColor: "var(--primary)", border: "2px solid white", boxShadow: "0 0 5px rgba(0,0,0,0.5)" }} />
+                            <div style={{
+                                backgroundColor: "var(--primary)",
+                                color: "white",
+                                padding: "2px 6px",
+                                borderRadius: "4px",
+                                fontSize: "10px",
+                                fontWeight: "bold",
+                                marginTop: "4px",
+                                whiteSpace: "nowrap"
+                            }}>
+                                {cur.userName}
+                            </div>
+                        </div>
+                    ))}
                 </div>
 
                 {/* Footer Info */}

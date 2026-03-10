@@ -11,7 +11,8 @@ import {
     Trash2,
     Calendar,
     Users,
-    Zap
+    Zap,
+    Folder
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import AppLayout from '../components/AppLayout';
@@ -31,6 +32,11 @@ const Dashboard = () => {
     const [showRenameModal, setShowRenameModal] = useState(null);
     const [showDeleteModal, setShowDeleteModal] = useState(null);
     const [newName, setNewName] = useState('');
+    const [activeTab, setActiveTab] = useState('rooms'); // rooms, projects
+    const [projects, setProjects] = useState([]);
+    const [showCreateProjectModal, setShowCreateProjectModal] = useState(false);
+    const [newProjectName, setNewProjectName] = useState('');
+    const [newProjectDesc, setNewProjectDesc] = useState('');
 
     useEffect(() => {
         if (!loading && !user) {
@@ -47,6 +53,11 @@ const Dashboard = () => {
 
             setRecentRooms(data.rooms || []);
             setStats(data.stats || { totalRooms: 0, sessions: 0, hours: 0 });
+
+            // Fetch Projects
+            const projRes = await fetch(`${backendUrl}/api/projects?userId=${user.uid}`);
+            const projData = await projRes.json();
+            setProjects(projData || []);
         } catch (err) {
             console.error("Dashboard Fetch Error:", err);
             toast.error("Failed to load your workspace data.");
@@ -96,6 +107,48 @@ const Dashboard = () => {
             }
         } catch (err) {
             toast.error("Failed to rename room");
+        }
+    };
+
+    const handleCreateProject = async (e) => {
+        e.preventDefault();
+        if (!newProjectName.trim()) return;
+        try {
+            const backendUrl = getBackendUrl();
+            const response = await fetch(`${backendUrl}/api/projects`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    userId: user.uid,
+                    name: newProjectName,
+                    description: newProjectDesc
+                })
+            });
+            if (response.ok) {
+                const project = await response.json();
+                toast.success("Project created");
+                setShowCreateProjectModal(false);
+                setNewProjectName('');
+                setNewProjectDesc('');
+                navigate(`/project/${project.id}`);
+            }
+        } catch (err) {
+            toast.error("Failed to create project");
+        }
+    };
+
+    const handleDeleteProject = async (projectId) => {
+        try {
+            const backendUrl = getBackendUrl();
+            const response = await fetch(`${backendUrl}/api/projects/${projectId}`, {
+                method: 'DELETE'
+            });
+            if (response.ok) {
+                toast.success("Project deleted");
+                fetchDashboardData();
+            }
+        } catch (err) {
+            toast.error("Delete failed");
         }
     };
 
@@ -165,6 +218,25 @@ const Dashboard = () => {
                                 <Zap size={18} fill="#a855f7" /> Resume: {user.last_room_id}
                             </button>
                         )}
+                        <button
+                            onClick={() => setShowCreateProjectModal(true)}
+                            style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '10px',
+                                padding: '12px 24px',
+                                background: 'rgba(59, 130, 246, 0.1)',
+                                color: 'var(--primary)',
+                                border: '1px solid var(--border-color)',
+                                borderRadius: '12px',
+                                fontWeight: '700',
+                                fontSize: '14px',
+                                cursor: 'pointer',
+                                transition: 'all 0.3s'
+                            }}
+                        >
+                            <Folder size={18} /> New Project
+                        </button>
                         <button
                             onClick={() => navigate('/')}
                             style={{
@@ -236,7 +308,38 @@ const Dashboard = () => {
                         justifyContent: 'space-between',
                         alignItems: 'center'
                     }}>
-                        <h2 style={{ fontSize: '16px', fontWeight: '600', margin: 0 }}>Recent Workspaces</h2>
+                        <div style={{ display: 'flex', gap: '24px' }}>
+                            <h2
+                                onClick={() => setActiveTab('rooms')}
+                                style={{
+                                    fontSize: '16px',
+                                    fontWeight: '600',
+                                    margin: 0,
+                                    cursor: 'pointer',
+                                    color: activeTab === 'rooms' ? 'var(--primary)' : 'var(--text-muted)',
+                                    borderBottom: activeTab === 'rooms' ? '2px solid var(--primary)' : '2px solid transparent',
+                                    paddingBottom: '20px',
+                                    marginBottom: '-21px'
+                                }}
+                            >
+                                Single Rooms
+                            </h2>
+                            <h2
+                                onClick={() => setActiveTab('projects')}
+                                style={{
+                                    fontSize: '16px',
+                                    fontWeight: '600',
+                                    margin: 0,
+                                    cursor: 'pointer',
+                                    color: activeTab === 'projects' ? 'var(--primary)' : 'var(--text-muted)',
+                                    borderBottom: activeTab === 'projects' ? '2px solid var(--primary)' : '2px solid transparent',
+                                    paddingBottom: '20px',
+                                    marginBottom: '-21px'
+                                }}
+                            >
+                                Pro Projects
+                            </h2>
+                        </div>
                         <div style={{
                             display: 'flex',
                             alignItems: 'center',
@@ -268,122 +371,231 @@ const Dashboard = () => {
                     <div style={{ padding: '24px' }}>
                         {loadingRooms ? (
                             <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>Loading...</div>
-                        ) : filteredRooms.length > 0 ? (
-                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '16px' }}>
-                                {filteredRooms.map((room) => (
-                                    <div
-                                        key={room.id}
-                                        style={{
-                                            padding: '20px',
-                                            backgroundColor: 'var(--bg-dark)',
-                                            borderRadius: '8px',
-                                            border: '1px solid var(--border-color)',
-                                            display: 'flex',
-                                            flexDirection: 'column',
-                                            justifyContent: 'space-between'
-                                        }}
+                        ) : activeTab === 'rooms' ? (
+                            filteredRooms.length > 0 ? (
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '16px' }}>
+                                    {filteredRooms.map((room) => (
+                                        <div
+                                            key={room.id}
+                                            style={{
+                                                padding: '20px',
+                                                backgroundColor: 'var(--bg-dark)',
+                                                borderRadius: '8px',
+                                                border: '1px solid var(--border-color)',
+                                                display: 'flex',
+                                                flexDirection: 'column',
+                                                justifyContent: 'space-between'
+                                            }}
+                                        >
+                                            {/* ... room content ... */}
+                                            <div>
+                                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                                                    <span style={{
+                                                        fontSize: '10px',
+                                                        fontWeight: '700',
+                                                        padding: '4px 8px',
+                                                        backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                                                        color: 'var(--primary)',
+                                                        borderRadius: '4px',
+                                                        textTransform: 'uppercase'
+                                                    }}>
+                                                        {room.lang}
+                                                    </span>
+                                                    <div style={{ position: 'relative' }}>
+                                                        <button
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                setShowActionMenu(showActionMenu === room.id ? null : room.id);
+                                                            }}
+                                                            style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}
+                                                        >
+                                                            <MoreVertical size={16} />
+                                                        </button>
+
+                                                        {showActionMenu === room.id && (
+                                                            <div style={{
+                                                                position: 'absolute',
+                                                                right: 0,
+                                                                top: '24px',
+                                                                backgroundColor: 'var(--bg-card)',
+                                                                border: '1px solid var(--border-color)',
+                                                                borderRadius: '6px',
+                                                                padding: '4px',
+                                                                zIndex: 10,
+                                                                minWidth: '120px',
+                                                                boxShadow: '0 4px 12px rgba(0,0,0,0.3)'
+                                                            }}>
+                                                                <button
+                                                                    onClick={() => { setShowRenameModal(room); setShowActionMenu(null); }}
+                                                                    style={menuButtonStyle}
+                                                                >
+                                                                    <Edit2 size={13} /> Rename
+                                                                </button>
+                                                                <button
+                                                                    onClick={() => { setShowDeleteModal(room); setShowActionMenu(null); }}
+                                                                    style={{ ...menuButtonStyle, color: '#f87171' }}
+                                                                >
+                                                                    <Trash2 size={13} /> Delete
+                                                                </button>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </div>
+
+                                                <h4 style={{ fontSize: '15px', fontWeight: '600', marginBottom: '4px', color: 'var(--text-main)' }}>{room.name}</h4>
+                                                <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '20px' }}>ID: {room.id}</p>
+                                            </div>
+
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                <div style={{ color: 'var(--text-muted)', fontSize: '11px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                                    <Calendar size={12} /> {room.lastActive.split(',')[0]}
+                                                </div>
+                                                <button
+                                                    onClick={() => navigate(`/editor/${room.id}`)}
+                                                    style={{
+                                                        padding: '6px 12px',
+                                                        borderRadius: '6px',
+                                                        border: '1px solid var(--border-color)',
+                                                        backgroundColor: 'transparent',
+                                                        color: 'var(--text-main)',
+                                                        fontWeight: '600',
+                                                        fontSize: '12px',
+                                                        cursor: 'pointer',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        gap: '6px'
+                                                    }}
+                                                >
+                                                    Open <ExternalLink size={12} />
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            ) : (
+                                <div style={{ padding: '60px 0', textAlign: 'center' }}>
+                                    <p style={{ color: 'var(--text-muted)', marginBottom: '20px' }}>No single rooms found.</p>
+                                    <button
+                                        onClick={() => navigate('/')}
+                                        style={{ padding: '8px 16px', backgroundColor: 'var(--primary)', color: 'white', border: 'none', borderRadius: '6px', fontWeight: '600', cursor: 'pointer' }}
                                     >
-                                        <div>
-                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                                                <span style={{
-                                                    fontSize: '10px',
-                                                    fontWeight: '700',
-                                                    padding: '4px 8px',
-                                                    backgroundColor: 'rgba(59, 130, 246, 0.1)',
-                                                    color: 'var(--primary)',
-                                                    borderRadius: '4px',
-                                                    textTransform: 'uppercase'
-                                                }}>
-                                                    {room.lang}
-                                                </span>
-                                                <div style={{ position: 'relative' }}>
+                                        Create New Room
+                                    </button>
+                                </div>
+                            )
+                        ) : (
+                            /* Projects Tab Content */
+                            projects.length > 0 ? (
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '16px' }}>
+                                    {projects.map((proj) => (
+                                        <div
+                                            key={proj.id}
+                                            style={{
+                                                padding: '24px',
+                                                backgroundColor: 'var(--bg-dark)',
+                                                borderRadius: '16px',
+                                                border: '1px solid var(--border-color)',
+                                                display: 'flex',
+                                                flexDirection: 'column',
+                                                justifyContent: 'space-between',
+                                                minHeight: '180px'
+                                            }}
+                                        >
+                                            <div>
+                                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                                                    <div style={{
+                                                        width: '40px',
+                                                        height: '40px',
+                                                        borderRadius: '10px',
+                                                        backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        justifyContent: 'center',
+                                                        color: 'var(--primary)'
+                                                    }}>
+                                                        <Folder size={20} />
+                                                    </div>
                                                     <button
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            setShowActionMenu(showActionMenu === room.id ? null : room.id);
-                                                        }}
+                                                        onClick={() => handleDeleteProject(proj.id)}
                                                         style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}
                                                     >
-                                                        <MoreVertical size={16} />
+                                                        <Trash2 size={16} />
                                                     </button>
-
-                                                    {showActionMenu === room.id && (
-                                                        <div style={{
-                                                            position: 'absolute',
-                                                            right: 0,
-                                                            top: '24px',
-                                                            backgroundColor: 'var(--bg-card)',
-                                                            border: '1px solid var(--border-color)',
-                                                            borderRadius: '6px',
-                                                            padding: '4px',
-                                                            zIndex: 10,
-                                                            minWidth: '120px',
-                                                            boxShadow: '0 4px 12px rgba(0,0,0,0.3)'
-                                                        }}>
-                                                            <button
-                                                                onClick={() => { setShowRenameModal(room); setShowActionMenu(null); }}
-                                                                style={menuButtonStyle}
-                                                            >
-                                                                <Edit2 size={13} /> Rename
-                                                            </button>
-                                                            <button
-                                                                onClick={() => { setShowDeleteModal(room); setShowActionMenu(null); }}
-                                                                style={{ ...menuButtonStyle, color: '#f87171' }}
-                                                            >
-                                                                <Trash2 size={13} /> Delete
-                                                            </button>
-                                                        </div>
-                                                    )}
                                                 </div>
-                                            </div>
-
-                                            <h4 style={{ fontSize: '15px', fontWeight: '600', marginBottom: '4px', color: 'var(--text-main)' }}>{room.name}</h4>
-                                            <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '20px' }}>ID: {room.id}</p>
-                                        </div>
-
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                            <div style={{ color: 'var(--text-muted)', fontSize: '11px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                                <Calendar size={12} /> {room.lastActive.split(',')[0]}
+                                                <h4 style={{ fontSize: '16px', fontWeight: '700', marginBottom: '4px' }}>{proj.name}</h4>
+                                                <p style={{ fontSize: '13px', color: 'var(--text-muted)' }}>{proj.description || "Multi-file project workspace"}</p>
                                             </div>
                                             <button
-                                                onClick={() => navigate(`/editor/${room.id}`)}
+                                                onClick={() => navigate(`/project/${proj.id}`)}
                                                 style={{
-                                                    padding: '6px 12px',
-                                                    borderRadius: '6px',
+                                                    marginTop: '20px',
+                                                    width: '100%',
+                                                    padding: '10px',
+                                                    borderRadius: '10px',
+                                                    backgroundColor: 'var(--bg-card)',
                                                     border: '1px solid var(--border-color)',
-                                                    backgroundColor: 'transparent',
-                                                    color: 'var(--text-main)',
-                                                    fontWeight: '600',
-                                                    fontSize: '12px',
-                                                    cursor: 'pointer',
-                                                    display: 'flex',
-                                                    alignItems: 'center',
-                                                    gap: '6px'
+                                                    color: 'white',
+                                                    fontWeight: '700',
+                                                    fontSize: '13px',
+                                                    cursor: 'pointer'
                                                 }}
                                             >
-                                                Open <ExternalLink size={12} />
+                                                Open Project
                                             </button>
                                         </div>
-                                    </div>
-                                ))}
-                            </div>
-                        ) : (
-                            <div style={{ padding: '60px 0', textAlign: 'center' }}>
-                                <p style={{ color: 'var(--text-muted)', marginBottom: '20px' }}>No workspaces found.</p>
-                                <button
-                                    onClick={() => navigate('/')}
-                                    style={{ padding: '8px 16px', backgroundColor: 'var(--primary)', color: 'white', border: 'none', borderRadius: '6px', fontWeight: '600', cursor: 'pointer' }}
-                                >
-                                    Create New Room
-                                </button>
-                            </div>
+                                    ))}
+                                </div>
+                            ) : (
+                                <div style={{ padding: '60px 0', textAlign: 'center' }}>
+                                    <p style={{ color: 'var(--text-muted)', marginBottom: '20px' }}>No projects yet. Create a multi-file workspace!</p>
+                                    <button
+                                        onClick={() => setShowCreateProjectModal(true)}
+                                        style={{ padding: '10px 20px', backgroundColor: 'var(--primary)', color: 'white', border: 'none', borderRadius: '8px', fontWeight: '700', cursor: 'pointer' }}
+                                    >
+                                        Start Pro Project
+                                    </button>
+                                </div>
+                            )
                         )}
                     </div>
                 </div>
 
                 {/* Modals - Clean Overlays */}
-                {(showRenameModal || showDeleteModal) && (
+                {(showRenameModal || showDeleteModal || showCreateProjectModal) && (
                     <div style={modalOverlayStyle}>
+                        {showCreateProjectModal && (
+                            <div style={modalContentStyle}>
+                                <h3 style={{ fontSize: '18px', fontWeight: '700', marginBottom: '8px' }}>Create Pro Project</h3>
+                                <p style={{ color: 'var(--text-muted)', marginBottom: '20px', fontSize: '13px' }}>Start a multi-file workspace with real-time preview.</p>
+                                <form onSubmit={handleCreateProject}>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                                        <div>
+                                            <label style={{ fontSize: '11px', fontWeight: '800', color: 'var(--text-muted)', marginBottom: '8px', display: 'block' }}>PROJECT NAME</label>
+                                            <input
+                                                style={modalInputStyle}
+                                                value={newProjectName}
+                                                onChange={(e) => setNewProjectName(e.target.value)}
+                                                placeholder="e.g. My Portfolio Website"
+                                                autoFocus
+                                            />
+                                        </div>
+                                        <div>
+                                            <label style={{ fontSize: '11px', fontWeight: '800', color: 'var(--text-muted)', marginBottom: '8px', display: 'block' }}>DESCRIPTION</label>
+                                            <input
+                                                style={modalInputStyle}
+                                                value={newProjectDesc}
+                                                onChange={(e) => setNewProjectDesc(e.target.value)}
+                                                placeholder="Short summary of your project..."
+                                            />
+                                        </div>
+                                    </div>
+                                    <div style={{ display: 'flex', gap: '10px', marginTop: '32px', justifyContent: 'flex-end' }}>
+                                        <button type="button" onClick={() => setShowCreateProjectModal(false)} style={cancelButtonStyle}>Cancel</button>
+                                        <button type="submit" style={confirmButtonStyle}>Create Project</button>
+                                    </div>
+                                </form>
+                            </div>
+                        )}
                         {showRenameModal && (
                             <div style={modalContentStyle}>
                                 <h3 style={{ fontSize: '18px', fontWeight: '700', marginBottom: '8px' }}>Rename Workspace</h3>

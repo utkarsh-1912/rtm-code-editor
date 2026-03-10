@@ -1,12 +1,15 @@
 import React, { useEffect } from "react";
 import { Download } from "lucide-react";
 import CodeMirror from "@uiw/react-codemirror";
-import { javascript } from "@codemirror/lang-javascript";
+import { javascript, esLint } from "@codemirror/lang-javascript";
 import { python } from "@codemirror/lang-python";
 import { cpp } from "@codemirror/lang-cpp";
 import { html } from "@codemirror/lang-html";
 import { dracula } from "@uiw/codemirror-theme-dracula";
 import { EditorView, Decoration, ViewPlugin, WidgetType } from "@codemirror/view";
+import { vim } from "@replit/codemirror-vim";
+import { emacs } from "@replit/codemirror-emacs";
+import { linter, lintGutter } from "@codemirror/lint";
 import ACTIONS from "../Action";
 import { LANGUAGES } from "../config";
 
@@ -131,14 +134,25 @@ function EditorComp({
           return next;
         });
       });
+      socket.on(ACTIONS.SYNC_SCROLL, ({ scrollPos, userName: remoteUser }) => {
+        if (settings?.keybinding !== "vim" && settings?.keybinding !== "emacs") {
+          // Find the editor view and scroll it
+          const editor = document.querySelector('.cm-content');
+          if (editor) {
+            const wrap = editor.closest('.cm-scroller');
+            if (wrap) wrap.scrollTop = scrollPos;
+          }
+        }
+      });
     }
     return () => {
       socket?.off(ACTIONS.CODE_CHANGE);
       socket?.off(ACTIONS.CURSOR_MOVE);
       socket?.off(ACTIONS.JOINED);
       socket?.off(ACTIONS.DISCONNECTED);
+      socket?.off(ACTIONS.SYNC_SCROLL);
     };
-  }, [socketRef, onCodeChange]);
+  }, [socketRef, onCodeChange, settings?.keybinding]);
 
   useEffect(() => {
     if (code !== undefined && code !== editorCode) {
@@ -167,6 +181,18 @@ function EditorComp({
       userName,
       color: "#3b82f6", // Default color, could be dynamic per user
     });
+
+    // Sync scroll if presenter
+    if (viewUpdate.transactions[0]?.isUserEvent("scroll") || viewUpdate.docChanged) {
+      const scroller = viewUpdate.view.scrollDOM;
+      if (scroller) {
+        socketRef.current?.emit(ACTIONS.SYNC_SCROLL, {
+          roomId,
+          scrollPos: scroller.scrollTop,
+          userName
+        });
+      }
+    }
   };
 
   const getLanguageExtension = (lang) => {
@@ -266,6 +292,9 @@ function EditorComp({
           extensions={[
             getLanguageExtension(language),
             ...(settings?.wordWrap ? [EditorView.lineWrapping] : []),
+            ...(settings?.keybinding === "vim" ? [vim()] : []),
+            ...(settings?.keybinding === "emacs" ? [emacs()] : []),
+            ...(settings?.enableLinting && language === "javascript" ? [lintGutter(), linter(esLint(new (require("eslint-linter-browserify").Linter)()))] : []),
             cursorPlugin(remoteCursors),
           ]}
         />

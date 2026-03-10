@@ -14,6 +14,7 @@ import SignUp from "./pages/SignUp";
 import Dashboard from "./pages/Dashboard";
 import Snippets from "./pages/Snippets";
 import Settings from "./pages/Settings";
+import ProjectPage from "./pages/ProjectPage";
 import NotFound from "./pages/NotFound";
 import OfflineBanner from "./components/OfflineBanner";
 import ErrorBoundary from "./components/ErrorBoundary";
@@ -60,6 +61,7 @@ function App() {
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/snippets" element={<Snippets />} />
             <Route path="/settings" element={<Settings />} />
+            <Route path="/project/:projectId" element={<ProjectPage />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>

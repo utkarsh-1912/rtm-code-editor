@@ -257,6 +257,7 @@ function Editor() {
         reactNavigator("/");
       }
 
+      socketRef.current.userName = location.state?.userName || "Guest";
       socketRef.current.emit(ACTIONS.JOIN, {
         roomId,
         userName: location.state?.userName,
@@ -970,6 +971,7 @@ function Editor() {
         onClose={() => setShowWhiteboard(false)}
         socketRef={socketRef}
         roomId={roomId}
+        user={user}
       />
       {showGistModal && (
         <GistModal

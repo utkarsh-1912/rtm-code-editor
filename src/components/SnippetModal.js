@@ -247,13 +247,33 @@ const SnippetModal = ({ isOpen, onClose, onImport, userId, code: currentCode, la
                             </select>
                         </div>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                            <label style={{ fontSize: '13px', fontWeight: '700', color: 'var(--text-muted)' }}>TAGS (COMMA SEPARATED)</label>
-                            <input
-                                placeholder="e.g. react, hooks, utility"
-                                value={saveData.tags}
-                                onChange={e => setSaveData({ ...saveData, tags: e.target.value })}
-                                style={inputStyle}
-                            />
+                            <label style={{ fontSize: '13px', fontWeight: '700', color: 'var(--text-muted)' }}>TAGS (PRESS ENTER TO ADD)</label>
+                            <div style={{ ...inputStyle, display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'center', padding: '8px 12px' }}>
+                                {(saveData.tags || "").split(',').filter(t => t.trim()).map((tag, i) => (
+                                    <span key={i} style={{ ...tagStyle, display: 'flex', alignItems: 'center', gap: '4px', backgroundColor: 'var(--primary)', color: 'white' }}>
+                                        {tag.trim()}
+                                        <X size={10} style={{ cursor: 'pointer' }} onClick={() => {
+                                            const tags = saveData.tags.split(',').filter(t => t.trim());
+                                            tags.splice(i, 1);
+                                            setSaveData({ ...saveData, tags: tags.join(',') });
+                                        }} />
+                                    </span>
+                                ))}
+                                <input
+                                    placeholder={saveData.tags ? "" : "e.g. react, hooks"}
+                                    style={{ background: 'transparent', border: 'none', color: 'white', fontSize: '14px', outline: 'none', flex: 1, minWidth: '60px' }}
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter' || e.key === ',') {
+                                            e.preventDefault();
+                                            const val = e.target.value.trim();
+                                            if (val && !saveData.tags.includes(val)) {
+                                                setSaveData({ ...saveData, tags: saveData.tags ? `${saveData.tags},${val}` : val });
+                                                e.target.value = '';
+                                            }
+                                        }
+                                    }}
+                                />
+                            </div>
                         </div>
                         <div style={{ backgroundColor: 'var(--bg-dark)', padding: '16px', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px', color: 'var(--text-muted)' }}>

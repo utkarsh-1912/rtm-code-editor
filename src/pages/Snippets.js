@@ -483,13 +483,43 @@ const Snippets = () => {
                             </div>
 
                             <div>
-                                <label style={labelStyle}>Tags (Comma Separated)</label>
-                                <input
-                                    style={modalInputStyle}
-                                    placeholder="e.g. react, hooks, api"
-                                    value={formData.tags}
-                                    onChange={e => setFormData({ ...formData, tags: e.target.value })}
-                                />
+                                <label style={labelStyle}>Tags (Press Enter to add)</label>
+                                <div style={{ ...modalInputStyle, display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'center', padding: '8px 12px' }}>
+                                    {(formData.tags || "").split(',').filter(t => t.trim()).map((tag, i) => (
+                                        <span key={i} style={{
+                                            fontSize: '10px',
+                                            fontWeight: '700',
+                                            backgroundColor: 'var(--primary)',
+                                            color: 'white',
+                                            padding: '2px 8px',
+                                            borderRadius: '4px',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '4px'
+                                        }}>
+                                            #{tag.trim()}
+                                            <X size={10} style={{ cursor: 'pointer' }} onClick={() => {
+                                                const tags = formData.tags.split(',').filter(t => t.trim());
+                                                tags.splice(i, 1);
+                                                setFormData({ ...formData, tags: tags.join(', ') });
+                                            }} />
+                                        </span>
+                                    ))}
+                                    <input
+                                        style={{ background: 'transparent', border: 'none', color: 'white', fontSize: '14px', outline: 'none', flex: 1, minWidth: '100px' }}
+                                        placeholder={formData.tags ? "" : "e.g. react, api"}
+                                        onKeyDown={(e) => {
+                                            if (e.key === 'Enter' || e.key === ',') {
+                                                e.preventDefault();
+                                                const val = e.target.value.trim();
+                                                if (val && !formData.tags.includes(val)) {
+                                                    setFormData({ ...formData, tags: formData.tags ? `${formData.tags}, ${val}` : val });
+                                                    e.target.value = '';
+                                                }
+                                            }
+                                        }}
+                                    />
+                                </div>
                             </div>
 
                             <div>
