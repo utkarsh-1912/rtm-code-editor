@@ -33,13 +33,14 @@ const WhiteboardModal = ({ isOpen, onClose, socketRef, roomId }) => {
         context.lineWidth = brushSize;
         contextRef.current = context;
 
+        const socket = socketRef.current;
         // Socket listener for drawing
-        if (socketRef.current) {
-            socketRef.current.on(ACTIONS.WHITEBOARD_DRAW, (data) => {
+        if (socket) {
+            socket.on(ACTIONS.WHITEBOARD_DRAW, (data) => {
                 drawFromSocket(data);
             });
 
-            socketRef.current.on(ACTIONS.WHITEBOARD_CLEAR, () => {
+            socket.on(ACTIONS.WHITEBOARD_CLEAR, () => {
                 const canvas = canvasRef.current;
                 const context = canvas.getContext("2d");
                 context.clearRect(0, 0, canvas.width, canvas.height);
@@ -47,12 +48,12 @@ const WhiteboardModal = ({ isOpen, onClose, socketRef, roomId }) => {
         }
 
         return () => {
-            if (socketRef.current) {
-                socketRef.current.off(ACTIONS.WHITEBOARD_DRAW);
-                socketRef.current.off(ACTIONS.WHITEBOARD_CLEAR);
+            if (socket) {
+                socket.off(ACTIONS.WHITEBOARD_DRAW);
+                socket.off(ACTIONS.WHITEBOARD_CLEAR);
             }
         };
-    }, [isOpen]);
+    }, [isOpen, color, brushSize, socketRef]); // eslint-disable-line react-hooks/exhaustive-deps
 
     useEffect(() => {
         if (contextRef.current) {

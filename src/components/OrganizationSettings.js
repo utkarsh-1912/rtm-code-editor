@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Plus, Users, Shield, Mail, Trash2 } from 'lucide-react';
+import { X, Plus, Users, Shield, Mail } from 'lucide-react';
 import { getBackendUrl } from '../utils/api';
 import toast from 'react-hot-toast';
 
@@ -12,11 +12,7 @@ const OrganizationSettings = ({ isOpen, onClose, userId }) => {
     const [members, setMembers] = useState([]);
     const [inviteEmail, setInviteEmail] = useState('');
 
-    useEffect(() => {
-        if (isOpen) fetchOrganizations();
-    }, [isOpen]);
-
-    const fetchOrganizations = async () => {
+    const fetchOrganizations = React.useCallback(async () => {
         try {
             const backendUrl = getBackendUrl();
             const response = await fetch(`${backendUrl}/api/organizations?userId=${userId}`);
@@ -30,7 +26,11 @@ const OrganizationSettings = ({ isOpen, onClose, userId }) => {
         } finally {
             setLoading(false);
         }
-    };
+    }, [userId, activeOrg]); // eslint-disable-line react-hooks/exhaustive-deps
+
+    useEffect(() => {
+        if (isOpen) fetchOrganizations();
+    }, [isOpen, fetchOrganizations]);
 
     const handleCreateOrg = async (e) => {
         e.preventDefault();
