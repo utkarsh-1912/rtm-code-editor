@@ -14,6 +14,8 @@ const ACTIONS = {
   DELETE_MESSAGE: "delete-message",
   SYNC_CHAT: "sync-chat",
   CURSOR_MOVE: "cursor-move",
+  WHITEBOARD_DRAW: "whiteboard-draw",
+  WHITEBOARD_CLEAR: "whiteboard-clear",
 };
 
 module.exports = ACTIONS;

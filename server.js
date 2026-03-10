@@ -69,7 +69,11 @@ app.put("/api/rename-room", async (req, res) => {
  */
 app.get("/api/snippets", async (req, res) => {
   try {
-    const { userId } = req.query;
+    const { userId, orgId } = req.query;
+    if (orgId) {
+      const snippets = await db.getOrgSnippets(orgId);
+      return res.json(snippets);
+    }
     if (!userId) return res.status(400).json({ error: "User ID required" });
     const snippets = await db.getSnippets(userId);
     res.json(snippets);
@@ -80,8 +84,8 @@ app.get("/api/snippets", async (req, res) => {
 
 app.post("/api/snippets", async (req, res) => {
   try {
-    const { userId, title, code, language } = req.body;
-    const snippet = await db.createSnippet(userId, title, code, language);
+    const { userId, title, code, language, tags, organizationId } = req.body;
+    const snippet = await db.createSnippet(userId, title, code, language, tags, organizationId);
     res.json(snippet[0]);
   } catch (err) {
     res.status(500).json({ error: "Failed to create snippet" });
@@ -90,8 +94,8 @@ app.post("/api/snippets", async (req, res) => {
 
 app.put("/api/snippets/:id", async (req, res) => {
   try {
-    const { title, code, language } = req.body;
-    const snippet = await db.updateSnippet(req.params.id, title, code, language);
+    const { title, code, language, tags } = req.body;
+    const snippet = await db.updateSnippet(req.params.id, title, code, language, tags);
     res.json(snippet[0]);
   } catch (err) {
     res.status(500).json({ error: "Failed to update snippet" });
@@ -104,6 +108,48 @@ app.delete("/api/snippets/:id", async (req, res) => {
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: "Failed to delete snippet" });
+  }
+});
+
+/**
+ * Organizations API
+ */
+app.post("/api/organizations", async (req, res) => {
+  try {
+    const { userId, name } = req.body;
+    const org = await db.createOrganization(userId, name);
+    res.json(org);
+  } catch (err) {
+    res.status(500).json({ error: "Failed to create organization" });
+  }
+});
+
+app.get("/api/organizations", async (req, res) => {
+  try {
+    const { userId } = req.query;
+    const orgs = await db.getOrganizations(userId);
+    res.json(orgs);
+  } catch (err) {
+    res.status(500).json({ error: "Failed to fetch organizations" });
+  }
+});
+
+app.post("/api/organizations/:id/members", async (req, res) => {
+  try {
+    const { email, role } = req.body;
+    const member = await db.addOrgMember(req.params.id, email, role);
+    res.json(member);
+  } catch (err) {
+    res.status(500).json({ error: err.message || "Failed to add member" });
+  }
+});
+
+app.get("/api/organizations/:id/members", async (req, res) => {
+  try {
+    const members = await db.getOrgMembers(req.params.id);
+    res.json(members);
+  } catch (err) {
+    res.status(500).json({ error: "Failed to fetch members" });
   }
 });
 
@@ -381,6 +427,15 @@ io.on("connection", (socket) => {
 
   socket.on(ACTIONS.CURSOR_MOVE, ({ roomId, cursor, userName }) => {
     socket.in(roomId).emit(ACTIONS.CURSOR_MOVE, { cursor, userName, socketId: socket.id });
+  });
+
+  socket.on(ACTIONS.WHITEBOARD_DRAW, (data) => {
+    const { roomId } = data;
+    socket.in(roomId).emit(ACTIONS.WHITEBOARD_DRAW, data);
+  });
+
+  socket.on(ACTIONS.WHITEBOARD_CLEAR, ({ roomId }) => {
+    socket.in(roomId).emit(ACTIONS.WHITEBOARD_CLEAR);
   });
 });
 

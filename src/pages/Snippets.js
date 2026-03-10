@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Search, Plus, Trash2, Edit2, Copy, Check, X } from 'lucide-react';
+import { Search, Plus, Trash2, Edit2, Copy, Check, X, Users } from 'lucide-react';
 import AppLayout from '../components/AppLayout';
 import { useAuth } from '../context/AuthContext';
 import { getBackendUrl } from '../utils/api';
 import toast from 'react-hot-toast';
+import OrganizationSettings from '../components/OrganizationSettings';
 
 const Snippets = () => {
     const { user } = useAuth();
@@ -14,7 +15,11 @@ const Snippets = () => {
 
     const [showModal, setShowModal] = useState(null); // 'create' | 'edit' | 'delete' | 'view'
     const [activeSnippet, setActiveSnippet] = useState(null);
-    const [formData, setFormData] = useState({ title: '', code: '', language: 'javascript' });
+    const [formData, setFormData] = useState({ title: '', code: '', language: 'javascript', tags: '', organizationId: null });
+    const [selectedTag, setSelectedTag] = useState(null);
+    const [organizations, setOrganizations] = useState([]);
+    const [selectedVault, setSelectedVault] = useState('personal'); // 'personal' | orgId
+    const [showOrgSettings, setShowOrgSettings] = useState(false);
     const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
 
     useEffect(() => {
@@ -23,11 +28,24 @@ const Snippets = () => {
         return () => window.removeEventListener("resize", handleResize);
     }, []);
 
+    const fetchOrgs = useCallback(async () => {
+        if (!user) return;
+        try {
+            const backendUrl = getBackendUrl();
+            const response = await fetch(`${backendUrl}/api/organizations?userId=${user.uid}`);
+            const data = await response.json();
+            setOrganizations(data);
+        } catch (err) { }
+    }, [user]);
+
     const fetchSnippets = useCallback(async () => {
         if (!user) return;
         try {
             const backendUrl = getBackendUrl();
-            const response = await fetch(`${backendUrl}/api/snippets?userId=${user.uid}`);
+            const url = selectedVault === 'personal'
+                ? `${backendUrl}/api/snippets?userId=${user.uid}`
+                : `${backendUrl}/api/snippets?orgId=${selectedVault}`;
+            const response = await fetch(url);
             const data = await response.json();
             setSnippets(Array.isArray(data) ? data : []);
         } catch (err) {
@@ -35,11 +53,12 @@ const Snippets = () => {
         } finally {
             setLoading(false);
         }
-    }, [user]);
+    }, [user, selectedVault]);
 
     useEffect(() => {
         fetchSnippets();
-    }, [fetchSnippets]);
+        fetchOrgs();
+    }, [fetchSnippets, fetchOrgs]);
 
     const handleAction = async (e) => {
         if (e) e.preventDefault();
@@ -49,14 +68,21 @@ const Snippets = () => {
                 await fetch(`${backendUrl}/api/snippets`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ ...formData, userId: user.uid })
+                    body: JSON.stringify({
+                        ...formData,
+                        userId: user.uid,
+                        tags: formData.tags.split(',').map(tag => tag.trim()).filter(t => t !== '')
+                    })
                 });
                 toast.success("Snippet saved");
             } else if (showModal === 'edit') {
                 await fetch(`${backendUrl}/api/snippets/${activeSnippet.id}`, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(formData)
+                    body: JSON.stringify({
+                        ...formData,
+                        tags: formData.tags.split(',').map(tag => tag.trim()).filter(t => t !== '')
+                    })
                 });
                 toast.success("Snippet updated");
             } else if (showModal === 'delete') {
@@ -76,16 +102,28 @@ const Snippets = () => {
         setShowModal(type);
         if (snippet) {
             setActiveSnippet(snippet);
-            setFormData({ title: snippet.title, code: snippet.code, language: snippet.language });
+            setFormData({
+                title: snippet.title,
+                code: snippet.code,
+                language: snippet.language,
+                tags: (snippet.tags || []).join(', '),
+                organizationId: snippet.organization_id || null
+            });
         } else {
-            setFormData({ title: '', code: '', language: 'javascript' });
+            setFormData({
+                title: '',
+                code: '',
+                language: 'javascript',
+                tags: '',
+                organizationId: selectedVault !== 'personal' ? selectedVault : null
+            });
         }
     };
 
     const closeModal = () => {
         setShowModal(null);
         setActiveSnippet(null);
-        setFormData({ title: '', code: '', language: 'javascript' });
+        setFormData({ title: '', code: '', language: 'javascript', tags: '', organizationId: null });
     };
 
     const copyToClipboard = (id, code) => {
@@ -95,11 +133,18 @@ const Snippets = () => {
         setTimeout(() => setCopiedId(null), 2000);
     };
 
-    const filteredSnippets = snippets.filter(s =>
-        s.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        s.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        s.language.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    const filteredSnippets = snippets.filter(s => {
+        const matchesSearch = s.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            s.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            s.language.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            (s.tags && s.tags.some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase())));
+
+        const matchesTag = !selectedTag || (s.tags && s.tags.includes(selectedTag));
+
+        return matchesSearch && matchesTag;
+    });
+
+    const allTags = Array.from(new Set(snippets.flatMap(s => s.tags || []))).sort();
 
     return (
         <AppLayout>
@@ -125,27 +170,38 @@ const Snippets = () => {
                             Store and manage your reusable logic blocks.
                         </p>
                     </div>
+                    <div style={{ display: 'flex', gap: '8px', width: isMobile ? '100%' : 'auto' }}>
+                        <button
+                            onClick={() => setShowOrgSettings(true)}
+                            style={{ ...secondaryButtonStyle, display: 'flex', alignItems: 'center', gap: '8px', flex: isMobile ? 1 : 'none' }}
+                        >
+                            <Users size={18} /> Teams
+                        </button>
+                        <button
+                            onClick={() => openModal('create')}
+                            style={{ ...primaryButtonStyle, display: 'flex', alignItems: 'center', gap: '8px', flex: isMobile ? 1 : 'none' }}
+                        >
+                            <Plus size={18} /> New Snippet
+                        </button>
+                    </div>
+                </div>
+
+                <div style={{ display: 'flex', gap: '12px', marginBottom: '24px', overflowX: 'auto', paddingBottom: '8px' }}>
                     <button
-                        onClick={() => openModal('create')}
-                        style={{
-                            padding: '10px 20px',
-                            backgroundColor: 'var(--primary)',
-                            color: 'white',
-                            border: 'none',
-                            borderRadius: '8px',
-                            fontWeight: '600',
-                            fontSize: '14px',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '8px',
-                            cursor: 'pointer',
-                            transition: 'opacity 0.2s',
-                            width: isMobile ? '100%' : 'auto',
-                            justifyContent: 'center'
-                        }}
+                        onClick={() => setSelectedVault('personal')}
+                        style={vaultButtonStyle(selectedVault === 'personal')}
                     >
-                        <Plus size={18} /> New Snippet
+                        My Vault
                     </button>
+                    {organizations.map(org => (
+                        <button
+                            key={org.id}
+                            onClick={() => setSelectedVault(org.id)}
+                            style={vaultButtonStyle(selectedVault === org.id)}
+                        >
+                            {org.name}
+                        </button>
+                    ))}
                 </div>
 
                 <div style={{
@@ -164,6 +220,27 @@ const Snippets = () => {
                         gap: '20px'
                     }}>
                         <h2 style={{ fontSize: '16px', fontWeight: '600', margin: 0 }}>All Fragments</h2>
+                        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', flex: 1, justifyContent: 'center' }}>
+                            {allTags.map(tag => (
+                                <button
+                                    key={tag}
+                                    onClick={() => setSelectedTag(selectedTag === tag ? null : tag)}
+                                    style={{
+                                        padding: '4px 10px',
+                                        borderRadius: '20px',
+                                        fontSize: '11px',
+                                        fontWeight: '600',
+                                        cursor: 'pointer',
+                                        border: '1px solid var(--border-color)',
+                                        backgroundColor: selectedTag === tag ? 'var(--primary)' : 'var(--bg-dark)',
+                                        color: selectedTag === tag ? 'white' : 'var(--text-muted)',
+                                        transition: 'all 0.2s'
+                                    }}
+                                >
+                                    #{tag}
+                                </button>
+                            ))}
+                        </div>
                         <div style={{
                             display: 'flex',
                             alignItems: 'center',
@@ -245,6 +322,18 @@ const Snippets = () => {
                                                 <button onClick={() => openModal('edit', snippet)} style={iconButtonStyle}><Edit2 size={14} /></button>
                                                 <button onClick={() => openModal('delete', snippet)} style={{ ...iconButtonStyle, color: '#f87171' }}><Trash2 size={14} /></button>
                                             </div>
+                                        </div>
+
+                                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                                            {snippet.tags && snippet.tags.map(tag => (
+                                                <span key={tag} style={{
+                                                    fontSize: '9px',
+                                                    color: 'var(--text-muted)',
+                                                    backgroundColor: 'rgba(255,255,255,0.05)',
+                                                    padding: '2px 6px',
+                                                    borderRadius: '4px'
+                                                }}>#{tag}</span>
+                                            ))}
                                         </div>
 
                                         <div style={{
@@ -333,6 +422,17 @@ const Snippets = () => {
                                     <code>{activeSnippet.code}</code>
                                 </pre>
                             </div>
+                            {activeSnippet.tags && activeSnippet.tags.length > 0 && (
+                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                                    {activeSnippet.tags.map(tag => (
+                                        <span key={tag} style={{
+                                            padding: '4px 12px', borderRadius: '20px',
+                                            backgroundColor: 'var(--bg-dark)', border: '1px solid var(--border-color)',
+                                            color: 'var(--text-muted)', fontSize: '12px'
+                                        }}>#{tag}</span>
+                                    ))}
+                                </div>
+                            )}
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: isMobile ? 'flex-start' : 'center', flexDirection: isMobile ? 'column' : 'row', gap: '8px', fontSize: '11px', color: 'var(--text-muted)' }}>
                                 <span>Vault Fragment ID: {activeSnippet.id}</span>
                                 <span>Last Secured: {new Date(activeSnippet.updated_at || activeSnippet.created_at).toLocaleString()}</span>
@@ -383,6 +483,16 @@ const Snippets = () => {
                             </div>
 
                             <div>
+                                <label style={labelStyle}>Tags (Comma Separated)</label>
+                                <input
+                                    style={modalInputStyle}
+                                    placeholder="e.g. react, hooks, api"
+                                    value={formData.tags}
+                                    onChange={e => setFormData({ ...formData, tags: e.target.value })}
+                                />
+                            </div>
+
+                            <div>
                                 <label style={labelStyle}>Code Block</label>
                                 <textarea
                                     required
@@ -410,6 +520,12 @@ const Snippets = () => {
                     </div>
                 </div>
             )}
+
+            <OrganizationSettings
+                isOpen={showOrgSettings}
+                onClose={() => { setShowOrgSettings(false); fetchOrgs(); }}
+                userId={user?.uid}
+            />
 
             {showModal === 'delete' && (
                 <div style={modalOverlayStyle} onClick={closeModal}>
@@ -562,5 +678,18 @@ const premiumButtonStyle = {
     cursor: 'pointer',
     transition: 'all 0.2s'
 };
+
+const vaultButtonStyle = (active) => ({
+    padding: '8px 16px',
+    borderRadius: '20px',
+    backgroundColor: active ? 'var(--primary)' : 'var(--bg-card)',
+    color: active ? 'white' : 'var(--text-muted)',
+    border: `1px solid ${active ? 'var(--primary)' : 'var(--border-color)'}`,
+    fontSize: '13px',
+    fontWeight: '600',
+    cursor: 'pointer',
+    whiteSpace: 'nowrap',
+    transition: 'all 0.2s'
+});
 
 export default Snippets;

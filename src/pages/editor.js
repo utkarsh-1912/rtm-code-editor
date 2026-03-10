@@ -40,7 +40,8 @@ import { LANGUAGES, THEMES } from "../config";
 import { useAuth } from "../context/AuthContext";
 import LoadingScreen from "../components/LoadingScreen";
 import SnippetModal from "../components/SnippetModal";
-import { ImportIcon } from "lucide-react";
+import { ImportIcon, PencilLine } from "lucide-react";
+import WhiteboardModal from "../components/WhiteboardModal";
 
 function Editor() {
   const socketRef = useRef(null);
@@ -103,6 +104,7 @@ function Editor() {
   });
 
   const [showSnippetModal, setShowSnippetModal] = useState(false);
+  const [showWhiteboard, setShowWhiteboard] = useState(false);
 
   useEffect(() => {
     localStorage.setItem("app-editor-settings", JSON.stringify(settings));
@@ -636,15 +638,26 @@ function Editor() {
                   <Download size={18} />
                 </button>
                 {user && (
-                  <button
-                    onClick={() => setShowSnippetModal(true)}
-                    style={{ width: "32px", height: "32px", color: "var(--text-muted)", background: "transparent", border: "none", borderRadius: "6px", cursor: "pointer", transition: "all 0.2s" }}
-                    onMouseOver={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-card)")}
-                    onMouseOut={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
-                    title="Import Snippet"
-                  >
-                    <ImportIcon size={18} />
-                  </button>
+                  <>
+                    <button
+                      onClick={() => setShowSnippetModal(true)}
+                      style={{ width: "32px", height: "32px", color: "var(--text-muted)", background: "transparent", border: "none", borderRadius: "6px", cursor: "pointer", transition: "all 0.2s" }}
+                      onMouseOver={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-card)")}
+                      onMouseOut={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
+                      title="Import Snippet"
+                    >
+                      <ImportIcon size={18} />
+                    </button>
+                    <button
+                      onClick={() => setShowWhiteboard(true)}
+                      style={{ width: "32px", height: "32px", color: "var(--text-muted)", background: "transparent", border: "none", borderRadius: "6px", cursor: "pointer", transition: "all 0.2s" }}
+                      onMouseOver={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-card)")}
+                      onMouseOut={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
+                      title="Collaborative Whiteboard"
+                    >
+                      <PencilLine size={18} />
+                    </button>
+                  </>
                 )}
                 <button
                   onClick={copyRoomId}
@@ -713,7 +726,7 @@ function Editor() {
                     />
                   )}
                   {activeTab === "output" && (
-                    <OutputWindow output={output} isError={isError} time={execTime} isMobile={isMobile} stdin={stdin} setStdin={setStdin} />
+                    <OutputWindow output={output} isError={isError} time={execTime} isMobile={isMobile} stdin={stdin} setStdin={setStdin} isLightMode={isLightMode} />
                   )}
                   {activeTab === "chat" && (
                     <ChatWindow
@@ -928,6 +941,7 @@ function Editor() {
                             isMobile={isMobile}
                             stdin={stdin}
                             setStdin={setStdin}
+                            isLightMode={isLightMode}
                           />
                         </div>
                       </ReflexElement>
@@ -949,6 +963,13 @@ function Editor() {
         onClose={() => setShowSettings(false)}
         settings={settings}
         onSettingsChange={setSettings}
+      />
+
+      <WhiteboardModal
+        isOpen={showWhiteboard}
+        onClose={() => setShowWhiteboard(false)}
+        socketRef={socketRef}
+        roomId={roomId}
       />
       {showGistModal && (
         <GistModal

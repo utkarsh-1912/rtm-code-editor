@@ -87,6 +87,71 @@ async function findOrCreateUser(firebaseUser) {
     return newUser[0];
 }
 
+/**
+ * Organization Management
+ */
+async function createOrganization(userId, name) {
+    const user = await sql`SELECT id FROM users WHERE auth_provider_id = ${userId}`;
+    if (!user.length) throw new Error("User not found");
+
+    const org = await sql`
+        INSERT INTO organizations (name, created_by)
+        VALUES (${name}, ${user[0].id})
+        RETURNING *
+    `;
+
+    // Automatically add creator as admin
+    await sql`
+        INSERT INTO organization_members (org_id, user_id, role)
+        VALUES (${org[0].id}, ${user[0].id}, 'admin')
+    `;
+
+    return org[0];
+}
+
+async function getOrganizations(userId) {
+    const user = await sql`SELECT id FROM users WHERE auth_provider_id = ${userId}`;
+    if (!user.length) return [];
+
+    return await sql`
+        SELECT o.*, om.role 
+        FROM organizations o
+        JOIN organization_members om ON o.id = om.org_id
+        WHERE om.user_id = ${user[0].id}
+    `;
+}
+
+async function getOrgSnippets(orgId) {
+    return await sql`
+        SELECT s.*, u.name as author_name 
+        FROM snippets s
+        JOIN users u ON s.user_id = u.id
+        WHERE s.organization_id = ${orgId}
+        ORDER BY s.updated_at DESC
+    `;
+}
+
+async function addOrgMember(orgId, email, role = 'member') {
+    const user = await sql`SELECT id FROM users WHERE email = ${email}`;
+    if (!user.length) throw new Error("User with this email not found");
+
+    return await sql`
+        INSERT INTO organization_members (org_id, user_id, role)
+        VALUES (${orgId}, ${user[0].id}, ${role})
+        ON CONFLICT (org_id, user_id) DO UPDATE SET role = EXCLUDED.role
+        RETURNING *
+    `;
+}
+
+async function getOrgMembers(orgId) {
+    return await sql`
+        SELECT u.id, u.name, u.email, om.role, om.joined_at
+        FROM users u
+        JOIN organization_members om ON u.id = om.user_id
+        WHERE om.org_id = ${orgId}
+    `;
+}
+
 async function updateLastRoom(userId, roomId) {
     return await sql`
         UPDATE users 
@@ -192,21 +257,21 @@ async function getSnippets(userId) {
     `;
 }
 
-async function createSnippet(userId, title, code, language) {
+async function createSnippet(userId, title, code, language, tags = [], organizationId = null) {
     const user = await sql`SELECT id FROM users WHERE auth_provider_id = ${userId}`;
     if (!user.length) throw new Error("User not found");
 
     return await sql`
-        INSERT INTO snippets (user_id, title, code, language)
-        VALUES (${user[0].id}, ${title}, ${code}, ${language})
+        INSERT INTO snippets (user_id, title, code, language, tags, organization_id)
+        VALUES (${user[0].id}, ${title}, ${code}, ${language}, ${JSON.stringify(tags)}, ${organizationId})
         RETURNING *
     `;
 }
 
-async function updateSnippet(snippetId, title, code, language) {
+async function updateSnippet(snippetId, title, code, language, tags = []) {
     return await sql`
         UPDATE snippets 
-        SET title = ${title}, code = ${code}, language = ${language}, updated_at = CURRENT_TIMESTAMP 
+        SET title = ${title}, code = ${code}, language = ${language}, tags = ${JSON.stringify(tags)}, updated_at = CURRENT_TIMESTAMP 
         WHERE id = ${snippetId}
         RETURNING *
     `;
@@ -360,13 +425,40 @@ async function initializeSchema() {
             CREATE TABLE IF NOT EXISTS snippets(
         id SERIAL PRIMARY KEY,
         user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        organization_id INTEGER,
         title VARCHAR(255) NOT NULL,
         code TEXT,
         language VARCHAR(50) DEFAULT 'javascript',
+        tags JSONB DEFAULT '[]',
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
     `;
+
+        // Migration: Add tags and organization_id if missing
+        await sql`ALTER TABLE snippets ADD COLUMN IF NOT EXISTS tags JSONB DEFAULT '[]'`;
+        await sql`ALTER TABLE snippets ADD COLUMN IF NOT EXISTS organization_id INTEGER`;
+
+        // Organizations Table
+        await sql`
+            CREATE TABLE IF NOT EXISTS organizations(
+                id SERIAL PRIMARY KEY,
+                name VARCHAR(255) NOT NULL,
+                created_by INTEGER REFERENCES users(id),
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        `;
+
+        // Organization Members Table
+        await sql`
+            CREATE TABLE IF NOT EXISTS organization_members(
+                org_id INTEGER REFERENCES organizations(id) ON DELETE CASCADE,
+                user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+                role VARCHAR(50) DEFAULT 'member',
+                joined_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (org_id, user_id)
+            )
+        `;
 
         // Notifications Table
         await sql`
@@ -452,5 +544,10 @@ module.exports = {
     getSessions,
     createSession,
     deleteOtherSessions,
-    updateLastRoom
+    updateLastRoom,
+    createOrganization,
+    getOrganizations,
+    getOrgSnippets,
+    addOrgMember,
+    getOrgMembers
 };

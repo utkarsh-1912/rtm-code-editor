@@ -3,7 +3,7 @@ import { Terminal } from "lucide-react";
 import { ReflexContainer, ReflexSplitter, ReflexElement } from "react-reflex";
 import "react-reflex/styles.css";
 
-export default function OutputWindow({ output, isError, time, isMobile, stdin, setStdin }) {
+export default function OutputWindow({ output, isError, time, isMobile, stdin, setStdin, isLightMode }) {
     const renderStdin = () => (
         <div style={{
             flex: 1,
@@ -50,14 +50,21 @@ export default function OutputWindow({ output, isError, time, isMobile, stdin, s
                 )}
             </div>
 
-            <div style={{ flex: 1, padding: "12px 16px", overflow: "auto", backgroundColor: "rgba(0,0,0,0.2)" }}>
+            <div style={{
+                flex: 1,
+                padding: "12px 16px",
+                overflow: "auto",
+                backgroundColor: isLightMode ? "rgba(0,0,0,0.05)" : "rgba(0,0,0,0.2)"
+            }}>
                 {output ? (
                     <pre style={{
                         whiteSpace: "pre-wrap",
                         margin: 0,
                         fontSize: "13px",
                         lineHeight: 1.5,
-                        color: isError ? "#f87171" : "#4ade80"
+                        color: isError
+                            ? (isLightMode ? "#dc2626" : "#f87171") // Red-600 vs Red-400
+                            : (isLightMode ? "#16a34a" : "#4ade80") // Green-600 vs Green-400
                     }}>
                         {output}
                     </pre>

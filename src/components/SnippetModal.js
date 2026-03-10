@@ -8,7 +8,7 @@ const SnippetModal = ({ isOpen, onClose, onImport, userId, code: currentCode, la
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
     const [activeTab, setActiveTab] = useState('import'); // 'import' | 'save'
-    const [saveData, setSaveData] = useState({ title: '', language: currentLanguage || 'javascript' });
+    const [saveData, setSaveData] = useState({ title: '', language: currentLanguage || 'javascript', tags: '' });
     const [isSaving, setIsSaving] = useState(false);
 
     const fetchSnippets = useCallback(async () => {
@@ -45,7 +45,8 @@ const SnippetModal = ({ isOpen, onClose, onImport, userId, code: currentCode, la
                     userId,
                     title: saveData.title,
                     code: currentCode,
-                    language: saveData.language
+                    language: saveData.language,
+                    tags: saveData.tags.split(',').map(tag => tag.trim()).filter(tag => tag !== '')
                 })
             });
 
@@ -75,7 +76,8 @@ const SnippetModal = ({ isOpen, onClose, onImport, userId, code: currentCode, la
                 body: JSON.stringify({
                     title: snippet.title,
                     code: currentCode,
-                    language: snippet.language
+                    language: snippet.language,
+                    tags: snippet.tags || []
                 })
             });
 
@@ -94,7 +96,8 @@ const SnippetModal = ({ isOpen, onClose, onImport, userId, code: currentCode, la
 
     const filteredSnippets = snippets.filter(s =>
         s.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        s.language.toLowerCase().includes(searchTerm.toLowerCase())
+        s.language.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (s.tags && s.tags.some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase())))
     );
 
     if (!isOpen) return null;
@@ -184,6 +187,13 @@ const SnippetModal = ({ isOpen, onClose, onImport, userId, code: currentCode, la
                                             <div style={previewStyle}>
                                                 <code>{snippet.code.slice(0, 80)}{snippet.code.length > 80 ? '...' : ''}</code>
                                             </div>
+                                            {snippet.tags && snippet.tags.length > 0 && (
+                                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '8px' }}>
+                                                    {snippet.tags.map(tag => (
+                                                        <span key={tag} style={tagStyle}>#{tag}</span>
+                                                    ))}
+                                                </div>
+                                            )}
                                         </div>
                                         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                                             <button
@@ -235,6 +245,15 @@ const SnippetModal = ({ isOpen, onClose, onImport, userId, code: currentCode, la
                                 <option value="html">HTML</option>
                                 <option value="css">CSS</option>
                             </select>
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                            <label style={{ fontSize: '13px', fontWeight: '700', color: 'var(--text-muted)' }}>TAGS (COMMA SEPARATED)</label>
+                            <input
+                                placeholder="e.g. react, hooks, utility"
+                                value={saveData.tags}
+                                onChange={e => setSaveData({ ...saveData, tags: e.target.value })}
+                                style={inputStyle}
+                            />
                         </div>
                         <div style={{ backgroundColor: 'var(--bg-dark)', padding: '16px', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px', color: 'var(--text-muted)' }}>
@@ -302,6 +321,15 @@ const actionButtonStyle = (isPrimary) => ({
 const inputStyle = {
     padding: '14px 16px', backgroundColor: 'var(--bg-dark)', border: '1px solid var(--border-color)',
     borderRadius: '12px', color: 'white', fontSize: '14px', outline: 'none'
+};
+
+const tagStyle = {
+    fontSize: '10px',
+    color: 'var(--text-muted)',
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    padding: '2px 6px',
+    borderRadius: '4px',
+    fontWeight: '600'
 };
 
 export default SnippetModal;
