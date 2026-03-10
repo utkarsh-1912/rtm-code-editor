@@ -12,14 +12,22 @@ const VideoChat = ({ socketRef, projectId, user }) => {
     const localVideoRef = useRef();
 
     const startCall = async () => {
+        if (!user && !socketRef.current?.userName?.startsWith("Guest_")) {
+            toast.error("You must set a display name first");
+            return;
+        }
+
+        if (!user || user.isGuest) {
+            toast.error("Guests are only allowed to view and chat");
+            return;
+        }
+
         try {
             const localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
             setStream(localStream);
-            if (localVideoRef.current) localVideoRef.current.srcObject = localStream;
             setInCall(true);
 
-            // Notify others that we joined the call
-            socketRef.current.emit('join-video-chat', { projectId, userId: socketRef.current.id, name: user.name });
+            socketRef.current.emit('join-video-chat', { projectId, userId: socketRef.current.id, name: user.name || socketRef.current.userName });
         } catch (err) {
             console.error("Failed to get media", err);
             toast.error("Could not access camera/microphone");
@@ -44,7 +52,6 @@ const VideoChat = ({ socketRef, projectId, user }) => {
         });
 
         peersRef.current[userId] = peer;
-
         localStream.getTracks().forEach(track => peer.addTrack(track, localStream));
 
         peer.onicecandidate = (event) => {
@@ -69,7 +76,6 @@ const VideoChat = ({ socketRef, projectId, user }) => {
         });
 
         peersRef.current[userId] = peer;
-
         localStream.getTracks().forEach(track => peer.addTrack(track, localStream));
 
         peer.onicecandidate = (event) => {
@@ -102,14 +108,12 @@ const VideoChat = ({ socketRef, projectId, user }) => {
             if (userId === socket.id) return;
             toast(`${name} joined video`);
             if (stream) {
-                // We are the existing user, we create an offer to the new user
                 createPeer(userId, socket.id, stream, name);
             }
         };
 
         const handleOffer = async ({ from, offer }) => {
-            // We are the new user receiving an offer from an existing user
-            const peer = addPeer(from, socket.id, stream, "User"); // Name gets updated on track/join
+            const peer = addPeer(from, socket.id, stream, "User");
             try {
                 await peer.setRemoteDescription(new RTCSessionDescription(offer));
                 const answer = await peer.createAnswer();
@@ -136,9 +140,7 @@ const VideoChat = ({ socketRef, projectId, user }) => {
             if (peer) {
                 try {
                     await peer.addIceCandidate(new RTCIceCandidate(candidate));
-                } catch (err) {
-                    // ICE candidate errors are common during teardown
-                }
+                } catch (err) { }
             }
         };
 
@@ -168,13 +170,26 @@ const VideoChat = ({ socketRef, projectId, user }) => {
         };
     }, [stream, socketRef, createPeer, addPeer]);
 
+    useEffect(() => {
+        if (inCall && stream && localVideoRef.current && !isVideoOff) {
+            localVideoRef.current.srcObject = stream;
+        }
+    }, [inCall, stream, isVideoOff]);
+
     return (
         <div style={containerStyle}>
             {!inCall ? (
                 <div style={{ textAlign: 'center', padding: '10px' }}>
-                    <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '10px' }}>Join the community call</p>
-                    <button onClick={startCall} style={joinButtonStyle}>
-                        <Video size={16} /> Join Call
+                    <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '10px' }}>
+                        {(!user || user.isGuest) ? "Guests can view and chat" : "Join the community call"}
+                    </p>
+                    <button
+                        onClick={startCall}
+                        style={{ ...joinButtonStyle, opacity: (!user || user.isGuest) ? 0.6 : 1, cursor: (!user || user.isGuest) ? "not-allowed" : "pointer" }}
+                        disabled={!user || user.isGuest}
+                        title={(!user || user.isGuest) ? "Guests cannot stream" : "Join Call"}
+                    >
+                        <Video size={20} />
                     </button>
                 </div>
             ) : (
@@ -190,8 +205,7 @@ const VideoChat = ({ socketRef, projectId, user }) => {
                         </div>
                         {Object.entries(remoteStreams).map(([id, remote]) => (
                             <div key={id} style={videoWrapperStyle}>
-                                <VideoElement stream={remote.stream} />
-                                <span style={labelStyle}>{remote.name || "Participant"}</span>
+                                <VideoElement stream={remote.stream} name={remote.name} />
                             </div>
                         ))}
                     </div>
@@ -220,12 +234,17 @@ const VideoChat = ({ socketRef, projectId, user }) => {
     );
 };
 
-const VideoElement = ({ stream }) => {
+const VideoElement = ({ stream, name }) => {
     const ref = useRef();
     useEffect(() => {
-        if (ref.current) ref.current.srcObject = stream;
+        if (ref.current && stream) ref.current.srcObject = stream;
     }, [stream]);
-    return <video ref={ref} autoPlay playsInline style={videoStyle} />;
+    return (
+        <>
+            <video ref={ref} autoPlay playsInline style={videoStyle} />
+            <span style={labelStyle}>{name || "Participant"}</span>
+        </>
+    );
 };
 
 const containerStyle = {
@@ -235,20 +254,20 @@ const containerStyle = {
 };
 
 const joinButtonStyle = {
-    width: "100%",
-    padding: "8px",
+    width: "48px",
+    height: "48px",
     backgroundColor: "var(--primary)",
     color: "white",
     border: "none",
-    borderRadius: "10px",
+    borderRadius: "14px",
     fontWeight: "700",
     cursor: "pointer",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
-    gap: "8px",
-    fontSize: "13px",
-    transition: "all 0.2s"
+    margin: "0 auto",
+    transition: "all 0.2s",
+    boxShadow: "0 4px 12px rgba(59, 130, 246, 0.3)"
 };
 
 const callWorkspaceStyle = {
@@ -259,7 +278,7 @@ const callWorkspaceStyle = {
 
 const videoGridStyle = {
     display: "grid",
-    gridTemplateColumns: "1fr 1fr",
+    gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))",
     gap: "8px"
 };
 
