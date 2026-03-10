@@ -5,16 +5,12 @@ import "react-reflex/styles.css";
 import {
     FileText,
     Folder,
-    ChevronRight,
-    ChevronDown,
     Plus,
     Trash2,
     Play,
     Code,
     Layout,
-    MousePointer2,
     Users,
-    Settings,
     Home,
     Search,
     Video,
@@ -40,10 +36,7 @@ const ProjectPage = () => {
     const [openFiles, setOpenFiles] = useState([]);
     const [loading, setLoading] = useState(true);
     const [showPreview, setShowPreview] = useState(true);
-    const [isFullScreen, setIsFullScreen] = useState(false);
     const [remoteCursors, setRemoteCursors] = useState({}); // { socketId: { x, y, name } }
-    const [following, setFollowing] = useState(null); // socketId
-    const [isFollowedBy, setIsFollowedBy] = useState([]); // [socketIds]
     const [isPresenter, setIsPresenter] = useState(false);
     const [showVideoPane, setShowVideoPane] = useState(false);
     const [messages, setMessages] = useState([]);
@@ -61,7 +54,6 @@ const ProjectPage = () => {
     const [mobileView, setMobileView] = useState("editor"); // "files", "editor", "preview", "collab"
 
     const socketRef = useRef(null);
-    const editorRef = useRef(null);
     const filesRef = useRef([]);
     const openFilesRef = useRef([]);
 

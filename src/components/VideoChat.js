@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Phone, PhoneOff, Video, VideoOff, Mic, MicOff } from 'lucide-react';
+import { PhoneOff, Video, VideoOff, Mic, MicOff } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 const VideoChat = ({ socketRef, projectId, user }) => {
@@ -94,9 +94,9 @@ const VideoChat = ({ socketRef, projectId, user }) => {
             socket.off('new-ice-candidate');
             socket.off('user-left-video');
         };
-    }, [stream, socketRef, projectId]);
+    }, [stream, socketRef, projectId, createPeer, addPeer]);
 
-    const createPeer = (userId, myId, localStream) => {
+    const createPeer = React.useCallback((userId, myId, localStream) => {
         const peer = new RTCPeerConnection({
             iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
         });
@@ -121,9 +121,9 @@ const VideoChat = ({ socketRef, projectId, user }) => {
         });
 
         return peer;
-    };
+    }, [socketRef, setRemoteStreams]);
 
-    const addPeer = (userId, myId, localStream) => {
+    const addPeer = React.useCallback((userId, myId, localStream) => {
         const peer = new RTCPeerConnection({
             iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
         });
@@ -143,7 +143,7 @@ const VideoChat = ({ socketRef, projectId, user }) => {
         };
 
         return peer;
-    };
+    }, [socketRef, setRemoteStreams]);
 
     return (
         <div style={containerStyle}>
