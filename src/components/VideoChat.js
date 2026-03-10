@@ -92,31 +92,47 @@ const VideoChat = ({ socketRef, projectId, user }) => {
 
         const socket = socketRef.current;
 
-        const handleUserJoined = async ({ userId, name }) => {
+        const handleUserJoined = ({ userId, name }) => {
             if (userId === socket.id) return;
             toast(`${name} joined the call`);
-            createPeer(userId, socket.id, stream);
+            if (stream) {
+                createPeer(userId, socket.id, stream);
+            }
         };
 
         const handleOffer = async ({ from, offer }) => {
+            console.log("Received video offer from", from);
             const peer = addPeer(from, socket.id, stream);
-            await peer.setRemoteDescription(new RTCSessionDescription(offer));
-            const answer = await peer.createAnswer();
-            await peer.setLocalDescription(answer);
-            socket.emit('video-answer', { to: from, answer });
+            try {
+                await peer.setRemoteDescription(new RTCSessionDescription(offer));
+                const answer = await peer.createAnswer();
+                await peer.setLocalDescription(answer);
+                socket.emit('video-answer', { to: from, answer });
+            } catch (err) {
+                console.error("Error handling offer", err);
+            }
         };
 
         const handleAnswer = async ({ from, answer }) => {
+            console.log("Received video answer from", from);
             const peer = peersRef.current[from];
             if (peer) {
-                await peer.setRemoteDescription(new RTCSessionDescription(answer));
+                try {
+                    await peer.setRemoteDescription(new RTCSessionDescription(answer));
+                } catch (err) {
+                    console.error("Error handling answer", err);
+                }
             }
         };
 
         const handleCandidate = async ({ from, candidate }) => {
             const peer = peersRef.current[from];
             if (peer) {
-                await peer.addIceCandidate(new RTCIceCandidate(candidate));
+                try {
+                    await peer.addIceCandidate(new RTCIceCandidate(candidate));
+                } catch (err) {
+                    console.error("Error adding ICE candidate", err);
+                }
             }
         };
 
@@ -124,6 +140,7 @@ const VideoChat = ({ socketRef, projectId, user }) => {
         socket.on('video-offer', handleOffer);
         socket.on('video-answer', handleAnswer);
         socket.on('new-ice-candidate', handleCandidate);
+
         socket.on('user-left-video', ({ userId }) => {
             if (peersRef.current[userId]) {
                 peersRef.current[userId].close();
@@ -137,13 +154,13 @@ const VideoChat = ({ socketRef, projectId, user }) => {
         });
 
         return () => {
-            socket.off('user-joined-video');
-            socket.off('video-offer');
-            socket.off('video-answer');
-            socket.off('new-ice-candidate');
+            socket.off('user-joined-video', handleUserJoined);
+            socket.off('video-offer', handleOffer);
+            socket.off('video-answer', handleAnswer);
+            socket.off('new-ice-candidate', handleCandidate);
             socket.off('user-left-video');
         };
-    }, [stream, socketRef, projectId, createPeer, addPeer]);
+    }, [stream, socketRef, createPeer, addPeer]);
 
     return (
         <div style={containerStyle}>
