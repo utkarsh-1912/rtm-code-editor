@@ -1,10 +1,10 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { PhoneOff, Video, VideoOff, Mic, MicOff } from 'lucide-react';
+import { PhoneOff, Video, VideoOff, Mic, MicOff, User } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 const VideoChat = ({ socketRef, projectId, user }) => {
     const [stream, setStream] = useState(null);
-    const [remoteStreams, setRemoteStreams] = useState({}); // { socketId: stream }
+    const [remoteStreams, setRemoteStreams] = useState({}); // { socketId: { stream, name } }
     const [isMuted, setIsMuted] = useState(false);
     const [isVideoOff, setIsVideoOff] = useState(false);
     const [inCall, setInCall] = useState(false);
@@ -38,7 +38,7 @@ const VideoChat = ({ socketRef, projectId, user }) => {
         socketRef.current.emit('leave-video-chat', { projectId });
     };
 
-    const addPeer = useCallback((userId, myId, localStream) => {
+    const addPeer = useCallback((userId, myId, localStream, remoteName) => {
         const peer = new RTCPeerConnection({
             iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
         });
@@ -54,13 +54,16 @@ const VideoChat = ({ socketRef, projectId, user }) => {
         };
 
         peer.ontrack = (event) => {
-            setRemoteStreams(prev => ({ ...prev, [userId]: event.streams[0] }));
+            setRemoteStreams(prev => ({
+                ...prev,
+                [userId]: { stream: event.streams[0], name: remoteName }
+            }));
         };
 
         return peer;
     }, [socketRef, setRemoteStreams]);
 
-    const createPeer = useCallback((userId, myId, localStream) => {
+    const createPeer = useCallback((userId, myId, localStream, remoteName) => {
         const peer = new RTCPeerConnection({
             iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
         });
@@ -76,7 +79,10 @@ const VideoChat = ({ socketRef, projectId, user }) => {
         };
 
         peer.ontrack = (event) => {
-            setRemoteStreams(prev => ({ ...prev, [userId]: event.streams[0] }));
+            setRemoteStreams(prev => ({
+                ...prev,
+                [userId]: { stream: event.streams[0], name: remoteName }
+            }));
         };
 
         peer.createOffer().then(offer => {
@@ -94,15 +100,16 @@ const VideoChat = ({ socketRef, projectId, user }) => {
 
         const handleUserJoined = ({ userId, name }) => {
             if (userId === socket.id) return;
-            toast(`${name} joined the call`);
+            toast(`${name} joined video`);
             if (stream) {
-                createPeer(userId, socket.id, stream);
+                // We are the existing user, we create an offer to the new user
+                createPeer(userId, socket.id, stream, name);
             }
         };
 
         const handleOffer = async ({ from, offer }) => {
-            console.log("Received video offer from", from);
-            const peer = addPeer(from, socket.id, stream);
+            // We are the new user receiving an offer from an existing user
+            const peer = addPeer(from, socket.id, stream, "User"); // Name gets updated on track/join
             try {
                 await peer.setRemoteDescription(new RTCSessionDescription(offer));
                 const answer = await peer.createAnswer();
@@ -114,7 +121,6 @@ const VideoChat = ({ socketRef, projectId, user }) => {
         };
 
         const handleAnswer = async ({ from, answer }) => {
-            console.log("Received video answer from", from);
             const peer = peersRef.current[from];
             if (peer) {
                 try {
@@ -131,7 +137,7 @@ const VideoChat = ({ socketRef, projectId, user }) => {
                 try {
                     await peer.addIceCandidate(new RTCIceCandidate(candidate));
                 } catch (err) {
-                    console.error("Error adding ICE candidate", err);
+                    // ICE candidate errors are common during teardown
                 }
             }
         };
@@ -165,20 +171,27 @@ const VideoChat = ({ socketRef, projectId, user }) => {
     return (
         <div style={containerStyle}>
             {!inCall ? (
-                <button onClick={startCall} style={joinButtonStyle}>
-                    <Video size={18} /> Join Video Call
-                </button>
+                <div style={{ textAlign: 'center', padding: '10px' }}>
+                    <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '10px' }}>Join the community call</p>
+                    <button onClick={startCall} style={joinButtonStyle}>
+                        <Video size={16} /> Join Call
+                    </button>
+                </div>
             ) : (
                 <div style={callWorkspaceStyle}>
                     <div style={videoGridStyle}>
                         <div style={videoWrapperStyle}>
-                            <video ref={localVideoRef} autoPlay muted playsInline style={videoStyle} />
+                            {isVideoOff ? (
+                                <div style={avatarPlaceholderStyle}><User size={32} /></div>
+                            ) : (
+                                <video ref={localVideoRef} autoPlay muted playsInline style={videoStyle} />
+                            )}
                             <span style={labelStyle}>You</span>
                         </div>
-                        {Object.entries(remoteStreams).map(([id, remoteStream]) => (
+                        {Object.entries(remoteStreams).map(([id, remote]) => (
                             <div key={id} style={videoWrapperStyle}>
-                                <VideoElement stream={remoteStream} />
-                                <span style={labelStyle}>Partner</span>
+                                <VideoElement stream={remote.stream} />
+                                <span style={labelStyle}>{remote.name || "Participant"}</span>
                             </div>
                         ))}
                     </div>
@@ -188,17 +201,17 @@ const VideoChat = ({ socketRef, projectId, user }) => {
                             audioTrack.enabled = !audioTrack.enabled;
                             setIsMuted(!audioTrack.enabled);
                         }} style={controlButtonStyle}>
-                            {isMuted ? <MicOff size={20} color="#f87171" /> : <Mic size={20} />}
+                            {isMuted ? <MicOff size={16} color="#ef4444" /> : <Mic size={16} />}
                         </button>
                         <button onClick={() => {
                             const videoTrack = stream.getVideoTracks()[0];
                             videoTrack.enabled = !videoTrack.enabled;
                             setIsVideoOff(!videoTrack.enabled);
                         }} style={controlButtonStyle}>
-                            {isVideoOff ? <VideoOff size={20} color="#f87171" /> : <Video size={20} />}
+                            {isVideoOff ? <VideoOff size={16} color="#ef4444" /> : <Video size={16} />}
                         </button>
-                        <button onClick={endCall} style={{ ...controlButtonStyle, backgroundColor: "#ef4444" }}>
-                            <PhoneOff size={20} color="white" />
+                        <button onClick={endCall} style={{ ...controlButtonStyle, backgroundColor: "#ef4444", borderColor: "transparent" }}>
+                            <PhoneOff size={16} color="white" />
                         </button>
                     </div>
                 </div>
@@ -216,26 +229,26 @@ const VideoElement = ({ stream }) => {
 };
 
 const containerStyle = {
-    padding: "12px",
-    backgroundColor: "var(--bg-card)",
-    borderRadius: "12px",
-    border: "1px solid var(--border-color)",
-    marginBottom: "12px"
+    backgroundColor: "var(--bg-dark)",
+    borderBottom: "1px solid var(--border-color)",
+    padding: "16px",
 };
 
 const joinButtonStyle = {
     width: "100%",
-    padding: "10px",
+    padding: "8px",
     backgroundColor: "var(--primary)",
     color: "white",
     border: "none",
-    borderRadius: "8px",
+    borderRadius: "10px",
     fontWeight: "700",
     cursor: "pointer",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
-    gap: "10px"
+    gap: "8px",
+    fontSize: "13px",
+    transition: "all 0.2s"
 };
 
 const callWorkspaceStyle = {
@@ -246,16 +259,26 @@ const callWorkspaceStyle = {
 
 const videoGridStyle = {
     display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))",
+    gridTemplateColumns: "1fr 1fr",
     gap: "8px"
 };
 
 const videoWrapperStyle = {
     position: "relative",
-    borderRadius: "8px",
+    borderRadius: "12px",
     overflow: "hidden",
-    backgroundColor: "#000",
-    aspectRatio: "4/3"
+    backgroundColor: "#111",
+    aspectRatio: "1/1",
+    border: "1px solid rgba(255,255,255,0.05)"
+};
+
+const avatarPlaceholderStyle = {
+    width: "100%",
+    height: "100%",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    color: "rgba(255,255,255,0.2)"
 };
 
 const videoStyle = {
@@ -266,27 +289,32 @@ const videoStyle = {
 
 const labelStyle = {
     position: "absolute",
-    bottom: "4px",
-    left: "4px",
-    backgroundColor: "rgba(0,0,0,0.5)",
+    bottom: "6px",
+    left: "6px",
+    backgroundColor: "rgba(0,0,0,0.6)",
     color: "white",
-    fontSize: "10px",
+    fontSize: "9px",
+    fontWeight: "700",
     padding: "2px 6px",
-    borderRadius: "4px"
+    borderRadius: "4px",
+    maxWidth: "80%",
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    textOverflow: "ellipsis"
 };
 
 const controlsStyle = {
     display: "flex",
     justifyContent: "center",
-    gap: "10px"
+    gap: "8px"
 };
 
 const controlButtonStyle = {
-    width: "40px",
-    height: "40px",
-    borderRadius: "50%",
-    backgroundColor: "var(--bg-dark)",
-    border: "1px solid var(--border-color)",
+    width: "36px",
+    height: "36px",
+    borderRadius: "10px",
+    backgroundColor: "rgba(255,255,255,0.05)",
+    border: "1px solid rgba(255,255,255,0.1)",
     color: "var(--text-main)",
     display: "flex",
     alignItems: "center",

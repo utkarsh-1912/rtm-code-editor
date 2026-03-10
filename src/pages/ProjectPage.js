@@ -423,66 +423,41 @@ const ProjectPage = () => {
 
                         <ReflexSplitter style={splitterStyle} />
 
-                        {/* 2. Main Content Area (Video + Editor) */}
-                        <ReflexElement flex={1} minSize={layoutMode === "focus" ? 0 : 300}>
-                            <ReflexContainer orientation="horizontal">
-                                {/* Top: Video Area */}
-                                {layoutMode !== "focus" && (
-                                    <ReflexElement size={layoutMode === "cinema" ? 600 : 350} minSize={200}>
-                                        <div style={{
-                                            height: "100%",
-                                            backgroundColor: "#000",
-                                            position: "relative",
-                                            display: "flex",
-                                            alignItems: "center",
-                                            justifyContent: "center",
-                                            overflow: "hidden"
-                                        }}>
-                                            <VideoChat socketRef={socketRef} projectId={projectId} user={user || { name: socketRef.current?.userName || "Guest" }} />
+                        {/* 2. Main Content Area (Editor Only) */}
+                        <ReflexElement flex={1} minSize={300}>
+                            <div style={{ height: "100%", display: "flex", flexDirection: "column", backgroundColor: "var(--bg-dark)" }}>
+                                <div style={tabContainerStyle}>
+                                    {openFiles.map(file => (
+                                        <div key={file.id} onClick={() => setActiveFile(file)} style={tabStyle(activeFile?.id === file.id)}>
+                                            <FileText size={12} />
+                                            <span>{file.name}</span>
+                                            <button style={closeTabStyle} onClick={(e) => handleCloseTab(e, file.id)}>&times;</button>
                                         </div>
-                                    </ReflexElement>
-                                )}
-
-                                {layoutMode === "default" && <ReflexSplitter style={splitterStyle} />}
-
-                                {/* Bottom: Editor Workspace */}
-                                {layoutMode !== "cinema" && (
-                                    <ReflexElement flex={1} minSize={200}>
-                                        <div style={{ height: "100%", display: "flex", flexDirection: "column", backgroundColor: "var(--bg-dark)" }}>
-                                            <div style={tabContainerStyle}>
-                                                {openFiles.map(file => (
-                                                    <div key={file.id} onClick={() => setActiveFile(file)} style={tabStyle(activeFile?.id === file.id)}>
-                                                        <FileText size={12} />
-                                                        <span>{file.name}</span>
-                                                        <button style={closeTabStyle} onClick={(e) => handleCloseTab(e, file.id)}>&times;</button>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                            <div style={{ flex: 1, overflow: "hidden" }}>
-                                                {activeFile && (
-                                                    <EditorComp
-                                                        socketRef={socketRef}
-                                                        roomId={`project-${projectId}-${activeFile.id}`}
-                                                        onCodeChange={handleSaveFile}
-                                                        initialCode={activeFile.content}
-                                                        filename={activeFile.name}
-                                                        lockLanguage={true}
-                                                        language={activeFile.name.split('.').pop() === 'js' ? 'javascript' : activeFile.name.split('.').pop() === 'html' ? 'html' : 'css'}
-                                                        settings={settings}
-                                                    />
-                                                )}
-                                            </div>
-                                        </div>
-                                    </ReflexElement>
-                                )}
-                            </ReflexContainer>
+                                    ))}
+                                </div>
+                                <div style={{ flex: 1, overflow: "hidden" }}>
+                                    {activeFile && (
+                                        <EditorComp
+                                            socketRef={socketRef}
+                                            roomId={`project-${projectId}-${activeFile.id}`}
+                                            onCodeChange={handleSaveFile}
+                                            initialCode={activeFile.content}
+                                            filename={activeFile.name}
+                                            lockLanguage={true}
+                                            language={activeFile.name.split('.').pop() === 'js' ? 'javascript' : activeFile.name.split('.').pop() === 'html' ? 'html' : 'css'}
+                                            settings={settings}
+                                        />
+                                    )}
+                                </div>
+                            </div>
                         </ReflexElement>
 
                         <ReflexSplitter style={splitterStyle} />
 
-                        {/* 3. Sidebar Pane (Chat/Users) */}
+                        {/* 3. Sidebar Pane (Video + Chat/Users) */}
                         <ReflexElement size={320} minSize={200}>
                             <div style={streamingSidebarStyle}>
+                                <VideoChat socketRef={socketRef} projectId={projectId} user={user || { name: socketRef.current?.userName || "Guest" }} />
                                 <div style={sidebarTabsStyle}>
                                     <button
                                         onClick={() => setActiveSidebarTab("chat")}
