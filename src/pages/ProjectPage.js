@@ -33,7 +33,6 @@ const ProjectPage = () => {
     const [activeFile, setActiveFile] = useState(null);
     const [openFiles, setOpenFiles] = useState([]);
     const [loading, setLoading] = useState(true);
-    const [showPreview] = useState(true);
     const [remoteCursors, setRemoteCursors] = useState({}); // { socketId: { x, y, name } }
     const [isPresenter, setIsPresenter] = useState(false);
     const [messages, setMessages] = useState([]);
@@ -274,25 +273,6 @@ const ProjectPage = () => {
         toast(newState ? "Presenter mode: ON" : "Presenter mode: OFF");
     };
 
-    const generatePreviewDoc = () => {
-        const htmlFile = files.find(f => f.name.endsWith('.html')) || { content: "<h1>No index.html found</h1>" };
-        const cssFiles = files.filter(f => f.name.endsWith('.css'));
-        const jsFiles = files.filter(f => f.name.endsWith('.js'));
-
-        let combinedDoc = htmlFile.content;
-
-        // Inject Styles
-        const styles = cssFiles.map(f => `<style data-name="${f.name}">${f.content}</style>`).join('\n');
-        combinedDoc = combinedDoc.replace('</head>', `${styles}\n</head>`);
-        if (!combinedDoc.includes('</head>')) combinedDoc = styles + combinedDoc;
-
-        // Inject Scripts
-        const scripts = jsFiles.map(f => `<script data-name="${f.name}">${f.content}</script>`).join('\n');
-        combinedDoc = combinedDoc.replace('</body>', `${scripts}\n</body>`);
-        if (!combinedDoc.includes('</body>')) combinedDoc = combinedDoc + scripts;
-
-        return combinedDoc;
-    };
 
     if (loading) return (
         <div style={{ height: "100vh", width: "100vw", display: "flex", alignItems: "center", justifyContent: "center", backgroundColor: "var(--bg-dark)" }}>
@@ -788,12 +768,6 @@ const closeTabStyle = {
     padding: "2px"
 };
 
-const previewContainerStyle = {
-    height: "100%",
-    display: "flex",
-    flexDirection: "column",
-    backgroundColor: "white"
-};
 
 
 const splitterStyle = {
