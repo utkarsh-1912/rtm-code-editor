@@ -419,6 +419,21 @@ io.on("connection", (socket) => {
     }
   });
 
+  socket.on(ACTIONS.PROJECT_JOIN, async ({ projectId, userName }) => {
+    const roomId = `project-${projectId}`;
+    userSocketMap[socket.id] = userName;
+    socket.join(roomId);
+
+    const clients = getAllClients(roomId);
+    clients.forEach(({ socketId }) => {
+      io.to(socketId).emit(ACTIONS.JOINED, {
+        clients,
+        userName,
+        socketId: socket.id,
+      });
+    });
+  });
+
   socket.on(ACTIONS.CODE_CHANGE, ({ roomId, code }) => {
     socket.in(roomId).emit(ACTIONS.CODE_CHANGE, { code });
     // Save to DB asynchronously

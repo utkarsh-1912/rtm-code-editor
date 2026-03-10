@@ -220,7 +220,7 @@ const SnippetModal = ({ isOpen, onClose, onImport, userId, code: currentCode, la
                         </div>
                     </>
                 ) : (
-                    <div style={{ padding: '32px 24px', display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                    <div style={{ flex: 1, overflowY: 'auto', padding: '32px 24px', display: 'flex', flexDirection: 'column', gap: '24px' }}>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                             <label style={{ fontSize: '13px', fontWeight: '700', color: 'var(--text-muted)' }}>SNIPPET TITLE</label>
                             <input

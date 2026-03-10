@@ -308,36 +308,58 @@ const Dashboard = () => {
                         justifyContent: 'space-between',
                         alignItems: 'center'
                     }}>
-                        <div style={{ display: 'flex', gap: '24px' }}>
+                        <div style={{ display: 'flex', gap: '32px' }}>
                             <h2
                                 onClick={() => setActiveTab('rooms')}
                                 style={{
-                                    fontSize: '16px',
-                                    fontWeight: '600',
+                                    fontSize: '15px',
+                                    fontWeight: '700',
                                     margin: 0,
                                     cursor: 'pointer',
                                     color: activeTab === 'rooms' ? 'var(--primary)' : 'var(--text-muted)',
-                                    borderBottom: activeTab === 'rooms' ? '2px solid var(--primary)' : '2px solid transparent',
-                                    paddingBottom: '20px',
-                                    marginBottom: '-21px'
+                                    position: 'relative',
+                                    padding: '8px 4px',
+                                    transition: 'color 0.2s'
                                 }}
                             >
                                 Single Rooms
+                                {activeTab === 'rooms' && (
+                                    <div style={{
+                                        position: 'absolute',
+                                        bottom: 0,
+                                        left: 0,
+                                        right: 0,
+                                        height: '2px',
+                                        backgroundColor: 'var(--primary)',
+                                        borderRadius: '2px'
+                                    }} />
+                                )}
                             </h2>
                             <h2
                                 onClick={() => setActiveTab('projects')}
                                 style={{
-                                    fontSize: '16px',
-                                    fontWeight: '600',
+                                    fontSize: '15px',
+                                    fontWeight: '700',
                                     margin: 0,
                                     cursor: 'pointer',
                                     color: activeTab === 'projects' ? 'var(--primary)' : 'var(--text-muted)',
-                                    borderBottom: activeTab === 'projects' ? '2px solid var(--primary)' : '2px solid transparent',
-                                    paddingBottom: '20px',
-                                    marginBottom: '-21px'
+                                    position: 'relative',
+                                    padding: '8px 4px',
+                                    transition: 'color 0.2s'
                                 }}
                             >
                                 Pro Projects
+                                {activeTab === 'projects' && (
+                                    <div style={{
+                                        position: 'absolute',
+                                        bottom: 0,
+                                        left: 0,
+                                        right: 0,
+                                        height: '2px',
+                                        backgroundColor: 'var(--primary)',
+                                        borderRadius: '2px'
+                                    }} />
+                                )}
                             </h2>
                         </div>
                         <div style={{

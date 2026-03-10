@@ -94,6 +94,8 @@ function EditorComp({
   onDownload,
   settings,
   isReadOnly,
+  filename,
+  lockLanguage
 }) {
   const [editorCode, setEditorCode] = React.useState(code || "");
   const [remoteCursors, setRemoteCursors] = React.useState({});
@@ -201,7 +203,9 @@ function EditorComp({
       case "python": return python();
       case "cpp": return cpp();
       case "java": return cpp();
+      case "html":
       case "htmlmixed": return html();
+      case "css": return html(); // cm-lang-html often handles css well enough or has its own, but sticking to basics
       default: return javascript();
     }
   };
@@ -212,8 +216,8 @@ function EditorComp({
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 16px", backgroundColor: "var(--bg-card)", borderBottom: "1px solid var(--border-color)" }}>
 
         <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-          <div style={{ fontSize: "14px", fontWeight: "600", color: "var(--text-main)", opacity: 0.8 }}>
-            main.{language === "javascript" ? "js" : language === "python" ? "py" : language === "cpp" ? "cpp" : "java"}
+          <div style={{ fontSize: "14px", fontWeight: "700", color: "var(--text-main)", opacity: 0.9 }}>
+            {filename || `main.${language === "javascript" ? "js" : language === "python" ? "py" : language === "cpp" ? "cpp" : "java"}`}
           </div>
         </div>
 
@@ -242,28 +246,30 @@ function EditorComp({
             </button>
           )}
 
-          <select
-            value={language}
-            onChange={(e) => onLanguageChange(e.target.value)}
-            style={{
-              backgroundColor: "var(--secondary)",
-              border: "1px solid var(--border-color)",
-              color: "var(--text-muted)",
-              fontSize: "12px",
-              fontWeight: "500",
-              outline: "none",
-              cursor: "pointer",
-              padding: "4px 10px",
-              borderRadius: "6px",
-              transition: "all 0.2s"
-            }}
-            onMouseOver={(e) => e.target.style.borderColor = "var(--primary)"}
-            onMouseOut={(e) => e.target.style.borderColor = "var(--border-color)"}
-          >
-            {LANGUAGES.map(l => (
-              <option key={l.value} value={l.value} style={{ backgroundColor: "var(--bg-card)", color: "var(--text-main)" }}>{l.name}</option>
-            ))}
-          </select>
+          {!lockLanguage && (
+            <select
+              value={language}
+              onChange={(e) => onLanguageChange(e.target.value)}
+              style={{
+                backgroundColor: "var(--secondary)",
+                border: "1px solid var(--border-color)",
+                color: "var(--text-muted)",
+                fontSize: "12px",
+                fontWeight: "500",
+                outline: "none",
+                cursor: "pointer",
+                padding: "4px 10px",
+                borderRadius: "6px",
+                transition: "all 0.2s"
+              }}
+              onMouseOver={(e) => e.target.style.borderColor = "var(--primary)"}
+              onMouseOut={(e) => e.target.style.borderColor = "var(--border-color)"}
+            >
+              {LANGUAGES.map(l => (
+                <option key={l.value} value={l.value} style={{ backgroundColor: "var(--bg-card)", color: "var(--text-main)" }}>{l.name}</option>
+              ))}
+            </select>
+          )}
         </div>
 
       </div>
