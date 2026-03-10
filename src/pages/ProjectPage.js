@@ -13,8 +13,6 @@ import {
     MousePointer2,
     Users,
     Home,
-    Search,
-    Video,
     PencilLine
 } from "lucide-react";
 import toast from "react-hot-toast";
@@ -36,14 +34,13 @@ const ProjectPage = () => {
     const [activeFile, setActiveFile] = useState(null);
     const [openFiles, setOpenFiles] = useState([]);
     const [loading, setLoading] = useState(true);
-    const [showPreview, setShowPreview] = useState(true);
+    const [showPreview] = useState(true);
     const [remoteCursors, setRemoteCursors] = useState({}); // { socketId: { x, y, name } }
     const [isPresenter, setIsPresenter] = useState(false);
-    const [showVideoPane, setShowVideoPane] = useState(false);
     const [messages, setMessages] = useState([]);
     const [newMessage, setNewMessage] = useState("");
     const [showWhiteboard, setShowWhiteboard] = useState(false);
-    const [settings, setSettings] = useState({
+    const [settings] = useState({
         fontSize: 16,
         tabSize: 4,
         keybinding: "default",
@@ -254,33 +251,7 @@ const ProjectPage = () => {
         }
     };
 
-    const handleDeleteFile = async (e, file) => {
-        e.stopPropagation();
-        if (!window.confirm(`Delete ${file.name}?`)) return;
 
-        try {
-            const backendUrl = getBackendUrl();
-            await fetch(`${backendUrl}/api/projects/${projectId}/files?path=${file.path}`, {
-                method: 'DELETE'
-            });
-            setFiles(prev => prev.filter(f => f.id !== file.id));
-            setOpenFiles(prev => prev.filter(f => f.id !== file.id));
-            if (activeFile?.id === file.id) setActiveFile(null);
-            toast.success("File deleted");
-        } catch (err) {
-            toast.error("Failed to delete file");
-        }
-    };
-
-    const handleMouseMove = (e) => {
-        if (!socketRef.current) return;
-        const { clientX: x, clientY: y } = e;
-        socketRef.current.emit(ACTIONS.MOUSE_MOVE, {
-            roomId: projectId,
-            mouse: { x, y },
-            userName: user?.name
-        });
-    };
 
     const toggleFollowMe = () => {
         const newState = !isPresenter;
@@ -700,47 +671,6 @@ const mobileTabButtonStyle = (active) => ({
     transition: "all 0.2s"
 });
 
-const actionButtonStyle = {
-    display: "flex",
-    alignItems: "center",
-    gap: "8px",
-    backgroundColor: "var(--bg-dark)",
-    color: "var(--text-main)",
-    border: "1px solid var(--border-color)",
-    padding: "6px 12px",
-    borderRadius: "10px",
-    fontSize: "13px",
-    fontWeight: "600",
-    cursor: "pointer",
-    transition: "all 0.2s"
-};
-
-const primaryButtonStyle = {
-    display: "flex",
-    alignItems: "center",
-    gap: "8px",
-    backgroundColor: "var(--primary)",
-    color: "white",
-    border: "none",
-    padding: "6px 16px",
-    borderRadius: "10px",
-    fontSize: "13px",
-    fontWeight: "600",
-    cursor: "pointer",
-    boxShadow: "0 4px 12px rgba(59, 130, 246, 0.3)"
-};
-
-const selectStyle = {
-    backgroundColor: "var(--bg-dark)",
-    border: "1px solid var(--border-color)",
-    color: "var(--text-main)",
-    padding: "6px 12px",
-    borderRadius: "10px",
-    fontSize: "13px",
-    outline: "none",
-    cursor: "pointer",
-    fontWeight: "600"
-};
 
 const fileTreeContainerStyle = {
     height: "100%",
@@ -808,27 +738,6 @@ const previewContainerStyle = {
     backgroundColor: "white"
 };
 
-const previewHeaderStyle = {
-    height: "40px",
-    padding: "0 16px",
-    backgroundColor: "var(--bg-card)",
-    borderBottom: "1px solid var(--border-color)",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between"
-};
-
-const refreshButtonStyle = {
-    fontSize: "10px",
-    fontWeight: "700",
-    textTransform: "uppercase",
-    backgroundColor: "var(--bg-dark)",
-    color: "var(--primary)",
-    border: "1px solid var(--border-color)",
-    padding: "4px 8px",
-    borderRadius: "4px",
-    cursor: "pointer"
-};
 
 const splitterStyle = {
     backgroundColor: "var(--border-color)",
