@@ -10,6 +10,7 @@ import {
     Play,
     Code,
     Layout,
+    MousePointer2,
     Users,
     Home,
     Search,
@@ -336,7 +337,7 @@ const ProjectPage = () => {
     );
 
     return (
-        <AppLayout hideSidebar={isFullScreen || isMobile}>
+        <AppLayout hideSidebar={isMobile}>
             <div
                 onMouseMove={handleMouseMove}
                 style={{ height: "100vh", display: "flex", flexDirection: "column", backgroundColor: "var(--bg-dark)", position: "relative" }}
