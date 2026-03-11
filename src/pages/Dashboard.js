@@ -340,12 +340,7 @@ const Dashboard = () => {
                             </div>
                         ) : activeTab === 'rooms' ? (
                             filteredRooms.length > 0 ? (
-                                <div style={{
-                                    display: 'grid',
-                                    gridTemplateColumns: 'repeat(auto-fill, minmax(calc(100% - 20px), 1fr))',
-                                    '--desktop-cols': 'repeat(auto-fill, minmax(320px, 1fr))',
-                                    gap: '20px'
-                                }} className="responsive-grid">
+                                <div className="responsive-grid">
                                     {filteredRooms.map((room) => (
                                         <div
                                             key={room.id}
@@ -400,12 +395,7 @@ const Dashboard = () => {
                             )
                         ) : (
                             projects.length > 0 ? (
-                                <div style={{
-                                    display: 'grid',
-                                    gridTemplateColumns: 'repeat(auto-fill, minmax(calc(100% - 20px), 1fr))',
-                                    '--desktop-cols': 'repeat(auto-fill, minmax(360px, 1fr))',
-                                    gap: '20px'
-                                }} className="responsive-grid">
+                                <div className="responsive-grid">
                                     {projects.map((proj) => (
                                         <div
                                             key={proj.id}
