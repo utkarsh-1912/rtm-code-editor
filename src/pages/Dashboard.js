@@ -295,250 +295,124 @@ const Dashboard = () => {
                     ))}
                 </div>
 
-                <div style={{
-                    backgroundColor: 'var(--bg-card)',
-                    border: '1px solid var(--border-color)',
-                    borderRadius: '12px',
-                    overflow: 'hidden'
-                }}>
-                    <div style={{
-                        padding: '20px 24px',
-                        borderBottom: '1px solid var(--border-color)',
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'center'
-                    }}>
-                        <div style={{ display: 'flex', gap: '32px' }}>
-                            <h2
+                <div style={workspaceCardStyle}>
+                    <div style={workspaceHeaderStyle}>
+                        <div style={pillTabContainerStyle}>
+                            <button
                                 onClick={() => setActiveTab('rooms')}
-                                style={{
-                                    fontSize: '15px',
-                                    fontWeight: '700',
-                                    margin: 0,
-                                    cursor: 'pointer',
-                                    color: activeTab === 'rooms' ? 'var(--primary)' : 'var(--text-muted)',
-                                    position: 'relative',
-                                    padding: '8px 4px',
-                                    transition: 'color 0.2s'
-                                }}
+                                style={pillTabButtonStyle(activeTab === 'rooms')}
                             >
                                 Single Rooms
-                                {activeTab === 'rooms' && (
-                                    <div style={{
-                                        position: 'absolute',
-                                        bottom: 0,
-                                        left: 0,
-                                        right: 0,
-                                        height: '2px',
-                                        backgroundColor: 'var(--primary)',
-                                        borderRadius: '2px'
-                                    }} />
-                                )}
-                            </h2>
-                            <h2
+                            </button>
+                            <button
                                 onClick={() => setActiveTab('projects')}
-                                style={{
-                                    fontSize: '15px',
-                                    fontWeight: '700',
-                                    margin: 0,
-                                    cursor: 'pointer',
-                                    color: activeTab === 'projects' ? 'var(--primary)' : 'var(--text-muted)',
-                                    position: 'relative',
-                                    padding: '8px 4px',
-                                    transition: 'color 0.2s'
-                                }}
+                                style={pillTabButtonStyle(activeTab === 'projects')}
                             >
                                 Pro Projects
-                                {activeTab === 'projects' && (
-                                    <div style={{
-                                        position: 'absolute',
-                                        bottom: 0,
-                                        left: 0,
-                                        right: 0,
-                                        height: '2px',
-                                        backgroundColor: 'var(--primary)',
-                                        borderRadius: '2px'
-                                    }} />
-                                )}
-                            </h2>
+                            </button>
                         </div>
-                        <div style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '10px',
-                            padding: '8px 12px',
-                            backgroundColor: 'var(--bg-dark)',
-                            borderRadius: '6px',
-                            border: '1px solid var(--border-color)',
-                            width: '240px'
-                        }}>
+                        <div style={searchContainerStyle}>
                             <Search size={14} color="var(--text-muted)" />
                             <input
                                 type="text"
-                                placeholder="Filter rooms..."
+                                placeholder={`Search ${activeTab}...`}
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
-                                style={{
-                                    background: 'transparent',
-                                    border: 'none',
-                                    color: 'white',
-                                    fontSize: '13px',
-                                    width: '100%',
-                                    outline: 'none'
-                                }}
+                                style={searchInputStyle}
                             />
                         </div>
                     </div>
 
-                    <div style={{ padding: '24px' }}>
+                    <div style={{ padding: '32px' }}>
                         {loadingRooms ? (
-                            <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>Loading...</div>
+                            <div style={{ padding: '60px', textAlign: 'center', color: 'var(--text-muted)' }}>
+                                <SpaceLoader />
+                            </div>
                         ) : activeTab === 'rooms' ? (
                             filteredRooms.length > 0 ? (
-                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '16px' }}>
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '20px' }}>
                                     {filteredRooms.map((room) => (
                                         <div
                                             key={room.id}
-                                            style={premiumCardStyle}
+                                            style={sharpItemCardStyle}
                                             onMouseOver={(e) => {
-                                                e.currentTarget.style.transform = "translateY(-4px)";
-                                                e.currentTarget.style.boxShadow = "0 20px 40px rgba(0,0,0,0.3), 0 0 0 1px var(--primary)";
+                                                e.currentTarget.style.borderColor = "var(--primary)";
+                                                e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.02)";
                                             }}
                                             onMouseOut={(e) => {
-                                                e.currentTarget.style.transform = "translateY(0)";
-                                                e.currentTarget.style.boxShadow = "0 8px 30px rgba(0,0,0,0.2), 0 0 0 1px var(--border-color)";
+                                                e.currentTarget.style.borderColor = "var(--border-color)";
+                                                e.currentTarget.style.backgroundColor = "transparent";
                                             }}
                                         >
-                                            <div>
-                                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                                                    <div style={{ display: 'flex', gap: '8px' }}>
-                                                        <span style={langBadgeStyle(room.lang)}>
-                                                            {room.lang}
-                                                        </span>
-                                                        {room.isNew && <span style={newBadgeStyle}>New</span>}
-                                                    </div>
-                                                    <div style={{ position: 'relative' }}>
-                                                        <button
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                setShowActionMenu(showActionMenu === room.id ? null : room.id);
-                                                            }}
-                                                            style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '4px' }}
-                                                        >
-                                                            <MoreVertical size={16} />
-                                                        </button>
-
-                                                        {showActionMenu === room.id && (
-                                                            <div style={premiumMenuStyle}>
-                                                                <button
-                                                                    onClick={() => { setShowRenameModal(room); setShowActionMenu(null); }}
-                                                                    style={menuButtonStyle}
-                                                                >
-                                                                    <Edit2 size={13} /> Rename
-                                                                </button>
-                                                                <button
-                                                                    onClick={() => { setShowDeleteModal(room); setShowActionMenu(null); }}
-                                                                    style={{ ...menuButtonStyle, color: '#f87171' }}
-                                                                >
-                                                                    <Trash2 size={13} /> Delete
-                                                                </button>
-                                                            </div>
-                                                        )}
-                                                    </div>
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                                                <span style={sharpLangBadgeStyle(room.lang)}>
+                                                    {room.lang}
+                                                </span>
+                                                <div style={{ position: 'relative' }}>
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            setShowActionMenu(showActionMenu === room.id ? null : room.id);
+                                                        }}
+                                                        style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '4px' }}
+                                                    >
+                                                        <MoreVertical size={16} />
+                                                    </button>
+                                                    {showActionMenu === room.id && (
+                                                        <div style={sharpMenuStyle}>
+                                                            <button onClick={() => { setShowRenameModal(room); setShowActionMenu(null); }} style={menuButtonStyle}><Edit2 size={13} /> Rename</button>
+                                                            <button onClick={() => { setShowDeleteModal(room); setShowActionMenu(null); }} style={{ ...menuButtonStyle, color: '#f87171' }}><Trash2 size={13} /> Delete</button>
+                                                        </div>
+                                                    )}
                                                 </div>
-
-                                                <h4 style={{ fontSize: '16px', fontWeight: '700', marginBottom: '6px', color: 'var(--text-main)', letterSpacing: '-0.3px' }}>{room.name}</h4>
-                                                <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '24px', fontFamily: 'monospace', opacity: 0.7 }}>ID: {room.id}</p>
                                             </div>
-
+                                            <h4 style={{ fontSize: '16px', fontWeight: '700', marginBottom: '4px', color: 'var(--text-main)' }}>{room.name}</h4>
+                                            <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '24px', fontFamily: 'monospace' }}>ID: {room.id}</p>
                                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 'auto' }}>
-                                                <div style={{ color: 'var(--text-muted)', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '6px', fontWeight: '500' }}>
-                                                    <Calendar size={13} /> {room.lastActive?.split(',')[0] || "Just now"}
+                                                <div style={{ color: 'var(--text-muted)', fontSize: '11px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                    <Calendar size={12} /> {room.lastActive?.split(',')[0] || "Just now"}
                                                 </div>
-                                                <button
-                                                    onClick={() => navigate(`/editor/${room.id}`)}
-                                                    style={cardButtonStyle}
-                                                >
-                                                    Open <ExternalLink size={14} />
-                                                </button>
+                                                <button onClick={() => navigate(`/editor/${room.id}`)} style={sharpCardButtonStyle}>Open Workspace</button>
                                             </div>
                                         </div>
                                     ))}
                                 </div>
                             ) : (
-                                <div style={{ padding: '60px 0', textAlign: 'center' }}>
-                                    <p style={{ color: 'var(--text-muted)', marginBottom: '20px' }}>No single rooms found.</p>
-                                    <button
-                                        onClick={() => navigate('/')}
-                                        style={{ padding: '8px 16px', backgroundColor: 'var(--primary)', color: 'white', border: 'none', borderRadius: '6px', fontWeight: '600', cursor: 'pointer' }}
-                                    >
-                                        Create New Room
-                                    </button>
+                                <div style={emptyStateStyle}>
+                                    <Terminal size={48} style={{ opacity: 0.1, marginBottom: '16px' }} />
+                                    <p>No rooms found matching your search</p>
                                 </div>
                             )
                         ) : (
-                            /* Projects Tab Content */
                             projects.length > 0 ? (
-                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '16px' }}>
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))', gap: '20px' }}>
                                     {projects.map((proj) => (
                                         <div
                                             key={proj.id}
-                                            style={premiumCardStyle}
+                                            style={sharpItemCardStyle}
                                             onMouseOver={(e) => {
-                                                e.currentTarget.style.transform = "translateY(-4px)";
-                                                e.currentTarget.style.boxShadow = "0 20px 40px rgba(0,0,0,0.3), 0 0 0 1px var(--primary)";
+                                                e.currentTarget.style.borderColor = "var(--primary)";
+                                                e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.02)";
                                             }}
                                             onMouseOut={(e) => {
-                                                e.currentTarget.style.transform = "translateY(0)";
-                                                e.currentTarget.style.boxShadow = "0 8px 30px rgba(0,0,0,0.2), 0 0 0 1px var(--border-color)";
+                                                e.currentTarget.style.borderColor = "var(--border-color)";
+                                                e.currentTarget.style.backgroundColor = "transparent";
                                             }}
                                         >
-                                            <div>
-                                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-                                                    <div style={{
-                                                        width: '44px',
-                                                        height: '44px',
-                                                        borderRadius: '12px',
-                                                        backgroundColor: 'rgba(59, 130, 246, 0.1)',
-                                                        display: 'flex',
-                                                        alignItems: 'center',
-                                                        justifyContent: 'center',
-                                                        color: 'var(--primary)',
-                                                        boxShadow: 'inset 0 0 0 1px rgba(59, 130, 246, 0.2)'
-                                                    }}>
-                                                        <Folder size={22} />
-                                                    </div>
-                                                    <button
-                                                        onClick={() => handleDeleteProject(proj.id)}
-                                                        style={{ background: 'transparent', border: 'none', color: 'rgba(248, 113, 113, 0.5)', cursor: 'pointer', transition: 'color 0.2s' }}
-                                                        onMouseOver={(e) => e.currentTarget.style.color = '#f87171'}
-                                                        onMouseOut={(e) => e.currentTarget.style.color = 'rgba(248, 113, 113, 0.5)'}
-                                                        title="Delete Project"
-                                                    >
-                                                        <Trash2 size={16} />
-                                                    </button>
-                                                </div>
-                                                <h4 style={{ fontSize: '18px', fontWeight: '800', marginBottom: '8px', color: 'var(--text-main)', letterSpacing: '-0.4px' }}>{proj.name}</h4>
-                                                <p style={{ fontSize: '13px', color: 'var(--text-muted)', lineHeight: '1.6', marginBottom: '24px' }}>{proj.description || "Multi-file project workspace"}</p>
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                                                <div style={{ color: 'var(--primary)' }}><Folder size={24} /></div>
+                                                <button onClick={() => handleDeleteProject(proj.id)} style={{ background: 'transparent', border: 'none', color: 'rgba(248, 113, 113, 0.5)', cursor: 'pointer' }}><Trash2 size={16} /></button>
                                             </div>
-                                            <button
-                                                onClick={() => navigate(`/project/${proj.id}`)}
-                                                style={cardButtonStyle}
-                                            >
-                                                Open Workspace <ExternalLink size={14} />
-                                            </button>
+                                            <h4 style={{ fontSize: '18px', fontWeight: '800', marginBottom: '8px', color: 'var(--text-main)' }}>{proj.name}</h4>
+                                            <p style={{ fontSize: '13px', color: 'var(--text-muted)', lineHeight: '1.6', marginBottom: '24px' }}>{proj.description || "Multi-file project workspace"}</p>
+                                            <button onClick={() => navigate(`/project/${proj.id}`)} style={sharpCardButtonStyle}>Join Project</button>
                                         </div>
                                     ))}
                                 </div>
                             ) : (
-                                <div style={{ padding: '60px 0', textAlign: 'center' }}>
-                                    <p style={{ color: 'var(--text-muted)', marginBottom: '20px' }}>No projects yet. Create a multi-file workspace!</p>
-                                    <button
-                                        onClick={() => setShowCreateProjectModal(true)}
-                                        style={{ padding: '10px 20px', backgroundColor: 'var(--primary)', color: 'white', border: 'none', borderRadius: '8px', fontWeight: '700', cursor: 'pointer' }}
-                                    >
-                                        Start Pro Project
-                                    </button>
+                                <div style={emptyStateStyle}>
+                                    <Folder size={48} style={{ opacity: 0.1, marginBottom: '16px' }} />
+                                    <p>No projects created yet</p>
                                 </div>
                             )
                         )}
@@ -617,74 +491,121 @@ const Dashboard = () => {
 };
 
 // Styles
-const premiumCardStyle = {
-    padding: '24px',
+// Modern Sharp Styles
+const workspaceCardStyle = {
     backgroundColor: 'var(--bg-card)',
-    backdropFilter: 'blur(8px)',
-    borderRadius: '20px',
     border: '1px solid var(--border-color)',
-    display: 'flex',
-    flexDirection: 'column',
-    justifyContent: 'space-between',
-    minHeight: '200px',
-    transition: 'all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
-    boxShadow: '0 8px 30px rgba(0,0,0,0.2)',
-    cursor: 'default',
-    position: 'relative',
+    borderRadius: '8px',
+    boxShadow: '0 4px 20px rgba(0,0,0,0.2)',
     overflow: 'hidden'
 };
 
-const cardButtonStyle = {
-    width: '100%',
-    padding: '12px',
-    borderRadius: '12px',
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    border: '1px solid var(--border-color)',
-    color: 'var(--text-main)',
-    fontWeight: '700',
+const workspaceHeaderStyle = {
+    padding: '24px 32px',
+    borderBottom: '1px solid var(--border-color)',
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.01)',
+    flexWrap: 'wrap',
+    gap: '20px'
+};
+
+const pillTabContainerStyle = {
+    display: 'flex',
+    backgroundColor: 'var(--bg-dark)',
+    padding: '4px',
+    borderRadius: '6px',
+    border: '1px solid var(--border-color)'
+};
+
+const pillTabButtonStyle = (active) => ({
+    padding: '8px 24px',
+    borderRadius: '4px',
+    backgroundColor: active ? 'var(--bg-card)' : 'transparent',
+    color: active ? 'var(--primary)' : 'var(--text-muted)',
+    border: 'none',
     fontSize: '13px',
+    fontWeight: '700',
     cursor: 'pointer',
+    transition: 'all 0.2s',
+    boxShadow: active ? '0 2px 8px rgba(0,0,0,0.2)' : 'none'
+});
+
+const searchContainerStyle = {
     display: 'flex',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: '8px',
+    gap: '12px',
+    padding: '10px 16px',
+    backgroundColor: 'var(--bg-dark)',
+    borderRadius: '4px',
+    border: '1px solid var(--border-color)',
+    minWidth: '280px',
+    transition: 'border-color 0.2s'
+};
+
+const searchInputStyle = {
+    background: 'transparent',
+    border: 'none',
+    color: 'white',
+    fontSize: '14px',
+    width: '100%',
+    outline: 'none'
+};
+
+const sharpItemCardStyle = {
+    padding: '24px',
+    backgroundColor: 'transparent',
+    borderRadius: '6px',
+    border: '1px solid var(--border-color)',
+    display: 'flex',
+    flexDirection: 'column',
+    transition: 'all 0.2s ease',
+    minHeight: '180px'
+};
+
+const sharpCardButtonStyle = {
+    padding: '8px 16px',
+    borderRadius: '4px',
+    backgroundColor: 'var(--bg-dark)',
+    border: '1px solid var(--border-color)',
+    color: 'var(--text-main)',
+    fontWeight: '600',
+    fontSize: '12px',
+    cursor: 'pointer',
     transition: 'all 0.2s'
 };
 
-const langBadgeStyle = (lang) => ({
+const sharpLangBadgeStyle = (lang) => ({
     fontSize: '10px',
-    fontWeight: '800',
-    padding: '4px 10px',
-    backgroundColor: 'rgba(59, 130, 246, 0.1)',
+    fontWeight: '700',
+    padding: '4px 8px',
+    backgroundColor: 'rgba(59, 130, 246, 0.08)',
     color: 'var(--primary)',
-    borderRadius: '20px',
-    textTransform: 'uppercase',
-    letterSpacing: '0.5px'
+    borderRadius: '2px',
+    textTransform: 'uppercase'
 });
 
-const newBadgeStyle = {
-    fontSize: '10px',
-    fontWeight: '800',
-    padding: '4px 10px',
-    backgroundColor: 'rgba(16, 185, 129, 0.1)',
-    color: '#10b981',
-    borderRadius: '20px',
-    textTransform: 'uppercase',
-    letterSpacing: '0.5px'
-};
-
-const premiumMenuStyle = {
+const sharpMenuStyle = {
     position: 'absolute',
     right: 0,
-    top: '32px',
+    top: '28px',
     backgroundColor: 'var(--bg-card)',
-    backdropFilter: 'blur(16px)',
     border: '1px solid var(--border-color)',
-    borderRadius: '12px',
-    padding: '6px',
+    borderRadius: '4px',
+    padding: '4px',
     zIndex: 100,
     minWidth: '140px',
-    boxShadow: '0 10px 25px rgba(0,0,0,0.5)'
+    boxShadow: '0 8px 16px rgba(0,0,0,0.4)'
+};
+
+const emptyStateStyle = {
+    padding: '80px 20px',
+    textAlign: 'center',
+    color: 'var(--text-muted)',
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center'
 };
 
 const menuButtonStyle = {
@@ -722,7 +643,7 @@ const modalOverlayStyle = {
 const modalContentStyle = {
     backgroundColor: 'var(--bg-card)',
     padding: '24px',
-    borderRadius: '20px',
+    borderRadius: '8px',
     border: '1px solid var(--border-color)',
     width: '100%',
     maxWidth: '480px',
@@ -735,7 +656,7 @@ const modalInputStyle = {
     padding: '14px 16px',
     backgroundColor: 'var(--bg-dark)',
     border: '1px solid var(--border-color)',
-    borderRadius: '12px',
+    borderRadius: '6px',
     color: 'var(--text-main)',
     fontSize: '15px',
     outline: 'none',
@@ -747,25 +668,22 @@ const cancelButtonStyle = {
     padding: '12px 20px',
     backgroundColor: 'transparent',
     border: '1px solid var(--border-color)',
-    borderRadius: '12px',
+    borderRadius: '6px',
     color: 'var(--text-muted)',
     fontSize: '14px',
     fontWeight: '600',
-    cursor: 'pointer',
-    transition: 'all 0.2s'
+    cursor: 'pointer'
 };
 
 const confirmButtonStyle = {
     padding: '12px 24px',
     backgroundColor: 'var(--primary)',
     border: 'none',
-    borderRadius: '12px',
+    borderRadius: '6px',
     color: 'white',
     fontSize: '14px',
     fontWeight: '700',
-    cursor: 'pointer',
-    transition: 'all 0.2s',
-    boxShadow: '0 4px 12px rgba(59, 130, 246, 0.3)'
+    cursor: 'pointer'
 };
 
 export default Dashboard;
