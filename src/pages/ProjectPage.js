@@ -77,38 +77,6 @@ const ProjectPage = () => {
             userName: name,
         });
 
-        socketRef.current.on(ACTIONS.JOINED, ({ clients }) => {
-            setClients(clients);
-        });
-
-        socketRef.current.on(ACTIONS.DISCONNECTED, ({ socketId }) => {
-            setClients(prev => prev.filter(c => c.socketId !== socketId));
-        });
-
-        socketRef.current.on(ACTIONS.MOUSE_MOVE, ({ socketId, x, y, name }) => {
-            // Future implementation: render cursors on editor
-        });
-
-        socketRef.current.on(ACTIONS.FILE_CHANGE, ({ fileId, content }) => {
-            setFiles(prev => prev.map(f => f.id === fileId ? { ...f, content } : f));
-        });
-
-        socketRef.current.on(ACTIONS.FOLLOW_MODE, ({ viewState, userName }) => {
-            if (viewState?.fileId) {
-                const file = filesRef.current.find(f => f.id === viewState.fileId);
-                if (file) {
-                    setActiveFile(file);
-                    if (!openFilesRef.current.find(f => f.id === file.id)) {
-                        setOpenFiles(prev => [...prev, file]);
-                    }
-                }
-            }
-        });
-
-        socketRef.current.on(ACTIONS.RECEIVE_MESSAGE, (message) => {
-            setMessages(prev => [...prev, message]);
-        });
-
         setHasJoined(true);
         setShowNamePrompt(false);
     }, [hasJoined, projectId]);
@@ -139,6 +107,39 @@ const ProjectPage = () => {
                 socketRef.current = await initSocket();
                 socketRef.current.on('connect_error', (err) => handleErrors(err));
                 socketRef.current.on('connect_failed', (err) => handleErrors(err));
+
+                // Universal Project Listeners
+                socketRef.current.on(ACTIONS.JOINED, ({ clients }) => {
+                    setClients(clients);
+                });
+
+                socketRef.current.on(ACTIONS.DISCONNECTED, ({ socketId }) => {
+                    setClients(prev => prev.filter(c => c.socketId !== socketId));
+                });
+
+                socketRef.current.on(ACTIONS.MOUSE_MOVE, ({ socketId, x, y, name }) => {
+                    // Cursors handled in EditorComp
+                });
+
+                socketRef.current.on(ACTIONS.FILE_CHANGE, ({ fileId, content }) => {
+                    setFiles(prev => prev.map(f => f.id === fileId ? { ...f, content } : f));
+                });
+
+                socketRef.current.on(ACTIONS.FOLLOW_MODE, ({ viewState, userName }) => {
+                    if (viewState?.fileId) {
+                        const file = filesRef.current.find(f => f.id === viewState.fileId);
+                        if (file) {
+                            setActiveFile(file);
+                            if (!openFilesRef.current.find(f => f.id === file.id)) {
+                                setOpenFiles(prev => [...prev, file]);
+                            }
+                        }
+                    }
+                });
+
+                socketRef.current.on(ACTIONS.RECEIVE_MESSAGE, (message) => {
+                    setMessages(prev => [...prev, message]);
+                });
 
                 function handleErrors(e) {
                     console.log('socket error', e);
@@ -281,7 +282,7 @@ const ProjectPage = () => {
                     </div>
                     <div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <h2 style={{ margin: 0, fontSize: '14px', fontWeight: '800', letterSpacing: '-0.01em', color: 'var(--text-main)' }}>{project?.title || "Loading..."}.studio</h2>
+                            <h2 style={{ margin: 0, fontSize: '14px', fontWeight: '800', letterSpacing: '-0.01em', color: 'var(--text-main)' }}>{project?.name || "Loading..."}....studio</h2>
                             <span style={statusBadgeStyle}>LIVE</span>
                         </div>
                         <p style={{ margin: 0, fontSize: '10px', color: 'var(--text-muted)', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Collaboration Hub</p>
