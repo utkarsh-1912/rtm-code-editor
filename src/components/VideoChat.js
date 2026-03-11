@@ -12,6 +12,11 @@ const VideoChat = ({ socketRef, projectId, user }) => {
     const localVideoRef = useRef();
 
     const startCall = async () => {
+        if (!socketRef || !socketRef.current) {
+            toast.error("Connecting to server...");
+            return;
+        }
+
         if (!user && !socketRef.current?.userName) {
             toast.error("Please enter a name first");
             return;

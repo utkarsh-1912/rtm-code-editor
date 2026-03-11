@@ -470,7 +470,8 @@ const ProjectPage = () => {
                                 </div>
                                 <div style={{ flex: 1, backgroundColor: '#000', position: 'relative' }}>
                                     <VideoChat
-                                        roomId={`project-${projectId}`}
+                                        socketRef={socketRef}
+                                        projectId={projectId}
                                         user={user || { name: socketRef.current?.userName, isGuest: true }}
                                     />
                                 </div>

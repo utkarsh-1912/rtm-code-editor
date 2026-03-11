@@ -155,6 +155,7 @@ const Dashboard = () => {
             });
             if (response.ok) {
                 toast.success("Project deleted");
+                setShowDeleteModal(null);
                 fetchDashboardData();
             }
         } catch (err) {
@@ -197,7 +198,13 @@ const Dashboard = () => {
                         </p>
                     </div>
 
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+                    <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '12px',
+                        flexWrap: 'wrap',
+                        width: window.innerWidth < 768 ? '100%' : 'auto'
+                    }}>
                         {user?.last_room_id && (
                             <button
                                 onClick={() => navigate(`/editor/${user.last_room_id}`, { state: { userName: user.name, role: 'editor' } })}
@@ -214,7 +221,10 @@ const Dashboard = () => {
                                     fontSize: '14px',
                                     cursor: 'pointer',
                                     transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                                    boxShadow: '0 4px 12px rgba(168, 85, 247, 0.1)'
+                                    boxShadow: '0 4px 12px rgba(168, 85, 247, 0.1)',
+                                    flex: window.innerWidth < 768 ? '1' : 'none',
+                                    justifyContent: 'center',
+                                    minWidth: window.innerWidth < 768 ? '100%' : 'auto'
                                 }}
                                 onMouseOver={(e) => {
                                     e.currentTarget.style.backgroundColor = 'rgba(168, 85, 247, 0.12)';
@@ -242,7 +252,9 @@ const Dashboard = () => {
                                 fontWeight: '700',
                                 fontSize: '14px',
                                 cursor: 'pointer',
-                                transition: 'all 0.3s'
+                                transition: 'all 0.3s',
+                                flex: window.innerWidth < 768 ? '1' : 'none',
+                                justifyContent: 'center'
                             }}
                         >
                             <Folder size={18} /> New Project
@@ -262,7 +274,9 @@ const Dashboard = () => {
                                 fontSize: '14px',
                                 cursor: 'pointer',
                                 transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                                boxShadow: '0 10px 20px -5px rgba(59, 130, 246, 0.4)'
+                                boxShadow: '0 10px 20px -5px rgba(59, 130, 246, 0.4)',
+                                flex: window.innerWidth < 768 ? '1' : 'none',
+                                justifyContent: 'center'
                             }}
                             onMouseOver={(e) => {
                                 e.currentTarget.style.transform = 'translateY(-2px)';
@@ -473,9 +487,9 @@ const Dashboard = () => {
                                             />
                                         </div>
                                     </div>
-                                    <div style={{ display: 'flex', gap: '10px', marginTop: '32px', justifyContent: 'flex-end' }}>
-                                        <button type="button" onClick={() => setShowCreateProjectModal(false)} style={cancelButtonStyle}>Cancel</button>
-                                        <button type="submit" style={confirmButtonStyle}>Create Project</button>
+                                    <div style={{ display: 'flex', gap: '12px', marginTop: '32px', justifyContent: 'flex-end' }}>
+                                        <button type="button" onClick={() => setShowCreateProjectModal(false)} style={{ ...cancelButtonStyle, flex: 1 }}>Cancel</button>
+                                        <button type="submit" style={{ ...confirmButtonStyle, flex: 1 }}>Create Project</button>
                                     </div>
                                 </form>
                             </div>
@@ -491,7 +505,7 @@ const Dashboard = () => {
                                     placeholder="Workspace name"
                                     autoFocus
                                 />
-                                <div style={{ display: 'flex', gap: '10px', marginTop: '24px', justifyContent: 'flex-end' }}>
+                                <div style={{ display: 'flex', gap: '12px', marginTop: '24px', justifyContent: 'flex-end' }}>
                                     <button onClick={() => setShowRenameModal(null)} style={cancelButtonStyle}>Cancel</button>
                                     <button onClick={() => handleRenameRoom(showRenameModal.id)} style={confirmButtonStyle}>Rename</button>
                                 </div>
@@ -499,19 +513,24 @@ const Dashboard = () => {
                         )}
 
                         {showDeleteModal && (
-                            <div style={modalContentStyle}>
-                                <h3 style={{ fontSize: '18px', fontWeight: '700', marginBottom: '8px', color: '#f87171' }}>Delete {showDeleteModal.isProject ? "Project" : "Workspace"}</h3>
-                                <p style={{ color: 'var(--text-muted)', marginBottom: '20px', fontSize: '13px' }}>
-                                    Are you sure you want to delete this {showDeleteModal.isProject ? "project" : "workspace"}? This action cannot be undone.
-                                </p>
-                                <div style={{ display: 'flex', gap: '10px', marginTop: '24px', justifyContent: 'flex-end' }}>
-                                    <button onClick={() => setShowDeleteModal(null)} style={cancelButtonStyle}>Cancel</button>
-                                    <button
-                                        onClick={() => showDeleteModal.isProject ? handleDeleteProject(showDeleteModal.id) : handleDeleteRoom(showDeleteModal.id)}
-                                        style={{ ...confirmButtonStyle, backgroundColor: '#ef4444' }}
-                                    >
-                                        Delete Permanently
-                                    </button>
+                            <div style={modalOverlayStyle} onClick={() => setShowDeleteModal(null)}>
+                                <div style={modalContentStyle} onClick={e => e.stopPropagation()}>
+                                    <h2 style={{ fontSize: '20px', fontWeight: '800', marginBottom: '8px', color: '#f87171' }}>Confirm Delete</h2>
+                                    <p style={{ fontSize: '14px', color: 'var(--text-muted)', marginBottom: '24px' }}>
+                                        Are you sure you want to delete <strong>{showDeleteModal.name}</strong>? This action cannot be undone.
+                                    </p>
+                                    <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+                                        <button onClick={() => setShowDeleteModal(null)} style={cancelButtonStyle}>Cancel</button>
+                                        <button
+                                            onClick={() => {
+                                                if (showDeleteModal.isProject) handleDeleteProject(showDeleteModal.id);
+                                                else handleDeleteRoom(showDeleteModal.id);
+                                            }}
+                                            style={{ ...confirmButtonStyle, backgroundColor: '#f87171' }}
+                                        >
+                                            Delete
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                         )}
@@ -572,7 +591,7 @@ const searchContainerStyle = {
     backgroundColor: 'var(--bg-dark)',
     borderRadius: '4px',
     border: '1px solid var(--border-color)',
-    minWidth: '280px',
+    minWidth: window.innerWidth < 768 ? '180px' : '280px',
     transition: 'border-color 0.2s'
 };
 
