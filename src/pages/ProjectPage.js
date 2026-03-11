@@ -53,7 +53,7 @@ const ProjectPage = () => {
     const [guestName, setGuestName] = useState("");
 
     const [sidebarTab, setSidebarTab] = useState('files'); // files, chat, users, settings
-    const [hasJoined, setHasJoined] = useState(false);
+    const hasJoinedRef = useRef(false);
     const [showVideo, setShowVideo] = useState(true);
 
     const socketRef = useRef(null);
@@ -69,7 +69,7 @@ const ProjectPage = () => {
     }, [openFiles]);
 
     const joinProject = React.useCallback((name) => {
-        if (!socketRef.current || hasJoined) return;
+        if (!socketRef.current || hasJoinedRef.current) return;
 
         socketRef.current.userName = name;
         socketRef.current.emit(ACTIONS.PROJECT_JOIN, {
@@ -77,9 +77,9 @@ const ProjectPage = () => {
             userName: name,
         });
 
-        setHasJoined(true);
+        hasJoinedRef.current = true;
         setShowNamePrompt(false);
-    }, [hasJoined, projectId]);
+    }, [projectId]);
 
     useEffect(() => {
         const handleResize = () => {
@@ -169,7 +169,7 @@ const ProjectPage = () => {
                 socketRef.current.disconnect();
             }
         };
-    }, [projectId, user, navigate, joinProject]);
+    }, [projectId, user, navigate]); // Removed joinProject to prevent re-init loops
 
     const handleGuestJoin = (e) => {
         e.preventDefault();
@@ -282,7 +282,9 @@ const ProjectPage = () => {
                     </div>
                     <div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <h2 style={{ margin: 0, fontSize: '14px', fontWeight: '800', letterSpacing: '-0.01em', color: 'var(--text-main)' }}>{project?.name || "Loading..."}....studio</h2>
+                            <h2 style={{ margin: 0, fontSize: '14px', fontWeight: '800', letterSpacing: '-0.01em', color: 'var(--text-main)' }}>
+                                {project ? `${project.name}....studio` : "Loading....studio"}
+                            </h2>
                             <span style={statusBadgeStyle}>LIVE</span>
                         </div>
                         <p style={{ margin: 0, fontSize: '10px', color: 'var(--text-muted)', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Collaboration Hub</p>
