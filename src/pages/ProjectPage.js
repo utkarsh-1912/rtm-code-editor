@@ -46,6 +46,7 @@ const ProjectPage = () => {
     const [, setIsMobile] = useState(window.innerWidth < 768);
     const [activeSidebarTab, setActiveSidebarTab] = useState("chat"); // "chat", "participants"
     const [layoutMode, setLayoutMode] = useState("default"); // "cinema", "default", "focus"
+    const [clients, setClients] = useState([]);
 
     const [guestName, setGuestName] = useState("");
     const [showNamePrompt, setShowNamePrompt] = useState(false);
@@ -70,6 +71,14 @@ const ProjectPage = () => {
         socketRef.current.emit(ACTIONS.PROJECT_JOIN, {
             projectId,
             userName: name,
+        });
+
+        socketRef.current.on(ACTIONS.JOINED, ({ clients }) => {
+            setClients(clients);
+        });
+
+        socketRef.current.on(ACTIONS.DISCONNECTED, ({ socketId }) => {
+            setClients(prev => prev.filter(c => c.socketId !== socketId));
         });
 
         socketRef.current.on(ACTIONS.MOUSE_MOVE, ({ socketId, x, y, name }) => {
@@ -178,7 +187,7 @@ const ProjectPage = () => {
         setFiles(prev => prev.map(f => f.id === activeFile.id ? { ...f, content } : f));
         // Real-time broadcast
         socketRef.current.emit(ACTIONS.FILE_CHANGE, {
-            roomId: `project-${projectId}-${activeFile.id}`,
+            roomId: `project-${projectId}`,
             fileId: activeFile.id,
             content
         });
@@ -240,6 +249,31 @@ const ProjectPage = () => {
                             <span style={{ fontSize: "11px", fontWeight: "800", color: "#ef4444", textTransform: "uppercase" }}>Live</span>
                         </div>
                     </div>
+                </div>
+
+                <div style={{ display: "flex", alignItems: "center", gap: "12px", marginLeft: "20px" }}>
+                    <button
+                        onClick={() => {
+                            navigator.clipboard.writeText(window.location.href);
+                            toast.success("Invite link copied!");
+                        }}
+                        style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "8px",
+                            backgroundColor: "rgba(59, 130, 246, 0.1)",
+                            color: "var(--primary)",
+                            border: "1px solid rgba(59, 130, 246, 0.2)",
+                            padding: "6px 12px",
+                            borderRadius: "8px",
+                            fontSize: "12px",
+                            fontWeight: "700",
+                            cursor: "pointer",
+                            transition: "all 0.2s"
+                        }}
+                    >
+                        <Plus size={16} /> Share Invite
+                    </button>
                 </div>
 
                 <div style={{ display: "flex", alignItems: "center", gap: "20px", marginLeft: "auto" }}>
@@ -379,20 +413,19 @@ const ProjectPage = () => {
                                         </div>
                                     </>
                                 ) : (
-                                    <div style={{ padding: "20px" }}>
-                                        <span style={{ fontSize: "12px", fontWeight: "700", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "1px" }}>Active Users</span>
-                                        <div style={{ marginTop: "16px", display: "flex", flexDirection: "column", gap: "12px" }}>
-                                            {Object.entries(remoteCursors).map(([id, cursor]) => (
-                                                <div key={id} style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                                                    <div style={{ width: "8px", height: "8px", backgroundColor: "#10b981", borderRadius: "50%" }}></div>
-                                                    <span style={{ fontSize: "14px", fontWeight: "600", color: "var(--text-main)" }}>{cursor.name}</span>
+                                    <div style={{ flex: 1, padding: "20px", overflowY: "auto", display: "flex", flexDirection: "column", gap: "12px" }}>
+                                        {clients.map(client => (
+                                            <div key={client.socketId} style={{ display: "flex", alignItems: "center", gap: "12px", padding: "10px", backgroundColor: "rgba(255,255,255,0.02)", borderRadius: "10px" }}>
+                                                <div style={{ width: "32px", height: "32px", borderRadius: "50%", backgroundColor: "var(--primary)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "12px", fontWeight: "700", color: "white" }}>
+                                                    {client.userName[0]}
                                                 </div>
-                                            ))}
-                                            <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                                                <div style={{ width: "8px", height: "8px", backgroundColor: "#10b981", borderRadius: "50%" }}></div>
-                                                <span style={{ fontSize: "14px", fontWeight: "600", color: "var(--text-main)" }}>{user?.name || socketRef.current?.userName} (You)</span>
+                                                <div style={{ flex: 1 }}>
+                                                    <div style={{ fontSize: "13px", fontWeight: "700", color: "var(--text-main)" }}>{client.userName}</div>
+                                                    <div style={{ fontSize: "10px", color: "var(--text-muted)" }}>{client.socketId === socketRef.current?.id ? "You" : "Connected"}</div>
+                                                </div>
+                                                <div style={{ width: "8px", height: "8px", borderRadius: "50%", backgroundColor: "#10b981" }}></div>
                                             </div>
-                                        </div>
+                                        ))}
                                     </div>
                                 )}
                             </div>

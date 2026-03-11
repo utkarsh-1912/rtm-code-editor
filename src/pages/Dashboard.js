@@ -399,54 +399,37 @@ const Dashboard = () => {
                                     {filteredRooms.map((room) => (
                                         <div
                                             key={room.id}
-                                            style={{
-                                                padding: '20px',
-                                                backgroundColor: 'var(--bg-dark)',
-                                                borderRadius: '8px',
-                                                border: '1px solid var(--border-color)',
-                                                display: 'flex',
-                                                flexDirection: 'column',
-                                                justifyContent: 'space-between'
+                                            style={premiumCardStyle}
+                                            onMouseOver={(e) => {
+                                                e.currentTarget.style.transform = "translateY(-4px)";
+                                                e.currentTarget.style.boxShadow = "0 20px 40px rgba(0,0,0,0.3), 0 0 0 1px var(--primary)";
+                                            }}
+                                            onMouseOut={(e) => {
+                                                e.currentTarget.style.transform = "translateY(0)";
+                                                e.currentTarget.style.boxShadow = "0 8px 30px rgba(0,0,0,0.2), 0 0 0 1px var(--border-color)";
                                             }}
                                         >
-                                            {/* ... room content ... */}
                                             <div>
                                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                                                    <span style={{
-                                                        fontSize: '10px',
-                                                        fontWeight: '700',
-                                                        padding: '4px 8px',
-                                                        backgroundColor: 'rgba(59, 130, 246, 0.1)',
-                                                        color: 'var(--primary)',
-                                                        borderRadius: '4px',
-                                                        textTransform: 'uppercase'
-                                                    }}>
-                                                        {room.lang}
-                                                    </span>
+                                                    <div style={{ display: 'flex', gap: '8px' }}>
+                                                        <span style={langBadgeStyle(room.lang)}>
+                                                            {room.lang}
+                                                        </span>
+                                                        {room.isNew && <span style={newBadgeStyle}>New</span>}
+                                                    </div>
                                                     <div style={{ position: 'relative' }}>
                                                         <button
                                                             onClick={(e) => {
                                                                 e.stopPropagation();
                                                                 setShowActionMenu(showActionMenu === room.id ? null : room.id);
                                                             }}
-                                                            style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}
+                                                            style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '4px' }}
                                                         >
                                                             <MoreVertical size={16} />
                                                         </button>
 
                                                         {showActionMenu === room.id && (
-                                                            <div style={{
-                                                                position: 'absolute',
-                                                                right: 0,
-                                                                top: '24px',
-                                                                backgroundColor: 'var(--bg-card)',
-                                                                border: '1px solid var(--border-color)',
-                                                                borderRadius: '6px',
-                                                                padding: '4px',
-                                                                zIndex: 10,
-                                                                minWidth: '120px',
-                                                                boxShadow: '0 4px 12px rgba(0,0,0,0.3)'
-                                                            }}>
+                                                            <div style={premiumMenuStyle}>
                                                                 <button
                                                                     onClick={() => { setShowRenameModal(room); setShowActionMenu(null); }}
                                                                     style={menuButtonStyle}
@@ -464,31 +447,19 @@ const Dashboard = () => {
                                                     </div>
                                                 </div>
 
-                                                <h4 style={{ fontSize: '15px', fontWeight: '600', marginBottom: '4px', color: 'var(--text-main)' }}>{room.name}</h4>
-                                                <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '20px' }}>ID: {room.id}</p>
+                                                <h4 style={{ fontSize: '16px', fontWeight: '700', marginBottom: '6px', color: 'var(--text-main)', letterSpacing: '-0.3px' }}>{room.name}</h4>
+                                                <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '24px', fontFamily: 'monospace', opacity: 0.7 }}>ID: {room.id}</p>
                                             </div>
 
-                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                                <div style={{ color: 'var(--text-muted)', fontSize: '11px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                                    <Calendar size={12} /> {room.lastActive.split(',')[0]}
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 'auto' }}>
+                                                <div style={{ color: 'var(--text-muted)', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '6px', fontWeight: '500' }}>
+                                                    <Calendar size={13} /> {room.lastActive?.split(',')[0] || "Just now"}
                                                 </div>
                                                 <button
                                                     onClick={() => navigate(`/editor/${room.id}`)}
-                                                    style={{
-                                                        padding: '6px 12px',
-                                                        borderRadius: '6px',
-                                                        border: '1px solid var(--border-color)',
-                                                        backgroundColor: 'transparent',
-                                                        color: 'var(--text-main)',
-                                                        fontWeight: '600',
-                                                        fontSize: '12px',
-                                                        cursor: 'pointer',
-                                                        display: 'flex',
-                                                        alignItems: 'center',
-                                                        gap: '6px'
-                                                    }}
+                                                    style={cardButtonStyle}
                                                 >
-                                                    Open <ExternalLink size={12} />
+                                                    Open <ExternalLink size={14} />
                                                 </button>
                                             </div>
                                         </div>
@@ -512,57 +483,49 @@ const Dashboard = () => {
                                     {projects.map((proj) => (
                                         <div
                                             key={proj.id}
-                                            style={{
-                                                padding: '24px',
-                                                backgroundColor: 'var(--bg-dark)',
-                                                borderRadius: '16px',
-                                                border: '1px solid var(--border-color)',
-                                                display: 'flex',
-                                                flexDirection: 'column',
-                                                justifyContent: 'space-between',
-                                                minHeight: '180px'
+                                            style={premiumCardStyle}
+                                            onMouseOver={(e) => {
+                                                e.currentTarget.style.transform = "translateY(-4px)";
+                                                e.currentTarget.style.boxShadow = "0 20px 40px rgba(0,0,0,0.3), 0 0 0 1px var(--primary)";
+                                            }}
+                                            onMouseOut={(e) => {
+                                                e.currentTarget.style.transform = "translateY(0)";
+                                                e.currentTarget.style.boxShadow = "0 8px 30px rgba(0,0,0,0.2), 0 0 0 1px var(--border-color)";
                                             }}
                                         >
                                             <div>
-                                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
                                                     <div style={{
-                                                        width: '40px',
-                                                        height: '40px',
-                                                        borderRadius: '10px',
+                                                        width: '44px',
+                                                        height: '44px',
+                                                        borderRadius: '12px',
                                                         backgroundColor: 'rgba(59, 130, 246, 0.1)',
                                                         display: 'flex',
                                                         alignItems: 'center',
                                                         justifyContent: 'center',
-                                                        color: 'var(--primary)'
+                                                        color: 'var(--primary)',
+                                                        boxShadow: 'inset 0 0 0 1px rgba(59, 130, 246, 0.2)'
                                                     }}>
-                                                        <Folder size={20} />
+                                                        <Folder size={22} />
                                                     </div>
                                                     <button
                                                         onClick={() => handleDeleteProject(proj.id)}
-                                                        style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}
+                                                        style={{ background: 'transparent', border: 'none', color: 'rgba(248, 113, 113, 0.5)', cursor: 'pointer', transition: 'color 0.2s' }}
+                                                        onMouseOver={(e) => e.currentTarget.style.color = '#f87171'}
+                                                        onMouseOut={(e) => e.currentTarget.style.color = 'rgba(248, 113, 113, 0.5)'}
+                                                        title="Delete Project"
                                                     >
                                                         <Trash2 size={16} />
                                                     </button>
                                                 </div>
-                                                <h4 style={{ fontSize: '16px', fontWeight: '700', marginBottom: '4px' }}>{proj.name}</h4>
-                                                <p style={{ fontSize: '13px', color: 'var(--text-muted)' }}>{proj.description || "Multi-file project workspace"}</p>
+                                                <h4 style={{ fontSize: '18px', fontWeight: '800', marginBottom: '8px', color: 'var(--text-main)', letterSpacing: '-0.4px' }}>{proj.name}</h4>
+                                                <p style={{ fontSize: '13px', color: 'var(--text-muted)', lineHeight: '1.6', marginBottom: '24px' }}>{proj.description || "Multi-file project workspace"}</p>
                                             </div>
                                             <button
                                                 onClick={() => navigate(`/project/${proj.id}`)}
-                                                style={{
-                                                    marginTop: '20px',
-                                                    width: '100%',
-                                                    padding: '10px',
-                                                    borderRadius: '10px',
-                                                    backgroundColor: 'var(--bg-card)',
-                                                    border: '1px solid var(--border-color)',
-                                                    color: 'white',
-                                                    fontWeight: '700',
-                                                    fontSize: '13px',
-                                                    cursor: 'pointer'
-                                                }}
+                                                style={cardButtonStyle}
                                             >
-                                                Open Project
+                                                Open Workspace <ExternalLink size={14} />
                                             </button>
                                         </div>
                                     ))}
@@ -654,6 +617,76 @@ const Dashboard = () => {
 };
 
 // Styles
+const premiumCardStyle = {
+    padding: '24px',
+    backgroundColor: 'var(--bg-card)',
+    backdropFilter: 'blur(8px)',
+    borderRadius: '20px',
+    border: '1px solid var(--border-color)',
+    display: 'flex',
+    flexDirection: 'column',
+    justifyContent: 'space-between',
+    minHeight: '200px',
+    transition: 'all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
+    boxShadow: '0 8px 30px rgba(0,0,0,0.2)',
+    cursor: 'default',
+    position: 'relative',
+    overflow: 'hidden'
+};
+
+const cardButtonStyle = {
+    width: '100%',
+    padding: '12px',
+    borderRadius: '12px',
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    border: '1px solid var(--border-color)',
+    color: 'var(--text-main)',
+    fontWeight: '700',
+    fontSize: '13px',
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '8px',
+    transition: 'all 0.2s'
+};
+
+const langBadgeStyle = (lang) => ({
+    fontSize: '10px',
+    fontWeight: '800',
+    padding: '4px 10px',
+    backgroundColor: 'rgba(59, 130, 246, 0.1)',
+    color: 'var(--primary)',
+    borderRadius: '20px',
+    textTransform: 'uppercase',
+    letterSpacing: '0.5px'
+});
+
+const newBadgeStyle = {
+    fontSize: '10px',
+    fontWeight: '800',
+    padding: '4px 10px',
+    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+    color: '#10b981',
+    borderRadius: '20px',
+    textTransform: 'uppercase',
+    letterSpacing: '0.5px'
+};
+
+const premiumMenuStyle = {
+    position: 'absolute',
+    right: 0,
+    top: '32px',
+    backgroundColor: 'var(--bg-card)',
+    backdropFilter: 'blur(16px)',
+    border: '1px solid var(--border-color)',
+    borderRadius: '12px',
+    padding: '6px',
+    zIndex: 100,
+    minWidth: '140px',
+    boxShadow: '0 10px 25px rgba(0,0,0,0.5)'
+};
+
 const menuButtonStyle = {
     display: 'flex',
     alignItems: 'center',
@@ -688,45 +721,51 @@ const modalOverlayStyle = {
 
 const modalContentStyle = {
     backgroundColor: 'var(--bg-card)',
-    padding: '8px 24px',
-    borderRadius: '12px',
+    padding: '24px',
+    borderRadius: '20px',
     border: '1px solid var(--border-color)',
     width: '100%',
-    maxWidth: '440px',
-    boxShadow: '0 20px 40px rgba(0,0,0,0.4)'
+    maxWidth: '480px',
+    boxShadow: '0 20px 40px rgba(0,0,0,0.4)',
+    position: 'relative'
 };
 
 const modalInputStyle = {
     width: '100%',
-    padding: '12px 14px',
+    padding: '14px 16px',
     backgroundColor: 'var(--bg-dark)',
     border: '1px solid var(--border-color)',
-    borderRadius: '8px',
+    borderRadius: '12px',
     color: 'var(--text-main)',
-    fontSize: '14px',
-    outline: 'none'
+    fontSize: '15px',
+    outline: 'none',
+    transition: 'border-color 0.2s',
+    boxSizing: 'border-box'
 };
 
 const cancelButtonStyle = {
-    padding: '10px 18px',
+    padding: '12px 20px',
     backgroundColor: 'transparent',
     border: '1px solid var(--border-color)',
-    borderRadius: '8px',
+    borderRadius: '12px',
     color: 'var(--text-muted)',
-    fontSize: '13px',
+    fontSize: '14px',
     fontWeight: '600',
-    cursor: 'pointer'
+    cursor: 'pointer',
+    transition: 'all 0.2s'
 };
 
 const confirmButtonStyle = {
-    padding: '10px 18px',
+    padding: '12px 24px',
     backgroundColor: 'var(--primary)',
     border: 'none',
-    borderRadius: '8px',
+    borderRadius: '12px',
     color: 'white',
-    fontSize: '13px',
-    fontWeight: '600',
-    cursor: 'pointer'
+    fontSize: '14px',
+    fontWeight: '700',
+    cursor: 'pointer',
+    transition: 'all 0.2s',
+    boxShadow: '0 4px 12px rgba(59, 130, 246, 0.3)'
 };
 
 export default Dashboard;

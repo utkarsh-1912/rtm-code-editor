@@ -424,6 +424,8 @@ io.on("connection", (socket) => {
     userSocketMap[socket.id] = userName;
     socket.join(roomId);
 
+    console.log(`User ${userName} joined project room: ${roomId}`);
+
     const clients = getAllClients(roomId);
     clients.forEach(({ socketId }) => {
       io.to(socketId).emit(ACTIONS.JOINED, {
@@ -557,7 +559,8 @@ io.on("connection", (socket) => {
 
   // WebRTC Signaling
   socket.on('join-video-chat', ({ projectId, userId, name }) => {
-    socket.to(projectId).emit('user-joined-video', { userId, name });
+    const roomId = `project-${projectId}`;
+    socket.to(roomId).emit('user-joined-video', { userId, name });
   });
 
   socket.on('video-offer', ({ to, offer }) => {
@@ -573,7 +576,8 @@ io.on("connection", (socket) => {
   });
 
   socket.on('leave-video-chat', ({ projectId }) => {
-    socket.to(projectId).emit('user-left-video', { userId: socket.id });
+    const roomId = `project-${projectId}`;
+    socket.to(roomId).emit('user-left-video', { userId: socket.id });
   });
 });
 

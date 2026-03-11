@@ -12,13 +12,13 @@ const VideoChat = ({ socketRef, projectId, user }) => {
     const localVideoRef = useRef();
 
     const startCall = async () => {
-        if (!user && !socketRef.current?.userName?.startsWith("Guest_")) {
-            toast.error("You must set a display name first");
+        if (!user && !socketRef.current?.userName) {
+            toast.error("Please enter a name first");
             return;
         }
 
         if (!user || user.isGuest) {
-            toast.error("Guests are only allowed to view and chat");
+            toast.error("Guests can only view, no microphone/camera access");
             return;
         }
 
@@ -237,11 +237,22 @@ const VideoChat = ({ socketRef, projectId, user }) => {
 const VideoElement = ({ stream, name }) => {
     const ref = useRef();
     useEffect(() => {
-        if (ref.current && stream) ref.current.srcObject = stream;
+        if (ref.current && stream) {
+            ref.current.srcObject = stream;
+            // Explicitly play to handle some browser policies
+            ref.current.play().catch(e => console.log("Auto-play blocked or failed", e));
+        }
     }, [stream]);
     return (
         <>
-            <video ref={ref} autoPlay playsInline style={videoStyle} />
+            <video
+                ref={ref}
+                autoPlay
+                playsInline
+                style={videoStyle}
+                // Ensure audio is NOT muted for remote participants
+                muted={false}
+            />
             <span style={labelStyle}>{name || "Participant"}</span>
         </>
     );
@@ -273,7 +284,8 @@ const joinButtonStyle = {
 const callWorkspaceStyle = {
     display: "flex",
     flexDirection: "column",
-    gap: "12px"
+    gap: "16px",
+    padding: "8px"
 };
 
 const videoGridStyle = {
