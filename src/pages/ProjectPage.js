@@ -31,7 +31,6 @@ const ProjectPage = () => {
     const [activeFile, setActiveFile] = useState(null);
     const [openFiles, setOpenFiles] = useState([]);
     const [loading, setLoading] = useState(true);
-    const [remoteCursors, setRemoteCursors] = useState({}); // { socketId: { x, y, name } }
     const [messages, setMessages] = useState([]);
     const [newMessage, setNewMessage] = useState("");
     const [showWhiteboard, setShowWhiteboard] = useState(false);
@@ -82,7 +81,7 @@ const ProjectPage = () => {
         });
 
         socketRef.current.on(ACTIONS.MOUSE_MOVE, ({ socketId, x, y, name }) => {
-            setRemoteCursors(prev => ({ ...prev, [socketId]: { x, y, name } }));
+            // Future implementation: render cursors on editor
         });
 
         socketRef.current.on(ACTIONS.FILE_CHANGE, ({ fileId, content }) => {
