@@ -95,7 +95,8 @@ function EditorComp({
   settings,
   isReadOnly,
   filename,
-  lockLanguage
+  lockLanguage,
+  fileId // Added fileId prop
 }) {
   const [editorCode, setEditorCode] = React.useState(code || "");
   const [remoteCursors, setRemoteCursors] = React.useState({});
@@ -103,18 +104,27 @@ function EditorComp({
   useEffect(() => {
     const socket = socketRef.current;
     if (socket) {
-      socket.on(ACTIONS.CODE_CHANGE, ({ code: incomingCode }) => {
-        if (incomingCode !== null) {
+      socket.on(ACTIONS.CODE_CHANGE, ({ code: incomingCode, fileId: incomingFileId }) => {
+        if (incomingCode !== null && (!incomingFileId || incomingFileId === fileId)) {
           setEditorCode(incomingCode);
           onCodeChange(incomingCode);
         }
       });
 
-      socket.on(ACTIONS.CURSOR_MOVE, ({ cursor, userName: remoteUser, socketId, color }) => {
-        setRemoteCursors((prev) => ({
-          ...prev,
-          [socketId]: { pos: cursor, userName: remoteUser, color: color || "#3b82f6" }
-        }));
+      socket.on(ACTIONS.CURSOR_MOVE, ({ cursor, userName: remoteUser, socketId, color, fileId: incomingFileId }) => {
+        if (incomingFileId === fileId) {
+          setRemoteCursors((prev) => ({
+            ...prev,
+            [socketId]: { pos: cursor, userName: remoteUser, color: color || "#3b82f6" }
+          }));
+        } else {
+          // If they moved to another file, remove their cursor from this view
+          setRemoteCursors((prev) => {
+            const next = { ...prev };
+            delete next[socketId];
+            return next;
+          });
+        }
       });
 
       socket.on(ACTIONS.JOINED, ({ clients }) => {
@@ -136,8 +146,8 @@ function EditorComp({
           return next;
         });
       });
-      socket.on(ACTIONS.SYNC_SCROLL, ({ scrollPos, userName: remoteUser }) => {
-        if (settings?.keybinding !== "vim" && settings?.keybinding !== "emacs") {
+      socket.on(ACTIONS.SYNC_SCROLL, ({ scrollPos, userName: remoteUser, fileId: incomingFileId }) => {
+        if (incomingFileId === fileId && settings?.keybinding !== "vim" && settings?.keybinding !== "emacs") {
           // Find the editor view and scroll it
           const editor = document.querySelector('.cm-content');
           if (editor) {
@@ -171,6 +181,7 @@ function EditorComp({
     if (viewUpdate.transactions[0]?.isUserEvent("input") || viewUpdate.transactions[0]?.isUserEvent("delete")) {
       socketRef.current?.emit(ACTIONS.CODE_CHANGE, {
         roomId,
+        fileId,
         code: value,
       });
     }
@@ -179,6 +190,7 @@ function EditorComp({
     const cursor = viewUpdate.state.selection.main.head;
     socketRef.current?.emit(ACTIONS.CURSOR_MOVE, {
       roomId,
+      fileId,
       cursor,
       userName,
       color: "#3b82f6", // Default color, could be dynamic per user
@@ -190,6 +202,7 @@ function EditorComp({
       if (scroller) {
         socketRef.current?.emit(ACTIONS.SYNC_SCROLL, {
           roomId,
+          fileId,
           scrollPos: scroller.scrollTop,
           userName
         });

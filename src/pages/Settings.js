@@ -10,6 +10,7 @@ const Settings = () => {
     const [activeTab, setActiveTab] = useState('profile');
     const [saving, setSaving] = useState(false);
     const [sessions, setSessions] = useState([]);
+    const [showDeleteModal, setShowDeleteModal] = useState(false);
 
     const fetchSessions = useCallback(async () => {
         if (!user) return;
@@ -117,6 +118,22 @@ const Settings = () => {
             document.documentElement.classList.remove('light-theme');
         }
         toast.success(`Theme set to ${newTheme}`);
+    };
+
+    const handleDeleteAccount = async () => {
+        try {
+            const res = await fetch(`${getBackendUrl()}/api/user?userId=${user.uid}`, {
+                method: 'DELETE'
+            });
+            if (res.ok) {
+                toast.success("Account deleted permanently");
+                window.location.href = '/login';
+            } else {
+                toast.error("Failed to delete account");
+            }
+        } catch (err) {
+            toast.error("An error occurred");
+        }
     };
 
     const renderContent = () => {
@@ -282,9 +299,34 @@ const Settings = () => {
                                     <h4 style={{ margin: '0 0 4px', fontSize: '14px', fontWeight: '600', color: '#ef4444' }}>Delete Account</h4>
                                     <p style={{ margin: 0, fontSize: '12px', color: 'var(--text-muted)' }}>Permanently remove your account and all associated workspaces.</p>
                                 </div>
-                                <button style={{ ...ghostButtonStyle, color: '#ef4444' }} onClick={() => toast("Critical action: Please contact support")}>Delete</button>
+                                <button
+                                    style={{ ...ghostButtonStyle, color: '#ef4444' }}
+                                    onClick={() => setShowDeleteModal(true)}
+                                >
+                                    Delete Account
+                                </button>
                             </div>
                         </div>
+
+                        {showDeleteModal && (
+                            <div style={modalOverlayStyle}>
+                                <div style={modalContentStyle}>
+                                    <h3 style={{ fontSize: '18px', fontWeight: '700', marginBottom: '8px', color: '#ef4444' }}>Delete Account</h3>
+                                    <p style={{ color: 'var(--text-muted)', marginBottom: '24px', fontSize: '13px' }}>
+                                        Are you sure you want to delete your account? This action is <strong>permanent</strong> and will remove all your rooms, snippets, and settings.
+                                    </p>
+                                    <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+                                        <button onClick={() => setShowDeleteModal(false)} style={ghostButtonStyle}>Cancel</button>
+                                        <button
+                                            onClick={handleDeleteAccount}
+                                            style={{ ...saveButtonStyle, backgroundColor: '#ef4444' }}
+                                        >
+                                            Delete Permanently
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 );
             default:
@@ -398,5 +440,29 @@ const saveButtonStyle = { display: 'flex', alignItems: 'center', gap: '10px', pa
 const themeOptionStyle = { padding: '24px 16px', borderRadius: '12px', display: 'flex', flexDirection: 'column', alignItems: 'center', cursor: 'pointer', position: 'relative', transition: 'all 0.2s' };
 const dangerZoneItemStyle = { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px', borderRadius: '12px', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-dark)' };
 const ghostButtonStyle = { padding: '8px 16px', backgroundColor: 'transparent', border: '1px solid var(--border-color)', borderRadius: '6px', color: 'var(--text-main)', fontSize: '13px', fontWeight: '600', cursor: 'pointer' };
+
+const modalOverlayStyle = {
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 2000,
+    backdropFilter: 'blur(4px)'
+};
+
+const modalContentStyle = {
+    backgroundColor: 'var(--bg-card)',
+    padding: '32px',
+    borderRadius: '12px',
+    border: '1px solid var(--border-color)',
+    width: '90%',
+    maxWidth: '450px',
+    boxShadow: '0 20px 40px rgba(0,0,0,0.5)'
+};
 
 export default Settings;

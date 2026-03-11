@@ -5,7 +5,6 @@ import {
     Plus,
     Terminal,
     Search,
-    ExternalLink,
     MoreVertical,
     Edit2,
     Trash2,
@@ -37,6 +36,17 @@ const Dashboard = () => {
     const [showCreateProjectModal, setShowCreateProjectModal] = useState(false);
     const [newProjectName, setNewProjectName] = useState('');
     const [newProjectDesc, setNewProjectDesc] = useState('');
+
+    // Click outside listener for dropdown
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (showActionMenu && !event.target.closest('.action-menu-container')) {
+                setShowActionMenu(null);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, [showActionMenu]);
 
     useEffect(() => {
         if (!loading && !user) {
@@ -330,7 +340,12 @@ const Dashboard = () => {
                             </div>
                         ) : activeTab === 'rooms' ? (
                             filteredRooms.length > 0 ? (
-                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '20px' }}>
+                                <div style={{
+                                    display: 'grid',
+                                    gridTemplateColumns: 'repeat(auto-fill, minmax(calc(100% - 20px), 1fr))',
+                                    '--desktop-cols': 'repeat(auto-fill, minmax(320px, 1fr))',
+                                    gap: '20px'
+                                }} className="responsive-grid">
                                     {filteredRooms.map((room) => (
                                         <div
                                             key={room.id}
@@ -348,7 +363,7 @@ const Dashboard = () => {
                                                 <span style={sharpLangBadgeStyle(room.lang)}>
                                                     {room.lang}
                                                 </span>
-                                                <div style={{ position: 'relative' }}>
+                                                <div style={{ position: 'relative' }} className="action-menu-container">
                                                     <button
                                                         onClick={(e) => {
                                                             e.stopPropagation();
@@ -385,7 +400,12 @@ const Dashboard = () => {
                             )
                         ) : (
                             projects.length > 0 ? (
-                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))', gap: '20px' }}>
+                                <div style={{
+                                    display: 'grid',
+                                    gridTemplateColumns: 'repeat(auto-fill, minmax(calc(100% - 20px), 1fr))',
+                                    '--desktop-cols': 'repeat(auto-fill, minmax(360px, 1fr))',
+                                    gap: '20px'
+                                }} className="responsive-grid">
                                     {projects.map((proj) => (
                                         <div
                                             key={proj.id}
@@ -401,7 +421,22 @@ const Dashboard = () => {
                                         >
                                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
                                                 <div style={{ color: 'var(--primary)' }}><Folder size={24} /></div>
-                                                <button onClick={() => handleDeleteProject(proj.id)} style={{ background: 'transparent', border: 'none', color: 'rgba(248, 113, 113, 0.5)', cursor: 'pointer' }}><Trash2 size={16} /></button>
+                                                <div style={{ position: 'relative' }} className="action-menu-container">
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            setShowActionMenu(showActionMenu === proj.id ? null : proj.id);
+                                                        }}
+                                                        style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '4px' }}
+                                                    >
+                                                        <MoreVertical size={16} />
+                                                    </button>
+                                                    {showActionMenu === proj.id && (
+                                                        <div style={sharpMenuStyle}>
+                                                            <button onClick={() => { setShowDeleteModal({ ...proj, isProject: true }); setShowActionMenu(null); }} style={{ ...menuButtonStyle, color: '#f87171' }}><Trash2 size={13} /> Delete</button>
+                                                        </div>
+                                                    )}
+                                                </div>
                                             </div>
                                             <h4 style={{ fontSize: '18px', fontWeight: '800', marginBottom: '8px', color: 'var(--text-main)' }}>{proj.name}</h4>
                                             <p style={{ fontSize: '13px', color: 'var(--text-muted)', lineHeight: '1.6', marginBottom: '24px' }}>{proj.description || "Multi-file project workspace"}</p>
@@ -475,11 +510,18 @@ const Dashboard = () => {
 
                         {showDeleteModal && (
                             <div style={modalContentStyle}>
-                                <h3 style={{ fontSize: '18px', fontWeight: '700', marginBottom: '8px', color: '#f87171' }}>Delete Workspace</h3>
-                                <p style={{ color: 'var(--text-muted)', marginBottom: '20px', fontSize: '13px' }}>Are you sure you want to delete this workspace? This action cannot be undone.</p>
+                                <h3 style={{ fontSize: '18px', fontWeight: '700', marginBottom: '8px', color: '#f87171' }}>Delete {showDeleteModal.isProject ? "Project" : "Workspace"}</h3>
+                                <p style={{ color: 'var(--text-muted)', marginBottom: '20px', fontSize: '13px' }}>
+                                    Are you sure you want to delete this {showDeleteModal.isProject ? "project" : "workspace"}? This action cannot be undone.
+                                </p>
                                 <div style={{ display: 'flex', gap: '10px', marginTop: '24px', justifyContent: 'flex-end' }}>
                                     <button onClick={() => setShowDeleteModal(null)} style={cancelButtonStyle}>Cancel</button>
-                                    <button onClick={() => handleDeleteRoom(showDeleteModal.id)} style={{ ...confirmButtonStyle, backgroundColor: '#ef4444' }}>Delete Permanently</button>
+                                    <button
+                                        onClick={() => showDeleteModal.isProject ? handleDeleteProject(showDeleteModal.id) : handleDeleteRoom(showDeleteModal.id)}
+                                        style={{ ...confirmButtonStyle, backgroundColor: '#ef4444' }}
+                                    >
+                                        Delete Permanently
+                                    </button>
                                 </div>
                             </div>
                         )}

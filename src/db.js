@@ -597,6 +597,14 @@ async function deleteProject(projectId) {
     return await sql`DELETE FROM projects WHERE id = ${projectId}`;
 }
 
+async function deleteAccount(userId) {
+    return await sql`DELETE FROM users WHERE auth_provider_id = ${userId}`;
+}
+
+async function deleteOrganization(orgId) {
+    return await sql`DELETE FROM organizations WHERE id = ${orgId}`;
+}
+
 module.exports = {
     initializeSchema,
     getRoom,
@@ -636,5 +644,7 @@ module.exports = {
     getProjectFiles,
     upsertProjectFile,
     deleteProjectFile,
-    deleteProject
+    deleteProject,
+    deleteAccount,
+    deleteOrganization
 };

@@ -11,6 +11,7 @@ const OrganizationSettings = ({ isOpen, onClose, userId }) => {
     const [activeOrg, setActiveOrg] = useState(null);
     const [members, setMembers] = useState([]);
     const [inviteEmail, setInviteEmail] = useState('');
+    const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
     const fetchOrganizations = React.useCallback(async () => {
         try {
@@ -85,6 +86,26 @@ const OrganizationSettings = ({ isOpen, onClose, userId }) => {
             }
         } catch (err) {
             toast.error("Invite failed");
+        }
+    };
+
+    const handleDeleteOrg = async () => {
+        if (!activeOrg) return;
+        try {
+            const backendUrl = getBackendUrl();
+            const response = await fetch(`${backendUrl}/api/organizations/${activeOrg.id}`, {
+                method: 'DELETE'
+            });
+            if (response.ok) {
+                toast.success("Team deleted successfully");
+                setActiveOrg(null);
+                setShowDeleteConfirm(false);
+                fetchOrganizations();
+            } else {
+                toast.error("Failed to delete team");
+            }
+        } catch (err) {
+            toast.error("Error deleting team");
         }
     };
 
@@ -191,6 +212,27 @@ const OrganizationSettings = ({ isOpen, onClose, userId }) => {
                                         ))}
                                     </div>
                                 </div>
+
+                                {activeOrg.role === 'admin' && (
+                                    <div style={{ marginTop: 'auto', paddingTop: '20px', borderTop: '1px solid var(--border-color)' }}>
+                                        {!showDeleteConfirm ? (
+                                            <button
+                                                onClick={() => setShowDeleteConfirm(true)}
+                                                style={{ ...secondaryButtonStyle, color: '#ef4444', borderColor: 'rgba(239, 68, 68, 0.2)', width: '100%' }}
+                                            >
+                                                Delete Team
+                                            </button>
+                                        ) : (
+                                            <div style={{ padding: '16px', backgroundColor: 'rgba(239, 68, 68, 0.05)', borderRadius: '12px', border: '1px solid rgba(239, 68, 68, 0.2)' }}>
+                                                <p style={{ margin: '0 0 12px', fontSize: '13px', color: '#ef4444', fontWeight: '600' }}>Confirm deletion? This cannot be undone.</p>
+                                                <div style={{ display: 'flex', gap: '8px' }}>
+                                                    <button onClick={() => setShowDeleteConfirm(false)} style={{ ...secondaryButtonStyle, flex: 1 }}>Cancel</button>
+                                                    <button onClick={handleDeleteOrg} style={{ ...primaryButtonStyle, backgroundColor: '#ef4444', flex: 1 }}>Confirm Delete</button>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
                             </div>
                         ) : (
                             <div style={emptyContentStyle}>

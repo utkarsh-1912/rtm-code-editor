@@ -153,6 +153,15 @@ app.get("/api/organizations/:id/members", async (req, res) => {
   }
 });
 
+app.delete("/api/organizations/:id", async (req, res) => {
+  try {
+    await db.deleteOrganization(req.params.id);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: "Failed to delete team" });
+  }
+});
+
 /**
  * Search API
  */
@@ -221,6 +230,17 @@ app.get("/api/user/profile", async (req, res) => {
     res.json(user);
   } catch (err) {
     res.status(500).json({ error: "Failed to fetch profile" });
+  }
+});
+
+app.delete("/api/user", async (req, res) => {
+  try {
+    const { userId } = req.query;
+    if (!userId) return res.status(400).json({ error: "User ID required" });
+    await db.deleteAccount(userId);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: "Failed to delete account" });
   }
 });
 
