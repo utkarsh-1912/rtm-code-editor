@@ -6,11 +6,8 @@ import {
     FileText,
     Folder,
     Plus,
-    Play,
     Code,
     Layout,
-    Video,
-    Users,
     User,
     Home,
     PencilLine,
@@ -35,7 +32,6 @@ const ProjectPage = () => {
     const [openFiles, setOpenFiles] = useState([]);
     const [loading, setLoading] = useState(true);
     const [remoteCursors, setRemoteCursors] = useState({}); // { socketId: { x, y, name } }
-    const [isPresenter, setIsPresenter] = useState(false);
     const [messages, setMessages] = useState([]);
     const [newMessage, setNewMessage] = useState("");
     const [showWhiteboard, setShowWhiteboard] = useState(false);
@@ -47,7 +43,7 @@ const ProjectPage = () => {
         wordWrap: true
     });
 
-    const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+    const [, setIsMobile] = useState(window.innerWidth < 768);
     const [activeSidebarTab, setActiveSidebarTab] = useState("chat"); // "chat", "participants"
     const [layoutMode, setLayoutMode] = useState("default"); // "cinema", "default", "focus"
 
@@ -66,6 +62,43 @@ const ProjectPage = () => {
     useEffect(() => {
         openFilesRef.current = openFiles;
     }, [openFiles]);
+
+    const joinProject = React.useCallback((name) => {
+        if (!socketRef.current || hasJoined) return;
+
+        socketRef.current.userName = name;
+        socketRef.current.emit(ACTIONS.PROJECT_JOIN, {
+            projectId,
+            userName: name,
+        });
+
+        socketRef.current.on(ACTIONS.MOUSE_MOVE, ({ socketId, x, y, name }) => {
+            setRemoteCursors(prev => ({ ...prev, [socketId]: { x, y, name } }));
+        });
+
+        socketRef.current.on(ACTIONS.FILE_CHANGE, ({ fileId, content }) => {
+            setFiles(prev => prev.map(f => f.id === fileId ? { ...f, content } : f));
+        });
+
+        socketRef.current.on(ACTIONS.FOLLOW_MODE, ({ viewState, userName }) => {
+            if (viewState?.fileId) {
+                const file = filesRef.current.find(f => f.id === viewState.fileId);
+                if (file) {
+                    setActiveFile(file);
+                    if (!openFilesRef.current.find(f => f.id === file.id)) {
+                        setOpenFiles(prev => [...prev, file]);
+                    }
+                }
+            }
+        });
+
+        socketRef.current.on(ACTIONS.RECEIVE_MESSAGE, (message) => {
+            setMessages(prev => [...prev, message]);
+        });
+
+        setHasJoined(true);
+        setShowNamePrompt(false);
+    }, [hasJoined, projectId]);
 
     useEffect(() => {
         const handleResize = () => {
@@ -122,44 +155,7 @@ const ProjectPage = () => {
                 socketRef.current.disconnect();
             }
         };
-    }, [projectId, user, navigate]);
-
-    const joinProject = (name) => {
-        if (!socketRef.current || hasJoined) return;
-
-        socketRef.current.userName = name;
-        socketRef.current.emit(ACTIONS.PROJECT_JOIN, {
-            projectId,
-            userName: name,
-        });
-
-        socketRef.current.on(ACTIONS.MOUSE_MOVE, ({ socketId, x, y, name }) => {
-            setRemoteCursors(prev => ({ ...prev, [socketId]: { x, y, name } }));
-        });
-
-        socketRef.current.on(ACTIONS.FILE_CHANGE, ({ fileId, content }) => {
-            setFiles(prev => prev.map(f => f.id === fileId ? { ...f, content } : f));
-        });
-
-        socketRef.current.on(ACTIONS.FOLLOW_MODE, ({ viewState, userName }) => {
-            if (viewState?.fileId) {
-                const file = filesRef.current.find(f => f.id === viewState.fileId);
-                if (file) {
-                    setActiveFile(file);
-                    if (!openFilesRef.current.find(f => f.id === file.id)) {
-                        setOpenFiles(prev => [...prev, file]);
-                    }
-                }
-            }
-        });
-
-        socketRef.current.on(ACTIONS.RECEIVE_MESSAGE, (message) => {
-            setMessages(prev => [...prev, message]);
-        });
-
-        setHasJoined(true);
-        setShowNamePrompt(false);
-    };
+    }, [projectId, user, navigate, joinProject]);
 
     const handleGuestJoin = (e) => {
         e.preventDefault();
@@ -354,7 +350,7 @@ const ProjectPage = () => {
                                             {messages.map(msg => (
                                                 <div key={msg.id} style={{ display: "flex", gap: "12px" }}>
                                                     <div style={{ width: "32px", height: "32px", borderRadius: "50%", backgroundColor: "var(--primary)", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", color: "white", fontSize: "12px", fontWeight: "700" }}>
-                                                        {msg.avatar ? <img src={msg.avatar} style={{ width: "100%", height: "100%", borderRadius: "50%" }} /> : msg.userName[0]}
+                                                        {msg.avatar ? <img src={msg.avatar} alt="avatar" style={{ width: "100%", height: "100%", borderRadius: "50%" }} /> : msg.userName[0]}
                                                     </div>
                                                     <div>
                                                         <div style={{ display: "flex", alignItems: "baseline", gap: "8px", marginBottom: "4px" }}>
