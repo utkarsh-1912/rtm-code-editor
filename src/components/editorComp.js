@@ -164,7 +164,7 @@ function EditorComp({
       socket?.off(ACTIONS.DISCONNECTED);
       socket?.off(ACTIONS.SYNC_SCROLL);
     };
-  }, [socketRef, onCodeChange, settings?.keybinding]);
+  }, [socketRef, onCodeChange, settings?.keybinding, fileId]);
 
   useEffect(() => {
     if (code !== undefined && code !== editorCode) {

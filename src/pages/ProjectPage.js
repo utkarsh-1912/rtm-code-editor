@@ -6,12 +6,6 @@ import {
     FileText,
     Folder,
     Plus,
-    Code,
-    Layout,
-    User,
-    Home,
-    PencilLine,
-    Send,
     X,
     MessageSquare,
     LogOut,
@@ -54,15 +48,11 @@ const ProjectPage = () => {
     });
 
     const [, setIsMobile] = useState(window.innerWidth < 768);
-    const [activeSidebarTab, setActiveSidebarTab] = useState("chat"); // "chat", "participants"
-    const [layoutMode, setLayoutMode] = useState("default"); // "cinema", "default", "focus"
     const [clients, setClients] = useState([]);
     const [showNamePrompt, setShowNamePrompt] = useState(false);
     const [guestName, setGuestName] = useState("");
 
-    const [showCreateProjectModal, setShowCreateProjectModal] = useState(false);
     const [sidebarTab, setSidebarTab] = useState('files'); // files, chat, users, settings
-    const [isSidebarOpen, setIsSidebarOpen] = useState(true);
     const [hasJoined, setHasJoined] = useState(false);
     const [showVideo, setShowVideo] = useState(true);
 
@@ -616,7 +606,6 @@ const controlTabButtonStyle = (active) => ({
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    border: 'none',
     backgroundColor: active ? 'rgba(59, 130, 246, 0.1)' : 'transparent',
     color: active ? 'var(--primary)' : 'var(--text-muted)',
     borderRadius: '8px',
