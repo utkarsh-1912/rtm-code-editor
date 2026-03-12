@@ -169,7 +169,8 @@ const ProjectPage = () => {
                 socketRef.current.disconnect();
             }
         };
-    }, [projectId, user, navigate]); // Removed joinProject to prevent re-init loops
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [projectId, user, navigate]);
 
     const handleGuestJoin = (e) => {
         e.preventDefault();
