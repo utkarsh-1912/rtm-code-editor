@@ -599,6 +599,18 @@ io.on("connection", (socket) => {
     const roomId = `project-${projectId}`;
     socket.to(roomId).emit('user-left-video', { userId: socket.id });
   });
+
+  socket.on(ACTIONS.SCREEN_SHARE_START, ({ roomId }) => {
+    socket.to(roomId).emit(ACTIONS.SCREEN_SHARE_START, { userId: socket.id });
+  });
+
+  socket.on(ACTIONS.SCREEN_SHARE_STOP, ({ roomId }) => {
+    socket.to(roomId).emit(ACTIONS.SCREEN_SHARE_STOP, { userId: socket.id });
+  });
+
+  socket.on(ACTIONS.MEDIA_STATE_CHANGE, ({ roomId, state }) => {
+    socket.to(roomId).emit(ACTIONS.MEDIA_STATE_CHANGE, { userId: socket.id, state });
+  });
 });
 
 // Initialize Database & Start Server

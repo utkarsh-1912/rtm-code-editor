@@ -22,6 +22,9 @@ const ACTIONS = {
   FOLLOW_MODE: "follow-mode",
   WHITEBOARD_CURSOR: "whiteboard-cursor",
   SYNC_SCROLL: "sync-scroll",
+  SCREEN_SHARE_START: "screen-share-start",
+  SCREEN_SHARE_STOP: "screen-share-stop",
+  MEDIA_STATE_CHANGE: "media-state-change",
 };
 
 module.exports = ACTIONS;

@@ -467,21 +467,25 @@ const ProjectPage = () => {
 
                     {/* Right Sidebar: Video & Tools */}
                     {showVideo && (
-                        <ReflexElement flex={0.15} minSize={240} style={{ backgroundColor: 'var(--bg-card)', borderLeft: '1px solid var(--border-color)' }}>
-                            <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-                                <div style={sidebarHeaderStyle}>
+                        <ReflexElement flex={0.2} minSize={280} style={{ backgroundColor: 'var(--bg-card)', borderLeft: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column' }}>
+                            <div style={{ height: '100%', display: 'flex', flexDirection: 'column', backgroundColor: '#0d1117' }}>
+                                <div style={{ ...sidebarHeaderStyle, backgroundColor: 'rgba(255,255,255,0.02)', borderBottom: '1px solid rgba(255,255,255,0.05)', padding: '0 16px' }}>
                                     <span style={{ fontSize: '10px', fontWeight: '800', letterSpacing: '0.1em', color: 'var(--text-muted)' }}>SESSION STREAM</span>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                        <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#ef4444', boxShadow: '0 0 10px rgba(239, 68, 68, 0.5)' }} />
+                                        <span style={{ fontSize: '9px', fontWeight: '900', color: '#ef4444' }}>LIVE</span>
+                                    </div>
                                 </div>
-                                <div style={{ flex: 1, backgroundColor: '#000', position: 'relative' }}>
+                                <div style={{ flex: '1 1 auto', position: 'relative', minHeight: 0 }}>
                                     <VideoChat
                                         socketRef={socketRef}
                                         projectId={projectId}
                                         user={user || { name: socketRef.current?.userName, isGuest: true }}
                                     />
                                 </div>
-                                <div style={{ padding: '16px', borderTop: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                    <span style={{ fontSize: '10px', fontWeight: '800', color: 'var(--text-muted)' }}>ACTIVE TOOLS</span>
-                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                                <div style={{ padding: '20px', borderTop: '1px solid rgba(255,255,255,0.05)', display: 'flex', flexDirection: 'column', gap: '12px', backgroundColor: 'rgba(255,255,255,0.01)' }}>
+                                    <span style={{ fontSize: '10px', fontWeight: '800', color: 'var(--text-muted)', letterSpacing: '0.05em' }}>WORKSPACE TOOLS</span>
+                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
                                         <button style={toolMiniButtonStyle} onClick={() => setShowWhiteboard(true)}><Pencil size={12} /> Board</button>
                                         <button style={toolMiniButtonStyle}><Play size={12} /> Run</button>
                                     </div>
