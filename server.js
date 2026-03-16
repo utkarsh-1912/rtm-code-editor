@@ -593,9 +593,13 @@ io.on("connection", (socket) => {
   });
 
   // WebRTC Signaling
-  socket.on('join-video-chat', ({ projectId, userId, name }) => {
+  socket.on('join-video-chat', ({ projectId, userId, name, isSpectator }) => {
     const roomId = `project-${projectId}`;
-    socket.to(roomId).emit('user-joined-video', { userId, name });
+    socket.to(roomId).emit('user-joined-video', { userId, name, isSpectator });
+  });
+
+  socket.on('request-streams', ({ to }) => {
+    io.to(to).emit('request-streams', { from: socket.id });
   });
 
   socket.on('video-offer', ({ to, offer }) => {

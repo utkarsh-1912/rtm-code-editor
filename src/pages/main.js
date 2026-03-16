@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from "react";
 import toast from "react-hot-toast";
 import { useNavigate, useLocation } from "react-router-dom";
-import { Zap, Code, Globe, Users, Shield, LayoutDashboard, ChevronRight } from "lucide-react";
+import { Zap, Code, Globe, Users, Shield, LayoutDashboard, ChevronRight, Folder, Plus } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
+import { getBackendUrl } from "../utils/api";
 
 // Modular Components
 import Navbar from "../components/Landing/Navbar";
@@ -17,12 +18,24 @@ function HomePage() {
   const [isLightMode, setIsLightMode] = useState(() => {
     return localStorage.getItem("app-theme") === "light";
   });
+  const [recentProjects, setRecentProjects] = useState([]);
 
   const location = useLocation();
 
   useEffect(() => {
     if (user?.uid) {
       refreshProfile(user.uid);
+      const fetchRecentProjects = async () => {
+        try {
+          const backendUrl = getBackendUrl();
+          const res = await fetch(`${backendUrl}/api/projects?userId=${user.uid}`);
+          const data = await res.json();
+          setRecentProjects(data.slice(0, 3) || []);
+        } catch (err) {
+          console.error("Failed to fetch projects", err);
+        }
+      };
+      fetchRecentProjects();
     }
   }, [user?.uid, refreshProfile]);
 
@@ -127,16 +140,16 @@ function HomePage() {
           --orb-opacity: 0.4;
         }
         .light-theme {
-          --bg-dark: #fbfdff;
+          --bg-dark: #f8fafc;
           --bg-card: #ffffff;
-          --bg-card-transparent: rgba(255, 255, 255, 0.7);
-          --border-color-glass: rgba(0, 0, 0, 0.05);
-          --border-color-soft: rgba(0, 0, 0, 0.05);
-          --text-main: #1e293b;
-          --text-muted: #64748b;
-          --bg-input: rgba(241, 245, 249, 0.8);
-          --bg-footer: rgba(248, 250, 252, 0.5);
-          --orb-opacity: 0.2;
+          --bg-card-transparent: rgba(255, 255, 255, 0.9);
+          --border-color-glass: rgba(0, 0, 0, 0.1);
+          --border-color-soft: rgba(0, 0, 0, 0.08);
+          --text-main: #0f172a;
+          --text-muted: #334155;
+          --bg-input: #ffffff;
+          --bg-footer: #f1f5f9;
+          --orb-opacity: 0.15;
         }
       `}</style>
 
@@ -202,7 +215,7 @@ function HomePage() {
                     onClick={() => navigate("/dashboard")}
                     style={{
                       flex: 1,
-                      minWidth: "240px",
+                      minWidth: "200px",
                       padding: "16px 32px",
                       background: "linear-gradient(135deg, var(--primary) 0%, #2563eb 100%)",
                       color: "white",
@@ -227,13 +240,13 @@ function HomePage() {
                       e.currentTarget.style.boxShadow = "0 10px 25px -5px rgba(59, 130, 246, 0.5)";
                     }}
                   >
-                    <LayoutDashboard size={20} strokeWidth={2.5} /> Open Dashboard
+                    <LayoutDashboard size={20} strokeWidth={2.5} /> Dashboard
                   </button>
                   <button
-                    onClick={createNewRoom}
+                    onClick={() => navigate("/dashboard", { state: { openCreateProject: true } })}
                     style={{
                       flex: 1,
-                      minWidth: "240px",
+                      minWidth: "200px",
                       padding: "16px 32px",
                       backgroundColor: "var(--bg-card-transparent)",
                       color: "var(--text-main)",
@@ -260,43 +273,46 @@ function HomePage() {
                       e.currentTarget.style.backgroundColor = "var(--bg-card-transparent)";
                     }}
                   >
-                    <Code size={20} strokeWidth={2.5} /> New Workspace
+                    <Plus size={20} strokeWidth={2.5} /> New Project
                   </button>
                 </div>
 
-                {user.last_room_id && (
+                {recentProjects.length > 0 && (
                   <div className="staggered-entry" style={{ animationDelay: "0.5s", width: "100%", marginBottom: "48px" }}>
-                    <div style={{
-                      padding: "24px",
-                      backgroundColor: "rgba(168, 85, 247, 0.04)",
-                      borderRadius: "20px",
-                      border: "1px solid rgba(168, 85, 247, 0.15)",
-                      display: "block",
-                      width: "100%",
-                      boxShadow: "0 10px 30px -10px rgba(168, 85, 247, 0.2)",
-                      position: "relative",
-                      overflow: "hidden"
-                    }}>
-                      <div style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "2px", background: "linear-gradient(90deg, transparent, #a855f7, transparent)" }}></div>
-                      <div style={{ fontSize: "11px", color: "#a855f7", fontWeight: "800", marginBottom: "12px", textTransform: "uppercase", letterSpacing: "0.1em" }}>Continue Session</div>
-                      <button
-                        onClick={revisitLastRoom}
-                        style={{
-                          display: "flex", alignItems: "center", gap: "12px", background: "none", border: "none",
-                          color: "var(--text-main)", fontWeight: "700", cursor: "pointer", padding: 0,
-                          fontSize: "16px", transition: "all 0.2s", width: "100%", justifyContent: "flex-start"
-                        }}
-                        onMouseOver={e => e.currentTarget.style.color = "#a855f7"}
-                        onMouseOut={e => e.currentTarget.style.color = "var(--text-main)"}
-                      >
-                        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-                          <div style={{ backgroundColor: "rgba(168, 85, 247, 0.1)", padding: "8px", borderRadius: "10px" }}>
-                            <Globe size={18} color="#a855f7" />
+                    <div style={{ fontSize: "11px", color: "var(--primary)", fontWeight: "800", marginBottom: "16px", textTransform: "uppercase", letterSpacing: "0.1em" }}>Recent Projects</div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                      {recentProjects.map(proj => (
+                        <div
+                          key={proj.id}
+                          onClick={() => navigate(`/project/${proj.id}`)}
+                          style={{
+                            padding: "16px 20px",
+                            backgroundColor: "var(--bg-card-transparent)",
+                            borderRadius: "16px",
+                            border: "1px solid var(--border-color-glass)",
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "14px",
+                            cursor: "pointer",
+                            transition: "all 0.2s"
+                          }}
+                          onMouseOver={e => {
+                            e.currentTarget.style.borderColor = "var(--primary)";
+                            e.currentTarget.style.transform = "translateX(5px)";
+                          }}
+                          onMouseOut={e => {
+                            e.currentTarget.style.borderColor = "var(--border-color-glass)";
+                            e.currentTarget.style.transform = "translateX(0)";
+                          }}
+                        >
+                          <div style={{ color: "var(--primary)" }}><Folder size={18} /></div>
+                          <div style={{ flex: 1 }}>
+                            <div style={{ fontSize: "14px", fontWeight: "700" }}>{proj.name}</div>
+                            <div style={{ fontSize: "11px", color: "var(--text-muted)" }}>{proj.type} Project</div>
                           </div>
-                          <span>Revisit Room: <span style={{ opacity: 0.6 }}>{user.last_room_id}</span></span>
+                          <ChevronRight size={16} color="var(--text-muted)" />
                         </div>
-                        <ChevronRight size={18} />
-                      </button>
+                      ))}
                     </div>
                   </div>
                 )}

@@ -295,6 +295,14 @@ const ProjectPage = () => {
 
     const handleDeleteFile = async (e, file) => {
         e.stopPropagation();
+
+        // Protect core files
+        const coreFiles = ['index.html', 'style.css', 'script.js', 'main.cpp', 'main.py', 'Main.java', 'utils.h'];
+        if (coreFiles.includes(file.name)) {
+            toast.error(`Cannot delete core file: ${file.name}`);
+            return;
+        }
+
         if (!window.confirm(`Are you sure you want to delete ${file.name}?`)) return;
 
         try {
@@ -325,6 +333,90 @@ const ProjectPage = () => {
         } catch (err) {
             toast.error("Error deleting file");
         }
+    };
+
+    const handleResetFile = async (file) => {
+        if (!window.confirm(`Reset ${file.name} to default content? This will overwrite your changes.`)) return;
+
+        const type = project?.type || "web";
+        let defaultContent = "";
+
+        if (type === "web") {
+            if (file.name === 'index.html') defaultContent = '<!DOCTYPE html>\n<html>\n<head>\n  <title>New Project</title>\n</head>\n<body>\n  <h1>Hello World</h1>\n</body>\n</html>';
+            else if (file.name === 'style.css') defaultContent = 'body {\n  background-color: #f0f0f0;\n  font-family: sans-serif;\n}';
+            else if (file.name === 'script.js') defaultContent = 'console.log("Hello from script.js");';
+        } else if (type === "cpp") {
+            if (file.name === 'main.cpp') defaultContent = '#include <iostream>\n\nint main() {\n    std::cout << "Hello RTM Studio!" << std::endl;\n    return 0;\n}';
+            else if (file.name === 'utils.h') defaultContent = '// Utility functions\n#ifndef UTILS_H\n#define UTILS_H\n\nvoid greet();\n\n#endif';
+        } else if (type === "python") {
+            if (file.name === 'main.py') defaultContent = 'def main():\n    print("Hello from RTM Studio!")\n\nif __name__ == "__main__":\n    main()';
+        } else if (type === "java") {
+            if (file.name === 'Main.java') defaultContent = 'public class Main {\n    public static void main(String[] args) {\n        System.out.println("Hello from Java!");\n    }\n}';
+        }
+
+        if (!defaultContent) {
+            toast.error("No default content for this file.");
+            return;
+        }
+
+        try {
+            const backendUrl = getBackendUrl();
+            await fetch(`${backendUrl}/api/projects/${projectId}/files`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ fileId: file.id, content: defaultContent })
+            });
+
+            setFiles(prev => prev.map(f => f.id === file.id ? { ...f, content: defaultContent } : f));
+            if (activeFile?.id === file.id) setActiveFile({ ...activeFile, content: defaultContent });
+
+            socketRef.current.emit(ACTIONS.CODE_CHANGE, { roomId: `project-${projectId}`, fileId: file.id, content: defaultContent });
+            toast.success("File reset to default");
+        } catch (err) {
+            toast.error("Failed to reset file");
+        }
+    };
+
+    const handleImportFile = (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = async (event) => {
+            const content = event.target.result;
+            const fileName = file.name;
+
+            try {
+                const backendUrl = getBackendUrl();
+                const res = await fetch(`${backendUrl}/api/projects/${projectId}/files`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        name: fileName,
+                        path: `/${fileName}`,
+                        content: content,
+                        isDirectory: false
+                    })
+                });
+
+                if (!res.ok) throw new Error("Import failed");
+                const newFile = await res.json();
+
+                setFiles(prev => [...prev, newFile]);
+                setActiveFile(newFile);
+                socketRef.current.emit(ACTIONS.FILE_CHANGE, {
+                    roomId: `project-${projectId}`,
+                    fileId: newFile.id,
+                    path: newFile.path,
+                    content: content,
+                    isNew: true
+                });
+                toast.success("File imported!");
+            } catch (err) {
+                toast.error("Import failed");
+            }
+        };
+        reader.readAsText(file);
     };
 
     const handleCompile = async () => {
@@ -486,9 +578,11 @@ const ProjectPage = () => {
                     </div>
                     <div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <h2 style={{ margin: 0, fontSize: '14px', fontWeight: '800', letterSpacing: '-0.01em', color: 'var(--text-main)' }}>
-                                {project ? `${project.name}....studio` : "Loading....studio"}
+                            <h2 style={{ margin: 0, fontSize: '15px', fontWeight: '900', letterSpacing: '-0.02em', color: 'var(--text-main)', background: 'linear-gradient(135deg, #fff 0%, #aaa 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+                                {project ? project.name : "UNTITLED PROJECT"}
                             </h2>
+                            <div style={{ width: '1px', height: '14px', backgroundColor: 'var(--border-color)', margin: '0 4px' }} />
+                            <span style={{ fontSize: '10px', fontWeight: '800', color: 'var(--primary)', letterSpacing: '0.1em' }}>RTM STUDIO</span>
                             <span style={statusBadgeStyle}>LIVE</span>
                         </div>
                         <p className="header-metadata" style={{ margin: 0, fontSize: '10px', color: 'var(--text-muted)', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
@@ -580,7 +674,13 @@ const ProjectPage = () => {
                                                 {sidebarTab}
                                             </span>
                                             {sidebarTab === 'files' && (
-                                                <Plus size={14} style={{ cursor: 'pointer', opacity: 0.6 }} onClick={handleAddFile} />
+                                                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                                    <label style={{ cursor: 'pointer', opacity: 0.6 }} title="Import File">
+                                                        <FileText size={14} />
+                                                        <input type="file" style={{ display: 'none' }} onChange={handleImportFile} />
+                                                    </label>
+                                                    <Plus size={14} style={{ cursor: 'pointer', opacity: 0.6 }} onClick={handleAddFile} title="New File" />
+                                                </div>
                                             )}
                                         </div>
 

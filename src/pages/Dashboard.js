@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import {
     Plus,
@@ -11,7 +11,8 @@ import {
     Calendar,
     Users,
     Zap,
-    Folder
+    Folder,
+    ChevronRight
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import AppLayout from '../components/AppLayout';
@@ -21,6 +22,7 @@ import SpaceLoader from '../components/SpaceLoader';
 const Dashboard = () => {
     const { user, loading } = useAuth();
     const navigate = useNavigate();
+    const location = useLocation();
     const [recentRooms, setRecentRooms] = useState([]);
     const [loadingRooms, setLoadingRooms] = useState(true);
     const [stats, setStats] = useState({ totalRooms: 0, sessions: 0, hours: 0 });
@@ -36,6 +38,7 @@ const Dashboard = () => {
     const [showCreateProjectModal, setShowCreateProjectModal] = useState(false);
     const [newProjectName, setNewProjectName] = useState('');
     const [newProjectDesc, setNewProjectDesc] = useState('');
+    const [newProjectType, setNewProjectType] = useState('web');
 
     // Click outside listener for dropdown
     useEffect(() => {
@@ -52,7 +55,13 @@ const Dashboard = () => {
         if (!loading && !user) {
             navigate('/login');
         }
-    }, [user, loading, navigate]);
+        if (location.state?.openCreateProject) {
+            setShowCreateProjectModal(true);
+            setActiveTab('projects');
+            // Clear state to avoid reopening on refresh
+            window.history.replaceState({}, document.title);
+        }
+    }, [user, loading, navigate, location]);
 
     const fetchDashboardData = useCallback(async () => {
         if (!user) return;
@@ -131,7 +140,8 @@ const Dashboard = () => {
                 body: JSON.stringify({
                     userId: user.uid,
                     name: newProjectName,
-                    description: newProjectDesc
+                    description: newProjectDesc,
+                    type: newProjectType
                 })
             });
             if (response.ok) {
@@ -140,6 +150,7 @@ const Dashboard = () => {
                 setShowCreateProjectModal(false);
                 setNewProjectName('');
                 setNewProjectDesc('');
+                setNewProjectType('web');
                 navigate(`/project/${project.id}`);
             }
         } catch (err) {
@@ -291,6 +302,86 @@ const Dashboard = () => {
                         </button>
                     </div>
                 </div>
+
+                {/* Recent Activity Section */}
+                {(recentRooms.length > 0 || projects.length > 0) && (
+                    <div style={{ marginBottom: '40px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
+                            <Zap size={18} color="var(--primary)" fill="var(--primary)" />
+                            <h2 style={{ fontSize: '18px', fontWeight: '800', margin: 0 }}>Recent Activity</h2>
+                        </div>
+                        <div style={{
+                            display: 'grid',
+                            gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+                            gap: '20px'
+                        }}>
+                            {recentRooms.slice(0, 2).map(room => (
+                                <div
+                                    key={`recent-room-${room.id}`}
+                                    onClick={() => navigate(`/editor/${room.id}`)}
+                                    style={{
+                                        padding: '20px',
+                                        backgroundColor: 'var(--bg-card)',
+                                        border: '1px solid var(--border-color)',
+                                        borderRadius: '12px',
+                                        cursor: 'pointer',
+                                        transition: 'all 0.2s',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '16px'
+                                    }}
+                                    onMouseOver={e => {
+                                        e.currentTarget.style.borderColor = "var(--primary)";
+                                        e.currentTarget.style.transform = "translateY(-3px)";
+                                    }}
+                                    onMouseOut={e => {
+                                        e.currentTarget.style.borderColor = "var(--border-color)";
+                                        e.currentTarget.style.transform = "translateY(0)";
+                                    }}
+                                >
+                                    <div style={{ color: 'var(--primary)', backgroundColor: 'var(--accent-glow)', padding: '10px', borderRadius: '10px' }}><Terminal size={20} /></div>
+                                    <div style={{ flex: 1 }}>
+                                        <div style={{ fontSize: '14px', fontWeight: '700' }}>{room.name}</div>
+                                        <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Workspace Room</div>
+                                    </div>
+                                    <ChevronRight size={16} color="var(--text-muted)" />
+                                </div>
+                            ))}
+                            {projects.slice(0, 2).map(proj => (
+                                <div
+                                    key={`recent-proj-${proj.id}`}
+                                    onClick={() => navigate(`/project/${proj.id}`)}
+                                    style={{
+                                        padding: '20px',
+                                        backgroundColor: 'var(--bg-card)',
+                                        border: '1px solid var(--border-color)',
+                                        borderRadius: '12px',
+                                        cursor: 'pointer',
+                                        transition: 'all 0.2s',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '16px'
+                                    }}
+                                    onMouseOver={e => {
+                                        e.currentTarget.style.borderColor = "var(--primary)";
+                                        e.currentTarget.style.transform = "translateY(-3px)";
+                                    }}
+                                    onMouseOut={e => {
+                                        e.currentTarget.style.borderColor = "var(--border-color)";
+                                        e.currentTarget.style.transform = "translateY(0)";
+                                    }}
+                                >
+                                    <div style={{ color: 'var(--primary)', backgroundColor: 'var(--accent-glow)', padding: '10px', borderRadius: '10px' }}><Folder size={20} /></div>
+                                    <div style={{ flex: 1 }}>
+                                        <div style={{ fontSize: '14px', fontWeight: '700' }}>{proj.name}</div>
+                                        <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{proj.type || 'Web'} Project</div>
+                                    </div>
+                                    <ChevronRight size={16} color="var(--text-muted)" />
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
 
                 {/* Industry Standard Stats Area */}
                 <div style={{
@@ -486,6 +577,19 @@ const Dashboard = () => {
                                                 placeholder="Short summary of your project..."
                                             />
                                         </div>
+                                        <div>
+                                            <label style={{ fontSize: '11px', fontWeight: '800', color: 'var(--text-muted)', marginBottom: '8px', display: 'block' }}>PROJECT TYPE</label>
+                                            <select
+                                                style={modalInputStyle}
+                                                value={newProjectType}
+                                                onChange={(e) => setNewProjectType(e.target.value)}
+                                            >
+                                                <option value="web">Web Project (HTML/CSS/JS)</option>
+                                                <option value="cpp">C++ Project</option>
+                                                <option value="python">Python Project</option>
+                                                <option value="java">Java Project</option>
+                                            </select>
+                                        </div>
                                     </div>
                                     <div style={{ display: 'flex', gap: '12px', marginTop: '32px', justifyContent: 'flex-end' }}>
                                         <button type="button" onClick={() => setShowCreateProjectModal(false)} style={{ ...cancelButtonStyle, flex: 1 }}>Cancel</button>
@@ -546,8 +650,8 @@ const Dashboard = () => {
 const workspaceCardStyle = {
     backgroundColor: 'var(--bg-card)',
     border: '1px solid var(--border-color)',
-    borderRadius: '8px',
-    boxShadow: '0 4px 20px rgba(0,0,0,0.2)',
+    borderRadius: '12px',
+    boxShadow: '0 10px 30px -10px rgba(0,0,0,0.1)',
     overflow: 'hidden'
 };
 
@@ -557,7 +661,7 @@ const workspaceHeaderStyle = {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.01)',
+    backgroundColor: 'rgba(255,255,255,0.02)',
     flexWrap: 'wrap',
     gap: '20px'
 };

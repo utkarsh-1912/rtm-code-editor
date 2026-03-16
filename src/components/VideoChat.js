@@ -43,7 +43,14 @@ const VideoChat = ({ socketRef, projectId, user }) => {
         }
 
         if (!user || user.isGuest) {
-            toast.error("Guests can only view, no microphone/camera access");
+            // Guests can join to view
+            setInCall(true);
+            socketRef.current.emit('join-video-chat', {
+                projectId,
+                userId: socketRef.current.id,
+                name: user?.name || socketRef.current.userName,
+                isSpectator: true
+            });
             return;
         }
 
@@ -60,7 +67,8 @@ const VideoChat = ({ socketRef, projectId, user }) => {
             socketRef.current.emit('join-video-chat', {
                 projectId,
                 userId: socketRef.current.id,
-                name: user.name || socketRef.current.userName
+                name: user.name || socketRef.current.userName,
+                isSpectator: false
             });
         } catch (err) {
             console.error("Failed to get media", err);
@@ -120,10 +128,15 @@ const VideoChat = ({ socketRef, projectId, user }) => {
 
     const createPeer = useCallback((userId, myId, localStream, remoteName) => {
         const peer = addPeer(userId, myId, localStream, remoteName);
-        peer.createOffer().then(offer => {
-            peer.setLocalDescription(offer);
-            socketRef.current.emit('video-offer', { to: userId, offer });
-        });
+        if (localStream) {
+            peer.createOffer().then(offer => {
+                peer.setLocalDescription(offer);
+                socketRef.current.emit('video-offer', { to: userId, offer });
+            });
+        } else {
+            // Spectator only
+            socketRef.current.emit('request-streams', { to: userId });
+        }
         return peer;
     }, [addPeer, socketRef]);
 
@@ -229,10 +242,18 @@ const VideoChat = ({ socketRef, projectId, user }) => {
         if (!socketRef.current) return;
         const socket = socketRef.current;
 
-        const handleUserJoined = ({ userId, name }) => {
+        const handleUserJoined = ({ userId, name, isSpectator }) => {
             if (userId === socket.id) return;
+            if (isSpectator) {
+                toast(`${name} is watching`);
+                return;
+            }
             toast(`${name} joined video`);
             if (stream) createPeer(userId, socket.id, stream, name);
+        };
+
+        const handleRequestStreams = ({ from }) => {
+            if (stream) createPeer(from, socket.id, stream, user?.name || socket.id);
         };
 
         const handleOffer = async ({ from, offer }) => {
@@ -280,6 +301,7 @@ const VideoChat = ({ socketRef, projectId, user }) => {
         socket.on('video-offer', handleOffer);
         socket.on('video-answer', handleAnswer);
         socket.on('new-ice-candidate', handleCandidate);
+        socket.on('request-streams', handleRequestStreams);
         socket.on(ACTIONS.MEDIA_STATE_CHANGE, handleMediaChange);
         socket.on(ACTIONS.SCREEN_SHARE_START, handleScreenStart);
         socket.on(ACTIONS.SCREEN_SHARE_STOP, handleScreenStop);
@@ -302,6 +324,7 @@ const VideoChat = ({ socketRef, projectId, user }) => {
             socket.off('video-offer', handleOffer);
             socket.off('video-answer', handleAnswer);
             socket.off('new-ice-candidate', handleCandidate);
+            socket.off('request-streams', handleRequestStreams);
             socket.off(ACTIONS.MEDIA_STATE_CHANGE);
             socket.off(ACTIONS.SCREEN_SHARE_START);
             socket.off(ACTIONS.SCREEN_SHARE_STOP);
@@ -314,6 +337,16 @@ const VideoChat = ({ socketRef, projectId, user }) => {
             localVideoRef.current.srcObject = stream;
         }
     }, [inCall, stream, isVideoOff]);
+
+    // Auto-join for guests/spectators
+    useEffect(() => {
+        if (!inCall && user?.isGuest) {
+            const timer = setTimeout(() => {
+                startCall();
+            }, 1500);
+            return () => clearTimeout(timer);
+        }
+    }, [user, inCall]);
 
     // --- Layout Logic ---
     const screenSharer = Object.entries(remoteStreams).find(([, r]) => r.isScreenSharing) || (isScreenSharing ? ['local', { name: 'You' }] : null);
