@@ -17,7 +17,8 @@ import {
     FileCode,
     Users,
     Play,
-    Trash2
+    Trash2,
+    RotateCcw
 } from "lucide-react";
 import toast from "react-hot-toast";
 import EditorComp from "../components/editorComp";
@@ -698,12 +699,19 @@ const ProjectPage = () => {
                                                                 <FileCode size={13} opacity={0.6} color={activeFile?.id === file.id ? 'var(--primary)' : 'inherit'} />
                                                                 <span style={{ fontSize: '12px', fontWeight: activeFile?.id === file.id ? '700' : '500' }}>{file.name}</span>
                                                             </div>
-                                                            <Trash2
-                                                                size={12}
-                                                                className="delete-icon"
-                                                                style={{ opacity: 0, transition: 'opacity 0.2s', cursor: 'pointer' }}
-                                                                onClick={(e) => handleDeleteFile(e, file)}
-                                                            />
+                                                            <div style={{ display: 'flex', gap: '4px', opacity: 0, transition: 'opacity 0.2s' }} className="file-actions">
+                                                                <RotateCcw
+                                                                    size={12}
+                                                                    style={{ cursor: 'pointer', color: 'var(--text-muted)' }}
+                                                                    onClick={(e) => { e.stopPropagation(); handleResetFile(file); }}
+                                                                    title="Reset to Default"
+                                                                />
+                                                                <Trash2
+                                                                    size={12}
+                                                                    style={{ cursor: 'pointer', color: '#f87171' }}
+                                                                    onClick={(e) => handleDeleteFile(e, file)}
+                                                                />
+                                                            </div>
                                                         </div>
                                                     ))}
                                                 </div>

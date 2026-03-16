@@ -103,13 +103,6 @@ function HomePage() {
     });
   };
 
-  const revisitLastRoom = () => {
-    if (user?.last_room_id) {
-      navigate(`/editor/${user.last_room_id}`, {
-        state: { userName: user.name, role: "editor" },
-      });
-    }
-  };
 
   const handleEnterKey = (e) => {
     if (e.code === "Enter") {

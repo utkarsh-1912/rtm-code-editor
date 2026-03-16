@@ -330,7 +330,7 @@ const VideoChat = ({ socketRef, projectId, user }) => {
             socket.off(ACTIONS.SCREEN_SHARE_STOP);
             socket.off('user-left-video');
         };
-    }, [stream, socketRef, createPeer, addPeer]);
+    }, [stream, socketRef, createPeer, addPeer, user?.name]);
 
     useEffect(() => {
         if (inCall && stream && localVideoRef.current && !isVideoOff) {
@@ -346,7 +346,7 @@ const VideoChat = ({ socketRef, projectId, user }) => {
             }, 1500);
             return () => clearTimeout(timer);
         }
-    }, [user, inCall]);
+    }, [user, inCall, startCall]);
 
     // --- Layout Logic ---
     const screenSharer = Object.entries(remoteStreams).find(([, r]) => r.isScreenSharing) || (isScreenSharing ? ['local', { name: 'You' }] : null);
