@@ -12,7 +12,6 @@ import {
     LogOut,
     Palette,
     Wifi,
-    Pencil,
     Video,
     Terminal,
     FileCode,
@@ -764,18 +763,6 @@ const ProjectPage = () => {
     );
 };
 
-const studioHeaderStyle = {
-    height: '60px',
-    backgroundColor: 'rgba(13, 17, 23, 0.8)',
-    backdropFilter: 'blur(20px)',
-    borderBottom: '1px solid var(--border-color)',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: '0 24px',
-    zIndex: 1000,
-    boxShadow: '0 4px 15px rgba(0,0,0,0.1)'
-};
 
 const logoWrapperStyle = {
     width: '36px',
