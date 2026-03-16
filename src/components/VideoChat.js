@@ -30,8 +30,33 @@ const VideoChat = ({ socketRef, projectId, user }) => {
         });
     }, [projectId, socketRef]);
 
+    // --- Speaker Detection Logic ---
+    const initAudioDetection = useCallback((audioStream, id) => {
+        try {
+            if (!audioContextRef.current) {
+                audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            if (audioContextRef.current.state === 'suspended') {
+                audioContextRef.current.resume();
+            }
+
+            const source = audioContextRef.current.createMediaStreamSource(audioStream);
+            const analyser = audioContextRef.current.createAnalyser();
+            analyser.fftSize = 256;
+            source.connect(analyser);
+
+            if (id === 'local') {
+                localAudioAnalyserRef.current = analyser;
+            } else {
+                audioAnalysersRef.current[id] = analyser;
+            }
+        } catch (e) {
+            console.warn("Audio Context init failed", e);
+        }
+    }, [audioContextRef]);
+
     // --- Media Controls ---
-    const startCall = async () => {
+    const startCall = useCallback(async () => {
         if (!socketRef || !socketRef.current) {
             toast.error("Connecting to server...");
             return;
@@ -74,7 +99,7 @@ const VideoChat = ({ socketRef, projectId, user }) => {
             console.error("Failed to get media", err);
             toast.error("Could not access camera/microphone");
         }
-    };
+    }, [projectId, socketRef, user, initAudioDetection]);
 
     const endCall = () => {
         if (stream) {
@@ -124,7 +149,7 @@ const VideoChat = ({ socketRef, projectId, user }) => {
         };
 
         return peer;
-    }, [socketRef]);
+    }, [socketRef, initAudioDetection]);
 
     const createPeer = useCallback((userId, myId, localStream, remoteName) => {
         const peer = addPeer(userId, myId, localStream, remoteName);
@@ -178,30 +203,6 @@ const VideoChat = ({ socketRef, projectId, user }) => {
         socketRef.current.emit(ACTIONS.SCREEN_SHARE_STOP, { roomId: `project-${projectId}` });
     };
 
-    // --- Speaker Detection Logic ---
-    const initAudioDetection = (audioStream, id) => {
-        try {
-            if (!audioContextRef.current) {
-                audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)();
-            }
-            if (audioContextRef.current.state === 'suspended') {
-                audioContextRef.current.resume();
-            }
-
-            const source = audioContextRef.current.createMediaStreamSource(audioStream);
-            const analyser = audioContextRef.current.createAnalyser();
-            analyser.fftSize = 256;
-            source.connect(analyser);
-
-            if (id === 'local') {
-                localAudioAnalyserRef.current = analyser;
-            } else {
-                audioAnalysersRef.current[id] = analyser;
-            }
-        } catch (e) {
-            console.warn("Audio Context init failed", e);
-        }
-    };
 
     useEffect(() => {
         if (!inCall) return;
