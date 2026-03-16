@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import { getBackendUrl } from '../utils/api';
 import toast from 'react-hot-toast';
 import OrganizationSettings from '../components/OrganizationSettings';
+import LogoLoader from '../components/LogoLoader';
 
 const Snippets = () => {
     const { user } = useAuth();
@@ -272,7 +273,9 @@ const Snippets = () => {
 
                     <div style={{ padding: '24px' }}>
                         {loading ? (
-                            <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>Loading...</div>
+                            <div style={{ textAlign: 'center', padding: '40px' }}>
+                                <LogoLoader message="Fetching Snippets..." />
+                            </div>
                         ) : filteredSnippets.length > 0 ? (
                             <div className="snippets-grid" style={{
                                 display: 'grid',

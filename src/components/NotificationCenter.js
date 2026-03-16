@@ -3,6 +3,7 @@ import { UserPlus, FileEdit, Info, CheckCircle2, Trash2 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { getBackendUrl } from '../utils/api';
 import toast from 'react-hot-toast';
+import LogoLoader from './LogoLoader';
 
 const NotificationCenter = ({ isOpen, onClose }) => {
     const { user } = useAuth();
@@ -112,7 +113,7 @@ const NotificationCenter = ({ isOpen, onClose }) => {
 
             <div style={contentStyle}>
                 {loading ? (
-                    <div style={statusTextStyle}>Loading...</div>
+                    <div style={statusTextStyle}><LogoLoader size={30} message="" /></div>
                 ) : notifications.length > 0 ? (
                     notifications.map((n) => (
                         <div key={n.id} style={notificationItemStyle} className="notification-item">

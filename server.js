@@ -260,9 +260,24 @@ app.get("/api/sessions", async (req, res) => {
 
 app.post("/api/sessions", async (req, res) => {
   try {
-    const { userId, device, ip, userAgent } = req.body;
+    const { userId, device: clientDevice, userAgent: clientUA } = req.body;
     if (!userId) return res.status(400).json({ error: "User ID required" });
-    const session = await db.createSession(userId, { device, ip, userAgent });
+
+    // Better IP detection
+    const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'Unknown';
+
+    // Better User-Agent detection
+    const ua = req.headers['user-agent'] || clientUA || 'Unknown Device';
+
+    // Simplified device parsing
+    let device = clientDevice || 'Mobile/Unknown';
+    if (ua.includes('Windows')) device = 'Windows PC';
+    else if (ua.includes('Macintosh')) device = 'MacBook/macOS';
+    else if (ua.includes('Linux')) device = 'Linux Machine';
+    else if (ua.includes('Android')) device = 'Android Device';
+    else if (ua.includes('iPhone')) device = 'iPhone';
+
+    const session = await db.createSession(userId, { device, ip, userAgent: ua });
     res.json(session);
   } catch (err) {
     res.status(500).json({ error: "Failed to create session" });
@@ -285,8 +300,8 @@ app.delete("/api/sessions/others", async (req, res) => {
  */
 app.post("/api/projects", async (req, res) => {
   try {
-    const { userId, name, description } = req.body;
-    const project = await db.createProject(userId, name, description);
+    const { userId, name, description, type } = req.body;
+    const project = await db.createProject(userId, name, description, type);
     res.json(project);
   } catch (err) {
     res.status(500).json({ error: "Failed to create project" });

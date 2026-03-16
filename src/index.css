@@ -7,9 +7,12 @@
   --bg-dark: #0f172a;
   --bg-dark-rgb: 15, 23, 42;
   --bg-card: rgba(30, 41, 59, 0.7);
+  --bg-floating: rgba(15, 23, 42, 0.85);
   --text-main: #f8fafc;
   --text-muted: #94a3b8;
   --border-color: rgba(255, 255, 255, 0.1);
+  --glass-border: rgba(255, 255, 255, 0.08);
+  --accent-glow: rgba(59, 130, 246, 0.3);
   --bg-image: radial-gradient(circle at 15% 50%, rgba(59, 130, 246, 0.15), transparent 25%),
     radial-gradient(circle at 85% 30%, rgba(139, 92, 246, 0.15), transparent 25%);
 }
@@ -21,14 +24,14 @@
   --bg-dark: #f8fafc;
   --bg-dark-rgb: 248, 250, 252;
   --bg-card: #ffffff;
+  --bg-floating: rgba(255, 255, 255, 0.9);
   --text-main: #0f172a;
   --text-muted: #475569;
   --border-color: #e2e8f0;
+  --glass-border: rgba(0, 0, 0, 0.05);
+  --accent-glow: rgba(37, 99, 235, 0.15);
   --bg-image: radial-gradient(circle at 15% 50%, rgba(59, 130, 246, 0.05), transparent 25%),
     radial-gradient(circle at 85% 30%, rgba(139, 92, 246, 0.05), transparent 25%);
-  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
-  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
-  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
 }
 
 html,

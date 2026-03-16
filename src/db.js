@@ -480,10 +480,16 @@ async function initializeSchema() {
                 user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
                 name VARCHAR(255) NOT NULL,
                 description TEXT,
+                type VARCHAR(50) DEFAULT 'web',
+                is_public BOOLEAN DEFAULT FALSE,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         `;
+
+        // Migration: Add type and is_public if missing
+        await sql`ALTER TABLE projects ADD COLUMN IF NOT EXISTS type VARCHAR(50) DEFAULT 'web'`;
+        await sql`ALTER TABLE projects ADD COLUMN IF NOT EXISTS is_public BOOLEAN DEFAULT FALSE`;
 
         // Project Files Table
         await sql`
@@ -534,21 +540,50 @@ async function deleteOtherSessions(userId, currentSessionId) {
 /**
  * Projects Management
  */
-async function createProject(userId, name, description = "") {
+async function createProject(userId, name, description = "", type = "web") {
     const user = await sql`SELECT id FROM users WHERE auth_provider_id = ${userId}`;
     if (!user.length) throw new Error("User not found");
 
     const project = await sql`
-        INSERT INTO projects (user_id, name, description)
-        VALUES (${user[0].id}, ${name}, ${description})
+        INSERT INTO projects (user_id, name, description, type)
+        VALUES (${user[0].id}, ${name}, ${description}, ${type})
         RETURNING *
     `;
 
-    // Create a default file
-    await sql`
-        INSERT INTO project_files (project_id, name, path, content)
-        VALUES (${project[0].id}, 'index.html', 'index.html', '<h1>Hello World</h1>')
-    `;
+    const projectId = project[0].id;
+
+    // Initialize files based on project type
+    if (type === "web") {
+        await sql`
+            INSERT INTO project_files (project_id, name, path, content)
+            VALUES 
+                (${projectId}, 'index.html', 'index.html', '<!DOCTYPE html>\n<html>\n<head>\n  <title>New Project</title>\n</head>\n<body>\n  <h1>Hello World</h1>\n</body>\n</html>'),
+                (${projectId}, 'style.css', 'style.css', 'body {\n  background-color: #f0f0f0;\n  font-family: sans-serif;\n}'),
+                (${projectId}, 'script.js', 'script.js', 'console.log("Hello from script.js");')
+        `;
+    } else if (type === "cpp") {
+        await sql`
+            INSERT INTO project_files (project_id, name, path, content)
+            VALUES 
+                (${projectId}, 'main.cpp', 'main.cpp', '#include <iostream>\n\nint main() {\n    std::cout << "Hello RTM Studio!" << std::endl;\n    return 0;\n}'),
+                (${projectId}, 'utils.h', 'utils.h', '// Utility functions\n#ifndef UTILS_H\n#define UTILS_H\n\nvoid greet();\n\n#endif')
+        `;
+    } else if (type === "python") {
+        await sql`
+            INSERT INTO project_files (project_id, name, path, content)
+            VALUES (${projectId}, 'main.py', 'main.py', 'def main():\n    print("Hello from RTM Studio!")\n\nif __name__ == "__main__":\n    main()')
+        `;
+    } else if (type === "java") {
+        await sql`
+            INSERT INTO project_files (project_id, name, path, content)
+            VALUES (${projectId}, 'Main.java', 'Main.java', 'public class Main {\n    public static void main(String[] args) {\n        System.out.println("Hello from Java!");\n    }\n}')
+        `;
+    } else {
+        await sql`
+            INSERT INTO project_files (project_id, name, path, content)
+            VALUES (${projectId}, 'index.html', 'index.html', '<h1>Hello World</h1>')
+        `;
+    }
 
     return project[0];
 }
