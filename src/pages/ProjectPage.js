@@ -712,8 +712,8 @@ const ProjectPage = () => {
                             disabled={isExecuting}
                             style={{
                                 ...toolRunButtonStyle,
-                                height: '36px',
-                                padding: '0 16px',
+                                height: '32px',
+                                padding: '0 12px',
                                 borderRadius: '8px',
                                 fontSize: '11px',
                                 background: 'var(--primary)',
