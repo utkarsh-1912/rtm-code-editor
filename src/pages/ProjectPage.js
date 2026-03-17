@@ -791,7 +791,7 @@ const ProjectPage = () => {
                                                 </div>
                                             ))}
                                         </div>
-                                        <div style={{ padding: '16px', borderTop: '1px solid var(--border-color)', backgroundColor: 'var(--bg-card)', paddingBottom: isMobile ? '80px' : '16px' }}>
+                                        <div style={{ padding: '16px', borderTop: '1px solid var(--border-color)', backgroundColor: 'var(--bg-card)', paddingBottom: isMobile ? '64px' : '16px' }}>
                                             <input
                                                 style={{ ...chatInputStyle, height: '44px', borderRadius: '22px', padding: '0 20px', backgroundColor: 'var(--bg-dark)' }}
                                                 placeholder="Message workspace..."

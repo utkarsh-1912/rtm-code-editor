@@ -123,24 +123,21 @@
         /* Space for bottom bar */
     }
 
-    /* Glassmorphic Bottom Bar for Mobile */
+    /* Fixed Bottom Bar for Mobile */
     .mobile-bottom-bar {
         position: fixed;
-        bottom: 16px;
-        left: 16px;
-        right: 16px;
+        bottom: 0;
+        left: 0;
+        right: 0;
         height: 64px;
-        background-color: rgba(13, 17, 23, 0.7);
-        backdrop-filter: blur(20px);
-        -webkit-backdrop-filter: blur(20px);
-        border: 1px solid rgba(255, 255, 255, 0.1);
+        background-color: var(--bg-card);
+        border-top: 1px solid var(--border-color);
         display: flex;
         justify-content: space-around;
         align-items: center;
         z-index: 1001;
         padding: 0 8px;
-        border-radius: 20px;
-        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+        box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.2);
     }
 
     .bottom-bar-item {
@@ -154,31 +151,29 @@
         border: none;
         padding: 8px 4px;
         cursor: pointer;
-        transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+        transition: all 0.2s;
         min-width: 60px;
-        border-radius: 12px;
     }
 
     .bottom-bar-item.active {
         color: var(--primary);
-        background-color: rgba(59, 130, 246, 0.15);
     }
 
     .bottom-bar-item:active {
-        transform: scale(0.92);
+        transform: scale(0.95);
     }
 
     .bottom-bar-item span {
-        font-size: 10px;
-        font-weight: 800;
+        font-size: 8px;
+        font-weight: 700;
         text-transform: uppercase;
-        letter-spacing: 0.03em;
+        letter-spacing: 0.05em;
     }
 
     /* Full-screen Tool View for Mobile */
     .workspace-content {
-        height: calc(100vh - 52px) !important;
-        /* Header height */
+        height: calc(100vh - 116px) !important;
+        /* Header + Bottom Bar */
         overflow: hidden;
     }
 }
