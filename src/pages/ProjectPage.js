@@ -791,9 +791,9 @@ const ProjectPage = () => {
                                                 </div>
                                             ))}
                                         </div>
-                                        <div style={{ padding: '16px', borderTop: '1px solid var(--border-color)', backgroundColor: 'var(--bg-card)' }}>
+                                        <div style={{ padding: '16px', borderTop: '1px solid var(--border-color)', backgroundColor: 'var(--bg-card)', paddingBottom: isMobile ? '80px' : '16px' }}>
                                             <input
-                                                style={{ ...chatInputStyle, height: '44px', borderRadius: '12px' }}
+                                                style={{ ...chatInputStyle, height: '44px', borderRadius: '22px', padding: '0 20px', backgroundColor: 'var(--bg-dark)' }}
                                                 placeholder="Message workspace..."
                                                 value={newMessage}
                                                 onChange={(e) => setNewMessage(e.target.value)}
@@ -841,7 +841,7 @@ const ProjectPage = () => {
                             </div>
                         ) : (
                             <ReflexContainer orientation="vertical" style={{ flex: 1, height: '100%', minHeight: 0 }}>
-                                {['files', 'chat', 'users'].includes(sidebarTab) && (
+                                {!isMobile && ['files', 'chat', 'users'].includes(sidebarTab) && (
                                     <ReflexElement flex={0.2} minSize={250} style={{ height: '100%', minHeight: 0, backgroundColor: 'var(--bg-card)', borderRight: '1px solid var(--border-color)' }}>
                                         <div style={{ height: '100%', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
                                             <div style={sidebarHeaderStyle}>
@@ -935,7 +935,7 @@ const ProjectPage = () => {
                                     </ReflexElement>
                                 )}
 
-                                {['files', 'chat', 'users'].includes(sidebarTab) && <ReflexSplitter style={splitterStyle} />}
+                                {!isMobile && ['files', 'chat', 'users'].includes(sidebarTab) && <ReflexSplitter style={splitterStyle} />}
 
                                 <ReflexElement flex={0.8} minSize={400} style={{ height: '100%' }}>
                                     <div style={{ height: '100%', display: 'flex', flexDirection: 'column', backgroundColor: '#0d1117' }}>
