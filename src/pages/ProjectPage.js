@@ -64,6 +64,7 @@ const ProjectPage = () => {
     const [isOutputVisible, setIsOutputVisible] = useState(false);
     const [showPreview, setShowPreview] = useState(false);
     const [activeTab, setActiveTab] = useState('code'); // 'code', 'files', 'chat', 'users', 'video'
+    const [userInput, setUserInput] = useState("");
 
     const socketRef = useRef(null);
     const hasJoinedRef = useRef(false);
@@ -234,20 +235,25 @@ const ProjectPage = () => {
             socketId: socketRef.current.id
         });
 
-        // 3. Debounced backend persistence (Critical fix for "resetting" issue)
+        // 3. Debounced backend persistence (POST method with full metadata)
         if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
         saveTimeoutRef.current = setTimeout(async () => {
             try {
                 const backendUrl = getBackendUrl();
                 await fetch(`${backendUrl}/api/projects/${projectId}/files`, {
-                    method: 'PUT',
+                    method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ fileId: activeFile.id, content })
+                    body: JSON.stringify({
+                        name: activeFile.name,
+                        path: activeFile.path || activeFile.name,
+                        content,
+                        isDirectory: false
+                    })
                 });
             } catch (err) {
                 console.error("Failed to persist file changes", err);
             }
-        }, 1000); // 1 second debounce
+        }, 1500); // 1.5 second debounce
     };
 
     const handleSendMessage = (e) => {
@@ -505,6 +511,7 @@ const ProjectPage = () => {
         const formData = {
             language_id: languageId,
             source_code: btoa(sourceCode),
+            stdin: btoa(userInput || ""),
         };
 
         const url = "https://judge0-ce.p.rapidapi.com/submissions?base64_encoded=true&fields=*";
@@ -609,7 +616,7 @@ const ProjectPage = () => {
                                 : (isLightMode ? "/utkristi-colabs.png" : "/utkristi-colabs-dark.png")
                             }
                             alt="Logo"
-                            style={{ height: isMobile ? '24px' : '28px', objectFit: 'contain' }}
+                            style={{ height: isMobile ? '24px' : '26px', objectFit: 'contain' }}
                         />
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
@@ -953,6 +960,7 @@ const ProjectPage = () => {
                                             <div style={{ flex: isOutputVisible ? 0.6 : 1, position: 'relative' }}>
                                                 {activeFile ? (
                                                     <EditorComp
+                                                        key={activeFile.id}
                                                         socketRef={socketRef}
                                                         roomId={`project-${projectId}`}
                                                         fileId={activeFile.id}
@@ -980,7 +988,7 @@ const ProjectPage = () => {
                                                             <X size={14} />
                                                         </button>
                                                     </div>
-                                                    <div style={{ flex: 1, overflow: 'hidden' }}>
+                                                    <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: isMobile ? 'column' : 'row' }}>
                                                         {showPreview ? (
                                                             <iframe
                                                                 title="Preview"
@@ -988,7 +996,33 @@ const ProjectPage = () => {
                                                                 srcDoc={generatePreviewDoc()}
                                                             />
                                                         ) : (
-                                                            <pre style={outputTextStyle}>{output}</pre>
+                                                            <>
+                                                                {project?.type !== 'web' && (
+                                                                    <div style={{ flex: 0.3, borderRight: isMobile ? 'none' : '1px solid var(--border-color)', borderBottom: isMobile ? '1px solid var(--border-color)' : 'none', display: 'flex', flexDirection: 'column' }}>
+                                                                        <div style={{ padding: '6px 12px', fontSize: '9px', fontWeight: '800', backgroundColor: 'rgba(255,255,255,0.02)', borderBottom: '1px solid var(--border-color)', color: 'var(--primary)' }}>INPUT (STDIN)</div>
+                                                                        <textarea
+                                                                            value={userInput}
+                                                                            onChange={(e) => setUserInput(e.target.value)}
+                                                                            placeholder="Enter input here..."
+                                                                            style={{
+                                                                                flex: 1,
+                                                                                backgroundColor: 'transparent',
+                                                                                border: 'none',
+                                                                                color: '#d1d5db',
+                                                                                padding: '12px',
+                                                                                fontSize: '12px',
+                                                                                fontFamily: 'monospace',
+                                                                                outline: 'none',
+                                                                                resize: 'none'
+                                                                            }}
+                                                                        />
+                                                                    </div>
+                                                                )}
+                                                                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+                                                                    {project?.type !== 'web' && <div style={{ padding: '6px 12px', fontSize: '9px', fontWeight: '800', backgroundColor: 'rgba(255,255,255,0.02)', borderBottom: '1px solid var(--border-color)', color: 'var(--text-muted)' }}>OUTPUT</div>}
+                                                                    <pre style={outputTextStyle}>{output}</pre>
+                                                                </div>
+                                                            </>
                                                         )}
                                                     </div>
                                                 </div>
