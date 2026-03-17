@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Settings as SettingsIcon, User, Bell, Shield, Palette, Save, Check, Moon, Sun, Monitor } from 'lucide-react';
+import { Settings as SettingsIcon, User, Bell, Shield, Palette, Save, Check, Moon, Sun, Monitor, Laptop, Smartphone, Tablet } from 'lucide-react';
 import AppLayout from '../components/AppLayout';
 import { useAuth } from '../context/AuthContext';
 import { getBackendUrl } from '../utils/api';
@@ -265,32 +265,57 @@ const Settings = () => {
                                 </div>
 
                                 <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                    {sessions.map(s => (
-                                        <div key={s.id} style={{
-                                            padding: '12px',
-                                            backgroundColor: 'rgba(255,255,255,0.02)',
-                                            borderRadius: '8px',
-                                            border: '1px solid var(--border-color)',
-                                            display: 'flex',
-                                            justifyContent: 'space-between',
-                                            alignItems: 'center'
-                                        }}>
-                                            <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-                                                <div style={{ width: '32px', height: '32px', borderRadius: '6px', backgroundColor: 'var(--bg-card)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)' }}>
-                                                    <Monitor size={16} />
-                                                </div>
-                                                <div>
-                                                    <div style={{ fontSize: '13px', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                                        {s.device || 'Unknown Device'}
-                                                        {String(s.id) === String(currentSessionId) && (
-                                                            <span style={{ fontSize: '10px', padding: '2px 6px', backgroundColor: 'rgba(59, 130, 246, 0.1)', color: 'var(--primary)', borderRadius: '4px' }}>Current</span>
-                                                        )}
+                                    {sessions.map(s => {
+                                        const isCurrent = String(s.id) === String(currentSessionId);
+                                        const getDeviceIcon = (device) => {
+                                            const d = device?.toLowerCase() || '';
+                                            if (d.includes('pc') || d.includes('linux') || d.includes('windows')) return <Monitor size={16} />;
+                                            if (d.includes('macbook')) return <Laptop size={16} />;
+                                            if (d.includes('iphone') || d.includes('android')) return <Smartphone size={16} />;
+                                            if (d.includes('tablet') || d.includes('ipad')) return <Tablet size={16} />;
+                                            return <Monitor size={16} />;
+                                        };
+
+                                        return (
+                                            <div key={s.id} style={{
+                                                padding: '12px 16px',
+                                                backgroundColor: isCurrent ? 'rgba(59, 130, 246, 0.05)' : 'rgba(255,255,255,0.02)',
+                                                borderRadius: '6px',
+                                                border: isCurrent ? '1px solid var(--primary)' : '1px solid var(--border-color)',
+                                                display: 'flex',
+                                                justifyContent: 'space-between',
+                                                alignItems: 'center',
+                                                transition: 'all 0.2s'
+                                            }}>
+                                                <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
+                                                    <div style={{
+                                                        width: '36px',
+                                                        height: '36px',
+                                                        borderRadius: '6px',
+                                                        backgroundColor: 'var(--bg-card)',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        justifyContent: 'center',
+                                                        color: isCurrent ? 'var(--primary)' : 'var(--text-muted)',
+                                                        border: '1px solid var(--border-color)'
+                                                    }}>
+                                                        {getDeviceIcon(s.device)}
                                                     </div>
-                                                    <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{s.ip} • Last active {new Date(s.last_active).toLocaleString()}</div>
+                                                    <div>
+                                                        <div style={{ fontSize: '13px', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-main)' }}>
+                                                            {s.device || 'Unknown Device'}
+                                                            {isCurrent && (
+                                                                <span style={{ fontSize: '10px', padding: '2px 8px', backgroundColor: 'var(--primary)', color: 'white', borderRadius: '4px', fontWeight: '800', textTransform: 'uppercase' }}>Current</span>
+                                                            )}
+                                                        </div>
+                                                        <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>
+                                                            <span style={{ color: s.ip === 'Localhost' ? 'var(--primary)' : 'var(--text-muted)' }}>{s.ip}</span> • Last active {new Date(s.last_active).toLocaleDateString()} at {new Date(s.last_active).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                        </div>
+                                                    </div>
                                                 </div>
                                             </div>
-                                        </div>
-                                    ))}
+                                        );
+                                    })}
                                 </div>
                             </div>
 
@@ -426,19 +451,19 @@ const ToggleItem = ({ label, description, enabled }) => {
 
 // Styles
 const gridStyle = { display: 'grid', gridTemplateColumns: '260px 1fr', gap: '32px', alignItems: 'start' };
-const sidebarNavStyle = { display: 'flex', flexDirection: 'column', gap: '4px', backgroundColor: 'var(--bg-card)', padding: '12px', borderRadius: '12px', border: '1px solid var(--border-color)' };
+const sidebarNavStyle = { display: 'flex', flexDirection: 'column', gap: '4px', backgroundColor: 'var(--bg-card)', padding: '12px', borderRadius: '8px', border: '1px solid var(--border-color)' };
 const sidebarButtonStyle = { display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 16px', border: 'none', borderRadius: '6px', fontSize: '14px', textAlign: 'left', cursor: 'pointer', transition: 'all 0.2s' };
-const contentAreaStyle = { backgroundColor: 'var(--bg-card)', padding: '32px', borderRadius: '12px', border: '1px solid var(--border-color)', minHeight: '500px' };
-const headerIconWrapperStyle = { width: '40px', height: '40px', borderRadius: '8px', backgroundColor: 'rgba(59, 130, 246, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--primary)', border: '1px solid var(--border-color)' };
+const contentAreaStyle = { backgroundColor: 'var(--bg-card)', padding: '32px', borderRadius: '8px', border: '1px solid var(--border-color)', minHeight: '500px' };
+const headerIconWrapperStyle = { width: '40px', height: '40px', borderRadius: '6px', backgroundColor: 'rgba(59, 130, 246, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--primary)', border: '1px solid var(--border-color)' };
 const sectionHeaderStyle = { marginBottom: '32px', borderBottom: '1px solid var(--border-color)', paddingBottom: '20px' };
 const sectionTitleStyle = { fontSize: '18px', fontWeight: '700', margin: '0 0 8px' };
 const sectionSubtitleStyle = { color: 'var(--text-muted)', fontSize: '14px', margin: 0 };
 const formGroupStyle = { marginBottom: '24px' };
 const labelStyle = { display: 'block', fontSize: '13px', fontWeight: '600', color: 'var(--text-muted)', marginBottom: '8px' };
-const inputStyle = { width: '100%', padding: '12px 16px', backgroundColor: 'var(--bg-dark)', border: '1px solid var(--border-color)', borderRadius: '8px', color: 'var(--text-main)', fontSize: '14px', outline: 'none' };
-const saveButtonStyle = { display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 24px', backgroundColor: 'var(--primary)', color: 'white', border: 'none', borderRadius: '8px', fontSize: '14px', fontWeight: '600', cursor: 'pointer', transition: 'opacity 0.2s' };
-const themeOptionStyle = { padding: '24px 16px', borderRadius: '12px', display: 'flex', flexDirection: 'column', alignItems: 'center', cursor: 'pointer', position: 'relative', transition: 'all 0.2s' };
-const dangerZoneItemStyle = { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px', borderRadius: '12px', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-dark)' };
+const inputStyle = { width: '100%', padding: '12px 16px', backgroundColor: 'var(--bg-dark)', border: '1px solid var(--border-color)', borderRadius: '6px', color: 'var(--text-main)', fontSize: '14px', outline: 'none' };
+const saveButtonStyle = { display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 24px', backgroundColor: 'var(--primary)', color: 'white', border: 'none', borderRadius: '6px', fontSize: '14px', fontWeight: '600', cursor: 'pointer', transition: 'opacity 0.2s' };
+const themeOptionStyle = { padding: '24px 16px', borderRadius: '8px', display: 'flex', flexDirection: 'column', alignItems: 'center', cursor: 'pointer', position: 'relative', transition: 'all 0.2s' };
+const dangerZoneItemStyle = { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px', borderRadius: '8px', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-dark)' };
 const ghostButtonStyle = { padding: '8px 16px', backgroundColor: 'transparent', border: '1px solid var(--border-color)', borderRadius: '6px', color: 'var(--text-main)', fontSize: '13px', fontWeight: '600', cursor: 'pointer' };
 
 const modalOverlayStyle = {

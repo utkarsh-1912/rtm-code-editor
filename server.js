@@ -260,24 +260,26 @@ app.get("/api/sessions", async (req, res) => {
 
 app.post("/api/sessions", async (req, res) => {
   try {
-    const { userId, device: clientDevice, userAgent: clientUA } = req.body;
+    const { userId, device: clientDevice, userAgent: clientUA, sessionId } = req.body;
     if (!userId) return res.status(400).json({ error: "User ID required" });
 
     // Better IP detection
-    const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'Unknown';
+    let ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'Unknown';
+    if (ip.includes(',')) ip = ip.split(',')[0].trim();
+    if (ip === '::1' || ip === '127.0.0.1') ip = 'Localhost';
 
     // Better User-Agent detection
     const ua = req.headers['user-agent'] || clientUA || 'Unknown Device';
 
-    // Simplified device parsing
-    let device = clientDevice || 'Mobile/Unknown';
+    // Premium device parsing
+    let device = 'Other Device';
     if (ua.includes('Windows')) device = 'Windows PC';
-    else if (ua.includes('Macintosh')) device = 'MacBook/macOS';
+    else if (ua.includes('Macintosh')) device = 'MacBook';
     else if (ua.includes('Linux')) device = 'Linux Machine';
-    else if (ua.includes('Android')) device = 'Android Device';
     else if (ua.includes('iPhone')) device = 'iPhone';
+    else if (ua.includes('Android')) device = 'Android';
 
-    const session = await db.createSession(userId, { device, ip, userAgent: ua });
+    const session = await db.createSession(userId, { device, ip, userAgent: ua, sessionId });
     res.json(session);
   } catch (err) {
     res.status(500).json({ error: "Failed to create session" });
@@ -481,7 +483,7 @@ io.on("connection", (socket) => {
     io.to(socketId).emit(ACTIONS.CODE_CHANGE, { code });
   });
 
-  socket.on(ACTIONS.LEAVE, ({ roomId }) => {
+  socket.on(ACTIONS.LEAVE, async ({ roomId }) => {
     socket.in(roomId).emit(ACTIONS.DISCONNECTED, {
       socketId: socket.id,
       userName: userSocketMap[socket.id],
@@ -492,6 +494,17 @@ io.on("connection", (socket) => {
     const remaining = getAllClients(roomId);
     if (remaining.length === 0) {
       delete roomChatHistory[roomId];
+
+      // Cleanup Guest Rooms (Owned by no one)
+      try {
+        const isGuest = await db.isRoomGuest(roomId);
+        if (isGuest && !roomId.startsWith('project-')) {
+          console.log(`Cleaning up empty guest room: ${roomId}`);
+          await db.deleteRoomPermanently(roomId);
+        }
+      } catch (err) {
+        console.error("Guest Room Cleanup Error:", err);
+      }
     }
   });
 
@@ -510,6 +523,16 @@ io.on("connection", (socket) => {
       const remaining = getAllClients(roomId);
       if (remaining.length <= 1) { // 1 because current socket hasn't fully left yet
         delete roomChatHistory[roomId];
+
+        // Cleanup Guest Rooms (Owned by no one)
+        if (remaining.length <= 1) {
+          db.isRoomGuest(roomId).then(isGuest => {
+            if (isGuest && !roomId.startsWith('project-')) {
+              console.log(`Cleaning up abandoned guest room: ${roomId}`);
+              db.deleteRoomPermanently(roomId).catch(() => { });
+            }
+          }).catch(() => { });
+        }
       }
     });
 

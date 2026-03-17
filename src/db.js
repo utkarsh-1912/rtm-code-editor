@@ -505,6 +505,18 @@ async function initializeSchema() {
             )
         `;
 
+        // Sessions Table
+        await sql`
+            CREATE TABLE IF NOT EXISTS sessions(
+                id SERIAL PRIMARY KEY,
+                user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+                device VARCHAR(255),
+                ip VARCHAR(255),
+                user_agent TEXT,
+                last_active TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        `;
+
         console.log("Database schema initialized successfully.");
     } catch (err) {
         console.error("Database Initialization Error:", err);
@@ -521,14 +533,64 @@ async function getSessions(userId) {
     return await sql`SELECT * FROM sessions WHERE user_id = ${user[0].id} ORDER BY last_active DESC`;
 }
 
-async function createSession(userId, { device, ip, userAgent }) {
+async function createSession(userId, { device, ip, userAgent, sessionId }) {
     const user = await sql`SELECT id FROM users WHERE auth_provider_id = ${userId}`;
     if (!user.length) return null;
+
+    if (sessionId) {
+        // Update existing session
+        const updated = await sql`
+            UPDATE sessions 
+            SET last_active = CURRENT_TIMESTAMP, ip = ${ip}, device = ${device}, user_agent = ${userAgent}
+            WHERE id = ${sessionId} AND user_id = ${user[0].id}
+            RETURNING *
+        `;
+        if (updated.length) return updated;
+    }
+
+    // Try to find a recent session with same user agent and ip to avoid duplicates
+    const existing = await sql`
+        SELECT id FROM sessions 
+        WHERE user_id = ${user[0].id} 
+        AND user_agent = ${userAgent} 
+        AND (ip = ${ip} OR ip = '::1' OR ip = '127.0.0.1')
+        ORDER BY last_active DESC LIMIT 1
+    `;
+
+    if (existing.length) {
+        return await sql`
+            UPDATE sessions 
+            SET last_active = CURRENT_TIMESTAMP 
+            WHERE id = ${existing[0].id}
+            RETURNING *
+        `;
+    }
+
     return await sql`
         INSERT INTO sessions (user_id, device, ip, user_agent)
         VALUES (${user[0].id}, ${device}, ${ip}, ${userAgent})
         RETURNING *
     `;
+}
+
+/**
+ * Check if a room is owned by any user
+ */
+async function isRoomGuest(roomId) {
+    const owners = await sql`
+        SELECT ur.user_id 
+        FROM user_rooms ur
+        JOIN rooms r ON ur.room_id = r.id
+        WHERE r.room_id = ${roomId}
+    `;
+    return owners.length === 0;
+}
+
+/**
+ * Delete a room permanently
+ */
+async function deleteRoomPermanently(roomId) {
+    return await sql`DELETE FROM rooms WHERE room_id = ${roomId}`;
 }
 
 async function deleteOtherSessions(userId, currentSessionId) {
@@ -681,5 +743,7 @@ module.exports = {
     deleteProjectFile,
     deleteProject,
     deleteAccount,
-    deleteOrganization
+    deleteOrganization,
+    isRoomGuest,
+    deleteRoomPermanently
 };

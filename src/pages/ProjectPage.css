@@ -4,6 +4,9 @@
     display: flex;
     flex-direction: column;
     overflow: hidden;
+    position: fixed;
+    top: 0;
+    left: 0;
     background-color: var(--bg-dark);
 }
 
@@ -16,6 +19,15 @@
     align-items: center;
     padding: 0 16px;
     z-index: 1000;
+}
+
+.workspace-container {
+    flex: 1;
+    display: flex;
+    flex-direction: row;
+    overflow: hidden;
+    position: relative;
+    height: calc(100vh - 52px);
 }
 
 .header-left {

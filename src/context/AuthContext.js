@@ -70,6 +70,7 @@ export const AuthProvider = ({ children }) => {
                         setUser({ ...userData }); // Update with real DB data
                     }
 
+                    const sessionId = localStorage.getItem('rtm_db_session_id');
                     const response = await fetch(`${getBackendUrl()}/api/sessions`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
@@ -77,7 +78,8 @@ export const AuthProvider = ({ children }) => {
                             userId: firebaseUser.uid,
                             device: navigator.platform,
                             ip: 'Auto',
-                            userAgent: navigator.userAgent
+                            userAgent: navigator.userAgent,
+                            sessionId: sessionId
                         })
                     });
                     const sessionData = await response.json();

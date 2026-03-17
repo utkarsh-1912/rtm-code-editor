@@ -712,7 +712,7 @@ const ProjectPage = () => {
             </header>
 
             <div className={`workspace-container ${showMobileSidebar ? 'mobile-sidebar-open' : ''}`}>
-                <div className="workspace-content" style={{ flex: 1, position: 'relative', display: 'flex', overflow: 'hidden' }}>
+                <div className="workspace-content" style={{ flex: 1, height: '100%', minHeight: 0, position: 'relative', display: 'flex', overflow: 'hidden' }}>
                     {sidebarTab === 'video' ? (
                         <div style={{ flex: 1, backgroundColor: '#0d1117', position: 'relative' }}>
                             <VideoChat
@@ -722,10 +722,10 @@ const ProjectPage = () => {
                             />
                         </div>
                     ) : (
-                        <ReflexContainer orientation="vertical" style={{ flex: 1 }}>
+                        <ReflexContainer orientation="vertical" style={{ flex: 1, height: '100%', minHeight: 0 }}>
                             {['files', 'chat', 'users'].includes(sidebarTab) && (
-                                <ReflexElement flex={0.2} minSize={250} style={{ backgroundColor: 'var(--bg-card)', borderRight: '1px solid var(--border-color)' }}>
-                                    <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+                                <ReflexElement flex={0.2} minSize={250} style={{ height: '100%', minHeight: 0, backgroundColor: 'var(--bg-card)', borderRight: '1px solid var(--border-color)' }}>
+                                    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
                                         <div style={sidebarHeaderStyle}>
                                             <span style={{ fontSize: '10px', fontWeight: '800', letterSpacing: '0.1em', color: 'var(--text-muted)', textTransform: 'uppercase' }}>
                                                 {sidebarTab}
@@ -819,7 +819,7 @@ const ProjectPage = () => {
 
                             {['files', 'chat', 'users'].includes(sidebarTab) && <ReflexSplitter style={splitterStyle} />}
 
-                            <ReflexElement flex={0.8} minSize={400}>
+                            <ReflexElement flex={0.8} minSize={400} style={{ height: '100%' }}>
                                 <div style={{ height: '100%', display: 'flex', flexDirection: 'column', backgroundColor: '#0d1117' }}>
                                     <div style={studioTabContainerStyle}>
                                         {openFiles.map(file => (
@@ -831,7 +831,7 @@ const ProjectPage = () => {
                                         ))}
                                         {openFiles.length === 0 && <div style={{ height: '36px' }} />}
                                     </div>
-                                    <div style={{ flex: 1, position: 'relative', display: 'flex', flexDirection: 'column' }}>
+                                    <div style={{ flex: 1, position: 'relative', display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
                                         <div style={{ flex: isOutputVisible ? 0.6 : 1, position: 'relative' }}>
                                             {activeFile ? (
                                                 <EditorComp
