@@ -9,7 +9,6 @@ import {
     Plus,
     X,
     MessageSquare,
-    LogOut,
     Sun,
     Moon,
     Wifi,
