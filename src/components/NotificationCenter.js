@@ -161,7 +161,7 @@ const dropdownStyle = {
     width: '320px',
     backgroundColor: 'var(--bg-card)',
     border: '1px solid var(--border-color)',
-    borderRadius: '12px',
+    borderRadius: '6px',
     boxShadow: '0 10px 25px rgba(0,0,0,0.4)',
     zIndex: 1000,
     overflow: 'hidden',
@@ -207,7 +207,7 @@ const notificationItemStyle = {
 const iconWrapperStyle = {
     width: '28px',
     height: '28px',
-    borderRadius: '50%',
+    borderRadius: '5px',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
@@ -298,7 +298,7 @@ const CustomStyles = () => (
                 right: 10px !important;
                 width: calc(100% - 20px) !important;
                 max-height: 80vh !important;
-                border-radius: 16px !important;
+                border-radius: 8px !important;
             }
             .dropdown-pointer {
                 display: none !important;

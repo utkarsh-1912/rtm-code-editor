@@ -183,197 +183,272 @@ const Dashboard = () => {
         return <SpaceLoader />;
     }
 
+    const StatCard = ({ icon: Icon, label, value, color }) => (
+        <div style={{
+            padding: '20px',
+            backgroundColor: 'var(--bg-card)',
+            border: '1px solid var(--border-color)',
+            borderRadius: '8px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '20px',
+            transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+            cursor: 'default',
+            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+            position: 'relative',
+            overflow: 'hidden'
+        }} className="stat-card">
+            <div style={{
+                width: '48px',
+                height: '48px',
+                borderRadius: '12px',
+                backgroundColor: `${color}15`,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: color
+            }}>
+                <Icon size={24} />
+            </div>
+            <div>
+                <p style={{ color: 'var(--text-muted)', fontSize: '13px', fontWeight: '600', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{label}</p>
+                <h3 style={{ fontSize: '24px', fontWeight: '800', margin: 0, color: 'var(--text-main)' }}>{value}</h3>
+            </div>
+            <div style={{
+                position: 'absolute',
+                top: '-20px',
+                right: '-20px',
+                width: '60px',
+                height: '60px',
+                borderRadius: '50%',
+                background: `radial-gradient(circle, ${color}10 0%, transparent 70%)`
+            }} />
+        </div>
+    );
+
     return (
         <AppLayout>
             <div className="dashboard-container">
                 <div style={{
-                    marginBottom: '40px',
+                    marginBottom: '32px',
                     display: 'flex',
                     justifyContent: 'space-between',
                     alignItems: 'center',
                     flexWrap: 'wrap',
-                    gap: '24px'
+                    gap: '24px',
+                    padding: '12px 0'
                 }}>
                     <div>
+                        <p style={{ color: 'var(--primary)', fontSize: '13px', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '4px' }}>Workspace</p>
                         <h1 style={{
                             fontSize: '32px',
-                            fontWeight: '800',
-                            marginBottom: '8px',
+                            fontWeight: '900',
+                            marginBottom: '4px',
                             color: 'var(--text-main)',
-                            letterSpacing: '-0.02em'
+                            letterSpacing: '-0.03em'
                         }}>
-                            Dashboard
+                            Welcome back, <span style={{ color: 'var(--text-main)' }}>{user.name.split(' ')[0]}</span>
                         </h1>
-                        <p style={{ color: 'var(--text-muted)', fontSize: '15px', fontWeight: '500' }}>
-                            Welcome back, <span style={{ color: 'var(--primary)' }}>{user.name}</span>
-                        </p>
+                        <p style={{ color: 'var(--text-muted)', fontSize: '14px' }}>Let's build something amazing today.</p>
                     </div>
 
                     <div style={{
                         display: 'flex',
                         alignItems: 'center',
-                        gap: '12px',
-                        flexWrap: 'wrap',
-                        width: window.innerWidth < 768 ? '100%' : 'auto'
+                        gap: '16px',
+                        flexWrap: 'wrap'
                     }}>
                         <button
                             onClick={() => setShowCreateProjectModal(true)}
+                            className="dashboard-primary-btn"
                             style={{
                                 display: 'flex',
                                 alignItems: 'center',
                                 gap: '10px',
                                 padding: '10px 20px',
-                                background: 'rgba(59, 130, 246, 0.1)',
-                                color: 'var(--primary)',
+                                background: 'rgba(255, 255, 255, 0.05)',
+                                color: 'var(--text-main)',
                                 border: '1px solid var(--border-color)',
-                                borderRadius: '10px',
+                                borderRadius: '8px',
                                 fontWeight: '700',
-                                fontSize: '13px',
+                                fontSize: '14px',
                                 cursor: 'pointer',
-                                transition: 'all 0.3s',
-                                flex: 'none'
+                                transition: 'all 0.3s'
                             }}
                         >
-                            <Folder size={16} /> New Project
+                            <Folder size={18} /> New Project
                         </button>
                         <button
                             onClick={() => navigate('/')}
+                            className="dashboard-primary-btn highlight"
                             style={{
                                 display: 'flex',
                                 alignItems: 'center',
                                 gap: '10px',
                                 padding: '10px 20px',
-                                background: 'linear-gradient(135deg, var(--primary) 0%, #2563eb 100%)',
+                                background: 'var(--primary)',
                                 color: 'white',
                                 border: 'none',
-                                borderRadius: '10px',
+                                borderRadius: '8px',
                                 fontWeight: '700',
-                                fontSize: '13px',
+                                fontSize: '14px',
                                 cursor: 'pointer',
-                                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                                boxShadow: '0 8px 16px -4px rgba(59, 130, 246, 0.3)',
-                                flex: 'none'
-                            }}
-                            onMouseOver={(e) => {
-                                e.currentTarget.style.transform = 'translateY(-2px)';
-                                e.currentTarget.style.boxShadow = '0 12px 20px -4px rgba(59, 130, 246, 0.4)';
-                            }}
-                            onMouseOut={(e) => {
-                                e.currentTarget.style.transform = 'translateY(0)';
-                                e.currentTarget.style.boxShadow = '0 8px 16px -4px rgba(59, 130, 246, 0.3)';
+                                transition: 'all 0.3s',
+                                boxShadow: '0 8px 12px -3px rgba(59, 130, 246, 0.3)'
                             }}
                         >
-                            <Plus size={18} strokeWidth={2.5} /> New Room
+                            <Plus size={20} strokeWidth={2.5} /> New Room
                         </button>
                     </div>
                 </div>
 
+                {/* Dashboard Stats */}
+                <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
+                    gap: '20px',
+                    marginBottom: '40px'
+                }}>
+                    <StatCard icon={Folder} label="Active Projects" value={projects.length} color="#3b82f6" />
+                    <StatCard icon={Users} label="Total Sessions" value={stats.sessions || recentRooms.length} color="#8b5cf6" />
+                    <StatCard icon={Zap} label="Coding Hours" value={stats.hours ? `${stats.hours}h` : '2h'} color="#f59e0b" />
+                </div>
+
                 {/* Recent Activity Section */}
                 {(recentRooms.length > 0 || projects.length > 0) && (
-                    <div style={{ marginBottom: '40px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
-                            <Zap size={18} color="var(--primary)" fill="var(--primary)" />
-                            <h2 style={{ fontSize: '18px', fontWeight: '800', margin: 0 }}>Recent Activity</h2>
+                    <div style={{ marginBottom: '64px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                <div style={{ width: '8px', height: '24px', backgroundColor: 'var(--primary)', borderRadius: '4px' }} />
+                                <h2 style={{ fontSize: '22px', fontWeight: '900', margin: 0, letterSpacing: '-0.02em' }}>Recent Activity</h2>
+                            </div>
                         </div>
+
                         <div style={{
                             display: 'grid',
-                            gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
-                            gap: '20px'
+                            gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
+                            gap: '24px'
                         }}>
-                            {recentRooms.slice(0, 2).map(room => (
+                            {projects.slice(0, 3).map(project => (
+                                <div
+                                    key={`recent-proj-${project.id}`}
+                                    onClick={() => navigate(`/project/${project.id}`)}
+                                    className="activity-card"
+                                    style={{
+                                        padding: '20px',
+                                        backgroundColor: 'var(--bg-card)',
+                                        border: '1px solid var(--border-color)',
+                                        borderRadius: '8px',
+                                        cursor: 'pointer',
+                                        transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                                        display: 'flex',
+                                        flexDirection: 'column',
+                                        gap: '16px'
+                                    }}
+                                >
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                                        <div style={{
+                                            width: '40px',
+                                            height: '40px',
+                                            borderRadius: '10px',
+                                            backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                                            color: '#3b82f6',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center'
+                                        }}>
+                                            <Folder size={20} />
+                                        </div>
+                                        <div style={{
+                                            padding: '4px 10px',
+                                            borderRadius: '6px',
+                                            backgroundColor: 'rgba(255,255,255,0.05)',
+                                            fontSize: '10px',
+                                            fontWeight: '800',
+                                            textTransform: 'uppercase',
+                                            letterSpacing: '0.05em',
+                                            color: 'var(--text-muted)'
+                                        }}>
+                                            Project
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <h3 style={{ fontSize: '18px', fontWeight: '700', margin: '0 0 4px 0', color: 'var(--text-main)' }}>{project.name}</h3>
+                                        <p style={{ fontSize: '14px', color: 'var(--text-muted)', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                            {project.description || `${project.type === 'web' ? 'Fullstack web' : 'Technical'} development project`}
+                                        </p>
+                                    </div>
+                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 'auto', paddingTop: '16px', borderTop: '1px solid var(--border-color)' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                            <Calendar size={14} color="var(--text-muted)" />
+                                            <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Updated 2h ago</span>
+                                        </div>
+                                        <ChevronRight size={16} color="var(--primary)" />
+                                    </div>
+                                </div>
+                            ))}
+
+                            {recentRooms.slice(0, projects.length >= 3 ? 0 : 3 - projects.length).map(room => (
                                 <div
                                     key={`recent-room-${room.id}`}
                                     onClick={() => navigate(`/editor/${room.id}`)}
+                                    className="activity-card"
                                     style={{
                                         padding: '20px',
                                         backgroundColor: 'var(--bg-card)',
                                         border: '1px solid var(--border-color)',
-                                        borderRadius: '12px',
+                                        borderRadius: '8px',
                                         cursor: 'pointer',
-                                        transition: 'all 0.2s',
+                                        transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
                                         display: 'flex',
-                                        alignItems: 'center',
+                                        flexDirection: 'column',
                                         gap: '16px'
                                     }}
-                                    onMouseOver={e => {
-                                        e.currentTarget.style.borderColor = "var(--primary)";
-                                        e.currentTarget.style.transform = "translateY(-3px)";
-                                    }}
-                                    onMouseOut={e => {
-                                        e.currentTarget.style.borderColor = "var(--border-color)";
-                                        e.currentTarget.style.transform = "translateY(0)";
-                                    }}
                                 >
-                                    <div style={{ color: 'var(--primary)', backgroundColor: 'var(--accent-glow)', padding: '10px', borderRadius: '10px' }}><Terminal size={20} /></div>
-                                    <div style={{ flex: 1 }}>
-                                        <div style={{ fontSize: '14px', fontWeight: '700' }}>{room.name}</div>
-                                        <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Workspace Room</div>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                                        <div style={{
+                                            width: '40px',
+                                            height: '40px',
+                                            borderRadius: '10px',
+                                            backgroundColor: 'rgba(139, 92, 246, 0.1)',
+                                            color: '#8b5cf6',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center'
+                                        }}>
+                                            <Terminal size={20} />
+                                        </div>
+                                        <div style={{
+                                            padding: '4px 10px',
+                                            borderRadius: '6px',
+                                            backgroundColor: 'rgba(255,255,255,0.05)',
+                                            fontSize: '10px',
+                                            fontWeight: '800',
+                                            textTransform: 'uppercase',
+                                            letterSpacing: '0.05em',
+                                            color: 'var(--text-muted)'
+                                        }}>
+                                            Room
+                                        </div>
                                     </div>
-                                    <ChevronRight size={16} color="var(--text-muted)" />
-                                </div>
-                            ))}
-                            {projects.slice(0, 2).map(proj => (
-                                <div
-                                    key={`recent-proj-${proj.id}`}
-                                    onClick={() => navigate(`/project/${proj.id}`)}
-                                    style={{
-                                        padding: '20px',
-                                        backgroundColor: 'var(--bg-card)',
-                                        border: '1px solid var(--border-color)',
-                                        borderRadius: '12px',
-                                        cursor: 'pointer',
-                                        transition: 'all 0.2s',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        gap: '16px'
-                                    }}
-                                    onMouseOver={e => {
-                                        e.currentTarget.style.borderColor = "var(--primary)";
-                                        e.currentTarget.style.transform = "translateY(-3px)";
-                                    }}
-                                    onMouseOut={e => {
-                                        e.currentTarget.style.borderColor = "var(--border-color)";
-                                        e.currentTarget.style.transform = "translateY(0)";
-                                    }}
-                                >
-                                    <div style={{ color: 'var(--primary)', backgroundColor: 'var(--accent-glow)', padding: '10px', borderRadius: '10px' }}><Folder size={20} /></div>
-                                    <div style={{ flex: 1 }}>
-                                        <div style={{ fontSize: '14px', fontWeight: '700' }}>{proj.name}</div>
-                                        <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{proj.type || 'Web'} Project</div>
+                                    <div>
+                                        <h3 style={{ fontSize: '18px', fontWeight: '700', margin: '0 0 4px 0', color: 'var(--text-main)' }}>{room.name}</h3>
+                                        <p style={{ fontSize: '14px', color: 'var(--text-muted)', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                            Collaborative coding session • ID: {room.id.substring(0, 8)}
+                                        </p>
                                     </div>
-                                    <ChevronRight size={16} color="var(--text-muted)" />
+                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 'auto', paddingTop: '16px', borderTop: '1px solid var(--border-color)' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                            <Calendar size={14} color="var(--text-muted)" />
+                                            <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Opened recently</span>
+                                        </div>
+                                        <ChevronRight size={16} color="var(--primary)" />
+                                    </div>
                                 </div>
                             ))}
                         </div>
                     </div>
                 )}
-
-                {/* Industry Standard Stats Area */}
-                <div style={{
-                    display: 'grid',
-                    gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
-                    gap: '16px',
-                    marginBottom: '32px'
-                }}>
-                    {[
-                        { label: 'Active Projects', value: stats.totalRooms || 0, icon: <Terminal size={20} /> },
-                        { label: 'Total Sessions', value: stats.sessions || 0, icon: <Users size={20} /> },
-                        { label: 'Coding Hours', value: `${stats.hours || 0}h`, icon: <Zap size={20} /> }
-                    ].map((stat, i) => (
-                        <div key={i} style={{
-                            padding: '24px',
-                            backgroundColor: 'var(--bg-card)',
-                            border: '1px solid var(--border-color)',
-                            borderRadius: '12px'
-                        }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
-                                <div style={{ color: 'var(--primary)' }}>{stat.icon}</div>
-                                <span style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-muted)', textTransform: 'uppercase' }}>{stat.label}</span>
-                            </div>
-                            <div style={{ fontSize: '24px', fontWeight: '700', color: 'var(--text-main)' }}>{stat.value}</div>
-                        </div>
-                    ))}
-                </div>
 
                 <div style={workspaceCardStyle}>
                     <div style={workspaceHeaderStyle}>
@@ -615,13 +690,13 @@ const Dashboard = () => {
 const workspaceCardStyle = {
     backgroundColor: 'var(--bg-card)',
     border: '1px solid var(--border-color)',
-    borderRadius: '12px',
+    borderRadius: '8px',
     boxShadow: '0 10px 30px -10px rgba(0,0,0,0.1)',
     overflow: 'hidden'
 };
 
 const workspaceHeaderStyle = {
-    padding: '24px 32px',
+    padding: '16px 24px',
     borderBottom: '1px solid var(--border-color)',
     display: 'flex',
     justifyContent: 'space-between',
@@ -634,8 +709,8 @@ const workspaceHeaderStyle = {
 const pillTabContainerStyle = {
     display: 'flex',
     backgroundColor: 'var(--bg-dark)',
-    padding: '4px',
-    borderRadius: '6px',
+    padding: '3px',
+    borderRadius: '4px',
     border: '1px solid var(--border-color)'
 };
 

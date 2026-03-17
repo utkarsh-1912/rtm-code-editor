@@ -63,6 +63,7 @@ const ProjectPage = () => {
     const [output, setOutput] = useState("");
     const [isOutputVisible, setIsOutputVisible] = useState(false);
     const [showPreview, setShowPreview] = useState(false);
+    const [showMobileSidebar, setShowMobileSidebar] = useState(false);
 
     const socketRef = useRef(null);
     const hasJoinedRef = useRef(false);
@@ -678,7 +679,7 @@ const ProjectPage = () => {
                         </button>
                         <div style={{ width: '1px', height: '16px', backgroundColor: 'var(--border-color)', margin: '0 2px' }} />
                         <button className="tray-btn" onClick={toggleTheme} title="Toggle Theme">
-                            {isLightMode ? <Moon size={16} /> : <Sun size={16} />}
+                            {isLightMode ? <Sun size={16} /> : <Moon size={16} />}
                         </button>
                     </div>
 
@@ -688,10 +689,29 @@ const ProjectPage = () => {
                     }}>
                         <Users size={14} /> <span>Invite</span>
                     </button>
+
+                    {window.innerWidth < 768 && (
+                        <button
+                            className="mobile-sidebar-toggle"
+                            onClick={() => setShowMobileSidebar(!showMobileSidebar)}
+                            style={{
+                                background: 'rgba(255,255,255,0.05)',
+                                border: '1px solid var(--border-color)',
+                                borderRadius: '8px',
+                                padding: '8px',
+                                color: 'var(--text-main)',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center'
+                            }}
+                        >
+                            <ChevronRight size={18} style={{ transform: showMobileSidebar ? 'rotate(180deg)' : 'none', transition: 'transform 0.3s' }} />
+                        </button>
+                    )}
                 </div>
             </header>
 
-            <div className="workspace-container">
+            <div className={`workspace-container ${showMobileSidebar ? 'mobile-sidebar-open' : ''}`}>
                 <div className="workspace-content" style={{ flex: 1, position: 'relative', display: 'flex', overflow: 'hidden' }}>
                     {sidebarTab === 'video' ? (
                         <div style={{ flex: 1, backgroundColor: '#0d1117', position: 'relative' }}>
@@ -900,6 +920,46 @@ const ProjectPage = () => {
                     roomId={projectId}
                     user={user || { name: socketRef.current?.userName || "Guest" }}
                 />
+
+                {window.innerWidth < 768 && (
+                    <div className="mobile-bottom-bar">
+                        <button
+                            className={`bottom-bar-item ${sidebarTab === 'files' ? 'active' : ''}`}
+                            onClick={() => { setSidebarTab('files'); setShowMobileSidebar(true); }}
+                        >
+                            <Folder size={20} />
+                            <span>Files</span>
+                        </button>
+                        <button
+                            className={`bottom-bar-item ${sidebarTab === 'chat' ? 'active' : ''}`}
+                            onClick={() => { setSidebarTab('chat'); setShowMobileSidebar(true); }}
+                        >
+                            <MessageSquare size={20} />
+                            <span>Chat</span>
+                        </button>
+                        <button
+                            className={`bottom-bar-item ${sidebarTab === 'video' ? 'active' : ''}`}
+                            onClick={() => { setSidebarTab('video'); setShowMobileSidebar(false); }}
+                        >
+                            <Video size={20} />
+                            <span>Meeting</span>
+                        </button>
+                        <button
+                            className={`bottom-bar-item ${sidebarTab === 'users' ? 'active' : ''}`}
+                            onClick={() => { setSidebarTab('users'); setShowMobileSidebar(true); }}
+                        >
+                            <Users size={20} />
+                            <span>People</span>
+                        </button>
+                        <button
+                            className="bottom-bar-item"
+                            onClick={() => setShowWhiteboard(true)}
+                        >
+                            <Palette size={20} />
+                            <span>Board</span>
+                        </button>
+                    </div>
+                )}
             </div>
         </div>
     );
@@ -988,7 +1048,7 @@ const studioTabStyle = (active, isLight) => ({
     backgroundColor: active ? (isLight ? '#fff' : '#0d1117') : 'transparent',
     border: '1px solid var(--border-color)',
     borderBottom: active ? (isLight ? '1px solid #fff' : '1px solid #0d1117') : '1px solid var(--border-color)',
-    borderRadius: '10px 10px 0 0',
+    borderRadius: '4px 4px 0 0',
     display: 'flex',
     alignItems: 'center',
     gap: '10px',
@@ -1020,7 +1080,7 @@ const studioFooterStyle = {
 const messageBoxStyle = (own) => ({
     padding: '12px',
     backgroundColor: own ? 'rgba(59, 130, 246, 0.05)' : 'rgba(255,255,255,0.02)',
-    borderRadius: '12px',
+    borderRadius: '6px',
     border: own ? '1px solid rgba(59, 130, 246, 0.1)' : '1px solid var(--border-color)'
 });
 
@@ -1041,7 +1101,7 @@ const participantRowStyle = {
     display: 'flex',
     alignItems: 'center',
     gap: '12px',
-    borderRadius: '10px',
+    borderRadius: '6px',
     backgroundColor: 'rgba(255,255,255,0.02)',
     border: '1px solid transparent',
     transition: 'all 0.2s'
@@ -1184,7 +1244,7 @@ const modalOverlayStyle = {
 const modalContentStyle = {
     backgroundColor: 'var(--bg-card)',
     padding: '40px',
-    borderRadius: '20px',
+    borderRadius: '8px',
     border: '1px solid var(--border-color)',
     width: '100%',
     maxWidth: '400px',
@@ -1197,7 +1257,7 @@ const modalInputStyle = {
     padding: '14px 20px',
     backgroundColor: 'var(--bg-dark)',
     border: '1px solid var(--border-color)',
-    borderRadius: '12px',
+    borderRadius: '6px',
     color: 'white',
     fontSize: '15px',
     outline: 'none',
@@ -1211,7 +1271,7 @@ const modalButtonStyle = {
     backgroundColor: 'var(--primary)',
     color: 'white',
     border: 'none',
-    borderRadius: '12px',
+    borderRadius: '6px',
     fontSize: '15px',
     fontWeight: '700',
     cursor: 'pointer',

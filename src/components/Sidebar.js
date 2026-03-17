@@ -95,7 +95,7 @@ const Sidebar = ({ isOpen, onClose, isMobile, isCollapsed, onToggleCollapse, isL
                             gap: '12px',
                             width: '100%',
                             padding: '12px',
-                            borderRadius: '12px',
+                            borderRadius: '6px',
                             backgroundColor: isActive(item.id) ? 'rgba(59, 130, 246, 0.1)' : 'transparent',
                             color: isActive(item.id) ? 'var(--primary)' : 'var(--text-muted)',
                             border: 'none',
@@ -128,7 +128,7 @@ const Sidebar = ({ isOpen, onClose, isMobile, isCollapsed, onToggleCollapse, isL
                     gap: '12px',
                     padding: isCollapsed && !isMobile ? '8px' : '12px',
                     backgroundColor: 'rgba(0,0,0,0.1)',
-                    borderRadius: '14px',
+                    borderRadius: '8px',
                     border: '1px solid var(--border-color)',
                     transition: 'all 0.3s'
                 }}>
@@ -138,7 +138,7 @@ const Sidebar = ({ isOpen, onClose, isMobile, isCollapsed, onToggleCollapse, isL
                         style={{
                             width: isCollapsed && !isMobile ? '28px' : '36px',
                             height: isCollapsed && !isMobile ? '28px' : '36px',
-                            borderRadius: '10px',
+                            borderRadius: '6px',
                             transition: 'all 0.3s'
                         }}
                     />
@@ -176,7 +176,7 @@ const Sidebar = ({ isOpen, onClose, isMobile, isCollapsed, onToggleCollapse, isL
                                 border: '1px solid rgba(239, 68, 68, 0.2)',
                                 padding: '8px',
                                 color: '#ef4444',
-                                borderRadius: '10px',
+                                borderRadius: '6px',
                                 cursor: 'pointer',
                                 display: 'flex',
                                 transition: 'all 0.2s'
@@ -200,7 +200,7 @@ const Sidebar = ({ isOpen, onClose, isMobile, isCollapsed, onToggleCollapse, isL
                             backgroundColor: 'transparent',
                             color: 'var(--text-muted)',
                             border: '1px solid var(--border-color)',
-                            borderRadius: '12px',
+                            borderRadius: '6px',
                             cursor: 'pointer',
                             transition: 'all 0.2s',
                             gap: '12px'
