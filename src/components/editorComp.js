@@ -104,7 +104,12 @@ function EditorComp({
   useEffect(() => {
     const socket = socketRef.current;
     if (socket) {
+      // Note: FILE_CHANGE is now handled by the parent ProjectPage component
+      // to maintain a single source of truth for the file list and content.
+
       socket.on(ACTIONS.CODE_CHANGE, ({ code: incomingCode, fileId: incomingFileId }) => {
+        // Compatibility: !incomingFileId means it's a standard room
+        // incomingFileId === fileId means it's the correct file in a multi-file project
         if (incomingCode !== null && (!incomingFileId || incomingFileId === fileId)) {
           setEditorCode(incomingCode);
           onCodeChange(incomingCode);
@@ -178,10 +183,12 @@ function EditorComp({
     localStorage.setItem(`code-${roomId}`, value);
 
     // Sync code change
-    if (viewUpdate.transactions[0]?.isUserEvent("input") || viewUpdate.transactions[0]?.isUserEvent("delete")) {
+    // For standard Rooms (editor.js), we use CODE_CHANGE for real-time sync.
+    // For Pro Projects (ProjectPage.js), we skip CODE_CHANGE to avoid echo loops
+    // because ProjectPage handles sync via FILE_CHANGE on onCodeChange.
+    if (!fileId && (viewUpdate.transactions[0]?.isUserEvent("input") || viewUpdate.transactions[0]?.isUserEvent("delete"))) {
       socketRef.current?.emit(ACTIONS.CODE_CHANGE, {
         roomId,
-        fileId,
         code: value,
       });
     }

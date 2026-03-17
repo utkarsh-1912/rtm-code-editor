@@ -20,7 +20,8 @@ import {
     Play,
     Trash2,
     RotateCcw,
-    Palette
+    Palette,
+    ChevronRight
 } from "lucide-react";
 import toast from "react-hot-toast";
 import EditorComp from "../components/editorComp";
@@ -59,7 +60,6 @@ const ProjectPage = () => {
 
     const [sidebarTab, setSidebarTab] = useState('files');
     const [theme, setTheme] = useState(localStorage.getItem("app-theme") || "dark");
-    const [showVideo, setShowVideo] = useState(true);
     const [isExecuting, setIsExecuting] = useState(false);
     const [output, setOutput] = useState("");
     const [isOutputVisible, setIsOutputVisible] = useState(false);
@@ -69,6 +69,7 @@ const ProjectPage = () => {
     const hasJoinedRef = useRef(false);
     const filesRef = useRef([]);
     const openFilesRef = useRef([]);
+    const saveTimeoutRef = useRef(null);
 
     const isLightMode = theme === "light";
 
@@ -128,8 +129,10 @@ const ProjectPage = () => {
                     setClients(prev => prev.filter(c => c.socketId !== socketId));
                 });
 
-                socketRef.current.on(ACTIONS.FILE_CHANGE, ({ fileId, content }) => {
+                socketRef.current.on(ACTIONS.FILE_CHANGE, ({ fileId, content, socketId }) => {
+                    if (socketRef.current.id === socketId) return;
                     setFiles(prev => prev.map(f => f.id === fileId ? { ...f, content } : f));
+                    setActiveFile(prev => prev?.id === fileId ? { ...prev, content } : prev);
                 });
 
                 socketRef.current.on(ACTIONS.FOLLOW_MODE, ({ viewState, userName }) => {
@@ -205,14 +208,35 @@ const ProjectPage = () => {
         }
     };
 
-    const handleSaveFile = async (content) => {
+    const handleSaveFile = (content) => {
         if (!activeFile) return;
+
+        // 1. Immediate local UI update
         setFiles(prev => prev.map(f => f.id === activeFile.id ? { ...f, content } : f));
+        setActiveFile(prev => prev ? { ...prev, content } : null);
+
+        // 2. Real-time broadcast (Debounced slightly for performance if needed, but socket is fast)
         socketRef.current.emit(ACTIONS.FILE_CHANGE, {
             roomId: `project-${projectId}`,
             fileId: activeFile.id,
-            content
+            content,
+            socketId: socketRef.current.id
         });
+
+        // 3. Debounced backend persistence (Critical fix for "resetting" issue)
+        if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+        saveTimeoutRef.current = setTimeout(async () => {
+            try {
+                const backendUrl = getBackendUrl();
+                await fetch(`${backendUrl}/api/projects/${projectId}/files`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ fileId: activeFile.id, content })
+                });
+            } catch (err) {
+                console.error("Failed to persist file changes", err);
+            }
+        }, 1000); // 1 second debounce
     };
 
     const handleSendMessage = (e) => {
@@ -358,7 +382,12 @@ const ProjectPage = () => {
             setFiles(prev => prev.map(f => f.id === file.id ? { ...f, content: defaultContent } : f));
             if (activeFile?.id === file.id) setActiveFile({ ...activeFile, content: defaultContent });
 
-            socketRef.current.emit(ACTIONS.CODE_CHANGE, { roomId: `project-${projectId}`, fileId: file.id, content: defaultContent });
+            socketRef.current.emit(ACTIONS.FILE_CHANGE, {
+                roomId: `project-${projectId}`,
+                fileId: file.id,
+                content: defaultContent,
+                socketId: socketRef.current.id
+            });
             toast.success("File reset to default");
         } catch (err) {
             toast.error("Failed to reset file");
@@ -554,54 +583,104 @@ const ProjectPage = () => {
 
     return (
         <div className="project-workspace">
-            {/* Premium Glassmorphism Header */}
+            {/* Redesigned IDE-style Navbar */}
             <header className="studio-header">
-                <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+                {/* Left Section: Branding & Project Meta */}
+                <div className="header-left">
                     <div style={logoWrapperStyle} onClick={() => navigate('/dashboard')}>
-                        <img src="/utkristi-labs.png" alt="Logo" style={{ height: '20px', objectFit: 'contain' }} />
+                        <img src="/utkristi-labs.png" alt="Logo" style={{ height: '18px', objectFit: 'contain' }} />
                     </div>
-                    <div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                             <h2 style={{
                                 margin: 0,
-                                fontSize: '15px',
+                                fontSize: '13px',
                                 fontWeight: '900',
-                                letterSpacing: '-0.02em',
                                 color: 'var(--text-main)',
-                                background: isLightMode
-                                    ? 'linear-gradient(135deg, var(--text-main) 0%, var(--primary) 100%)'
-                                    : 'linear-gradient(135deg, #fff 0%, #aaa 100%)',
-                                WebkitBackgroundClip: 'text',
-                                WebkitTextFillColor: 'transparent'
+                                whiteSpace: 'nowrap',
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                                maxWidth: '150px'
                             }}>
                                 {project ? project.name : "UNTITLED PROJECT"}
                             </h2>
-                            <div style={{ width: '1px', height: '14px', backgroundColor: 'var(--border-color)', margin: '0 4px' }} />
-                            <span style={{ fontSize: '10px', fontWeight: '800', color: 'var(--primary)', letterSpacing: '0.1em' }}>RTM STUDIO</span>
                             <span style={statusBadgeStyle}>LIVE</span>
                         </div>
-                        <p className="header-metadata" style={{ margin: 0, fontSize: '10px', color: 'var(--text-muted)', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                            {project?.type || 'Web'} Project {project?.is_public ? '• Public' : '• Private'}
-                        </p>
+                        <span style={{ fontSize: '9px', fontWeight: '800', color: 'var(--primary)', letterSpacing: '0.05em', opacity: 0.8 }}>RTM STUDIO</span>
                     </div>
                 </div>
 
-                <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
-                    <button style={themeToggleButtonStyle} onClick={toggleTheme}>
-                        {isLightMode ? <Moon size={16} /> : <Sun size={16} />}
-                    </button>
+                {/* Center Section: Active File Display (VS Code Style) */}
+                <div className="header-center">
+                    <span style={{ opacity: 0.5 }}>{project?.type || 'Web'}</span>
+                    <ChevronRight size={10} style={{ opacity: 0.3 }} />
+                    {activeFile ? (
+                        <div className="active-file-pill">
+                            <FileCode size={12} color="var(--primary)" />
+                            <span>{activeFile.name}</span>
+                        </div>
+                    ) : (
+                        <span style={{ opacity: 0.5 }}>Workspace Editor</span>
+                    )}
+                </div>
 
-                    <div style={collaboratorAvatarsStyle}>
+                {/* Right Section: Unified Icon Tray & Actions */}
+                <div className="header-right">
+                    <div style={{ ...collaboratorAvatarsStyle, marginRight: '4px' }}>
                         {clients.slice(0, 3).map((client, i) => (
-                            <div key={i} style={{ ...miniAvatarStyle, marginLeft: i > 0 ? '-8px' : '0', border: '2px solid var(--bg-card)' }} title={client.userName}>
+                            <div key={i} style={{ ...miniAvatarStyle, marginLeft: i > 0 ? '-8px' : '0' }} title={client.userName}>
                                 {client.userName[0]}
                             </div>
                         ))}
                         {clients.length > 3 && (
-                            <div style={{ ...miniAvatarStyle, marginLeft: '-8px', backgroundColor: 'var(--bg-dark)', fontSize: '9px', border: '2px solid var(--bg-card)' }}>
+                            <div style={{ ...miniAvatarStyle, marginLeft: '-8px', backgroundColor: 'var(--bg-dark)', fontSize: '8px' }}>
                                 +{clients.length - 3}
                             </div>
                         )}
+                    </div>
+
+                    <div className="icon-tray">
+                        <button
+                            className={`tray-btn ${sidebarTab === 'video' ? 'active' : ''}`}
+                            onClick={() => setSidebarTab('video')}
+                            title="Streaming View"
+                        >
+                            <Video size={16} />
+                        </button>
+                        <button
+                            className={`tray-btn ${sidebarTab === 'files' ? 'active' : ''}`}
+                            onClick={() => setSidebarTab('files')}
+                            title="File Explorer"
+                        >
+                            <Folder size={16} />
+                        </button>
+                        <button
+                            className={`tray-btn ${sidebarTab === 'chat' ? 'active' : ''}`}
+                            onClick={() => {
+                                setSidebarTab('chat');
+                                // Reset notif dot logic would go here
+                            }}
+                            title="Team Chat"
+                        >
+                            <div style={{ position: 'relative' }}>
+                                <MessageSquare size={16} />
+                                {messages.length > 0 && <div style={{ ...notifDotStyle, top: '-2px', right: '-2px', width: '6px', height: '6px' }} />}
+                            </div>
+                        </button>
+                        <button
+                            className={`tray-btn ${sidebarTab === 'users' ? 'active' : ''}`}
+                            onClick={() => setSidebarTab('users')}
+                            title="Participants"
+                        >
+                            <Users size={16} />
+                        </button>
+                        <button className="tray-btn" onClick={() => setShowWhiteboard(true)} title="Whiteboard">
+                            <Palette size={16} />
+                        </button>
+                        <div style={{ width: '1px', height: '16px', backgroundColor: 'var(--border-color)', margin: '0 2px' }} />
+                        <button className="tray-btn" onClick={toggleTheme} title="Toggle Theme">
+                            {isLightMode ? <Moon size={16} /> : <Sun size={16} />}
+                        </button>
                     </div>
 
                     <button className="share-button" style={shareButtonStyle} onClick={() => {
@@ -610,45 +689,10 @@ const ProjectPage = () => {
                     }}>
                         <Users size={14} /> <span>Invite</span>
                     </button>
-
-                    <div className="header-divider" style={headerDividerStyle} />
-
-                    <button style={videoToggleStyle(showVideo)} onClick={() => setShowVideo(!showVideo)}>
-                        <Video size={16} />
-                    </button>
                 </div>
             </header>
 
             <div className="workspace-container">
-                {/* Control Bar (Thin vertical strip for tabs) */}
-                <div className="control-bar" style={controlBarStyle}>
-                    <button className="control-tab-btn" style={controlTabButtonStyle(sidebarTab === 'video')} onClick={() => setSidebarTab('video')} title="Stream">
-                        <Video size={18} />
-                    </button>
-                    <button className="control-tab-btn" style={controlTabButtonStyle(sidebarTab === 'editor')} onClick={() => setSidebarTab('editor')} title="Editor">
-                        <FileCode size={18} />
-                    </button>
-                    <button className="control-tab-btn" style={controlTabButtonStyle(sidebarTab === 'files')} onClick={() => setSidebarTab('files')} title="Files">
-                        <Folder size={18} />
-                    </button>
-                    <button className="control-tab-btn" style={controlTabButtonStyle(sidebarTab === 'chat')} onClick={() => setSidebarTab('chat')} title="Chat">
-                        <div style={{ position: 'relative' }}>
-                            <MessageSquare size={18} />
-                            {messages.length > 0 && <div style={notifDotStyle} />}
-                        </div>
-                    </button>
-                    <button className="control-tab-btn" style={controlTabButtonStyle(sidebarTab === 'users')} onClick={() => setSidebarTab('users')} title="Participants">
-                        <Users size={18} />
-                    </button>
-                    <div style={{ flex: 1 }} />
-                    <button style={controlTabButtonStyle(false)} onClick={() => setShowWhiteboard(true)} title="Whiteboard">
-                        <Palette size={18} />
-                    </button>
-                    <button style={controlTabButtonStyle(false)} onClick={() => navigate('/dashboard')} title="Exit">
-                        <LogOut size={18} />
-                    </button>
-                </div>
-
                 <div className="workspace-content" style={{ flex: 1, position: 'relative', display: 'flex', overflow: 'hidden' }}>
                     {sidebarTab === 'video' ? (
                         <div style={{ flex: 1, backgroundColor: '#0d1117', position: 'relative' }}>
@@ -900,74 +944,18 @@ const shareButtonStyle = {
     boxShadow: '0 4px 10px rgba(59, 130, 246, 0.3)'
 };
 
-const videoToggleStyle = (active) => ({
-    width: '36px',
-    height: '36px',
-    borderRadius: '8px',
-    backgroundColor: active ? 'rgba(239, 68, 68, 0.1)' : 'rgba(255,255,255,0.03)',
-    color: active ? '#ef4444' : 'var(--text-muted)',
-    border: active ? '1px solid rgba(239, 68, 68, 0.2)' : '1px solid var(--border-color)',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    cursor: 'pointer',
-    transition: 'all 0.2s'
-});
 
-const themeToggleButtonStyle = {
-    width: '36px',
-    height: '36px',
-    borderRadius: '10px',
-    backgroundColor: 'rgba(255,255,255,0.03)',
-    color: 'var(--text-muted)',
-    border: '1px solid var(--border-color)',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    cursor: 'pointer',
-    transition: 'all 0.2s',
-    marginRight: '12px'
-};
 
-const headerDividerStyle = {
-    width: '1px',
-    height: '24px',
-    backgroundColor: 'var(--border-color)',
-    margin: '0 4px'
-};
 
-const controlBarStyle = {
-    width: '56px',
-    backgroundColor: 'var(--bg-card)',
-    borderRight: '1px solid var(--border-color)',
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    padding: '8px 0'
-};
-
-const controlTabButtonStyle = (active) => ({
-    width: '40px',
-    height: '40px',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: active ? 'rgba(59, 130, 246, 0.1)' : 'transparent',
-    color: active ? 'var(--primary)' : 'var(--text-muted)',
-    borderRadius: '8px',
-    marginBottom: '8px',
-    cursor: 'pointer',
-    transition: 'all 0.2s',
-    border: active ? '1px solid rgba(59, 130, 246, 0.2)' : '1px solid transparent'
-});
 
 const sidebarHeaderStyle = {
-    padding: '16px',
+    padding: '12px 16px',
     borderBottom: '1px solid var(--border-color)',
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.02)'
+    backgroundColor: 'var(--bg-dark)',
+    height: '40px'
 };
 
 const fileItemStyle = (active) => ({
@@ -1016,18 +1004,18 @@ const studioTabStyle = (active, isLight) => ({
 });
 
 const studioFooterStyle = {
-    height: '34px',
+    height: '28px',
     backgroundColor: 'var(--bg-card)',
     borderTop: '1px solid var(--border-color)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
     padding: '0 12px',
-    fontSize: '10px',
+    fontSize: '9px',
     fontWeight: '700',
     color: 'var(--text-muted)',
     textTransform: 'uppercase',
-    letterSpacing: '0.05em'
+    letterSpacing: '0.08em'
 };
 
 const messageBoxStyle = (own) => ({

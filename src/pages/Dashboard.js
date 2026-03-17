@@ -190,7 +190,7 @@ const Dashboard = () => {
                     marginBottom: '40px',
                     display: 'flex',
                     justifyContent: 'space-between',
-                    alignItems: 'flex-start',
+                    alignItems: 'center',
                     flexWrap: 'wrap',
                     gap: '24px'
                 }}>
