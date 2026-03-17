@@ -63,7 +63,7 @@ const ProjectPage = () => {
     const [output, setOutput] = useState("");
     const [isOutputVisible, setIsOutputVisible] = useState(false);
     const [showPreview, setShowPreview] = useState(false);
-    const [showMobileSidebar, setShowMobileSidebar] = useState(false);
+    const [activeTab, setActiveTab] = useState('code'); // 'code', 'files', 'chat', 'users', 'video'
 
     const socketRef = useRef(null);
     const hasJoinedRef = useRef(false);
@@ -148,7 +148,11 @@ const ProjectPage = () => {
                 });
 
                 socketRef.current.on(ACTIONS.RECEIVE_MESSAGE, (message) => {
-                    setMessages(prev => [...prev, message]);
+                    setMessages(prev => {
+                        const updated = [...prev, message];
+                        localStorage.setItem(`project-chat-${projectId}`, JSON.stringify(updated));
+                        return updated;
+                    });
                 });
 
                 function handleErrors(e) {
@@ -161,6 +165,12 @@ const ProjectPage = () => {
                     setShowNamePrompt(true);
                 } else {
                     joinProject(user.name);
+                }
+
+                // Load chat history from localstorage
+                const savedChat = localStorage.getItem(`project-chat-${projectId}`);
+                if (savedChat) {
+                    setMessages(JSON.parse(savedChat));
                 }
 
                 setLoading(false);
@@ -206,7 +216,7 @@ const ProjectPage = () => {
         if (!openFiles.find(f => f.id === file.id)) {
             setOpenFiles([...openFiles, file]);
         }
-        if (isMobile) setShowMobileSidebar(false);
+        if (isMobile) setActiveTab('code');
     };
 
     const handleSaveFile = (content) => {
@@ -249,7 +259,11 @@ const ProjectPage = () => {
                 timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
                 avatar: user?.photoURL
             };
-            setMessages(prev => [...prev, msg]);
+            setMessages(prev => {
+                const updated = [...prev, msg];
+                localStorage.setItem(`project-chat-${projectId}`, JSON.stringify(updated));
+                return updated;
+            });
             socketRef.current.emit(ACTIONS.SEND_MESSAGE, { roomId: `project-${projectId}`, message: msg });
             setNewMessage("");
         }
@@ -589,7 +603,14 @@ const ProjectPage = () => {
                 {/* Left Section: Branding & Project Meta */}
                 <div className="header-left">
                     <div style={logoWrapperStyle} onClick={() => navigate('/dashboard')}>
-                        <img src="/utkristi-labs.png" alt="Logo" style={{ height: '18px', objectFit: 'contain' }} />
+                        <img
+                            src={isMobile
+                                ? (isLightMode ? "/utkristi-labs.png" : "/utkristi-labs-dark.png")
+                                : (isLightMode ? "/utkristi-colabs.png" : "/utkristi-colabs-dark.png")
+                            }
+                            alt="Logo"
+                            style={{ height: isMobile ? '24px' : '28px', objectFit: 'contain' }}
+                        />
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -685,18 +706,19 @@ const ProjectPage = () => {
                         </div>
                     )}
 
-                    {isMobile && (
+                    {isMobile && activeTab === 'code' && (
                         <button
                             onClick={handleCompile}
                             disabled={isExecuting}
                             style={{
                                 ...toolRunButtonStyle,
                                 height: '36px',
-                                padding: '0 12px',
-                                borderRadius: '6px',
-                                fontSize: '10px',
+                                padding: '0 16px',
+                                borderRadius: '8px',
+                                fontSize: '11px',
                                 background: 'var(--primary)',
-                                boxShadow: '0 4px 12px rgba(59, 130, 246, 0.2)'
+                                boxShadow: '0 4px 12px rgba(59, 130, 246, 0.2)',
+                                border: 'none'
                             }}
                         >
                             <Play size={14} fill="white" />
@@ -704,215 +726,291 @@ const ProjectPage = () => {
                         </button>
                     )}
 
-                    <button className="share-button" style={shareButtonStyle} onClick={() => {
+                    <button className="share-button" style={{
+                        ...shareButtonStyle,
+                        padding: isMobile ? '8px' : '8px 16px',
+                        borderRadius: '8px'
+                    }} onClick={() => {
                         navigator.clipboard.writeText(window.location.href);
                         toast.success("Invite link copied!");
                     }}>
-                        <Users size={14} /> <span>Invite</span>
+                        <Users size={14} /> {!isMobile && <span>Invite</span>}
                     </button>
-
-                    {window.innerWidth < 768 && (
-                        <button
-                            className="mobile-sidebar-toggle"
-                            onClick={() => setShowMobileSidebar(!showMobileSidebar)}
-                            style={{
-                                background: 'rgba(255,255,255,0.05)',
-                                border: '1px solid var(--border-color)',
-                                borderRadius: '8px',
-                                padding: '8px',
-                                color: 'var(--text-main)',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center'
-                            }}
-                        >
-                            <ChevronRight size={18} style={{ transform: showMobileSidebar ? 'rotate(180deg)' : 'none', transition: 'transform 0.3s' }} />
-                        </button>
-                    )}
                 </div>
             </header>
 
-            <div className={`workspace-container ${showMobileSidebar ? 'mobile-sidebar-open' : ''}`}>
+            <div className="workspace-container">
                 <div className="workspace-content" style={{ flex: 1, height: '100%', minHeight: 0, position: 'relative', display: 'flex', overflow: 'hidden' }}>
-                    {sidebarTab === 'video' ? (
-                        <div style={{ flex: 1, backgroundColor: '#0d1117', position: 'relative' }}>
-                            <VideoChat
-                                socketRef={socketRef}
-                                projectId={projectId}
-                                user={user || { name: socketRef.current?.userName, isGuest: true }}
-                            />
+                    {/* Switch between full-screen mobile views or standard desktop split */}
+                    {isMobile && activeTab !== 'code' ? (
+                        <div style={{ flex: 1, height: '100%', backgroundColor: 'var(--bg-dark)', display: 'flex', flexDirection: 'column' }}>
+                            <div style={{ ...sidebarHeaderStyle, backgroundColor: 'var(--bg-card)', height: '48px', padding: '0 20px' }}>
+                                <span style={{ fontSize: '11px', fontWeight: '900', letterSpacing: '0.1em', color: 'var(--text-main)', textTransform: 'uppercase' }}>
+                                    {activeTab}
+                                </span>
+                                {activeTab === 'files' && (
+                                    <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
+                                        <label style={{ cursor: 'pointer', opacity: 0.8 }} title="Import File">
+                                            <FileText size={16} />
+                                            <input type="file" style={{ display: 'none' }} onChange={handleImportFile} />
+                                        </label>
+                                        <Plus size={16} style={{ cursor: 'pointer', opacity: 0.8 }} onClick={handleAddFile} title="New File" />
+                                    </div>
+                                )}
+                            </div>
+
+                            <div style={{ flex: 1, overflowY: 'auto' }}>
+                                {activeTab === 'files' && (
+                                    <div style={{ padding: '12px' }}>
+                                        {files.map(file => (
+                                            <div
+                                                key={file.id}
+                                                onClick={() => handleFileClick(file)}
+                                                style={fileItemStyle(activeFile?.id === file.id)}
+                                                className="file-item-hover"
+                                            >
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1 }}>
+                                                    <FileCode size={16} opacity={0.7} color={activeFile?.id === file.id ? 'var(--primary)' : 'inherit'} />
+                                                    <span style={{ fontSize: '14px', fontWeight: activeFile?.id === file.id ? '700' : '500' }}>{file.name}</span>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+
+                                {activeTab === 'chat' && (
+                                    <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+                                        <div style={{ flex: 1, padding: '20px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                                            {messages.map((msg, i) => (
+                                                <div key={i} style={messageBoxStyle(msg.userName === (user?.name || socketRef.current?.userName))}>
+                                                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
+                                                        <span style={{ fontSize: '11px', fontWeight: '900', color: 'var(--primary)' }}>{msg.userName}</span>
+                                                        <span style={{ fontSize: '10px', opacity: 0.4 }}>{msg.timestamp}</span>
+                                                    </div>
+                                                    <p style={{ margin: 0, fontSize: '13px', lineHeight: '1.6', color: 'var(--text-main)' }}>{msg.text}</p>
+                                                </div>
+                                            ))}
+                                        </div>
+                                        <div style={{ padding: '16px', borderTop: '1px solid var(--border-color)', backgroundColor: 'var(--bg-card)' }}>
+                                            <input
+                                                style={{ ...chatInputStyle, height: '44px', borderRadius: '12px' }}
+                                                placeholder="Message workspace..."
+                                                value={newMessage}
+                                                onChange={(e) => setNewMessage(e.target.value)}
+                                                onKeyPress={handleSendMessage}
+                                            />
+                                        </div>
+                                    </div>
+                                )}
+
+                                {activeTab === 'users' && (
+                                    <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                                        {clients.map((client, i) => (
+                                            <div key={i} style={{ ...participantRowStyle, padding: '12px', backgroundColor: 'var(--bg-card)' }}>
+                                                <div style={avatarCircleStyle}>{client.userName[0]}</div>
+                                                <div style={{ flex: 1 }}>
+                                                    <div style={{ fontSize: '14px', fontWeight: '700', color: 'var(--text-main)' }}>{client.userName}</div>
+                                                    <div style={{ fontSize: '10px', color: 'var(--primary)', fontWeight: '900', textTransform: 'uppercase' }}>{i === 0 ? 'Admin' : 'Member'}</div>
+                                                </div>
+                                                <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#10b981' }} />
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+
+                                {activeTab === 'video' && (
+                                    <div style={{ flex: 1, backgroundColor: '#000', height: '100%' }}>
+                                        <VideoChat
+                                            socketRef={socketRef}
+                                            projectId={projectId}
+                                            user={user || { name: socketRef.current?.userName, isGuest: true }}
+                                        />
+                                    </div>
+                                )}
+                            </div>
                         </div>
                     ) : (
-                        <ReflexContainer orientation="vertical" style={{ flex: 1, height: '100%', minHeight: 0 }}>
-                            {['files', 'chat', 'users'].includes(sidebarTab) && (
-                                <ReflexElement flex={0.2} minSize={250} style={{ height: '100%', minHeight: 0, backgroundColor: 'var(--bg-card)', borderRight: '1px solid var(--border-color)' }}>
-                                    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
-                                        <div style={sidebarHeaderStyle}>
-                                            <span style={{ fontSize: '10px', fontWeight: '800', letterSpacing: '0.1em', color: 'var(--text-muted)', textTransform: 'uppercase' }}>
-                                                {sidebarTab}
-                                            </span>
-                                            {sidebarTab === 'files' && (
-                                                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                                                    <label style={{ cursor: 'pointer', opacity: 0.6 }} title="Import File">
-                                                        <FileText size={14} />
-                                                        <input type="file" style={{ display: 'none' }} onChange={handleImportFile} />
-                                                    </label>
-                                                    <Plus size={14} style={{ cursor: 'pointer', opacity: 0.6 }} onClick={handleAddFile} title="New File" />
-                                                </div>
-                                            )}
-                                        </div>
+                        // Standard IDE Desktop Layout
+                        sidebarTab === 'video' ? (
+                            <div style={{ flex: 1, backgroundColor: '#0d1117', position: 'relative' }}>
+                                <VideoChat
+                                    socketRef={socketRef}
+                                    projectId={projectId}
+                                    user={user || { name: socketRef.current?.userName, isGuest: true }}
+                                />
+                            </div>
+                        ) : (
+                            <ReflexContainer orientation="vertical" style={{ flex: 1, height: '100%', minHeight: 0 }}>
+                                {['files', 'chat', 'users'].includes(sidebarTab) && (
+                                    <ReflexElement flex={0.2} minSize={250} style={{ height: '100%', minHeight: 0, backgroundColor: 'var(--bg-card)', borderRight: '1px solid var(--border-color)' }}>
+                                        <div style={{ height: '100%', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+                                            <div style={sidebarHeaderStyle}>
+                                                <span style={{ fontSize: '10px', fontWeight: '800', letterSpacing: '0.1em', color: 'var(--text-muted)', textTransform: 'uppercase' }}>
+                                                    {sidebarTab}
+                                                </span>
+                                                {sidebarTab === 'files' && (
+                                                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                                        <label style={{ cursor: 'pointer', opacity: 0.6 }} title="Import File">
+                                                            <FileText size={14} />
+                                                            <input type="file" style={{ display: 'none' }} onChange={handleImportFile} />
+                                                        </label>
+                                                        <Plus size={14} style={{ cursor: 'pointer', opacity: 0.6 }} onClick={handleAddFile} title="New File" />
+                                                    </div>
+                                                )}
+                                            </div>
 
-                                        <div style={{ flex: 1, overflowY: 'auto' }}>
-                                            {sidebarTab === 'files' && (
-                                                <div style={{ padding: '8px' }}>
-                                                    {files.map(file => (
-                                                        <div
-                                                            key={file.id}
-                                                            onClick={() => handleFileClick(file)}
-                                                            style={fileItemStyle(activeFile?.id === file.id)}
-                                                            className="file-item-hover"
-                                                        >
-                                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1 }}>
-                                                                <FileCode size={13} opacity={0.6} color={activeFile?.id === file.id ? 'var(--primary)' : 'inherit'} />
-                                                                <span style={{ fontSize: '12px', fontWeight: activeFile?.id === file.id ? '700' : '500' }}>{file.name}</span>
-                                                            </div>
-                                                            <div style={{ display: 'flex', gap: '4px', opacity: 0, transition: 'opacity 0.2s' }} className="file-actions">
-                                                                <RotateCcw
-                                                                    size={12}
-                                                                    style={{ cursor: 'pointer', color: 'var(--text-muted)' }}
-                                                                    onClick={(e) => { e.stopPropagation(); handleResetFile(file); }}
-                                                                    title="Reset to Default"
-                                                                />
-                                                                <Trash2
-                                                                    size={12}
-                                                                    style={{ cursor: 'pointer', color: '#f87171' }}
-                                                                    onClick={(e) => handleDeleteFile(e, file)}
-                                                                />
-                                                            </div>
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            )}
-
-                                            {sidebarTab === 'chat' && (
-                                                <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-                                                    <div style={{ flex: 1, padding: '16px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                                                        {messages.map((msg, i) => (
-                                                            <div key={i} style={messageBoxStyle(msg.userName === (user?.name || socketRef.current?.userName))}>
-                                                                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
-                                                                    <span style={{ fontSize: '10px', fontWeight: '800', color: 'var(--primary)' }}>{msg.userName}</span>
-                                                                    <span style={{ fontSize: '9px', opacity: 0.4 }}>{msg.timestamp}</span>
+                                            <div style={{ flex: 1, overflowY: 'auto' }}>
+                                                {sidebarTab === 'files' && (
+                                                    <div style={{ padding: '8px' }}>
+                                                        {files.map(file => (
+                                                            <div
+                                                                key={file.id}
+                                                                onClick={() => handleFileClick(file)}
+                                                                style={fileItemStyle(activeFile?.id === file.id)}
+                                                                className="file-item-hover"
+                                                            >
+                                                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1 }}>
+                                                                    <FileCode size={13} opacity={0.6} color={activeFile?.id === file.id ? 'var(--primary)' : 'inherit'} />
+                                                                    <span style={{ fontSize: '12px', fontWeight: activeFile?.id === file.id ? '700' : '500' }}>{file.name}</span>
                                                                 </div>
-                                                                <p style={{ margin: 0, fontSize: '12px', lineHeight: '1.5', color: 'var(--text-main)' }}>{msg.text}</p>
+                                                                <div style={{ display: 'flex', gap: '4px', opacity: 0, transition: 'opacity 0.2s' }} className="file-actions">
+                                                                    <RotateCcw
+                                                                        size={12}
+                                                                        style={{ cursor: 'pointer', color: 'var(--text-muted)' }}
+                                                                        onClick={(e) => { e.stopPropagation(); handleResetFile(file); }}
+                                                                        title="Reset to Default"
+                                                                    />
+                                                                    <Trash2
+                                                                        size={12}
+                                                                        style={{ cursor: 'pointer', color: '#f87171' }}
+                                                                        onClick={(e) => handleDeleteFile(e, file)}
+                                                                    />
+                                                                </div>
                                                             </div>
                                                         ))}
                                                     </div>
-                                                    <div style={{ padding: '12px', borderTop: '1px solid var(--border-color)', backgroundColor: 'rgba(255,255,255,0.01)' }}>
-                                                        <input
-                                                            style={chatInputStyle}
-                                                            placeholder="Type message..."
-                                                            value={newMessage}
-                                                            onChange={(e) => setNewMessage(e.target.value)}
-                                                            onKeyPress={handleSendMessage}
-                                                        />
+                                                )}
+
+                                                {sidebarTab === 'chat' && (
+                                                    <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+                                                        <div style={{ flex: 1, padding: '16px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                                                            {messages.map((msg, i) => (
+                                                                <div key={i} style={messageBoxStyle(msg.userName === (user?.name || socketRef.current?.userName))}>
+                                                                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                                                                        <span style={{ fontSize: '10px', fontWeight: '800', color: 'var(--primary)' }}>{msg.userName}</span>
+                                                                        <span style={{ fontSize: '9px', opacity: 0.4 }}>{msg.timestamp}</span>
+                                                                    </div>
+                                                                    <p style={{ margin: 0, fontSize: '12px', lineHeight: '1.5', color: 'var(--text-main)' }}>{msg.text}</p>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                        <div style={{ padding: '12px', borderTop: '1px solid var(--border-color)', backgroundColor: 'rgba(255,255,255,0.01)' }}>
+                                                            <input
+                                                                style={chatInputStyle}
+                                                                placeholder="Type message..."
+                                                                value={newMessage}
+                                                                onChange={(e) => setNewMessage(e.target.value)}
+                                                                onKeyPress={handleSendMessage}
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                )}
+
+                                                {sidebarTab === 'users' && (
+                                                    <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                                        {clients.map((client, i) => (
+                                                            <div key={i} style={participantRowStyle}>
+                                                                <div style={avatarCircleStyle}>{client.userName[0]}</div>
+                                                                <div style={{ flex: 1 }}>
+                                                                    <div style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-main)' }}>{client.userName}</div>
+                                                                    <div style={{ fontSize: '9px', color: 'var(--primary)', fontWeight: '800', textTransform: 'uppercase' }}>{i === 0 ? 'Admin' : 'Member'}</div>
+                                                                </div>
+                                                                <div style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#10b981' }} />
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </ReflexElement>
+                                )}
+
+                                {['files', 'chat', 'users'].includes(sidebarTab) && <ReflexSplitter style={splitterStyle} />}
+
+                                <ReflexElement flex={0.8} minSize={400} style={{ height: '100%' }}>
+                                    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', backgroundColor: '#0d1117' }}>
+                                        <div style={studioTabContainerStyle}>
+                                            {openFiles.map(file => (
+                                                <div key={file.id} onClick={() => setActiveFile(file)} style={studioTabStyle(activeFile?.id === file.id, isLightMode)}>
+                                                    <FileText size={12} opacity={0.7} />
+                                                    <span>{file.name}</span>
+                                                    <button style={closeTabStyle} onClick={(e) => handleCloseTab(e, file.id)}><X size={10} /></button>
+                                                </div>
+                                            ))}
+                                            {openFiles.length === 0 && <div style={{ height: '36px' }} />}
+                                        </div>
+                                        <div style={{ flex: 1, position: 'relative', display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
+                                            <div style={{ flex: isOutputVisible ? 0.6 : 1, position: 'relative' }}>
+                                                {activeFile ? (
+                                                    <EditorComp
+                                                        socketRef={socketRef}
+                                                        roomId={`project-${projectId}`}
+                                                        fileId={activeFile.id}
+                                                        onCodeChange={handleSaveFile}
+                                                        code={activeFile.content}
+                                                        filename={activeFile.name}
+                                                        lockLanguage={true}
+                                                        language={activeFile.name.split('.').pop()}
+                                                        settings={settings}
+                                                        userName={user?.name || socketRef.current?.userName}
+                                                    />
+                                                ) : (
+                                                    <div style={emptyEditorStyle}>
+                                                        <Terminal size={48} style={{ opacity: 0.05, marginBottom: '20px' }} />
+                                                        <p style={{ color: 'var(--text-muted)', fontSize: '12px', fontWeight: '600', letterSpacing: '0.1em' }}>SELECT A MODULE TO BEGIN</p>
+                                                    </div>
+                                                )}
+                                            </div>
+
+                                            {isOutputVisible && (
+                                                <div style={outputPaneStyle}>
+                                                    <div style={outputHeaderStyle}>
+                                                        <span>{showPreview ? 'Live Preview' : 'Terminal Output'}</span>
+                                                        <button style={{ background: 'none', border: 'none', color: 'white', cursor: 'pointer' }} onClick={() => { setIsOutputVisible(false); setShowPreview(false); }}>
+                                                            <X size={14} />
+                                                        </button>
+                                                    </div>
+                                                    <div style={{ flex: 1, overflow: 'hidden' }}>
+                                                        {showPreview ? (
+                                                            <iframe
+                                                                title="Preview"
+                                                                style={{ width: '100%', height: '100%', border: 'none', background: 'white' }}
+                                                                srcDoc={generatePreviewDoc()}
+                                                            />
+                                                        ) : (
+                                                            <pre style={outputTextStyle}>{output}</pre>
+                                                        )}
                                                     </div>
                                                 </div>
                                             )}
-
-                                            {sidebarTab === 'users' && (
-                                                <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                                    {clients.map((client, i) => (
-                                                        <div key={i} style={participantRowStyle}>
-                                                            <div style={avatarCircleStyle}>{client.userName[0]}</div>
-                                                            <div style={{ flex: 1 }}>
-                                                                <div style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-main)' }}>{client.userName}</div>
-                                                                <div style={{ fontSize: '9px', color: 'var(--primary)', fontWeight: '800', textTransform: 'uppercase' }}>{i === 0 ? 'Admin' : 'Member'}</div>
-                                                            </div>
-                                                            <div style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#10b981' }} />
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            )}
                                         </div>
-                                    </div>
-                                </ReflexElement>
-                            )}
-
-                            {['files', 'chat', 'users'].includes(sidebarTab) && <ReflexSplitter style={splitterStyle} />}
-
-                            <ReflexElement flex={0.8} minSize={400} style={{ height: '100%' }}>
-                                <div style={{ height: '100%', display: 'flex', flexDirection: 'column', backgroundColor: '#0d1117' }}>
-                                    <div style={studioTabContainerStyle}>
-                                        {openFiles.map(file => (
-                                            <div key={file.id} onClick={() => setActiveFile(file)} style={studioTabStyle(activeFile?.id === file.id, isLightMode)}>
-                                                <FileText size={12} opacity={0.7} />
-                                                <span>{file.name}</span>
-                                                <button style={closeTabStyle} onClick={(e) => handleCloseTab(e, file.id)}><X size={10} /></button>
-                                            </div>
-                                        ))}
-                                        {openFiles.length === 0 && <div style={{ height: '36px' }} />}
-                                    </div>
-                                    <div style={{ flex: 1, position: 'relative', display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
-                                        <div style={{ flex: isOutputVisible ? 0.6 : 1, position: 'relative' }}>
-                                            {activeFile ? (
-                                                <EditorComp
-                                                    socketRef={socketRef}
-                                                    roomId={`project-${projectId}`}
-                                                    fileId={activeFile.id}
-                                                    onCodeChange={handleSaveFile}
-                                                    code={activeFile.content}
-                                                    filename={activeFile.name}
-                                                    lockLanguage={true}
-                                                    language={activeFile.name.split('.').pop()}
-                                                    settings={settings}
-                                                    userName={user?.name || socketRef.current?.userName}
-                                                />
-                                            ) : (
-                                                <div style={emptyEditorStyle}>
-                                                    <Terminal size={48} style={{ opacity: 0.05, marginBottom: '20px' }} />
-                                                    <p style={{ color: 'var(--text-muted)', fontSize: '12px', fontWeight: '600', letterSpacing: '0.1em' }}>SELECT A MODULE TO BEGIN</p>
+                                        {!isMobile && (
+                                            <footer style={studioFooterStyle}>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                                    <Wifi size={12} color="#10b981" />
+                                                    <span>{project?.type?.toUpperCase()} Engine</span>
                                                 </div>
-                                            )}
-                                        </div>
-
-                                        {isOutputVisible && (
-                                            <div style={outputPaneStyle}>
-                                                <div style={outputHeaderStyle}>
-                                                    <span>{showPreview ? 'Live Preview' : 'Terminal Output'}</span>
-                                                    <button style={{ background: 'none', border: 'none', color: 'white', cursor: 'pointer' }} onClick={() => { setIsOutputVisible(false); setShowPreview(false); }}>
-                                                        <X size={14} />
+                                                <div style={{ display: 'flex', gap: '12px', height: '100%' }}>
+                                                    <button style={toolRunButtonStyle} onClick={handleCompile} disabled={isExecuting}>
+                                                        <Play size={12} fill="white" /> {isExecuting ? 'Running...' : 'Run Code'}
                                                     </button>
                                                 </div>
-                                                <div style={{ flex: 1, overflow: 'hidden' }}>
-                                                    {showPreview ? (
-                                                        <iframe
-                                                            title="Preview"
-                                                            style={{ width: '100%', height: '100%', border: 'none', background: 'white' }}
-                                                            srcDoc={generatePreviewDoc()}
-                                                        />
-                                                    ) : (
-                                                        <pre style={outputTextStyle}>{output}</pre>
-                                                    )}
-                                                </div>
-                                            </div>
+                                            </footer>
                                         )}
                                     </div>
-                                    {!isMobile && (
-                                        <footer style={studioFooterStyle}>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                                                <Wifi size={12} color="#10b981" />
-                                                <span>{project?.type?.toUpperCase()} Engine</span>
-                                            </div>
-                                            <div style={{ display: 'flex', gap: '12px', height: '100%' }}>
-                                                <button style={toolRunButtonStyle} onClick={handleCompile} disabled={isExecuting}>
-                                                    <Play size={12} fill="white" /> {isExecuting ? 'Running...' : 'Run Code'}
-                                                </button>
-                                            </div>
-                                        </footer>
-                                    )}
-                                </div>
-                            </ReflexElement>
-                        </ReflexContainer>
+                                </ReflexElement>
+                            </ReflexContainer>
+                        )
                     )}
                 </div>
 
@@ -944,45 +1042,46 @@ const ProjectPage = () => {
                     user={user || { name: socketRef.current?.userName || "Guest" }}
                 />
 
-                {window.innerWidth < 768 && (
+                {/* Bottom navigation for mobile */}
+                {isMobile && (
                     <div className="mobile-bottom-bar">
                         <button
-                            className={`bottom-bar-item ${sidebarTab === 'files' ? 'active' : ''}`}
-                            onClick={() => { setSidebarTab('files'); setShowMobileSidebar(true); }}
+                            className={`bottom-bar-item ${activeTab === 'code' ? 'active' : ''}`}
+                            onClick={() => setActiveTab('code')}
                         >
-                            <Folder size={20} />
-                            <span>Files</span>
+                            <FileCode size={20} />
+                            <span>Code</span>
                         </button>
                         <button
-                            className={`bottom-bar-item ${sidebarTab === 'chat' ? 'active' : ''}`}
-                            onClick={() => { setSidebarTab('chat'); setShowMobileSidebar(true); }}
+                            className={`bottom-bar-item ${activeTab === 'files' ? 'active' : ''}`}
+                            onClick={() => setActiveTab('files')}
                         >
-                            <MessageSquare size={20} />
+                            <Folder size={20} />
+                            <span>Explorer</span>
+                        </button>
+                        <button
+                            className={`bottom-bar-item ${activeTab === 'chat' ? 'active' : ''}`}
+                            onClick={() => setActiveTab('chat')}
+                        >
+                            <div style={{ position: 'relative' }}>
+                                <MessageSquare size={20} />
+                                {messages.length > 0 && <div style={{ ...notifDotStyle, width: '10px', height: '10px' }} />}
+                            </div>
                             <span>Chat</span>
                         </button>
                         <button
-                            className={`bottom-bar-item ${sidebarTab === 'video' ? 'active' : ''}`}
-                            onClick={() => { setSidebarTab('video'); setShowMobileSidebar(false); }}
+                            className={`bottom-bar-item ${activeTab === 'video' ? 'active' : ''}`}
+                            onClick={() => setActiveTab('video')}
                         >
                             <Video size={20} />
                             <span>Meeting</span>
                         </button>
                         <button
-                            className={`bottom-bar-item ${sidebarTab === 'users' ? 'active' : ''}`}
-                            onClick={() => { setSidebarTab('users'); setShowMobileSidebar(true); }}
+                            className={`bottom-bar-item ${activeTab === 'users' ? 'active' : ''}`}
+                            onClick={() => setActiveTab('users')}
                         >
                             <Users size={20} />
                             <span>People</span>
-                        </button>
-                        <button
-                            className="bottom-bar-item"
-                            onClick={() => {
-                                setShowWhiteboard(true);
-                                if (isMobile) setShowMobileSidebar(false);
-                            }}
-                        >
-                            <Palette size={20} />
-                            <span>Board</span>
                         </button>
                     </div>
                 )}
