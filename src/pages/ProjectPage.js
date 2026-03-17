@@ -10,7 +10,8 @@ import {
     X,
     MessageSquare,
     LogOut,
-    Palette,
+    Sun,
+    Moon,
     Wifi,
     Video,
     Terminal,
@@ -18,7 +19,8 @@ import {
     Users,
     Play,
     Trash2,
-    RotateCcw
+    RotateCcw,
+    Palette
 } from "lucide-react";
 import toast from "react-hot-toast";
 import EditorComp from "../components/editorComp";
@@ -68,6 +70,8 @@ const ProjectPage = () => {
     const filesRef = useRef([]);
     const openFilesRef = useRef([]);
 
+    const isLightMode = theme === "light";
+
     useEffect(() => {
         filesRef.current = files;
     }, [files]);
@@ -116,17 +120,12 @@ const ProjectPage = () => {
                 socketRef.current.on('connect_error', (err) => handleErrors(err));
                 socketRef.current.on('connect_failed', (err) => handleErrors(err));
 
-                // Universal Project Listeners
                 socketRef.current.on(ACTIONS.JOINED, ({ clients }) => {
                     setClients(clients);
                 });
 
                 socketRef.current.on(ACTIONS.DISCONNECTED, ({ socketId }) => {
                     setClients(prev => prev.filter(c => c.socketId !== socketId));
-                });
-
-                socketRef.current.on(ACTIONS.MOUSE_MOVE, ({ socketId, x, y, name }) => {
-                    // Cursors handled in EditorComp
                 });
 
                 socketRef.current.on(ACTIONS.FILE_CHANGE, ({ fileId, content }) => {
@@ -177,8 +176,7 @@ const ProjectPage = () => {
                 socketRef.current.disconnect();
             }
         };
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [projectId, user, navigate]);
+    }, [projectId, user, navigate, joinProject]);
 
     const toggleTheme = () => {
         const newTheme = theme === "dark" ? "light" : "dark";
@@ -210,7 +208,6 @@ const ProjectPage = () => {
     const handleSaveFile = async (content) => {
         if (!activeFile) return;
         setFiles(prev => prev.map(f => f.id === activeFile.id ? { ...f, content } : f));
-        // Real-time broadcast
         socketRef.current.emit(ACTIONS.FILE_CHANGE, {
             roomId: `project-${projectId}`,
             fileId: activeFile.id,
@@ -279,7 +276,6 @@ const ProjectPage = () => {
             setActiveFile(newFile);
             setOpenFiles(prev => [...prev, newFile]);
 
-            // Notify others
             socketRef.current.emit(ACTIONS.FILE_CHANGE, {
                 roomId: `project-${projectId}`,
                 fileId: newFile.id,
@@ -296,14 +292,6 @@ const ProjectPage = () => {
 
     const handleDeleteFile = async (e, file) => {
         e.stopPropagation();
-
-        // Protect core files
-        const coreFiles = ['index.html', 'style.css', 'script.js', 'main.cpp', 'main.py', 'Main.java', 'utils.h'];
-        if (coreFiles.includes(file.name)) {
-            toast.error(`Cannot delete core file: ${file.name}`);
-            return;
-        }
-
         if (!window.confirm(`Are you sure you want to delete ${file.name}?`)) return;
 
         try {
@@ -323,7 +311,6 @@ const ProjectPage = () => {
             });
             setOpenFiles(prev => prev.filter(f => f.id !== file.id));
 
-            // Sync with others
             socketRef.current.emit(ACTIONS.FILE_CHANGE, {
                 roomId: `project-${projectId}`,
                 fileId: file.id,
@@ -433,16 +420,14 @@ const ProjectPage = () => {
         setOutput("Bundling and running...");
 
         const language = activeFile?.name.split('.').pop();
-        let languageId = 63; // Default JS
+        let languageId = 63;
         if (language === 'cpp' || language === 'h') languageId = 54;
         else if (language === 'py') languageId = 71;
         else if (language === 'java') languageId = 62;
 
         let sourceCode = activeFile.content;
 
-        // Multi-file bundling logic
         if (language === 'cpp' || language === 'h') {
-            // Simple C++ include resolver
             const visited = new Set([activeFile.name]);
             const resolveIncludes = (content) => {
                 return content.replace(/#include\s*"(.*?)"/g, (match, fileName) => {
@@ -457,7 +442,6 @@ const ProjectPage = () => {
             };
             sourceCode = resolveIncludes(sourceCode);
         } else if (language === 'java') {
-            // Java Bundler: Combine all .java files, remove 'public' from secondary classes
             const otherJavaFiles = files.filter(f => f.name.endsWith('.java') && f.id !== activeFile.id);
             let bundled = sourceCode;
             otherJavaFiles.forEach(f => {
@@ -466,7 +450,6 @@ const ProjectPage = () => {
             });
             sourceCode = bundled;
         } else if (language === 'py') {
-            // Python Bundler: Append other .py files (risky but works for simple projects)
             const otherPyFiles = files.filter(f => f.name.endsWith('.py') && f.id !== activeFile.id);
             let bundled = sourceCode;
             otherPyFiles.forEach(f => {
@@ -579,7 +562,18 @@ const ProjectPage = () => {
                     </div>
                     <div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <h2 style={{ margin: 0, fontSize: '15px', fontWeight: '900', letterSpacing: '-0.02em', color: 'var(--text-main)', background: 'linear-gradient(135deg, #fff 0%, #aaa 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+                            <h2 style={{
+                                margin: 0,
+                                fontSize: '15px',
+                                fontWeight: '900',
+                                letterSpacing: '-0.02em',
+                                color: 'var(--text-main)',
+                                background: isLightMode
+                                    ? 'linear-gradient(135deg, var(--text-main) 0%, var(--primary) 100%)'
+                                    : 'linear-gradient(135deg, #fff 0%, #aaa 100%)',
+                                WebkitBackgroundClip: 'text',
+                                WebkitTextFillColor: 'transparent'
+                            }}>
                                 {project ? project.name : "UNTITLED PROJECT"}
                             </h2>
                             <div style={{ width: '1px', height: '14px', backgroundColor: 'var(--border-color)', margin: '0 4px' }} />
@@ -594,7 +588,7 @@ const ProjectPage = () => {
 
                 <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
                     <button style={themeToggleButtonStyle} onClick={toggleTheme}>
-                        <Palette size={16} />
+                        {isLightMode ? <Moon size={16} /> : <Sun size={16} />}
                     </button>
 
                     <div style={collaboratorAvatarsStyle}>
@@ -666,7 +660,6 @@ const ProjectPage = () => {
                         </div>
                     ) : (
                         <ReflexContainer orientation="vertical" style={{ flex: 1 }}>
-                            {/* Left Sidebar: Contextual Content (Collapsed if not needed) */}
                             {['files', 'chat', 'users'].includes(sidebarTab) && (
                                 <ReflexElement flex={0.2} minSize={250} style={{ backgroundColor: 'var(--bg-card)', borderRight: '1px solid var(--border-color)' }}>
                                     <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
@@ -763,12 +756,11 @@ const ProjectPage = () => {
 
                             {['files', 'chat', 'users'].includes(sidebarTab) && <ReflexSplitter style={splitterStyle} />}
 
-                            {/* Middle Area: Editor & Runner */}
                             <ReflexElement flex={0.8} minSize={400}>
                                 <div style={{ height: '100%', display: 'flex', flexDirection: 'column', backgroundColor: '#0d1117' }}>
                                     <div style={studioTabContainerStyle}>
                                         {openFiles.map(file => (
-                                            <div key={file.id} onClick={() => setActiveFile(file)} style={studioTabStyle(activeFile?.id === file.id)}>
+                                            <div key={file.id} onClick={() => setActiveFile(file)} style={studioTabStyle(activeFile?.id === file.id, isLightMode)}>
                                                 <FileText size={12} opacity={0.7} />
                                                 <span>{file.name}</span>
                                                 <button style={closeTabStyle} onClick={(e) => handleCloseTab(e, file.id)}><X size={10} /></button>
@@ -826,9 +818,9 @@ const ProjectPage = () => {
                                             <Wifi size={12} color="#10b981" />
                                             <span>{project?.type?.toUpperCase()} Engine</span>
                                         </div>
-                                        <div style={{ display: 'flex', gap: '12px' }}>
-                                            <button style={toolMiniButtonStyle} onClick={handleCompile} disabled={isExecuting}>
-                                                <Play size={12} /> {isExecuting ? 'Running...' : 'Run'}
+                                        <div style={{ display: 'flex', gap: '12px', height: '100%' }}>
+                                            <button style={toolRunButtonStyle} onClick={handleCompile} disabled={isExecuting}>
+                                                <Play size={12} fill="white" /> {isExecuting ? 'Running...' : 'Run Code'}
                                             </button>
                                         </div>
                                     </footer>
@@ -838,7 +830,6 @@ const ProjectPage = () => {
                     )}
                 </div>
 
-                {/* Overlay for Guest Name */}
                 {showNamePrompt && (
                     <div style={modalOverlayStyle}>
                         <div style={modalContentStyle}>
@@ -870,7 +861,6 @@ const ProjectPage = () => {
         </div>
     );
 };
-
 
 const logoWrapperStyle = {
     width: '36px',
@@ -953,7 +943,7 @@ const controlBarStyle = {
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
-    padding: '12px 0'
+    padding: '8px 0'
 };
 
 const controlTabButtonStyle = (active) => ({
@@ -1000,32 +990,33 @@ const studioTabContainerStyle = {
     borderBottom: '1px solid var(--border-color)',
     display: 'flex',
     alignItems: 'flex-end',
-    padding: '0 8px',
+    padding: '0 4px',
     overflowX: 'auto',
     gap: '4px'
 };
 
-const studioTabStyle = (active) => ({
+const studioTabStyle = (active, isLight) => ({
     height: '34px',
     padding: '0 16px',
-    backgroundColor: active ? '#0d1117' : 'transparent',
+    backgroundColor: active ? (isLight ? '#fff' : '#0d1117') : 'transparent',
     border: '1px solid var(--border-color)',
-    borderBottom: active ? '1px solid #0d1117' : '1px solid var(--border-color)',
-    borderRadius: '6px 6px 0 0',
+    borderBottom: active ? (isLight ? '1px solid #fff' : '1px solid #0d1117') : '1px solid var(--border-color)',
+    borderRadius: '10px 10px 0 0',
     display: 'flex',
     alignItems: 'center',
     gap: '10px',
-    fontSize: '12px',
-    fontWeight: active ? '700' : '500',
-    color: active ? 'var(--text-main)' : 'var(--text-muted)',
+    fontSize: '11px',
+    fontWeight: active ? '750' : '600',
+    color: active ? 'var(--primary)' : 'var(--text-muted)',
     cursor: 'pointer',
-    minWidth: '120px',
+    minWidth: '130px',
     zIndex: active ? 2 : 1,
-    marginBottom: '-1px'
+    marginBottom: '-1px',
+    transition: 'all 0.2s ease'
 });
 
 const studioFooterStyle = {
-    height: '28px',
+    height: '34px',
     backgroundColor: 'var(--bg-card)',
     borderTop: '1px solid var(--border-color)',
     display: 'flex',
@@ -1127,25 +1118,26 @@ const notifDotStyle = {
     border: '2px solid var(--bg-card)'
 };
 
-const toolMiniButtonStyle = {
-    padding: '6px 12px',
-    backgroundColor: 'rgba(59, 130, 246, 0.1)',
-    border: '1px solid rgba(59, 130, 246, 0.2)',
-    borderRadius: '6px',
-    color: 'var(--primary)',
+const toolRunButtonStyle = {
+    padding: '0 20px',
+    height: '100%',
+    backgroundColor: 'var(--primary)',
+    border: 'none',
+    color: 'white',
     fontSize: '11px',
-    fontWeight: '700',
+    fontWeight: '800',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: '6px',
+    gap: '8px',
     cursor: 'pointer',
-    transition: 'all 0.2s'
+    transition: 'all 0.2s',
+    borderRadius: '0'
 };
 
 const outputPaneStyle = {
     flex: 0.4,
-    backgroundColor: '#0d1117',
+    backgroundColor: 'var(--bg-dark)',
     borderTop: '1px solid var(--border-color)',
     display: 'flex',
     flexDirection: 'column',

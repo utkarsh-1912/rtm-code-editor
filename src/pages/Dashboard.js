@@ -216,59 +216,25 @@ const Dashboard = () => {
                         flexWrap: 'wrap',
                         width: window.innerWidth < 768 ? '100%' : 'auto'
                     }}>
-                        {user?.last_room_id && (
-                            <button
-                                onClick={() => navigate(`/editor/${user.last_room_id}`, { state: { userName: user.name, role: 'editor' } })}
-                                style={{
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '10px',
-                                    backgroundColor: 'rgba(168, 85, 247, 0.08)',
-                                    color: '#a855f7',
-                                    border: '1px solid rgba(168, 85, 247, 0.2)',
-                                    padding: '12px',
-                                    borderRadius: '12px',
-                                    fontWeight: '700',
-                                    fontSize: '14px',
-                                    cursor: 'pointer',
-                                    transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                                    boxShadow: '0 4px 12px rgba(168, 85, 247, 0.1)',
-                                    flex: window.innerWidth < 768 ? '1' : 'none',
-                                    justifyContent: 'center',
-                                    minWidth: window.innerWidth < 768 ? '100%' : 'auto'
-                                }}
-                                onMouseOver={(e) => {
-                                    e.currentTarget.style.backgroundColor = 'rgba(168, 85, 247, 0.12)';
-                                    e.currentTarget.style.transform = 'translateY(-2px)';
-                                }}
-                                onMouseOut={(e) => {
-                                    e.currentTarget.style.backgroundColor = 'rgba(168, 85, 247, 0.08)';
-                                    e.currentTarget.style.transform = 'translateY(0)';
-                                }}
-                            >
-                                <Zap size={18} fill="#a855f7" /> Resume: {user.last_room_id}
-                            </button>
-                        )}
                         <button
                             onClick={() => setShowCreateProjectModal(true)}
                             style={{
                                 display: 'flex',
                                 alignItems: 'center',
                                 gap: '10px',
-                                padding: '12px 24px',
+                                padding: '10px 20px',
                                 background: 'rgba(59, 130, 246, 0.1)',
                                 color: 'var(--primary)',
                                 border: '1px solid var(--border-color)',
-                                borderRadius: '12px',
+                                borderRadius: '10px',
                                 fontWeight: '700',
-                                fontSize: '14px',
+                                fontSize: '13px',
                                 cursor: 'pointer',
                                 transition: 'all 0.3s',
-                                flex: window.innerWidth < 768 ? '1' : 'none',
-                                justifyContent: 'center'
+                                flex: 'none'
                             }}
                         >
-                            <Folder size={18} /> New Project
+                            <Folder size={16} /> New Project
                         </button>
                         <button
                             onClick={() => navigate('/')}
@@ -276,29 +242,28 @@ const Dashboard = () => {
                                 display: 'flex',
                                 alignItems: 'center',
                                 gap: '10px',
-                                padding: '12px 24px',
+                                padding: '10px 20px',
                                 background: 'linear-gradient(135deg, var(--primary) 0%, #2563eb 100%)',
                                 color: 'white',
                                 border: 'none',
-                                borderRadius: '12px',
+                                borderRadius: '10px',
                                 fontWeight: '700',
-                                fontSize: '14px',
+                                fontSize: '13px',
                                 cursor: 'pointer',
                                 transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                                boxShadow: '0 10px 20px -5px rgba(59, 130, 246, 0.4)',
-                                flex: window.innerWidth < 768 ? '1' : 'none',
-                                justifyContent: 'center'
+                                boxShadow: '0 8px 16px -4px rgba(59, 130, 246, 0.3)',
+                                flex: 'none'
                             }}
                             onMouseOver={(e) => {
                                 e.currentTarget.style.transform = 'translateY(-2px)';
-                                e.currentTarget.style.boxShadow = '0 15px 25px -5px rgba(59, 130, 246, 0.5)';
+                                e.currentTarget.style.boxShadow = '0 12px 20px -4px rgba(59, 130, 246, 0.4)';
                             }}
                             onMouseOut={(e) => {
                                 e.currentTarget.style.transform = 'translateY(0)';
-                                e.currentTarget.style.boxShadow = '0 10px 20px -5px rgba(59, 130, 246, 0.4)';
+                                e.currentTarget.style.boxShadow = '0 8px 16px -4px rgba(59, 130, 246, 0.3)';
                             }}
                         >
-                            <Plus size={20} strokeWidth={2.5} /> New Room
+                            <Plus size={18} strokeWidth={2.5} /> New Room
                         </button>
                     </div>
                 </div>
@@ -387,8 +352,8 @@ const Dashboard = () => {
                 <div style={{
                     display: 'grid',
                     gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
-                    gap: '20px',
-                    marginBottom: '40px'
+                    gap: '16px',
+                    marginBottom: '32px'
                 }}>
                     {[
                         { label: 'Active Projects', value: stats.totalRooms || 0, icon: <Terminal size={20} /> },
