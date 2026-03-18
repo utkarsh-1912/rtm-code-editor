@@ -9,6 +9,7 @@ import { EditorView, Decoration, ViewPlugin, WidgetType } from "@codemirror/view
 import { vim } from "@replit/codemirror-vim";
 import { emacs } from "@replit/codemirror-emacs";
 import ACTIONS from "../Action";
+import { Terminal, X } from "lucide-react";
 
 // --- Remote Cursor Branding ---
 class CursorWidget extends WidgetType {
@@ -50,10 +51,13 @@ function ProjectEditor({
     onCodeChange,
     settings,
     isLightMode,
-    language
+    language,
+    userInput,
+    setUserInput
 }) {
     const [editorCode, setEditorCode] = useState(code || "");
     const [remoteCursors, setRemoteCursors] = useState({});
+    const [showInputModal, setShowInputModal] = useState(false);
     const bypassRef = useRef(false); // To prevent echo feedback loops
 
     // 1. Sync Remote Code Changes
@@ -141,7 +145,7 @@ function ProjectEditor({
     };
 
     return (
-        <div style={{ height: "100%", backgroundColor: "#0d1117", overflow: "hidden" }}>
+        <div style={{ height: "100%", backgroundColor: "#0d1117", overflow: "hidden", position: 'relative' }}>
             <CodeMirror
                 value={editorCode}
                 height="100%"
@@ -164,6 +168,123 @@ function ProjectEditor({
                 ]}
                 style={{ height: "100%" }}
             />
+
+            {/* Floating Input Trigger */}
+            <button
+                onClick={() => setShowInputModal(true)}
+                title="Program Input (STDIN)"
+                style={{
+                    position: 'absolute',
+                    bottom: '20px',
+                    right: '20px',
+                    width: '36px',
+                    height: '36px',
+                    borderRadius: '50%',
+                    backgroundColor: 'rgba(59, 130, 246, 0.2)',
+                    backdropFilter: 'blur(8px)',
+                    border: '1px solid rgba(59, 130, 246, 0.3)',
+                    color: 'var(--primary)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: 'pointer',
+                    zIndex: 50,
+                    transition: 'all 0.2s',
+                    boxShadow: '0 4px 12px rgba(0,0,0,0.3)'
+                }}
+                onMouseOver={(e) => {
+                    e.currentTarget.style.backgroundColor = 'var(--primary)';
+                    e.currentTarget.style.color = 'white';
+                }}
+                onMouseOut={(e) => {
+                    e.currentTarget.style.backgroundColor = 'rgba(59, 130, 246, 0.2)';
+                    e.currentTarget.style.color = 'var(--primary)';
+                }}
+            >
+                <Terminal size={18} />
+            </button>
+
+            {/* Input Overlay Modal */}
+            {showInputModal && (
+                <div style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    backgroundColor: 'rgba(0,0,0,0.6)',
+                    backdropFilter: 'blur(4px)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    zIndex: 1000
+                }}>
+                    <div className="glass-panel" style={{
+                        width: '400px',
+                        padding: '24px',
+                        borderRadius: '20px',
+                        border: '1px solid rgba(255,255,255,0.1)',
+                        boxShadow: '0 20px 40px rgba(0,0,0,0.4)',
+                        position: 'relative'
+                    }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                <Terminal size={20} color="var(--primary)" />
+                                <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '800' }}>Program Input</h3>
+                            </div>
+                            <button 
+                                onClick={() => setShowInputModal(false)}
+                                style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}
+                            >
+                                <X size={20} />
+                            </button>
+                        </div>
+                        
+                        <p style={{ margin: '0 0 16px 0', fontSize: '13px', color: 'var(--text-muted)', lineHeight: '1.5' }}>
+                            Provide text that will be sent to the program's standard input (STDIN) during execution.
+                        </p>
+
+                        <textarea 
+                            style={{
+                                width: '100%',
+                                height: '150px',
+                                backgroundColor: '#0d1117',
+                                border: '1px solid var(--border-color)',
+                                borderRadius: '12px',
+                                color: 'white',
+                                padding: '12px',
+                                fontSize: '14px',
+                                fontFamily: 'monospace',
+                                resize: 'none',
+                                outline: 'none',
+                                transition: 'border 0.2s'
+                            }}
+                            autoFocus
+                            placeholder="Enter stdin here..."
+                            value={userInput}
+                            onChange={(e) => setUserInput(e.target.value)}
+                        />
+
+                        <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '20px' }}>
+                            <button 
+                                onClick={() => setShowInputModal(false)}
+                                style={{
+                                    padding: '8px 24px',
+                                    borderRadius: '8px',
+                                    border: 'none',
+                                    backgroundColor: 'var(--primary)',
+                                    color: 'white',
+                                    fontWeight: '700',
+                                    cursor: 'pointer',
+                                    boxShadow: '0 4px 10px rgba(59, 130, 246, 0.3)'
+                                }}
+                            >
+                                Save Input
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

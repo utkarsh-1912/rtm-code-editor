@@ -18,6 +18,10 @@ const VideoChat = ({ socketRef, projectId, user, isMinimized, onMinimizeToggle, 
     const [activeSpeaker, setActiveSpeaker] = useState(null);
     const [isExpanded, setIsExpanded] = useState(false);
     const [isConnecting, setIsConnecting] = useState(false);
+    const [pipPosition, setPipPosition] = useState({ x: window.innerWidth - 240, y: window.innerHeight - 200 });
+    const [isDragging, setIsDragging] = useState(false);
+    const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+    const [isHoveringMini, setIsHoveringMini] = useState(false);
 
     // --- Refs for WebRTC & Audio ---
     const peersRef = useRef({}); // { socketId: RTCPeerConnection }
@@ -301,6 +305,35 @@ const VideoChat = ({ socketRef, projectId, user, isMinimized, onMinimizeToggle, 
         return () => clearInterval(interval);
     }, [inCall, activeSpeaker, isMuted, remoteUsers]);
 
+    // --- PiP Drag Logic ---
+    useEffect(() => {
+        if (!isDragging) return;
+
+        const handleMouseMove = (e) => {
+            setPipPosition({
+                x: e.clientX - dragOffset.x,
+                y: e.clientY - dragOffset.y
+            });
+        };
+
+        const handleMouseUp = () => setIsDragging(false);
+
+        window.addEventListener('mousemove', handleMouseMove);
+        window.addEventListener('mouseup', handleMouseUp);
+        return () => {
+            window.removeEventListener('mousemove', handleMouseMove);
+            window.removeEventListener('mouseup', handleMouseUp);
+        };
+    }, [isDragging, dragOffset]);
+
+    const startDragging = (e) => {
+        setIsDragging(true);
+        setDragOffset({
+            x: e.clientX - pipPosition.x,
+            y: e.clientY - pipPosition.y
+        });
+    };
+
     // --- Screen Sharing ---
     const toggleScreenShare = async () => {
         try {
@@ -342,29 +375,61 @@ const VideoChat = ({ socketRef, projectId, user, isMinimized, onMinimizeToggle, 
 
     if (isMinimized && inCall) {
         return (
-            <div className="glass-panel" style={minimizedOverlayStyle}>
+            <div 
+                className="glass-panel" 
+                style={{
+                    ...minimizedOverlayStyle,
+                    left: `${pipPosition.x}px`,
+                    top: `${pipPosition.y}px`,
+                    bottom: 'auto',
+                    right: 'auto',
+                    border: isDragging ? '2px solid var(--primary)' : '1px solid rgba(255,255,255,0.1)',
+                    scale: isDragging ? '1.02' : '1',
+                    transition: isDragging ? 'none' : 'scale 0.2s, border 0.2s'
+                }}
+                onMouseDown={startDragging}
+                onMouseEnter={() => setIsHoveringMini(true)}
+                onMouseLeave={() => setIsHoveringMini(false)}
+            >
                 <div style={minifiedGridStyle}>
-                    {/* SHOW ONLY ACTIVE SPEAKER OR LOCAL */}
                     {activeSpeaker === 'local' || !activeSpeaker ? (
                         <video ref={(el) => { if (el) el.srcObject = localStream }} autoPlay muted playsInline style={miniVideoElement} />
                     ) : (
                         <RemoteVideo user={remoteUsers[activeSpeaker]} isMini />
                     )}
                 </div>
-                <div style={miniControls}>
-                    <button style={miniBtn} onClick={() => onMinimizeToggle(false)}><Maximize2 size={12} color="white" /></button>
+
+                {/* Internal Hover Controls */}
+                <div style={{
+                    ...miniControls,
+                    opacity: isHoveringMini || isDragging ? 1 : 0,
+                    transform: isHoveringMini || isDragging ? 'translateY(0)' : 'translateY(10px)',
+                    transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                    pointerEvents: isHoveringMini ? 'auto' : 'none'
+                }}>
+                    <button style={miniBtn} onClick={(e) => { e.stopPropagation(); onMinimizeToggle(false); }} title="Expand">
+                        <Maximize2 size={12} color="white" />
+                    </button>
                     <button
                         style={{ ...miniBtn, color: isMuted ? '#ef4444' : 'white' }}
-                        onClick={() => {
+                        onClick={(e) => {
+                            e.stopPropagation();
                             const tr = localStream.getAudioTracks()[0];
                             tr.enabled = !tr.enabled;
                             setIsMuted(!tr.enabled);
                             broadcastMediaState({ isMuted: !tr.enabled });
                         }}
+                        title={isMuted ? "Unmute" : "Mute"}
                     >
                         {isMuted ? <MicOff size={12} color="#ef4444" /> : <Mic size={12} color="white" />}
                     </button>
-                    <button style={{ ...miniBtn, backgroundColor: '#ef4444' }} onClick={handleLeaveCallLocal}><PhoneOff size={12} color="white" /></button>
+                    <button 
+                        style={{ ...miniBtn, backgroundColor: '#ef4444' }} 
+                        onClick={(e) => { e.stopPropagation(); handleLeaveCallLocal(); }}
+                        title="End Call"
+                    >
+                        <PhoneOff size={12} color="white" />
+                    </button>
                 </div>
             </div>
         );
@@ -373,17 +438,9 @@ const VideoChat = ({ socketRef, projectId, user, isMinimized, onMinimizeToggle, 
     return (
         <div style={containerStyle(isExpanded)}>
             {!inCall ? (
-                <div style={welcomeScreenStyle}>
-                    <div className="glass-panel" style={welcomeCardStyle}>
-                        <div style={pulseIconStyle}><Radio size={32} color="var(--primary)" /></div>
-                        <h2 style={{ fontSize: '20px', fontWeight: '900', color: '#fff', marginBottom: '8px' }}>Collaboration Hub</h2>
-                        <button
-                            style={primaryJoinButtonStyle(isConnecting)}
-                            onClick={handleJoinCallLocal}
-                            disabled={isConnecting}
-                        >
-                            {isConnecting ? "Negotiating..." : (user?.isGuest ? "Join as Spectator" : "Join Conference")}
-                        </button>
+                <div style={{ ...welcomeScreenStyle, backgroundColor: 'transparent' }}>
+                    <div style={{ color: 'var(--text-muted)', fontSize: '12px', fontWeight: '800', letterSpacing: '0.1em', opacity: 0.5 }}>
+                        JOIN THE CONFERENCE TO BEGIN COLLABORATING
                     </div>
                 </div>
             ) : (
@@ -484,12 +541,17 @@ const containerStyle = (isExpanded) => ({
 const minimizedOverlayStyle = {
     position: 'fixed', bottom: '80px', right: '24px', width: '220px', height: '140px',
     borderRadius: '16px', zIndex: 9999, overflow: 'hidden', display: 'flex', flexDirection: 'column',
-    boxShadow: '0 20px 40px rgba(0,0,0,0.5)', cursor: 'move'
+    boxShadow: '0 20px 40px rgba(0,0,0,0.5)', cursor: 'move', userSelect: 'none'
 };
 
 const minifiedGridStyle = { flex: 1, backgroundColor: '#000', position: 'relative' };
-const miniVideoElement = { width: '100%', height: '100%', objectFit: 'cover' };
-const miniControls = { padding: '8px', display: 'flex', gap: '8px', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.5)', borderTop: '1px solid rgba(255,255,255,0.05)' };
+const miniVideoElement = { width: '100%', height: '100%', objectFit: 'cover', pointerEvents: 'none' };
+const miniControls = { 
+    position: 'absolute', bottom: '10px', left: '50%', transform: 'translateX(-50%)',
+    display: 'flex', gap: '8px', padding: '6px', borderRadius: '12px',
+    backgroundColor: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)',
+    border: '1px solid rgba(255,255,255,0.1)', zIndex: 2
+};
 const miniBtn = { width: '24px', height: '24px', borderRadius: '6px', border: 'none', backgroundColor: 'rgba(255,255,255,0.1)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' };
 
 const welcomeScreenStyle = { flex: 1, display: "flex", alignItems: "center", justifyContent: "center", padding: "24px" };

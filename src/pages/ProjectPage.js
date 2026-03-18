@@ -992,6 +992,8 @@ const ProjectPage = () => {
                                                         settings={settings}
                                                         userName={user?.name || socketRef.current?.userName}
                                                         isLightMode={isLightMode}
+                                                        userInput={userInput}
+                                                        setUserInput={setUserInput}
                                                     />
                                                 ) : (
                                                     <div style={emptyEditorStyle}>
@@ -1051,13 +1053,51 @@ const ProjectPage = () => {
                                         </div>
                                         {!isMobile && (
                                             <footer style={studioFooterStyle}>
-                                                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                                                    <Wifi size={12} color="#10b981" />
-                                                    <span>{project?.type?.toUpperCase()} Engine</span>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                    <div style={{ 
+                                                        width: '6px', 
+                                                        height: '6px', 
+                                                        borderRadius: '50%', 
+                                                        backgroundColor: '#10b981',
+                                                        boxShadow: '0 0 6px rgba(16, 185, 129, 0.4)'
+                                                    }} />
+                                                    <span style={{ fontSize: '9px', fontWeight: '900', color: 'var(--text-muted)' }}>{project?.type?.toUpperCase()} ENGINE</span>
                                                 </div>
-                                                <div style={{ display: 'flex', gap: '12px', height: '100%' }}>
-                                                    <button style={toolRunButtonStyle} onClick={handleCompile} disabled={isExecuting}>
-                                                        <Play size={12} fill="white" /> {isExecuting ? 'Running...' : 'Run Code'}
+                                                <div style={{ display: 'flex', gap: '10px', height: '100%', alignItems: 'center' }}>
+                                                    <button 
+                                                        onClick={() => setShowInputPanel(!showInputPanel)}
+                                                        title="Set Program Input"
+                                                        style={{ background: 'none', border: 'none', color: showInputPanel ? 'var(--primary)' : 'var(--text-muted)', cursor: 'pointer', padding: '2px' }}
+                                                    >
+                                                        <Terminal size={14} />
+                                                    </button>
+                                                    <div style={{ width: '1px', height: '12px', backgroundColor: 'var(--border-color)' }} />
+                                                    <button 
+                                                        onClick={() => setIsMeetingStarting(!isMeetingStarting)}
+                                                        title={isMeetingStarting ? "Leave Call" : "Join Conference"}
+                                                        style={{ background: 'none', border: 'none', color: isMeetingStarting ? '#ef4444' : 'var(--text-muted)', cursor: 'pointer', padding: '2px' }}
+                                                    >
+                                                        {isMeetingStarting ? <PhoneOff size={14} /> : <Video size={14} />}
+                                                    </button>
+                                                    <button 
+                                                        style={{
+                                                            display: 'flex',
+                                                            alignItems: 'center',
+                                                            gap: '6px',
+                                                            padding: '0 10px',
+                                                            borderRadius: '4px',
+                                                            border: 'none',
+                                                            backgroundColor: 'var(--primary)',
+                                                            color: 'white',
+                                                            fontSize: '9px',
+                                                            fontWeight: '900',
+                                                            cursor: isExecuting ? 'wait' : 'pointer',
+                                                            height: '20px'
+                                                        }}
+                                                        onClick={handleCompile} 
+                                                        disabled={isExecuting}
+                                                    >
+                                                        <Play size={10} fill="currentColor" /> {isExecuting ? '...' : 'RUN'}
                                                     </button>
                                                 </div>
                                             </footer>
@@ -1142,85 +1182,73 @@ const ProjectPage = () => {
                 )}
             </div>
 
-            {/* Studio Footer */}
-            <div style={{
-                height: '48px',
-                backgroundColor: '#0d1117',
-                borderTop: '1px solid var(--border-color)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                padding: '0 16px',
-                position: 'relative',
-                zIndex: 40
-            }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <div style={{
-                        width: '8px',
-                        height: '8px',
-                        borderRadius: '50%',
+            {/* Minimal Studio Footer */}
+            <footer style={studioFooterStyle}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <div style={{ 
+                        width: '6px', 
+                        height: '6px', 
+                        borderRadius: '50%', 
                         backgroundColor: '#10b981',
-                        boxShadow: '0 0 8px rgba(16, 185, 129, 0.4)'
+                        boxShadow: '0 0 6px rgba(16, 185, 129, 0.4)'
                     }} />
-                    <span style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-muted)' }}>
-                        Project Connected
+                    <span style={{ fontSize: '9px', fontWeight: '700', color: 'var(--text-muted)' }}>
+                        {project?.type?.toUpperCase()} ENGINE
                     </span>
                 </div>
 
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                    {/* Input Popover */}
-                    <div style={{ position: 'relative' }}>
-                        <button
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', height: '100%' }}>
+                    {/* Compact Input Trigger */}
+                    <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                        <button 
                             onClick={() => setShowInputPanel(!showInputPanel)}
+                            title="Set Program Input (STDIN)"
                             style={{
+                                background: 'none',
+                                border: 'none',
+                                color: showInputPanel ? 'var(--primary)' : 'var(--text-muted)',
+                                cursor: 'pointer',
                                 display: 'flex',
                                 alignItems: 'center',
-                                gap: '6px',
-                                padding: '6px 12px',
-                                borderRadius: '8px',
-                                border: showInputPanel ? '1px solid var(--primary)' : '1px solid var(--border-color)',
-                                backgroundColor: showInputPanel ? 'rgba(59, 130, 246, 0.1)' : 'transparent',
-                                color: showInputPanel ? 'var(--primary)' : 'var(--text-muted)',
-                                fontSize: '12px',
-                                fontWeight: '700',
-                                cursor: 'pointer',
+                                padding: '4px',
                                 transition: 'all 0.2s'
                             }}
                         >
-                            <span style={{ fontSize: '10px', opacity: 0.5 }}>STDIN</span>
-                            Input
+                            <Terminal size={14} />
                         </button>
-
+                        
                         {showInputPanel && (
                             <div className="glass-panel" style={{
                                 position: 'absolute',
-                                bottom: 'calc(100% + 12px)',
+                                bottom: 'calc(100% + 10px)',
                                 right: 0,
-                                width: '300px',
-                                padding: '16px',
-                                borderRadius: '16px',
+                                width: '240px',
+                                padding: '12px',
+                                borderRadius: '12px',
                                 boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
-                                border: '1px solid rgba(255,255,255,0.1)',
-                                zIndex: 100
+                                border: '1px solid var(--border-color)',
+                                zIndex: 100,
+                                textTransform: 'none'
                             }}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
-                                    <h4 style={{ margin: 0, fontSize: '13px', fontWeight: '800' }}>Program Input</h4>
-                                    <button onClick={() => setShowInputPanel(false)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}>Close</button>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', alignItems: 'center' }}>
+                                    <span style={{ fontSize: '11px', fontWeight: '800', color: 'white' }}>STDIN Input</span>
+                                    <button onClick={() => setShowInputPanel(false)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '10px' }}>✕</button>
                                 </div>
-                                <textarea
+                                <textarea 
                                     style={{
                                         width: '100%',
-                                        height: '100px',
+                                        height: '80px',
                                         backgroundColor: '#0d1117',
                                         border: '1px solid var(--border-color)',
-                                        borderRadius: '8px',
+                                        borderRadius: '6px',
                                         color: 'white',
-                                        padding: '10px',
-                                        fontSize: '13px',
+                                        padding: '8px',
+                                        fontSize: '12px',
                                         fontFamily: 'monospace',
-                                        resize: 'none'
+                                        resize: 'none',
+                                        outline: 'none'
                                     }}
-                                    placeholder="Enter stdin here..."
+                                    placeholder="Enter input here..."
                                     value={userInput}
                                     onChange={(e) => setUserInput(e.target.value)}
                                 />
@@ -1228,53 +1256,51 @@ const ProjectPage = () => {
                         )}
                     </div>
 
-                    <div style={{ width: '1px', height: '20px', backgroundColor: 'var(--border-color)' }} />
-
-                    <button
+                    <div style={{ width: '1px', height: '12px', backgroundColor: 'var(--border-color)' }} />
+                    
+                    {/* Compact Meeting Toggle */}
+                    <button 
                         onClick={() => setIsMeetingStarting(!isMeetingStarting)}
+                        title={isMeetingStarting ? "Leave Call" : "Join Conference"}
                         style={{
+                            background: 'none',
+                            border: 'none',
+                            color: isMeetingStarting ? '#ef4444' : 'var(--text-muted)',
+                            cursor: 'pointer',
                             display: 'flex',
                             alignItems: 'center',
-                            gap: '8px',
-                            padding: '6px 14px',
-                            borderRadius: '8px',
-                            border: isMeetingStarting ? '1px solid #ef4444' : '1px solid var(--border-color)',
-                            backgroundColor: isMeetingStarting ? 'rgba(239, 68, 68, 0.1)' : 'transparent',
-                            color: isMeetingStarting ? '#ef4444' : 'var(--text-muted)',
-                            fontSize: '12px',
-                            fontWeight: '700',
-                            cursor: 'pointer',
+                            padding: '4px',
                             transition: 'all 0.2s'
                         }}
                     >
                         {isMeetingStarting ? <PhoneOff size={14} /> : <Video size={14} />}
-                        {isMeetingStarting ? "Leave Call" : "Join Meeting"}
                     </button>
 
-                    <button
+                    <button 
                         onClick={handleCompile}
                         disabled={isExecuting}
                         style={{
                             display: 'flex',
                             alignItems: 'center',
-                            gap: '8px',
-                            padding: '6px 18px',
-                            borderRadius: '8px',
+                            gap: '6px',
+                            padding: '0 10px',
+                            borderRadius: '4px',
                             border: 'none',
                             backgroundColor: 'var(--primary)',
                             color: 'white',
-                            fontSize: '12px',
-                            fontWeight: '800',
+                            fontSize: '9px',
+                            fontWeight: '900',
                             cursor: isExecuting ? 'wait' : 'pointer',
-                            transition: 'all 0.2s',
-                            boxShadow: '0 4px 12px rgba(59, 130, 246, 0.3)'
+                            height: '20px',
+                            boxShadow: '0 2px 8px rgba(59, 130, 246, 0.2)',
+                            transition: 'all 0.2s'
                         }}
                     >
-                        <Play size={14} fill="currentColor" />
-                        {isExecuting ? "Running..." : "Run Code"}
+                        <Play size={10} fill="currentColor" />
+                        {isExecuting ? '...' : 'RUN'}
                     </button>
                 </div>
-            </div>
+            </footer>
 
             {/* Persistent Video Overlay */}
             <VideoChat
