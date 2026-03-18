@@ -415,13 +415,32 @@ const VideoChat = ({ socketRef, projectId, user, isMinimized, onMinimizeToggle, 
                     </button>
                     <button
                         style={{ ...miniBtn, color: isVideoOff ? '#ef4444' : 'white' }}
-                        onClick={(e) => {
+                        onClick={async (e) => {
                             e.stopPropagation();
-                            const tr = localStream?.getVideoTracks()[0];
-                            if (tr) {
-                                tr.enabled = !tr.enabled;
-                                setIsVideoOff(!tr.enabled);
-                                broadcastMediaState({ isVideoOff: !tr.enabled });
+                            const videoTrack = localStream?.getVideoTracks()[0];
+                            if (!videoTrack) return;
+                            
+                            if (!isVideoOff) {
+                                videoTrack.stop();
+                                setIsVideoOff(true);
+                                broadcastMediaState({ isVideoOff: true });
+                            } else {
+                                try {
+                                    const newStream = await navigator.mediaDevices.getUserMedia({ 
+                                        video: { width: 1280, height: 720, frameRate: 30 } 
+                                    });
+                                    const newTrack = newStream.getVideoTracks()[0];
+                                    localStream.removeTrack(videoTrack);
+                                    localStream.addTrack(newTrack);
+                                    Object.values(peersRef.current).forEach(peer => {
+                                        const sender = peer.getSenders().find(s => s.track && s.track.kind === 'video');
+                                        if (sender) sender.replaceTrack(newTrack);
+                                    });
+                                    setIsVideoOff(false);
+                                    broadcastMediaState({ isVideoOff: false });
+                                } catch (err) {
+                                    console.error("Failed to restart camera from PiP", err);
+                                }
                             }
                         }}
                         title={isVideoOff ? "Turn Camera On" : "Turn Camera Off"}
@@ -444,11 +463,11 @@ const VideoChat = ({ socketRef, projectId, user, isMinimized, onMinimizeToggle, 
                         {isMuted ? <MicOff size={12} /> : <Mic size={12} />}
                     </button>
                     <button
-                        style={{ ...miniBtn, backgroundColor: 'rgba(239, 68, 68, 0.8)' }}
-                        onClick={(e) => { e.stopPropagation(); handleLeaveCallLocal(); }}
-                        title="End Call"
+                        style={{ ...miniBtn }}
+                        onClick={(e) => { e.stopPropagation(); onMinimizeToggle(false); }}
+                        title="Expand"
                     >
-                        <PhoneOff size={12} color="white" />
+                        <Maximize2 size={12} color="white" />
                     </button>
                 </div>
             </div>
@@ -492,11 +511,37 @@ const VideoChat = ({ socketRef, projectId, user, isMinimized, onMinimizeToggle, 
                                     }}>
                                         {isMuted ? <MicOff size={18} color="#ef4444" /> : <Mic size={18} color="white" />}
                                     </button>
-                                    <button style={controlCircle(isVideoOff, '#ef4444')} onClick={() => {
-                                        const tr = localStream.getVideoTracks()[0];
-                                        tr.enabled = !tr.enabled;
-                                        setIsVideoOff(!tr.enabled);
-                                        broadcastMediaState({ isVideoOff: !tr.enabled });
+                                    <button style={controlCircle(isVideoOff, '#ef4444')} onClick={async () => {
+                                        const videoTrack = localStream.getVideoTracks()[0];
+                                        if (!isVideoOff) {
+                                            // Stop the track to turn off LED
+                                            videoTrack.stop();
+                                            setIsVideoOff(true);
+                                            broadcastMediaState({ isVideoOff: true });
+                                        } else {
+                                            try {
+                                                const newStream = await navigator.mediaDevices.getUserMedia({ 
+                                                    video: { width: 1280, height: 720, frameRate: 30 } 
+                                                });
+                                                const newTrack = newStream.getVideoTracks()[0];
+                                                
+                                                // Replace in local stream
+                                                localStream.removeTrack(videoTrack);
+                                                localStream.addTrack(newTrack);
+                                                
+                                                // Replace in all peer connections
+                                                Object.values(peersRef.current).forEach(peer => {
+                                                    const sender = peer.getSenders().find(s => s.track && s.track.kind === 'video');
+                                                    if (sender) sender.replaceTrack(newTrack);
+                                                });
+                                                
+                                                setIsVideoOff(false);
+                                                broadcastMediaState({ isVideoOff: false });
+                                            } catch (err) {
+                                                console.error("Failed to restart camera", err);
+                                                toast.error("Could not restart camera");
+                                            }
+                                        }
                                     }}>
                                         {isVideoOff ? <VideoOff size={18} color="#ef4444" /> : <Video size={18} color="white" />}
                                     </button>
