@@ -1125,7 +1125,9 @@ const ProjectPage = () => {
 };
 
 const logoWrapperStyle = {
-    width: '36px',
+    width: 'auto',
+    minWidth: '36px',
+    padding: '0 12px',
     height: '36px',
     backgroundColor: 'rgba(59, 130, 246, 0.1)',
     borderRadius: '10px',
