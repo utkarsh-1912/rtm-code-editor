@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import {
-    PhoneOff, Video, VideoOff, Mic, MicOff, Maximize2, Minimize2,
+    Video, VideoOff, Mic, MicOff, Maximize2, Minimize2,
     ChevronDown, User, ScreenShare, ScreenShareOff
 } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -156,10 +156,6 @@ const VideoChat = ({ socketRef, projectId, user, isMinimized, onMinimizeToggle, 
         }
     }, [externalInCall, inCall, handleJoinCall, handleLeaveCall]);
 
-    const handleLeaveCallLocal = () => {
-        handleLeaveCall();
-        onCallStateChange?.(false);
-    };
 
     // --- Socket Signaling Handlers ---
     useEffect(() => {
@@ -419,15 +415,15 @@ const VideoChat = ({ socketRef, projectId, user, isMinimized, onMinimizeToggle, 
                             e.stopPropagation();
                             const videoTrack = localStream?.getVideoTracks()[0];
                             if (!videoTrack) return;
-                            
+
                             if (!isVideoOff) {
                                 videoTrack.stop();
                                 setIsVideoOff(true);
                                 broadcastMediaState({ isVideoOff: true });
                             } else {
                                 try {
-                                    const newStream = await navigator.mediaDevices.getUserMedia({ 
-                                        video: { width: 1280, height: 720, frameRate: 30 } 
+                                    const newStream = await navigator.mediaDevices.getUserMedia({
+                                        video: { width: 1280, height: 720, frameRate: 30 }
                                     });
                                     const newTrack = newStream.getVideoTracks()[0];
                                     localStream.removeTrack(videoTrack);
@@ -520,21 +516,21 @@ const VideoChat = ({ socketRef, projectId, user, isMinimized, onMinimizeToggle, 
                                             broadcastMediaState({ isVideoOff: true });
                                         } else {
                                             try {
-                                                const newStream = await navigator.mediaDevices.getUserMedia({ 
-                                                    video: { width: 1280, height: 720, frameRate: 30 } 
+                                                const newStream = await navigator.mediaDevices.getUserMedia({
+                                                    video: { width: 1280, height: 720, frameRate: 30 }
                                                 });
                                                 const newTrack = newStream.getVideoTracks()[0];
-                                                
+
                                                 // Replace in local stream
                                                 localStream.removeTrack(videoTrack);
                                                 localStream.addTrack(newTrack);
-                                                
+
                                                 // Replace in all peer connections
                                                 Object.values(peersRef.current).forEach(peer => {
                                                     const sender = peer.getSenders().find(s => s.track && s.track.kind === 'video');
                                                     if (sender) sender.replaceTrack(newTrack);
                                                 });
-                                                
+
                                                 setIsVideoOff(false);
                                                 broadcastMediaState({ isVideoOff: false });
                                             } catch (err) {

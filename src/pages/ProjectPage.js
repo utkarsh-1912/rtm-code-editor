@@ -691,7 +691,7 @@ const ProjectPage = () => {
                             style={{ height: isMobile ? '24px' : '26px', objectFit: 'contain' }}
                         />
                     </div>
-                    <div style={{ width: '1px', height: '28px', backgroundColor: 'var(--border-color)', margin: '0 2px' }} />
+                    <div style={{ width: '1px', height: '28px', backgroundColor: 'var(--border-color)' }} />
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                             <h2 style={{
@@ -771,14 +771,10 @@ const ProjectPage = () => {
                                 >
                                     {isExecuting ? <Square size={14} fill="currentColor" /> : <Play size={14} fill="currentColor" />}
                                 </button>
-                                <div style={{ width: '1px', height: '16px', backgroundColor: 'var(--border-color)', margin: '0 8px 0 0' }} />
-                                <button
-                                    className={`tray-btn ${sidebarTab === 'files' ? 'active' : ''}`}
-                                    onClick={() => setSidebarTab('files')}
-                                    title="Files"
-                                >
-                                    <FileText size={16} />
+                                <button className="tray-btn" onClick={() => setShowWhiteboard(true)} title="Whiteboard">
+                                    <Palette size={16} />
                                 </button>
+                                <div style={{ width: '1px', height: '16px', backgroundColor: 'var(--border-color)', margin: '0 8px 0 0' }} />
                                 <button
                                     className={`tray-btn ${sidebarTab === 'files' ? 'active' : ''}`}
                                     onClick={() => setSidebarTab('files')}
@@ -804,9 +800,6 @@ const ProjectPage = () => {
                                     title="Participants"
                                 >
                                     <Users size={16} />
-                                </button>
-                                <button className="tray-btn" onClick={() => setShowWhiteboard(true)} title="Whiteboard">
-                                    <Palette size={16} />
                                 </button>
                                 <div style={{ width: '1px', height: '16px', backgroundColor: 'var(--border-color)', margin: '0 2px' }} />
                                 <button className="tray-btn" onClick={toggleTheme} title="Toggle Theme">
