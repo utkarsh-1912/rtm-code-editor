@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState, useCallback } from 'react';
 import {
     PhoneOff, Video, VideoOff, Mic, MicOff, User,
     ScreenShare, ScreenShareOff, Maximize2, Minimize2,
-    Radio, ChevronDown, ChevronUp
+    Radio, ChevronDown
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import ACTIONS from '../Action';
@@ -29,7 +29,7 @@ const VideoChat = ({ socketRef, projectId, user, isMinimized, onMinimizeToggle }
     const broadcastMediaState = useCallback((state) => {
         if (!socketRef.current) return;
         socketRef.current.emit(ACTIONS.MEDIA_STATE_CHANGE, {
-            roomId: `project-${projectId}`,
+            roomId: `project - ${projectId} `,
             state
         });
     }, [projectId, socketRef]);

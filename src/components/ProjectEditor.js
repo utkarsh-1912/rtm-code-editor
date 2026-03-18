@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import CodeMirror from "@uiw/react-codemirror";
-import { javascript, esLint } from "@codemirror/lang-javascript";
+import { javascript } from "@codemirror/lang-javascript";
 import { python } from "@codemirror/lang-python";
 import { cpp } from "@codemirror/lang-cpp";
 import { html } from "@codemirror/lang-html";
@@ -8,9 +8,7 @@ import { dracula } from "@uiw/codemirror-theme-dracula";
 import { EditorView, Decoration, ViewPlugin, WidgetType } from "@codemirror/view";
 import { vim } from "@replit/codemirror-vim";
 import { emacs } from "@replit/codemirror-emacs";
-import { linter, lintGutter } from "@codemirror/lint";
 import ACTIONS from "../Action";
-import { LANGUAGES } from "../config";
 
 // --- Remote Cursor Branding ---
 class CursorWidget extends WidgetType {
@@ -56,7 +54,6 @@ function ProjectEditor({
 }) {
     const [editorCode, setEditorCode] = useState(code || "");
     const [remoteCursors, setRemoteCursors] = useState({});
-    const editorRef = useRef(null);
     const bypassRef = useRef(false); // To prevent echo feedback loops
 
     // 1. Sync Remote Code Changes
@@ -100,7 +97,7 @@ function ProjectEditor({
         if (code !== undefined && code !== editorCode) {
             setEditorCode(code);
         }
-    }, [code, fileId]); // Added fileId to dependencies
+    }, [code, fileId, editorCode]); // Added fileId and editorCode to dependencies
 
     // 3. User Input Handler
     const handleEditorChange = (value, viewUpdate) => {
