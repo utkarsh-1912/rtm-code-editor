@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import {
     PhoneOff, Video, VideoOff, Mic, MicOff, Maximize2, Minimize2,
-    ChevronDown, User, ScreenShare, ScreenShareOff
+    ChevronDown, User, ScreenShare, ScreenShareOff, hangUpStyle
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import ACTIONS from '../Action';
