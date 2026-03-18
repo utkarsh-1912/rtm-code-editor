@@ -11,7 +11,6 @@ import {
     MessageSquare,
     Sun,
     Moon,
-    Moon,
     Video,
     Terminal,
     FileCode,
@@ -1054,17 +1053,17 @@ const ProjectPage = () => {
                                         {!isMobile && (
                                             <footer style={studioFooterStyle}>
                                                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                                    <div style={{ 
-                                                        width: '6px', 
-                                                        height: '6px', 
-                                                        borderRadius: '50%', 
+                                                    <div style={{
+                                                        width: '6px',
+                                                        height: '6px',
+                                                        borderRadius: '50%',
                                                         backgroundColor: '#10b981',
                                                         boxShadow: '0 0 6px rgba(16, 185, 129, 0.4)'
                                                     }} />
                                                     <span style={{ fontSize: '9px', fontWeight: '900', color: 'var(--text-muted)' }}>{project?.type?.toUpperCase()} ENGINE</span>
                                                 </div>
                                                 <div style={{ display: 'flex', gap: '10px', height: '100%', alignItems: 'center' }}>
-                                                    <button 
+                                                    <button
                                                         onClick={() => setShowInputPanel(!showInputPanel)}
                                                         title="Set Program Input"
                                                         style={{ background: 'none', border: 'none', color: showInputPanel ? 'var(--primary)' : 'var(--text-muted)', cursor: 'pointer', padding: '2px' }}
@@ -1072,14 +1071,14 @@ const ProjectPage = () => {
                                                         <Terminal size={14} />
                                                     </button>
                                                     <div style={{ width: '1px', height: '12px', backgroundColor: 'var(--border-color)' }} />
-                                                    <button 
+                                                    <button
                                                         onClick={() => setIsMeetingStarting(!isMeetingStarting)}
                                                         title={isMeetingStarting ? "Leave Call" : "Join Conference"}
                                                         style={{ background: 'none', border: 'none', color: isMeetingStarting ? '#ef4444' : 'var(--text-muted)', cursor: 'pointer', padding: '2px' }}
                                                     >
                                                         {isMeetingStarting ? <PhoneOff size={14} /> : <Video size={14} />}
                                                     </button>
-                                                    <button 
+                                                    <button
                                                         style={{
                                                             display: 'flex',
                                                             alignItems: 'center',
@@ -1094,7 +1093,7 @@ const ProjectPage = () => {
                                                             cursor: isExecuting ? 'wait' : 'pointer',
                                                             height: '20px'
                                                         }}
-                                                        onClick={handleCompile} 
+                                                        onClick={handleCompile}
                                                         disabled={isExecuting}
                                                     >
                                                         <Play size={10} fill="currentColor" /> {isExecuting ? '...' : 'RUN'}
@@ -1185,10 +1184,10 @@ const ProjectPage = () => {
             {/* Minimal Studio Footer */}
             <footer style={studioFooterStyle}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <div style={{ 
-                        width: '6px', 
-                        height: '6px', 
-                        borderRadius: '50%', 
+                    <div style={{
+                        width: '6px',
+                        height: '6px',
+                        borderRadius: '50%',
                         backgroundColor: '#10b981',
                         boxShadow: '0 0 6px rgba(16, 185, 129, 0.4)'
                     }} />
@@ -1200,7 +1199,7 @@ const ProjectPage = () => {
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px', height: '100%' }}>
                     {/* Compact Input Trigger */}
                     <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-                        <button 
+                        <button
                             onClick={() => setShowInputPanel(!showInputPanel)}
                             title="Set Program Input (STDIN)"
                             style={{
@@ -1216,7 +1215,7 @@ const ProjectPage = () => {
                         >
                             <Terminal size={14} />
                         </button>
-                        
+
                         {showInputPanel && (
                             <div className="glass-panel" style={{
                                 position: 'absolute',
@@ -1234,7 +1233,7 @@ const ProjectPage = () => {
                                     <span style={{ fontSize: '11px', fontWeight: '800', color: 'white' }}>STDIN Input</span>
                                     <button onClick={() => setShowInputPanel(false)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '10px' }}>✕</button>
                                 </div>
-                                <textarea 
+                                <textarea
                                     style={{
                                         width: '100%',
                                         height: '80px',
@@ -1257,9 +1256,9 @@ const ProjectPage = () => {
                     </div>
 
                     <div style={{ width: '1px', height: '12px', backgroundColor: 'var(--border-color)' }} />
-                    
+
                     {/* Compact Meeting Toggle */}
-                    <button 
+                    <button
                         onClick={() => setIsMeetingStarting(!isMeetingStarting)}
                         title={isMeetingStarting ? "Leave Call" : "Join Conference"}
                         style={{
@@ -1276,7 +1275,7 @@ const ProjectPage = () => {
                         {isMeetingStarting ? <PhoneOff size={14} /> : <Video size={14} />}
                     </button>
 
-                    <button 
+                    <button
                         onClick={handleCompile}
                         disabled={isExecuting}
                         style={{
