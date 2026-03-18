@@ -42,6 +42,7 @@ const ProjectPage = () => {
     const [openFiles, setOpenFiles] = useState([]);
     const [loading, setLoading] = useState(true);
     const [messages, setMessages] = useState([]);
+    const [terminalTab, setTerminalTab] = useState('output');
     const [newMessage, setNewMessage] = useState("");
     const [showWhiteboard, setShowWhiteboard] = useState(false);
     const [settings] = useState({
@@ -153,7 +154,24 @@ const ProjectPage = () => {
 
                 socketRef.current.on(ACTIONS.RECEIVE_MESSAGE, (message) => {
                     setMessages(prev => {
+                        if (prev.find(m => m.id === message.id)) return prev;
                         const updated = [...prev, message];
+                        localStorage.setItem(`project-chat-${projectId}`, JSON.stringify(updated));
+                        return updated;
+                    });
+                });
+
+                socketRef.current.on(ACTIONS.EDIT_MESSAGE, ({ messageId, newText }) => {
+                    setMessages(prev => {
+                        const updated = prev.map(m => m.id === messageId ? { ...m, text: newText, isEdited: true } : m);
+                         localStorage.setItem(`project-chat-${projectId}`, JSON.stringify(updated));
+                        return updated;
+                    });
+                });
+
+                socketRef.current.on(ACTIONS.DELETE_MESSAGE, ({ messageId }) => {
+                    setMessages(prev => {
+                        const updated = prev.filter(m => m.id !== messageId);
                         localStorage.setItem(`project-chat-${projectId}`, JSON.stringify(updated));
                         return updated;
                     });
@@ -267,7 +285,7 @@ const ProjectPage = () => {
     const handleSendMessage = (e) => {
         if ((e.key === "Enter" || e.type === "click") && newMessage.trim()) {
             const msg = {
-                id: Date.now(),
+                id: Date.now() + Math.random(),
                 text: newMessage,
                 userName: user?.name || socketRef.current?.userName,
                 timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
@@ -280,6 +298,29 @@ const ProjectPage = () => {
             });
             socketRef.current.emit(ACTIONS.SEND_MESSAGE, { roomId: `project-${projectId}`, message: msg });
             setNewMessage("");
+        }
+    };
+
+    const handleEditMessage = (messageId, oldText) => {
+        const newText = prompt("Edit message:", oldText);
+        if (newText !== null && newText.trim() && newText !== oldText) {
+            socketRef.current.emit(ACTIONS.EDIT_MESSAGE, { roomId: `project-${projectId}`, messageId, newText });
+            setMessages(prev => {
+                const updated = prev.map(m => m.id === messageId ? { ...m, text: newText, isEdited: true } : m);
+                localStorage.setItem(`project-chat-${projectId}`, JSON.stringify(updated));
+                return updated;
+            });
+        }
+    };
+
+    const handleDeleteMessage = (messageId) => {
+        if (window.confirm("Delete this message?")) {
+            socketRef.current.emit(ACTIONS.DELETE_MESSAGE, { roomId: `project-${projectId}`, messageId });
+            setMessages(prev => {
+                const updated = prev.filter(m => m.id !== messageId);
+                localStorage.setItem(`project-chat-${projectId}`, JSON.stringify(updated));
+                return updated;
+            });
         }
     };
 
@@ -922,10 +963,21 @@ const ProjectPage = () => {
                                                     <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
                                                         <div style={{ flex: 1, padding: '16px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '16px' }}>
                                                             {messages.map((msg, i) => (
-                                                                <div key={i} style={messageBoxStyle(msg.userName === (user?.name || socketRef.current?.userName))}>
+                                                                 <div key={i} style={messageBoxStyle(msg.userName === (user?.name || socketRef.current?.userName))} className="chat-msg">
                                                                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
-                                                                        <span style={{ fontSize: '10px', fontWeight: '800', color: 'var(--primary)' }}>{msg.userName}</span>
-                                                                        <span style={{ fontSize: '9px', opacity: 0.4 }}>{msg.timestamp}</span>
+                                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                                            <span style={{ fontSize: '10px', fontWeight: '800', color: 'var(--primary)' }}>{msg.userName}</span>
+                                                                            {msg.isEdited && <span style={{ fontSize: '8px', opacity: 0.3, fontStyle: 'italic' }}>(edited)</span>}
+                                                                        </div>
+                                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                                            <span style={{ fontSize: '9px', opacity: 0.4 }}>{msg.timestamp}</span>
+                                                                            {msg.userName === (user?.name || socketRef.current?.userName) && (
+                                                                                <div style={{ display: 'flex', gap: '6px' }} className="msg-actions">
+                                                                                    <Edit2 size={10} style={{ cursor: 'pointer', opacity: 0.5 }} onClick={() => handleEditMessage(msg.id, msg.text)} />
+                                                                                    <Trash2 size={10} style={{ cursor: 'pointer', color: '#f87171', opacity: 0.5 }} onClick={() => handleDeleteMessage(msg.id)} />
+                                                                                </div>
+                                                                            )}
+                                                                        </div>
                                                                     </div>
                                                                     <p style={{ margin: 0, fontSize: '12px', lineHeight: '1.5', color: 'var(--text-main)' }}>{msg.text}</p>
                                                                 </div>
@@ -1018,33 +1070,72 @@ const ProjectPage = () => {
                                                                 srcDoc={generatePreviewDoc()}
                                                             />
                                                         ) : (
-                                                            <>
+                                                        <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+                                                            <div style={{ display: 'flex', backgroundColor: 'rgba(255,255,255,0.02)', borderBottom: '1px solid var(--border-color)', height: '28px' }}>
+                                                                <button
+                                                                    onClick={() => setTerminalTab('output')}
+                                                                    style={{
+                                                                        padding: '0 16px',
+                                                                        height: '100%',
+                                                                        backgroundColor: terminalTab === 'output' ? 'rgba(255,255,255,0.05)' : 'transparent',
+                                                                        border: 'none',
+                                                                        borderBottom: terminalTab === 'output' ? '2px solid var(--primary)' : 'none',
+                                                                        color: terminalTab === 'output' ? 'var(--primary)' : 'var(--text-muted)',
+                                                                        fontSize: '9px',
+                                                                        fontWeight: '800',
+                                                                        cursor: 'pointer',
+                                                                        textTransform: 'uppercase',
+                                                                        letterSpacing: '0.05em'
+                                                                    }}
+                                                                >
+                                                                    OUTPUT
+                                                                </button>
                                                                 {project?.type !== 'web' && (
-                                                                    <div style={{ flex: 0.3, borderRight: isMobile ? 'none' : '1px solid var(--border-color)', borderBottom: isMobile ? '1px solid var(--border-color)' : 'none', display: 'flex', flexDirection: 'column' }}>
-                                                                        <div style={{ padding: '6px 12px', fontSize: '9px', fontWeight: '800', backgroundColor: 'rgba(255,255,255,0.02)', borderBottom: '1px solid var(--border-color)', color: 'var(--primary)' }}>INPUT (STDIN)</div>
-                                                                        <textarea
-                                                                            value={userInput}
-                                                                            onChange={(e) => setUserInput(e.target.value)}
-                                                                            placeholder="Enter input here..."
-                                                                            style={{
-                                                                                flex: 1,
-                                                                                backgroundColor: 'transparent',
-                                                                                border: 'none',
-                                                                                color: '#d1d5db',
-                                                                                padding: '12px',
-                                                                                fontSize: '12px',
-                                                                                fontFamily: 'monospace',
-                                                                                outline: 'none',
-                                                                                resize: 'none'
-                                                                            }}
-                                                                        />
-                                                                    </div>
+                                                                    <button
+                                                                        onClick={() => setTerminalTab('input')}
+                                                                        style={{
+                                                                            padding: '0 16px',
+                                                                            height: '100%',
+                                                                            backgroundColor: terminalTab === 'input' ? 'rgba(255,255,255,0.05)' : 'transparent',
+                                                                            border: 'none',
+                                                                            borderBottom: terminalTab === 'input' ? '2px solid var(--primary)' : 'none',
+                                                                            color: terminalTab === 'input' ? 'var(--primary)' : 'var(--text-muted)',
+                                                                            fontSize: '9px',
+                                                                            fontWeight: '800',
+                                                                            cursor: 'pointer',
+                                                                            textTransform: 'uppercase',
+                                                                            letterSpacing: '0.05em'
+                                                                        }}
+                                                                    >
+                                                                        INPUT (STDIN)
+                                                                    </button>
                                                                 )}
-                                                                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-                                                                    {project?.type !== 'web' && <div style={{ padding: '6px 12px', fontSize: '9px', fontWeight: '800', backgroundColor: 'rgba(255,255,255,0.02)', borderBottom: '1px solid var(--border-color)', color: 'var(--text-muted)' }}>OUTPUT</div>}
+                                                            </div>
+                                                            <div style={{ flex: 1, overflow: 'auto', position: 'relative' }}>
+                                                                {terminalTab === 'output' ? (
                                                                     <pre style={outputTextStyle}>{output}</pre>
-                                                                </div>
-                                                            </>
+                                                                ) : (
+                                                                    <textarea
+                                                                        value={userInput}
+                                                                        onChange={(e) => setUserInput(e.target.value)}
+                                                                        placeholder="Enter program input here..."
+                                                                        style={{
+                                                                            width: '100%',
+                                                                            height: '100%',
+                                                                            backgroundColor: 'transparent',
+                                                                            border: 'none',
+                                                                            color: '#d1d5db',
+                                                                            padding: '12px',
+                                                                            fontSize: '12px',
+                                                                            fontFamily: 'monospace',
+                                                                            outline: 'none',
+                                                                            resize: 'none',
+                                                                            display: 'block'
+                                                                        }}
+                                                                    />
+                                                                )}
+                                                            </div>
+                                                        </div>
                                                         )}
                                                     </div>
                                                 </div>
@@ -1146,66 +1237,6 @@ const ProjectPage = () => {
                 </div>
 
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px', height: '100%' }}>
-                    {/* Compact Input Trigger */}
-                    <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-                        <button
-                            onClick={() => setShowInputPanel(!showInputPanel)}
-                            title="Set Program Input (STDIN)"
-                            style={{
-                                background: 'none',
-                                border: 'none',
-                                color: showInputPanel ? 'var(--primary)' : 'var(--text-muted)',
-                                cursor: 'pointer',
-                                display: 'flex',
-                                alignItems: 'center',
-                                padding: '4px',
-                                transition: 'all 0.2s'
-                            }}
-                        >
-                            <Terminal size={14} />
-                        </button>
-
-                        {showInputPanel && (
-                            <div className="glass-panel" style={{
-                                position: 'absolute',
-                                bottom: 'calc(100% + 10px)',
-                                right: 0,
-                                width: '240px',
-                                padding: '12px',
-                                borderRadius: '12px',
-                                boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
-                                border: '1px solid var(--border-color)',
-                                zIndex: 100,
-                                textTransform: 'none'
-                            }}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', alignItems: 'center' }}>
-                                    <span style={{ fontSize: '11px', fontWeight: '800', color: 'white' }}>STDIN Input</span>
-                                    <button onClick={() => setShowInputPanel(false)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '10px' }}>✕</button>
-                                </div>
-                                <textarea
-                                    style={{
-                                        width: '100%',
-                                        height: '80px',
-                                        backgroundColor: '#0d1117',
-                                        border: '1px solid var(--border-color)',
-                                        borderRadius: '6px',
-                                        color: 'white',
-                                        padding: '8px',
-                                        fontSize: '12px',
-                                        fontFamily: 'monospace',
-                                        resize: 'none',
-                                        outline: 'none'
-                                    }}
-                                    placeholder="Enter input here..."
-                                    value={userInput}
-                                    onChange={(e) => setUserInput(e.target.value)}
-                                />
-                            </div>
-                        )}
-                    </div>
-
-                    <div style={{ width: '1px', height: '12px', backgroundColor: 'var(--border-color)' }} />
-
                     {/* Compact Meeting Toggle */}
                     <button
                         onClick={() => setIsMeetingStarting(!isMeetingStarting)}

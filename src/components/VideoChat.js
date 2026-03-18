@@ -270,16 +270,6 @@ const VideoChat = ({ socketRef, projectId, user, isMinimized, onMinimizeToggle, 
             socket.off('user-left-video', onUserLeft);
             socket.off(ACTIONS.MEDIA_STATE_CHANGE, onMediaStateChange);
         };
-
-        return () => {
-            socket.off('user-joined-video');
-            socket.off('video-offer');
-            socket.off('video-answer');
-            socket.off('new-ice-candidate');
-            socket.off('request-streams');
-            socket.off('user-left-video');
-            socket.off(ACTIONS.MEDIA_STATE_CHANGE);
-        };
     }, [localStream, socketRef, createPeer]);
 
     // --- Active Speaker Detection ---
