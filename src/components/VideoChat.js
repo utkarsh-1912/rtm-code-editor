@@ -554,8 +554,6 @@ const miniControls = {
 };
 const miniBtn = { width: '24px', height: '24px', borderRadius: '6px', border: 'none', backgroundColor: 'rgba(255,255,255,0.1)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' };
 
-const welcomeScreenStyle = { flex: 1, display: "flex", alignItems: "center", justifyContent: "center", padding: "24px" };
-
 const callWorkspaceStyle = { flex: 1, display: "flex", flexDirection: "column", position: 'relative' };
 
 const gridStyle = (total) => ({
