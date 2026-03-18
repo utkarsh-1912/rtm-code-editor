@@ -329,10 +329,16 @@ const Dashboard = () => {
                             gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
                             gap: '24px'
                         }}>
-                            {projects.slice(0, 3).map(project => (
+                            {/* Balanced Recent Activity: At least one of each if available */}
+                            {[
+                                ...projects.slice(0, 2).map(p => ({ ...p, type: 'project' })),
+                                ...recentRooms.slice(0, 2).map(r => ({ ...r, type: 'room' }))
+                            ].sort((a, b) => new Date(b.updatedAt || Date.now()) - new Date(a.updatedAt || Date.now()))
+                            .slice(0, 4)
+                            .map(item => (
                                 <div
-                                    key={`recent-proj-${project.id}`}
-                                    onClick={() => navigate(`/project/${project.id}`)}
+                                    key={`recent-${item.type}-${item.id}`}
+                                    onClick={() => navigate(item.type === 'project' ? `/project/${item.id}` : `/editor/${item.id}`)}
                                     className="activity-card"
                                     style={{
                                         padding: '20px',
@@ -340,10 +346,12 @@ const Dashboard = () => {
                                         border: '1px solid var(--border-color)',
                                         borderRadius: '8px',
                                         cursor: 'pointer',
-                                        transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                                        transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
                                         display: 'flex',
                                         flexDirection: 'column',
-                                        gap: '16px'
+                                        gap: '16px',
+                                        position: 'relative',
+                                        overflow: 'hidden'
                                     }}
                                 >
                                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
@@ -351,13 +359,13 @@ const Dashboard = () => {
                                             width: '40px',
                                             height: '40px',
                                             borderRadius: '10px',
-                                            backgroundColor: 'rgba(59, 130, 246, 0.1)',
-                                            color: '#3b82f6',
+                                            backgroundColor: item.type === 'project' ? 'rgba(59, 130, 246, 0.1)' : 'rgba(139, 92, 246, 0.1)',
+                                            color: item.type === 'project' ? '#3b82f6' : '#8b5cf6',
                                             display: 'flex',
                                             alignItems: 'center',
                                             justifyContent: 'center'
                                         }}>
-                                            <Folder size={20} />
+                                            {item.type === 'project' ? <Folder size={20} /> : <Terminal size={20} />}
                                         </div>
                                         <div style={{
                                             padding: '4px 10px',
@@ -369,78 +377,24 @@ const Dashboard = () => {
                                             letterSpacing: '0.05em',
                                             color: 'var(--text-muted)'
                                         }}>
-                                            Project
+                                            {item.type === 'project' ? 'Project' : 'Room'}
                                         </div>
                                     </div>
                                     <div>
-                                        <h3 style={{ fontSize: '18px', fontWeight: '700', margin: '0 0 4px 0', color: 'var(--text-main)' }}>{project.name}</h3>
+                                        <h3 style={{ fontSize: '18px', fontWeight: '700', margin: '0 0 4px 0', color: 'var(--text-main)' }}>{item.name}</h3>
                                         <p style={{ fontSize: '14px', color: 'var(--text-muted)', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                            {project.description || `${project.type === 'web' ? 'Fullstack web' : 'Technical'} development project`}
+                                            {item.type === 'project' 
+                                                ? (item.description || `${item.type === 'web' ? 'Fullstack web' : 'Technical'} development project`)
+                                                : `Collaborative coding session • ID: ${item.id.substring(0, 8)}`
+                                            }
                                         </p>
                                     </div>
                                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 'auto', paddingTop: '16px', borderTop: '1px solid var(--border-color)' }}>
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                                             <Calendar size={14} color="var(--text-muted)" />
-                                            <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Updated 2h ago</span>
-                                        </div>
-                                        <ChevronRight size={16} color="var(--primary)" />
-                                    </div>
-                                </div>
-                            ))}
-
-                            {recentRooms.slice(0, projects.length >= 3 ? 0 : 3 - projects.length).map(room => (
-                                <div
-                                    key={`recent-room-${room.id}`}
-                                    onClick={() => navigate(`/editor/${room.id}`)}
-                                    className="activity-card"
-                                    style={{
-                                        padding: '20px',
-                                        backgroundColor: 'var(--bg-card)',
-                                        border: '1px solid var(--border-color)',
-                                        borderRadius: '8px',
-                                        cursor: 'pointer',
-                                        transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                                        display: 'flex',
-                                        flexDirection: 'column',
-                                        gap: '16px'
-                                    }}
-                                >
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                                        <div style={{
-                                            width: '40px',
-                                            height: '40px',
-                                            borderRadius: '10px',
-                                            backgroundColor: 'rgba(139, 92, 246, 0.1)',
-                                            color: '#8b5cf6',
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            justifyContent: 'center'
-                                        }}>
-                                            <Terminal size={20} />
-                                        </div>
-                                        <div style={{
-                                            padding: '4px 10px',
-                                            borderRadius: '6px',
-                                            backgroundColor: 'rgba(255,255,255,0.05)',
-                                            fontSize: '10px',
-                                            fontWeight: '800',
-                                            textTransform: 'uppercase',
-                                            letterSpacing: '0.05em',
-                                            color: 'var(--text-muted)'
-                                        }}>
-                                            Room
-                                        </div>
-                                    </div>
-                                    <div>
-                                        <h3 style={{ fontSize: '18px', fontWeight: '700', margin: '0 0 4px 0', color: 'var(--text-main)' }}>{room.name}</h3>
-                                        <p style={{ fontSize: '14px', color: 'var(--text-muted)', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                            Collaborative coding session • ID: {room.id.substring(0, 8)}
-                                        </p>
-                                    </div>
-                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 'auto', paddingTop: '16px', borderTop: '1px solid var(--border-color)' }}>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                            <Calendar size={14} color="var(--text-muted)" />
-                                            <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Opened recently</span>
+                                            <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                                                {item.type === 'project' ? 'Updated recently' : 'Opened recently'}
+                                            </span>
                                         </div>
                                         <ChevronRight size={16} color="var(--primary)" />
                                     </div>

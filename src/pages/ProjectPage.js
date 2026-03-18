@@ -43,7 +43,6 @@ const ProjectPage = () => {
     const [openFiles, setOpenFiles] = useState([]);
     const [loading, setLoading] = useState(true);
     const [messages, setMessages] = useState([]);
-    const [terminalTab, setTerminalTab] = useState('output');
     const [newMessage, setNewMessage] = useState("");
     const [showWhiteboard, setShowWhiteboard] = useState(false);
     const [settings] = useState({
@@ -63,7 +62,9 @@ const ProjectPage = () => {
     const [theme, setTheme] = useState(localStorage.getItem("app-theme") || "dark");
     const [isExecuting, setIsExecuting] = useState(false);
     const [output, setOutput] = useState("");
-    const [isOutputVisible, setIsOutputVisible] = useState(false);
+    const [terminalTab, setTerminalTab] = useState('output');
+    const [mediaStates, setMediaStates] = useState({});
+    const [isOutputVisible, setIsOutputVisible] = useState(true);
     const [showPreview, setShowPreview] = useState(false);
     const [activeTab, setActiveTab] = useState('code'); // 'code', 'files', 'chat', 'users', 'video'
     const [userInput, setUserInput] = useState("");
@@ -127,12 +128,21 @@ const ProjectPage = () => {
                 socketRef.current.on('connect_error', (err) => handleErrors(err));
                 socketRef.current.on('connect_failed', (err) => handleErrors(err));
 
+                socketRef.current.on('media-state-update', ({ userId, state }) => {
+                    setMediaStates(prev => ({ ...prev, [userId]: { ...prev[userId], ...state } }));
+                });
+
                 socketRef.current.on(ACTIONS.JOINED, ({ clients }) => {
                     setClients(clients);
                 });
 
                 socketRef.current.on(ACTIONS.DISCONNECTED, ({ socketId }) => {
                     setClients(prev => prev.filter(c => c.socketId !== socketId));
+                    setMediaStates(prev => {
+                        const next = { ...prev };
+                        delete next[socketId];
+                        return next;
+                    });
                 });
 
                 socketRef.current.on(ACTIONS.FILE_CHANGE, ({ fileId, content, socketId }) => {
@@ -247,7 +257,10 @@ const ProjectPage = () => {
 
         // 1. Immediate local UI update
         setFiles(prev => prev.map(f => f.id === activeFile.id ? { ...f, content } : f));
+
+        // Update both activeFile and openFiles to prevent stale content when switching via tabs
         setActiveFile(prev => (prev && prev.id === activeFile.id) ? { ...prev, content } : prev);
+        setOpenFiles(prev => prev.map(f => f.id === activeFile.id ? { ...f, content } : f));
 
         if (isRemote) return; // Don't re-emit or re-save if change came from socket
 
@@ -729,39 +742,69 @@ const ProjectPage = () => {
                             >
                                 <Video size={16} />
                             </button>
-                            <button
-                                className={`tray-btn ${sidebarTab === 'files' ? 'active' : ''}`}
-                                onClick={() => setSidebarTab('files')}
-                                title="File Explorer"
-                            >
-                                <Folder size={16} />
-                            </button>
-                            <button
-                                className={`tray-btn ${sidebarTab === 'chat' ? 'active' : ''}`}
-                                onClick={() => {
-                                    setSidebarTab('chat');
-                                }}
-                                title="Team Chat"
-                            >
-                                <div style={{ position: 'relative' }}>
-                                    <MessageSquare size={16} />
-                                    {messages.length > 0 && <div style={{ ...notifDotStyle, top: '-2px', right: '-2px', width: '6px', height: '6px' }} />}
-                                </div>
-                            </button>
-                            <button
-                                className={`tray-btn ${sidebarTab === 'users' ? 'active' : ''}`}
-                                onClick={() => setSidebarTab('users')}
-                                title="Participants"
-                            >
-                                <Users size={16} />
-                            </button>
-                            <button className="tray-btn" onClick={() => setShowWhiteboard(true)} title="Whiteboard">
-                                <Palette size={16} />
-                            </button>
-                            <div style={{ width: '1px', height: '16px', backgroundColor: 'var(--border-color)', margin: '0 2px' }} />
-                            <button className="tray-btn" onClick={toggleTheme} title="Toggle Theme">
-                                {isLightMode ? <Sun size={16} /> : <Moon size={16} />}
-                            </button>
+                            <div style={trayIconsStyle}>
+                                <button
+                                    style={{
+                                        ...toolRunButtonStyle,
+                                        width: '32px',
+                                        height: '32px',
+                                        padding: '0',
+                                        borderRadius: '8px',
+                                        background: isExecuting ? 'rgba(239, 68, 68, 0.1)' : 'rgba(59, 130, 246, 0.1)',
+                                        color: isExecuting ? '#ef4444' : '#3b82f6',
+                                        border: 'none',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        marginRight: '8px'
+                                    }}
+                                    onClick={isExecuting ? () => setIsExecuting(false) : handleCompile}
+                                    title={isExecuting ? "Stop Running" : "Run Code"}
+                                >
+                                    {isExecuting ? <Square size={14} fill="currentColor" /> : <Play size={14} fill="currentColor" />}
+                                </button>
+                                <div style={{ width: '1px', height: '16px', backgroundColor: 'var(--border-color)', margin: '0 8px 0 0' }} />
+                                <button
+                                    className={`tray-btn ${sidebarTab === 'files' ? 'active' : ''}`}
+                                    onClick={() => setSidebarTab('files')}
+                                    title="Files"
+                                >
+                                    <FileText size={16} />
+                                </button>
+                                <button
+                                    className={`tray-btn ${sidebarTab === 'files' ? 'active' : ''}`}
+                                    onClick={() => setSidebarTab('files')}
+                                    title="File Explorer"
+                                >
+                                    <Folder size={16} />
+                                </button>
+                                <button
+                                    className={`tray-btn ${sidebarTab === 'chat' ? 'active' : ''}`}
+                                    onClick={() => {
+                                        setSidebarTab('chat');
+                                    }}
+                                    title="Team Chat"
+                                >
+                                    <div style={{ position: 'relative' }}>
+                                        <MessageSquare size={16} />
+                                        {messages.length > 0 && <div style={{ ...notifDotStyle, top: '-2px', right: '-2px', width: '6px', height: '6px' }} />}
+                                    </div>
+                                </button>
+                                <button
+                                    className={`tray-btn ${sidebarTab === 'users' ? 'active' : ''}`}
+                                    onClick={() => setSidebarTab('users')}
+                                    title="Participants"
+                                >
+                                    <Users size={16} />
+                                </button>
+                                <button className="tray-btn" onClick={() => setShowWhiteboard(true)} title="Whiteboard">
+                                    <Palette size={16} />
+                                </button>
+                                <div style={{ width: '1px', height: '16px', backgroundColor: 'var(--border-color)', margin: '0 2px' }} />
+                                <button className="tray-btn" onClick={toggleTheme} title="Toggle Theme">
+                                    {isLightMode ? <Sun size={16} /> : <Moon size={16} />}
+                                </button>
+                            </div>
                         </div>
                     )}
 
@@ -769,18 +812,15 @@ const ProjectPage = () => {
                         <button
                             onClick={handleCompile}
                             disabled={isExecuting}
+                            className="tool-btn highlight"
                             style={{
                                 ...toolRunButtonStyle,
-                                height: '32px',
-                                padding: '0 12px',
-                                borderRadius: '8px',
-                                fontSize: '11px',
-                                background: 'var(--primary)',
-                                boxShadow: '0 4px 12px rgba(59, 130, 246, 0.2)',
-                                border: 'none'
+                                background: 'transparent',
+                                border: '1px solid var(--border-color)',
+                                color: 'var(--text-main)'
                             }}
                         >
-                            <Play size={14} fill="white" />
+                            <Play size={14} fill="currentColor" />
                             <span>{isExecuting ? 'Running...' : 'Run'}</span>
                         </button>
                     )}
@@ -999,16 +1039,23 @@ const ProjectPage = () => {
 
                                                 {sidebarTab === 'users' && (
                                                     <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                                        {clients.map((client, i) => (
-                                                            <div key={i} style={participantRowStyle}>
-                                                                <div style={avatarCircleStyle}>{client.userName[0]}</div>
-                                                                <div style={{ flex: 1 }}>
-                                                                    <div style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-main)' }}>{client.userName}</div>
-                                                                    <div style={{ fontSize: '9px', color: 'var(--primary)', fontWeight: '800', textTransform: 'uppercase' }}>{i === 0 ? 'Admin' : 'Member'}</div>
+                                                        {clients.map((client, i) => {
+                                                            const media = mediaStates[client.socketId] || {};
+                                                            return (
+                                                                <div key={i} style={participantRowStyle}>
+                                                                    <div style={avatarCircleStyle}>{client.userName[0]}</div>
+                                                                    <div style={{ flex: 1 }}>
+                                                                        <div style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-main)' }}>{client.userName}</div>
+                                                                        <div style={{ fontSize: '9px', color: 'var(--primary)', fontWeight: '800', textTransform: 'uppercase' }}>{i === 0 ? 'Admin' : 'Member'}</div>
+                                                                    </div>
+                                                                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginRight: '8px' }}>
+                                                                        {media.isVideoOff ? <VideoOff size={12} color="#f87171" style={{ opacity: 0.5 }} /> : <Video size={12} color="#10b981" />}
+                                                                        {media.isMuted ? <MicOff size={12} color="#f87171" style={{ opacity: 0.5 }} /> : <Mic size={12} color="#10b981" />}
+                                                                    </div>
+                                                                    <div style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#10b981' }} />
                                                                 </div>
-                                                                <div style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#10b981' }} />
-                                                            </div>
-                                                        ))}
+                                                            );
+                                                        })}
                                                     </div>
                                                 )}
                                             </div>
@@ -1031,23 +1078,25 @@ const ProjectPage = () => {
                                             {openFiles.length === 0 && <div style={{ height: '36px' }} />}
                                         </div>
                                         <div style={{ flex: 1, position: 'relative', display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
-                                            <div style={{ flex: isOutputVisible ? 0.6 : 1, position: 'relative' }}>
+                                            <div style={{ flex: isOutputVisible ? 0.6 : 1, position: 'relative', height: '100%', minHeight: 0, overflow: 'hidden' }}>
                                                 {activeFile ? (
-                                                    <ProjectEditor
-                                                        key={activeFile.id}
-                                                        socketRef={socketRef}
-                                                        roomId={`project-${projectId}`}
-                                                        fileId={activeFile.id}
-                                                        onCodeChange={handleSaveFile}
-                                                        code={activeFile.content}
-                                                        filename={activeFile.name}
-                                                        language={activeFile.name.split('.').pop()}
-                                                        settings={settings}
-                                                        userName={user?.name || socketRef.current?.userName}
-                                                        isLightMode={isLightMode}
-                                                        userInput={userInput}
-                                                        setUserInput={setUserInput}
-                                                    />
+                                                    <div style={{ height: '100%', width: '100%', overflow: 'hidden' }}>
+                                                        <ProjectEditor
+                                                            key={activeFile.id}
+                                                            socketRef={socketRef}
+                                                            roomId={`project-${projectId}`}
+                                                            fileId={activeFile.id}
+                                                            onCodeChange={handleSaveFile}
+                                                            code={activeFile.content}
+                                                            filename={activeFile.name}
+                                                            language={activeFile.name.split('.').pop()}
+                                                            settings={settings}
+                                                            userName={user?.name || socketRef.current?.userName}
+                                                            isLightMode={isLightMode}
+                                                            userInput={userInput}
+                                                            setUserInput={setUserInput}
+                                                        />
+                                                    </div>
                                                 ) : (
                                                     <div style={emptyEditorStyle}>
                                                         <Terminal size={48} style={{ opacity: 0.05, marginBottom: '20px' }} />
