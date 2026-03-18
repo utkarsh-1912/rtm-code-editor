@@ -11,7 +11,7 @@ import {
     MessageSquare,
     Sun,
     Moon,
-    Wifi,
+    Moon,
     Video,
     Terminal,
     FileCode,

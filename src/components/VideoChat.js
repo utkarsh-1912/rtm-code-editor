@@ -1,8 +1,7 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import {
-    PhoneOff, Video, VideoOff, Mic, MicOff, User,
-    ScreenShare, ScreenShareOff, Maximize2, Minimize2,
-    Radio, ChevronDown
+    PhoneOff, Video, VideoOff, Mic, MicOff, Maximize2, Minimize2, 
+    ChevronDown, User, ScreenShare, ScreenShareOff, X
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import ACTIONS from '../Action';
@@ -17,7 +16,6 @@ const VideoChat = ({ socketRef, projectId, user, isMinimized, onMinimizeToggle, 
     const [inCall, setInCall] = useState(false);
     const [activeSpeaker, setActiveSpeaker] = useState(null);
     const [isExpanded, setIsExpanded] = useState(false);
-    const [isConnecting, setIsConnecting] = useState(false);
     const [pipPosition, setPipPosition] = useState({ x: window.innerWidth - 240, y: window.innerHeight - 200 });
     const [isDragging, setIsDragging] = useState(false);
     const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
@@ -161,11 +159,6 @@ const VideoChat = ({ socketRef, projectId, user, isMinimized, onMinimizeToggle, 
             handleLeaveCall();
         }
     }, [externalInCall, inCall, handleJoinCall, handleLeaveCall]);
-
-    const handleJoinCallLocal = async () => {
-        await handleJoinCall();
-        onCallStateChange?.(true);
-    };
 
     const handleLeaveCallLocal = () => {
         handleLeaveCall();
@@ -555,10 +548,6 @@ const miniControls = {
 const miniBtn = { width: '24px', height: '24px', borderRadius: '6px', border: 'none', backgroundColor: 'rgba(255,255,255,0.1)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' };
 
 const welcomeScreenStyle = { flex: 1, display: "flex", alignItems: "center", justifyContent: "center", padding: "24px" };
-const welcomeCardStyle = { borderRadius: "24px", padding: "48px 32px", textAlign: "center", border: "1px solid rgba(255,255,255,0.05)", maxWidth: "400px" };
-const pulseIconStyle = { width: '80px', height: '80px', borderRadius: '50%', backgroundColor: 'rgba(59, 130, 246, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 24px' };
-
-const primaryJoinButtonStyle = (loading) => ({ padding: "14px 28px", backgroundColor: loading ? "rgba(255,255,255,0.05)" : "var(--primary)", color: "#fff", border: "none", borderRadius: "14px", fontWeight: "800", cursor: loading ? "wait" : "pointer" });
 
 const callWorkspaceStyle = { flex: 1, display: "flex", flexDirection: "column", position: 'relative' };
 
