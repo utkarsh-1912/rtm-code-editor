@@ -69,7 +69,7 @@ const ProjectPage = () => {
     const [userInput, setUserInput] = useState("");
     const [isMeetingMinimized, setIsMeetingMinimized] = useState(false);
     const [isMeetingStarting, setIsMeetingStarting] = useState(false);
-    const [showInputPanel, setShowInputPanel] = useState(false);
+    // const [showInputPanel, setShowInputPanel] = useState(false);
 
     const socketRef = useRef(null);
     const hasJoinedRef = useRef(false);
@@ -165,7 +165,7 @@ const ProjectPage = () => {
                 socketRef.current.on(ACTIONS.EDIT_MESSAGE, ({ messageId, newText }) => {
                     setMessages(prev => {
                         const updated = prev.map(m => m.id === messageId ? { ...m, text: newText, isEdited: true } : m);
-                         localStorage.setItem(`project-chat-${projectId}`, JSON.stringify(updated));
+                        localStorage.setItem(`project-chat-${projectId}`, JSON.stringify(updated));
                         return updated;
                     });
                 });
@@ -965,7 +965,7 @@ const ProjectPage = () => {
                                                     <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
                                                         <div style={{ flex: 1, padding: '16px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '16px' }}>
                                                             {messages.map((msg, i) => (
-                                                                 <div key={i} style={messageBoxStyle(msg.userName === (user?.name || socketRef.current?.userName))} className="chat-msg">
+                                                                <div key={i} style={messageBoxStyle(msg.userName === (user?.name || socketRef.current?.userName))} className="chat-msg">
                                                                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
                                                                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                                                                             <span style={{ fontSize: '10px', fontWeight: '800', color: 'var(--primary)' }}>{msg.userName}</span>
@@ -1072,36 +1072,17 @@ const ProjectPage = () => {
                                                                 srcDoc={generatePreviewDoc()}
                                                             />
                                                         ) : (
-                                                        <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-                                                            <div style={{ display: 'flex', backgroundColor: 'rgba(255,255,255,0.02)', borderBottom: '1px solid var(--border-color)', height: '28px' }}>
-                                                                <button
-                                                                    onClick={() => setTerminalTab('output')}
-                                                                    style={{
-                                                                        padding: '0 16px',
-                                                                        height: '100%',
-                                                                        backgroundColor: terminalTab === 'output' ? 'rgba(255,255,255,0.05)' : 'transparent',
-                                                                        border: 'none',
-                                                                        borderBottom: terminalTab === 'output' ? '2px solid var(--primary)' : 'none',
-                                                                        color: terminalTab === 'output' ? 'var(--primary)' : 'var(--text-muted)',
-                                                                        fontSize: '9px',
-                                                                        fontWeight: '800',
-                                                                        cursor: 'pointer',
-                                                                        textTransform: 'uppercase',
-                                                                        letterSpacing: '0.05em'
-                                                                    }}
-                                                                >
-                                                                    OUTPUT
-                                                                </button>
-                                                                {project?.type !== 'web' && (
+                                                            <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+                                                                <div style={{ display: 'flex', backgroundColor: 'rgba(255,255,255,0.02)', borderBottom: '1px solid var(--border-color)', height: '28px' }}>
                                                                     <button
-                                                                        onClick={() => setTerminalTab('input')}
+                                                                        onClick={() => setTerminalTab('output')}
                                                                         style={{
                                                                             padding: '0 16px',
                                                                             height: '100%',
-                                                                            backgroundColor: terminalTab === 'input' ? 'rgba(255,255,255,0.05)' : 'transparent',
+                                                                            backgroundColor: terminalTab === 'output' ? 'rgba(255,255,255,0.05)' : 'transparent',
                                                                             border: 'none',
-                                                                            borderBottom: terminalTab === 'input' ? '2px solid var(--primary)' : 'none',
-                                                                            color: terminalTab === 'input' ? 'var(--primary)' : 'var(--text-muted)',
+                                                                            borderBottom: terminalTab === 'output' ? '2px solid var(--primary)' : 'none',
+                                                                            color: terminalTab === 'output' ? 'var(--primary)' : 'var(--text-muted)',
                                                                             fontSize: '9px',
                                                                             fontWeight: '800',
                                                                             cursor: 'pointer',
@@ -1109,35 +1090,54 @@ const ProjectPage = () => {
                                                                             letterSpacing: '0.05em'
                                                                         }}
                                                                     >
-                                                                        INPUT (STDIN)
+                                                                        OUTPUT
                                                                     </button>
-                                                                )}
+                                                                    {project?.type !== 'web' && (
+                                                                        <button
+                                                                            onClick={() => setTerminalTab('input')}
+                                                                            style={{
+                                                                                padding: '0 16px',
+                                                                                height: '100%',
+                                                                                backgroundColor: terminalTab === 'input' ? 'rgba(255,255,255,0.05)' : 'transparent',
+                                                                                border: 'none',
+                                                                                borderBottom: terminalTab === 'input' ? '2px solid var(--primary)' : 'none',
+                                                                                color: terminalTab === 'input' ? 'var(--primary)' : 'var(--text-muted)',
+                                                                                fontSize: '9px',
+                                                                                fontWeight: '800',
+                                                                                cursor: 'pointer',
+                                                                                textTransform: 'uppercase',
+                                                                                letterSpacing: '0.05em'
+                                                                            }}
+                                                                        >
+                                                                            INPUT (STDIN)
+                                                                        </button>
+                                                                    )}
+                                                                </div>
+                                                                <div style={{ flex: 1, overflow: 'auto', position: 'relative' }}>
+                                                                    {terminalTab === 'output' ? (
+                                                                        <pre style={outputTextStyle}>{output}</pre>
+                                                                    ) : (
+                                                                        <textarea
+                                                                            value={userInput}
+                                                                            onChange={(e) => setUserInput(e.target.value)}
+                                                                            placeholder="Enter program input here..."
+                                                                            style={{
+                                                                                width: '100%',
+                                                                                height: '100%',
+                                                                                backgroundColor: 'transparent',
+                                                                                border: 'none',
+                                                                                color: '#d1d5db',
+                                                                                padding: '12px',
+                                                                                fontSize: '12px',
+                                                                                fontFamily: 'monospace',
+                                                                                outline: 'none',
+                                                                                resize: 'none',
+                                                                                display: 'block'
+                                                                            }}
+                                                                        />
+                                                                    )}
+                                                                </div>
                                                             </div>
-                                                            <div style={{ flex: 1, overflow: 'auto', position: 'relative' }}>
-                                                                {terminalTab === 'output' ? (
-                                                                    <pre style={outputTextStyle}>{output}</pre>
-                                                                ) : (
-                                                                    <textarea
-                                                                        value={userInput}
-                                                                        onChange={(e) => setUserInput(e.target.value)}
-                                                                        placeholder="Enter program input here..."
-                                                                        style={{
-                                                                            width: '100%',
-                                                                            height: '100%',
-                                                                            backgroundColor: 'transparent',
-                                                                            border: 'none',
-                                                                            color: '#d1d5db',
-                                                                            padding: '12px',
-                                                                            fontSize: '12px',
-                                                                            fontFamily: 'monospace',
-                                                                            outline: 'none',
-                                                                            resize: 'none',
-                                                                            display: 'block'
-                                                                        }}
-                                                                    />
-                                                                )}
-                                                            </div>
-                                                        </div>
                                                         )}
                                                     </div>
                                                 </div>
