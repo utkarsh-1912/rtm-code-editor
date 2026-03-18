@@ -13,6 +13,7 @@ import {
     Video,
     Terminal,
     FileCode,
+    Moon,
     Users,
     Play,
     Trash2,
