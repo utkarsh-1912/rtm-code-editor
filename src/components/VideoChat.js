@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import {
     PhoneOff, Video, VideoOff, Mic, MicOff, Maximize2, Minimize2,
-    ChevronDown, User, ScreenShare, ScreenShareOff, hangUpStyle
+    ChevronDown, User, ScreenShare, ScreenShareOff
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import ACTIONS from '../Action';
@@ -609,6 +609,5 @@ const nameTagStyle = { backgroundColor: "rgba(13, 17, 23, 0.8)", backdropFilter:
 const controlDockWrapper = { position: "absolute", bottom: "40px", width: "100%", display: "flex", justifyContent: "center", pointerEvents: "none", zIndex: 100 };
 const controlDock = { display: "flex", alignItems: "center", gap: "12px", padding: "12px", borderRadius: "24px", border: '1px solid rgba(255,255,255,0.1)', pointerEvents: "auto" };
 const controlCircle = (active, color) => ({ width: "48px", height: "48px", borderRadius: "16px", backgroundColor: active ? (color || "rgba(255,255,255,0.1)") : "rgba(255,255,255,0.05)", color: "#fff", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", transition: 'all 0.2s' });
-const hangUpStyle = { width: "64px", height: "48px", borderRadius: "16px", backgroundColor: "#ef4444", color: "white", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", transition: 'all 0.2s' };
 
 export default VideoChat;
