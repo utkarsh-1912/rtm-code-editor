@@ -406,8 +406,8 @@ const VideoChat = ({ socketRef, projectId, user, isMinimized, onMinimizeToggle, 
                 <div style={{
                     ...miniControls,
                     opacity: isHoveringMini || isDragging ? 1 : 0,
-                    transform: isHoveringMini || isDragging ? 'translateY(0)' : 'translateY(10px)',
-                    transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                    transform: isHoveringMini || isDragging ? 'translate(calc(-50%)) scale(1)' : 'translate(calc(-50%)) translateY(10px) scale(0.9)',
+                    transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
                     pointerEvents: isHoveringMini ? 'auto' : 'none'
                 }}>
                     <button style={miniBtn} onClick={(e) => { e.stopPropagation(); onMinimizeToggle(false); }} title="Expand">
@@ -426,7 +426,7 @@ const VideoChat = ({ socketRef, projectId, user, isMinimized, onMinimizeToggle, 
                         }}
                         title={isVideoOff ? "Turn Camera On" : "Turn Camera Off"}
                     >
-                        {isVideoOff ? <VideoOff size={12} color="#ef4444" /> : <Video size={12} color="white" />}
+                        {isVideoOff ? <VideoOff size={12} /> : <Video size={12} />}
                     </button>
                     <button
                         style={{ ...miniBtn, color: isMuted ? '#ef4444' : 'white' }}
@@ -441,10 +441,10 @@ const VideoChat = ({ socketRef, projectId, user, isMinimized, onMinimizeToggle, 
                         }}
                         title={isMuted ? "Unmute" : "Mute"}
                     >
-                        {isMuted ? <MicOff size={12} color="#ef4444" /> : <Mic size={12} color="white" />}
+                        {isMuted ? <MicOff size={12} /> : <Mic size={12} />}
                     </button>
                     <button
-                        style={{ ...miniBtn, backgroundColor: '#ef4444' }}
+                        style={{ ...miniBtn, backgroundColor: 'rgba(239, 68, 68, 0.8)' }}
                         onClick={(e) => { e.stopPropagation(); handleLeaveCallLocal(); }}
                         title="End Call"
                     >
@@ -571,20 +571,45 @@ const miniBtn = { width: '24px', height: '24px', borderRadius: '6px', border: 'n
 
 const callWorkspaceStyle = { flex: 1, display: "flex", flexDirection: "column", position: 'relative' };
 
-const gridStyle = (total) => ({
-    display: 'grid',
-    gridTemplateColumns: total <= 1 ? '1fr' : total <= 2 ? '1fr 1fr' : 'repeat(auto-fill, minmax(200px, 1fr))',
-    gap: '12px', padding: '16px', height: '100%', width: '100%', overflowY: 'auto'
+const gridStyle = (total) => {
+    let cols = 1;
+    if (total === 2) cols = 2;
+    else if (total <= 4) cols = 2;
+    else cols = 3;
+
+    return {
+        display: 'grid',
+        gridTemplateColumns: `repeat(${cols}, 1fr)`,
+        gridAutoRows: 'min-content',
+        gap: '20px',
+        padding: '32px',
+        height: '100%',
+        width: '100%',
+        maxWidth: '1200px',
+        margin: '0 auto',
+        overflowY: 'auto',
+        alignContent: 'center'
+    };
+};
+
+const videoTileStyle = (active) => ({
+    borderRadius: "16px",
+    overflow: "hidden",
+    backgroundColor: "#161b22",
+    aspectRatio: "16/9",
+    border: active ? "3px solid var(--primary)" : "1px solid rgba(255,255,255,0.05)",
+    boxShadow: active ? "0 0 20px rgba(59, 130, 246, 0.4)" : "0 8px 16px rgba(0,0,0,0.2)",
+    transition: "all 0.3s cubic-bezier(0.16, 1, 0.3, 1)",
+    position: 'relative'
 });
 
-const videoTileStyle = (active) => ({ borderRadius: "20px", overflow: "hidden", backgroundColor: "#161b22", aspectRatio: "16/10", border: active ? "3px solid var(--primary)" : "1px solid rgba(255,255,255,0.05)", transition: "all 0.3s" });
-const videoElementStyle = { width: "100%", height: "100%", objectFit: "cover" };
-const avatarCenterStyle = { width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#0d1117' };
-const tileOverlayStyle = { position: "absolute", bottom: "12px", left: "12px", pointerEvents: "none" };
-const nameTagStyle = { backgroundColor: "rgba(0,0,0,0.7)", backdropFilter: "blur(8px)", color: "#fff", fontSize: "11px", fontWeight: "700", padding: "4px 12px", borderRadius: "100px" };
-const controlDockWrapper = { position: "absolute", bottom: "32px", width: "100%", display: "flex", justifyContent: "center", pointerEvents: "none", zIndex: 10 };
-const controlDock = { display: "flex", alignItems: "center", gap: "10px", padding: "10px", borderRadius: "24px", pointerEvents: "auto" };
-const controlCircle = (active, color) => ({ width: "42px", height: "42px", borderRadius: "14px", backgroundColor: active ? (color || "rgba(255,255,255,0.1)") : "rgba(255,255,255,0.03)", color: "#fff", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" });
-const hangUpStyle = { width: "56px", height: "42px", borderRadius: "14px", backgroundColor: "#ef4444", color: "white", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" };
+const videoElementStyle = { width: "100%", height: "100%", objectFit: "cover", transform: 'scale(1.01)' };
+const avatarCenterStyle = { width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#0d1117', color: 'rgba(255,255,255,0.1)' };
+const tileOverlayStyle = { position: "absolute", bottom: "16px", left: "16px", pointerEvents: "none", zIndex: 5 };
+const nameTagStyle = { backgroundColor: "rgba(13, 17, 23, 0.8)", backdropFilter: "blur(12px)", color: "#fff", fontSize: "11px", fontWeight: "700", padding: "6px 14px", borderRadius: "8px", border: '1px solid rgba(255,255,255,0.1)' };
+const controlDockWrapper = { position: "absolute", bottom: "40px", width: "100%", display: "flex", justifyContent: "center", pointerEvents: "none", zIndex: 100 };
+const controlDock = { display: "flex", alignItems: "center", gap: "12px", padding: "12px", borderRadius: "24px", border: '1px solid rgba(255,255,255,0.1)', pointerEvents: "auto" };
+const controlCircle = (active, color) => ({ width: "48px", height: "48px", borderRadius: "16px", backgroundColor: active ? (color || "rgba(255,255,255,0.1)") : "rgba(255,255,255,0.05)", color: "#fff", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", transition: 'all 0.2s' });
+const hangUpStyle = { width: "64px", height: "48px", borderRadius: "16px", backgroundColor: "#ef4444", color: "white", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", transition: 'all 0.2s' };
 
 export default VideoChat;

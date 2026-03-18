@@ -1257,6 +1257,27 @@ const ProjectPage = () => {
                         {isMeetingStarting ? <PhoneOff size={14} /> : <Video size={14} />}
                     </button>
 
+                    <div style={{ width: '1px', height: '12px', backgroundColor: 'var(--border-color)', margin: '0 4px' }} />
+
+                    <button
+                        onClick={() => setIsOutputVisible(!isOutputVisible)}
+                        title="Toggle Terminal"
+                        style={{
+                            background: 'none',
+                            border: 'none',
+                            color: isOutputVisible ? 'var(--primary)' : 'var(--text-muted)',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            padding: '4px',
+                            transition: 'all 0.2s'
+                        }}
+                    >
+                        <Terminal size={14} />
+                    </button>
+
+                    <div style={{ width: '1px', height: '12px', backgroundColor: 'var(--border-color)', margin: '0 4px' }} />
+
                     <button
                         onClick={handleCompile}
                         disabled={isExecuting}
