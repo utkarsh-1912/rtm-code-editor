@@ -20,7 +20,8 @@ import {
     RotateCcw,
     Palette,
     ChevronRight,
-    PhoneOff
+    PhoneOff,
+    Edit2
 } from "lucide-react";
 import toast from "react-hot-toast";
 import ProjectEditor from "../components/ProjectEditor";
@@ -516,6 +517,7 @@ const ProjectPage = () => {
 
         setIsExecuting(true);
         setIsOutputVisible(true);
+        setTerminalTab('output');
         setOutput("Bundling and running...");
 
         const language = activeFile?.name.split('.').pop();
