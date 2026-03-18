@@ -362,7 +362,9 @@ const VideoChat = ({ socketRef, projectId, user, isMinimized, onMinimizeToggle, 
     // --- UI Render Helpers ---
     const totalPeople = Object.keys(remoteUsers).length + (user?.isGuest ? 0 : 1);
 
-    if (isMinimized && inCall) {
+    if (!inCall) return null;
+
+    if (isMinimized) {
         return (
             <div
                 className="glass-panel"
@@ -440,6 +442,7 @@ const VideoChat = ({ socketRef, projectId, user, isMinimized, onMinimizeToggle, 
             </div>
         );
     }
+
 
     return (
         <div style={containerStyle(isExpanded)}>

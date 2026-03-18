@@ -1185,7 +1185,7 @@ const ProjectPage = () => {
                                 <textarea
                                     style={{
                                         width: '100%',
-                                        height: '100%',
+                                        height: '80px',
                                         backgroundColor: '#0d1117',
                                         border: '1px solid var(--border-color)',
                                         borderRadius: '6px',
