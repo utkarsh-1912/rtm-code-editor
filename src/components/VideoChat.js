@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import {
-    PhoneOff, Video, VideoOff, Mic, MicOff, Maximize2, Minimize2, 
-    ChevronDown, User, ScreenShare, ScreenShareOff, X
+    PhoneOff, Video, VideoOff, Mic, MicOff, Maximize2, Minimize2,
+    ChevronDown, User, ScreenShare, ScreenShareOff
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import ACTIONS from '../Action';
@@ -364,8 +364,8 @@ const VideoChat = ({ socketRef, projectId, user, isMinimized, onMinimizeToggle, 
 
     if (isMinimized && inCall) {
         return (
-            <div 
-                className="glass-panel" 
+            <div
+                className="glass-panel"
                 style={{
                     ...minimizedOverlayStyle,
                     left: `${pipPosition.x}px`,
@@ -412,8 +412,8 @@ const VideoChat = ({ socketRef, projectId, user, isMinimized, onMinimizeToggle, 
                     >
                         {isMuted ? <MicOff size={12} color="#ef4444" /> : <Mic size={12} color="white" />}
                     </button>
-                    <button 
-                        style={{ ...miniBtn, backgroundColor: '#ef4444' }} 
+                    <button
+                        style={{ ...miniBtn, backgroundColor: '#ef4444' }}
                         onClick={(e) => { e.stopPropagation(); handleLeaveCallLocal(); }}
                         title="End Call"
                     >
@@ -535,7 +535,7 @@ const minimizedOverlayStyle = {
 
 const minifiedGridStyle = { flex: 1, backgroundColor: '#000', position: 'relative' };
 const miniVideoElement = { width: '100%', height: '100%', objectFit: 'cover', pointerEvents: 'none' };
-const miniControls = { 
+const miniControls = {
     position: 'absolute', bottom: '10px', left: '50%', transform: 'translateX(-50%)',
     display: 'flex', gap: '8px', padding: '6px', borderRadius: '12px',
     backgroundColor: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)',
