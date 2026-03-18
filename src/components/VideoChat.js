@@ -31,7 +31,7 @@ const VideoChat = ({ socketRef, projectId, user, isMinimized, onMinimizeToggle, 
     const broadcastMediaState = useCallback((state) => {
         if (!socketRef.current) return;
         socketRef.current.emit(ACTIONS.MEDIA_STATE_CHANGE, {
-            roomId: `project - ${projectId} `,
+            roomId: `project-${projectId}`,
             state
         });
     }, [projectId, socketRef]);
@@ -400,13 +400,30 @@ const VideoChat = ({ socketRef, projectId, user, isMinimized, onMinimizeToggle, 
                         <Maximize2 size={12} color="white" />
                     </button>
                     <button
+                        style={{ ...miniBtn, color: isVideoOff ? '#ef4444' : 'white' }}
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            const tr = localStream?.getVideoTracks()[0];
+                            if (tr) {
+                                tr.enabled = !tr.enabled;
+                                setIsVideoOff(!tr.enabled);
+                                broadcastMediaState({ isVideoOff: !tr.enabled });
+                            }
+                        }}
+                        title={isVideoOff ? "Turn Camera On" : "Turn Camera Off"}
+                    >
+                        {isVideoOff ? <VideoOff size={12} color="#ef4444" /> : <Video size={12} color="white" />}
+                    </button>
+                    <button
                         style={{ ...miniBtn, color: isMuted ? '#ef4444' : 'white' }}
                         onClick={(e) => {
                             e.stopPropagation();
-                            const tr = localStream.getAudioTracks()[0];
-                            tr.enabled = !tr.enabled;
-                            setIsMuted(!tr.enabled);
-                            broadcastMediaState({ isMuted: !tr.enabled });
+                            const tr = localStream?.getAudioTracks()[0];
+                            if (tr) {
+                                tr.enabled = !tr.enabled;
+                                setIsMuted(!tr.enabled);
+                                broadcastMediaState({ isMuted: !tr.enabled });
+                            }
                         }}
                         title={isMuted ? "Unmute" : "Mute"}
                     >
@@ -426,13 +443,7 @@ const VideoChat = ({ socketRef, projectId, user, isMinimized, onMinimizeToggle, 
 
     return (
         <div style={containerStyle(isExpanded)}>
-            {!inCall ? (
-                <div style={{ ...welcomeScreenStyle, backgroundColor: 'transparent' }}>
-                    <div style={{ color: 'var(--text-muted)', fontSize: '12px', fontWeight: '800', letterSpacing: '0.1em', opacity: 0.5 }}>
-                        JOIN THE CONFERENCE TO BEGIN COLLABORATING
-                    </div>
-                </div>
-            ) : (
+            {!inCall ? null : (
                 <div style={callWorkspaceStyle}>
                     <div style={gridStyle(totalPeople)}>
                         {!user?.isGuest && (

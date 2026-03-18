@@ -1050,57 +1050,6 @@ const ProjectPage = () => {
                                                 </div>
                                             )}
                                         </div>
-                                        {!isMobile && (
-                                            <footer style={studioFooterStyle}>
-                                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                                    <div style={{
-                                                        width: '6px',
-                                                        height: '6px',
-                                                        borderRadius: '50%',
-                                                        backgroundColor: '#10b981',
-                                                        boxShadow: '0 0 6px rgba(16, 185, 129, 0.4)'
-                                                    }} />
-                                                    <span style={{ fontSize: '9px', fontWeight: '900', color: 'var(--text-muted)' }}>{project?.type?.toUpperCase()} ENGINE</span>
-                                                </div>
-                                                <div style={{ display: 'flex', gap: '10px', height: '100%', alignItems: 'center' }}>
-                                                    <button
-                                                        onClick={() => setShowInputPanel(!showInputPanel)}
-                                                        title="Set Program Input"
-                                                        style={{ background: 'none', border: 'none', color: showInputPanel ? 'var(--primary)' : 'var(--text-muted)', cursor: 'pointer', padding: '2px' }}
-                                                    >
-                                                        <Terminal size={14} />
-                                                    </button>
-                                                    <div style={{ width: '1px', height: '12px', backgroundColor: 'var(--border-color)' }} />
-                                                    <button
-                                                        onClick={() => setIsMeetingStarting(!isMeetingStarting)}
-                                                        title={isMeetingStarting ? "Leave Call" : "Join Conference"}
-                                                        style={{ background: 'none', border: 'none', color: isMeetingStarting ? '#ef4444' : 'var(--text-muted)', cursor: 'pointer', padding: '2px' }}
-                                                    >
-                                                        {isMeetingStarting ? <PhoneOff size={14} /> : <Video size={14} />}
-                                                    </button>
-                                                    <button
-                                                        style={{
-                                                            display: 'flex',
-                                                            alignItems: 'center',
-                                                            gap: '6px',
-                                                            padding: '0 10px',
-                                                            borderRadius: '4px',
-                                                            border: 'none',
-                                                            backgroundColor: 'var(--primary)',
-                                                            color: 'white',
-                                                            fontSize: '9px',
-                                                            fontWeight: '900',
-                                                            cursor: isExecuting ? 'wait' : 'pointer',
-                                                            height: '20px'
-                                                        }}
-                                                        onClick={handleCompile}
-                                                        disabled={isExecuting}
-                                                    >
-                                                        <Play size={10} fill="currentColor" /> {isExecuting ? '...' : 'RUN'}
-                                                    </button>
-                                                </div>
-                                            </footer>
-                                        )}
                                     </div>
                                 </ReflexElement>
                             </ReflexContainer>
@@ -1236,7 +1185,7 @@ const ProjectPage = () => {
                                 <textarea
                                     style={{
                                         width: '100%',
-                                        height: '80px',
+                                        height: '100%',
                                         backgroundColor: '#0d1117',
                                         border: '1px solid var(--border-color)',
                                         borderRadius: '6px',
