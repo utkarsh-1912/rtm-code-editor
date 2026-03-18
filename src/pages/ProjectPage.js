@@ -20,7 +20,8 @@ import {
     Trash2,
     RotateCcw,
     Palette,
-    ChevronRight
+    ChevronRight,
+    PhoneOff
 } from "lucide-react";
 import toast from "react-hot-toast";
 import ProjectEditor from "../components/ProjectEditor";
@@ -1251,8 +1252,8 @@ const ProjectPage = () => {
                     </button>
 
                     <button
-                        onClick={runCode}
-                        disabled={isRunning}
+                        onClick={handleCompile}
+                        disabled={isExecuting}
                         style={{
                             display: 'flex',
                             alignItems: 'center',
@@ -1264,13 +1265,13 @@ const ProjectPage = () => {
                             color: 'white',
                             fontSize: '12px',
                             fontWeight: '800',
-                            cursor: isRunning ? 'wait' : 'pointer',
+                            cursor: isExecuting ? 'wait' : 'pointer',
                             transition: 'all 0.2s',
                             boxShadow: '0 4px 12px rgba(59, 130, 246, 0.3)'
                         }}
                     >
                         <Play size={14} fill="currentColor" />
-                        {isRunning ? "Running..." : "Run Code"}
+                        {isExecuting ? "Running..." : "Run Code"}
                     </button>
                 </div>
             </div>
