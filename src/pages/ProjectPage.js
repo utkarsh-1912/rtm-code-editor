@@ -20,11 +20,9 @@ import {
     RotateCcw,
     Palette,
     ChevronRight,
-    PhoneOff,
     Edit2,
     Mic,
     MicOff,
-    Video,
     VideoOff,
 } from "lucide-react";
 import toast from "react-hot-toast";
