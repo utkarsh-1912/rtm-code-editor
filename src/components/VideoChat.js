@@ -89,7 +89,6 @@ const VideoChat = ({ socketRef, projectId, user, isMinimized, onMinimizeToggle, 
 
     const handleJoinCall = useCallback(async () => {
         if (!socketRef.current) return;
-        setIsConnecting(true);
 
         try {
             if (user?.isGuest) {
@@ -100,7 +99,6 @@ const VideoChat = ({ socketRef, projectId, user, isMinimized, onMinimizeToggle, 
                     name: user?.name || "Guest",
                     isSpectator: true
                 });
-                setIsConnecting(false);
                 return;
             }
 
@@ -123,8 +121,6 @@ const VideoChat = ({ socketRef, projectId, user, isMinimized, onMinimizeToggle, 
         } catch (err) {
             console.error("Camera access denied", err);
             toast.error("Please enable camera & microphone to join.");
-        } finally {
-            setIsConnecting(false);
         }
     }, [projectId, socketRef, user, setupAudioAnalysis]);
 

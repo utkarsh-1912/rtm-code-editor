@@ -10,7 +10,6 @@ import {
     X,
     MessageSquare,
     Sun,
-    Moon,
     Video,
     Terminal,
     FileCode,
