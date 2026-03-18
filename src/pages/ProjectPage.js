@@ -66,6 +66,8 @@ const ProjectPage = () => {
     const [activeTab, setActiveTab] = useState('code'); // 'code', 'files', 'chat', 'users', 'video'
     const [userInput, setUserInput] = useState("");
     const [isMeetingMinimized, setIsMeetingMinimized] = useState(false);
+    const [isMeetingStarting, setIsMeetingStarting] = useState(false);
+    const [showInputPanel, setShowInputPanel] = useState(false);
 
     const socketRef = useRef(null);
     const hasJoinedRef = useRef(false);
@@ -1139,12 +1141,148 @@ const ProjectPage = () => {
                 )}
             </div>
 
+            {/* Studio Footer */}
+            <div style={{
+                height: '48px',
+                backgroundColor: '#0d1117',
+                borderTop: '1px solid var(--border-color)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '0 16px',
+                position: 'relative',
+                zIndex: 40
+            }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <div style={{
+                        width: '8px',
+                        height: '8px',
+                        borderRadius: '50%',
+                        backgroundColor: '#10b981',
+                        boxShadow: '0 0 8px rgba(16, 185, 129, 0.4)'
+                    }} />
+                    <span style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-muted)' }}>
+                        Project Connected
+                    </span>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    {/* Input Popover */}
+                    <div style={{ position: 'relative' }}>
+                        <button
+                            onClick={() => setShowInputPanel(!showInputPanel)}
+                            style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '6px',
+                                padding: '6px 12px',
+                                borderRadius: '8px',
+                                border: showInputPanel ? '1px solid var(--primary)' : '1px solid var(--border-color)',
+                                backgroundColor: showInputPanel ? 'rgba(59, 130, 246, 0.1)' : 'transparent',
+                                color: showInputPanel ? 'var(--primary)' : 'var(--text-muted)',
+                                fontSize: '12px',
+                                fontWeight: '700',
+                                cursor: 'pointer',
+                                transition: 'all 0.2s'
+                            }}
+                        >
+                            <span style={{ fontSize: '10px', opacity: 0.5 }}>STDIN</span>
+                            Input
+                        </button>
+
+                        {showInputPanel && (
+                            <div className="glass-panel" style={{
+                                position: 'absolute',
+                                bottom: 'calc(100% + 12px)',
+                                right: 0,
+                                width: '300px',
+                                padding: '16px',
+                                borderRadius: '16px',
+                                boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
+                                border: '1px solid rgba(255,255,255,0.1)',
+                                zIndex: 100
+                            }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
+                                    <h4 style={{ margin: 0, fontSize: '13px', fontWeight: '800' }}>Program Input</h4>
+                                    <button onClick={() => setShowInputPanel(false)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}>Close</button>
+                                </div>
+                                <textarea
+                                    style={{
+                                        width: '100%',
+                                        height: '100px',
+                                        backgroundColor: '#0d1117',
+                                        border: '1px solid var(--border-color)',
+                                        borderRadius: '8px',
+                                        color: 'white',
+                                        padding: '10px',
+                                        fontSize: '13px',
+                                        fontFamily: 'monospace',
+                                        resize: 'none'
+                                    }}
+                                    placeholder="Enter stdin here..."
+                                    value={userInput}
+                                    onChange={(e) => setUserInput(e.target.value)}
+                                />
+                            </div>
+                        )}
+                    </div>
+
+                    <div style={{ width: '1px', height: '20px', backgroundColor: 'var(--border-color)' }} />
+
+                    <button
+                        onClick={() => setIsMeetingStarting(!isMeetingStarting)}
+                        style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                            padding: '6px 14px',
+                            borderRadius: '8px',
+                            border: isMeetingStarting ? '1px solid #ef4444' : '1px solid var(--border-color)',
+                            backgroundColor: isMeetingStarting ? 'rgba(239, 68, 68, 0.1)' : 'transparent',
+                            color: isMeetingStarting ? '#ef4444' : 'var(--text-muted)',
+                            fontSize: '12px',
+                            fontWeight: '700',
+                            cursor: 'pointer',
+                            transition: 'all 0.2s'
+                        }}
+                    >
+                        {isMeetingStarting ? <PhoneOff size={14} /> : <Video size={14} />}
+                        {isMeetingStarting ? "Leave Call" : "Join Meeting"}
+                    </button>
+
+                    <button
+                        onClick={runCode}
+                        disabled={isRunning}
+                        style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                            padding: '6px 18px',
+                            borderRadius: '8px',
+                            border: 'none',
+                            backgroundColor: 'var(--primary)',
+                            color: 'white',
+                            fontSize: '12px',
+                            fontWeight: '800',
+                            cursor: isRunning ? 'wait' : 'pointer',
+                            transition: 'all 0.2s',
+                            boxShadow: '0 4px 12px rgba(59, 130, 246, 0.3)'
+                        }}
+                    >
+                        <Play size={14} fill="currentColor" />
+                        {isRunning ? "Running..." : "Run Code"}
+                    </button>
+                </div>
+            </div>
+
             {/* Persistent Video Overlay */}
             <VideoChat
                 socketRef={socketRef}
                 projectId={projectId}
                 user={user || { name: socketRef.current?.userName, isGuest: true }}
                 isMinimized={isMeetingMinimized || (sidebarTab !== 'video' && activeTab !== 'video')}
+                externalInCall={isMeetingStarting}
+                onCallStateChange={setIsMeetingStarting}
                 onMinimizeToggle={(val) => {
                     setIsMeetingMinimized(val);
                     if (!val) {
@@ -1161,12 +1299,10 @@ const logoWrapperStyle = {
     width: 'auto',
     minWidth: '36px',
     height: '36px',
-    borderRadius: '10px',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
     cursor: 'pointer',
-    border: '1px solid rgba(59, 130, 246, 0.2)',
     transition: 'all 0.2s'
 };
 

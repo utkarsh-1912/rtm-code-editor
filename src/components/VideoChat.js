@@ -7,7 +7,7 @@ import {
 import toast from 'react-hot-toast';
 import ACTIONS from '../Action';
 
-const VideoChat = ({ socketRef, projectId, user, isMinimized, onMinimizeToggle }) => {
+const VideoChat = ({ socketRef, projectId, user, isMinimized, onMinimizeToggle, externalInCall, onCallStateChange }) => {
     // --- State Management ---
     const [localStream, setLocalStream] = useState(null);
     const [remoteUsers, setRemoteUsers] = useState({}); // { socketId: { stream, name, isMuted, isVideoOff, isScreenSharing } }
@@ -149,6 +149,24 @@ const VideoChat = ({ socketRef, projectId, user, isMinimized, onMinimizeToggle }
             socketRef.current.emit('leave-video-chat', { projectId });
         }
     }, [localStream, projectId, socketRef]);
+
+    useEffect(() => {
+        if (externalInCall && !inCall) {
+            handleJoinCall();
+        } else if (!externalInCall && inCall) {
+            handleLeaveCall();
+        }
+    }, [externalInCall, inCall, handleJoinCall, handleLeaveCall]);
+
+    const handleJoinCallLocal = async () => {
+        await handleJoinCall();
+        onCallStateChange?.(true);
+    };
+
+    const handleLeaveCallLocal = () => {
+        handleLeaveCall();
+        onCallStateChange?.(false);
+    };
 
     // --- Socket Signaling Handlers ---
     useEffect(() => {
@@ -334,7 +352,7 @@ const VideoChat = ({ socketRef, projectId, user, isMinimized, onMinimizeToggle }
                     )}
                 </div>
                 <div style={miniControls}>
-                    <button style={miniBtn} onClick={() => onMinimizeToggle(false)}><Maximize2 size={12} /></button>
+                    <button style={miniBtn} onClick={() => onMinimizeToggle(false)}><Maximize2 size={12} color="white" /></button>
                     <button
                         style={{ ...miniBtn, color: isMuted ? '#ef4444' : 'white' }}
                         onClick={() => {
@@ -344,9 +362,9 @@ const VideoChat = ({ socketRef, projectId, user, isMinimized, onMinimizeToggle }
                             broadcastMediaState({ isMuted: !tr.enabled });
                         }}
                     >
-                        {isMuted ? <MicOff size={12} /> : <Mic size={12} />}
+                        {isMuted ? <MicOff size={12} color="#ef4444" /> : <Mic size={12} color="white" />}
                     </button>
-                    <button style={{ ...miniBtn, backgroundColor: '#ef4444' }} onClick={handleLeaveCall}><PhoneOff size={12} /></button>
+                    <button style={{ ...miniBtn, backgroundColor: '#ef4444' }} onClick={handleLeaveCallLocal}><PhoneOff size={12} color="white" /></button>
                 </div>
             </div>
         );
@@ -361,7 +379,7 @@ const VideoChat = ({ socketRef, projectId, user, isMinimized, onMinimizeToggle }
                         <h2 style={{ fontSize: '20px', fontWeight: '900', color: '#fff', marginBottom: '8px' }}>Collaboration Hub</h2>
                         <button
                             style={primaryJoinButtonStyle(isConnecting)}
-                            onClick={handleJoinCall}
+                            onClick={handleJoinCallLocal}
                             disabled={isConnecting}
                         >
                             {isConnecting ? "Negotiating..." : (user?.isGuest ? "Join as Spectator" : "Join Conference")}
@@ -372,7 +390,7 @@ const VideoChat = ({ socketRef, projectId, user, isMinimized, onMinimizeToggle }
                 <div style={callWorkspaceStyle}>
                     <div style={gridStyle(totalPeople)}>
                         {!user?.isGuest && (
-                            <div style={videoTileStyle(activeSpeaker === 'local')}>
+                            <div style={{ ...videoTileStyle(activeSpeaker === 'local'), position: 'relative' }}>
                                 {isVideoOff ? (
                                     <div style={avatarCenterStyle}><User size={48} opacity={0.1} /></div>
                                 ) : (
@@ -384,7 +402,7 @@ const VideoChat = ({ socketRef, projectId, user, isMinimized, onMinimizeToggle }
                             </div>
                         )}
                         {Object.entries(remoteUsers).map(([id, remote]) => (
-                            <div key={id} style={videoTileStyle(activeSpeaker === id)}>
+                            <div key={id} style={{ ...videoTileStyle(activeSpeaker === id), position: 'relative' }}>
                                 <RemoteVideo user={remote} />
                             </div>
                         ))}
@@ -400,7 +418,7 @@ const VideoChat = ({ socketRef, projectId, user, isMinimized, onMinimizeToggle }
                                         setIsMuted(!tr.enabled);
                                         broadcastMediaState({ isMuted: !tr.enabled });
                                     }}>
-                                        {isMuted ? <MicOff size={18} /> : <Mic size={18} />}
+                                        {isMuted ? <MicOff size={18} color="#ef4444" /> : <Mic size={18} color="white" />}
                                     </button>
                                     <button style={controlCircle(isVideoOff, '#ef4444')} onClick={() => {
                                         const tr = localStream.getVideoTracks()[0];
@@ -408,20 +426,20 @@ const VideoChat = ({ socketRef, projectId, user, isMinimized, onMinimizeToggle }
                                         setIsVideoOff(!tr.enabled);
                                         broadcastMediaState({ isVideoOff: !tr.enabled });
                                     }}>
-                                        {isVideoOff ? <VideoOff size={18} /> : <Video size={18} />}
+                                        {isVideoOff ? <VideoOff size={18} color="#ef4444" /> : <Video size={18} color="white" />}
                                     </button>
                                     <button style={controlCircle(isScreenSharing, 'var(--primary)')} onClick={toggleScreenShare}>
-                                        {isScreenSharing ? <ScreenShareOff size={18} /> : <ScreenShare size={18} />}
+                                        {isScreenSharing ? <ScreenShareOff size={18} color="white" /> : <ScreenShare size={18} color="white" />}
                                     </button>
                                 </>
                             )}
                             <button style={controlCircle(false)} onClick={() => onMinimizeToggle(true)} title="Minimize to Overlay">
-                                <ChevronDown size={18} />
+                                <ChevronDown size={18} color="white" />
                             </button>
                             <button style={controlCircle(false)} onClick={() => setIsExpanded(!isExpanded)}>
-                                {isExpanded ? <Minimize2 size={18} /> : <Maximize2 size={18} />}
+                                {isExpanded ? <Minimize2 size={18} color="white" /> : <Maximize2 size={18} color="white" />}
                             </button>
-                            <button style={hangUpStyle} onClick={handleLeaveCall}><PhoneOff size={20} /></button>
+                            <button style={hangUpStyle} onClick={handleLeaveCallLocal}><PhoneOff size={20} color="white" /></button>
                         </div>
                     </div>
                 </div>
