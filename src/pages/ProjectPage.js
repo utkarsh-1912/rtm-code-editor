@@ -21,7 +21,11 @@ import {
     Palette,
     ChevronRight,
     PhoneOff,
-    Edit2
+    Edit2,
+    Mic,
+    MicOff,
+    Video,
+    VideoOff,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import ProjectEditor from "../components/ProjectEditor";
