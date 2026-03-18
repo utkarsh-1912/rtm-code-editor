@@ -23,7 +23,7 @@ import {
     ChevronRight
 } from "lucide-react";
 import toast from "react-hot-toast";
-import EditorComp from "../components/editorComp";
+import ProjectEditor from "../components/ProjectEditor";
 import LogoLoader from "../components/LogoLoader";
 import { getBackendUrl } from "../utils/api";
 import { useAuth } from "../context/AuthContext";
@@ -65,6 +65,7 @@ const ProjectPage = () => {
     const [showPreview, setShowPreview] = useState(false);
     const [activeTab, setActiveTab] = useState('code'); // 'code', 'files', 'chat', 'users', 'video'
     const [userInput, setUserInput] = useState("");
+    const [isMeetingMinimized, setIsMeetingMinimized] = useState(false);
 
     const socketRef = useRef(null);
     const hasJoinedRef = useRef(false);
@@ -220,22 +221,27 @@ const ProjectPage = () => {
         if (isMobile) setActiveTab('code');
     };
 
-    const handleSaveFile = (content) => {
+    const handleSaveFile = (content, isRemote = false) => {
         if (!activeFile) return;
 
         // 1. Immediate local UI update
         setFiles(prev => prev.map(f => f.id === activeFile.id ? { ...f, content } : f));
-        setActiveFile(prev => prev ? { ...prev, content } : null);
+        setActiveFile(prev => (prev && prev.id === activeFile.id) ? { ...prev, content } : prev);
 
-        // 2. Real-time broadcast (Debounced slightly for performance if needed, but socket is fast)
-        socketRef.current.emit(ACTIONS.FILE_CHANGE, {
-            roomId: `project-${projectId}`,
-            fileId: activeFile.id,
-            content,
-            socketId: socketRef.current.id
-        });
+        if (isRemote) return; // Don't re-emit or re-save if change came from socket
 
-        // 3. Debounced backend persistence (POST method with full metadata)
+        // 2. Real-time broadcast (This is now primarily handled by ProjectEditor, 
+        // but we keep this as a fallback or for other UI parts)
+        if (socketRef.current) {
+            socketRef.current.emit(ACTIONS.FILE_CHANGE, {
+                roomId: `project-${projectId}`,
+                fileId: activeFile.id,
+                content,
+                socketId: socketRef.current.id
+            });
+        }
+
+        // 3. Debounced backend persistence
         if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
         saveTimeoutRef.current = setTimeout(async () => {
             try {
@@ -253,7 +259,7 @@ const ProjectPage = () => {
             } catch (err) {
                 console.error("Failed to persist file changes", err);
             }
-        }, 1500); // 1.5 second debounce
+        }, 1500);
     };
 
     const handleSendMessage = (e) => {
@@ -619,6 +625,7 @@ const ProjectPage = () => {
                             style={{ height: isMobile ? '24px' : '26px', objectFit: 'contain' }}
                         />
                     </div>
+                    <div style={{ width: '1px', height: '28px', backgroundColor: 'var(--border-color)', margin: '0 2px' }} />
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                             <h2 style={{
@@ -826,12 +833,17 @@ const ProjectPage = () => {
                                 )}
 
                                 {activeTab === 'video' && (
-                                    <div style={{ flex: 1, backgroundColor: '#000', height: '100%' }}>
-                                        <VideoChat
-                                            socketRef={socketRef}
-                                            projectId={projectId}
-                                            user={user || { name: socketRef.current?.userName, isGuest: true }}
-                                        />
+                                    <div style={{ flex: 1, backgroundColor: '#000', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                        <div style={{ color: 'var(--text-muted)', textAlign: 'center', padding: '40px' }}>
+                                            <Video size={48} style={{ opacity: 0.1, marginBottom: '20px' }} />
+                                            <p style={{ fontSize: '14px', fontWeight: '600' }}>Call is active in the background.</p>
+                                            <button
+                                                style={{ ...modalButtonStyle, width: 'auto', padding: '10px 20px', marginTop: '20px' }}
+                                                onClick={() => setIsMeetingMinimized(false)}
+                                            >
+                                                Return to Meeting
+                                            </button>
+                                        </div>
                                     </div>
                                 )}
                             </div>
@@ -839,12 +851,18 @@ const ProjectPage = () => {
                     ) : (
                         // Standard IDE Desktop Layout
                         sidebarTab === 'video' ? (
-                            <div style={{ flex: 1, backgroundColor: '#0d1117', position: 'relative' }}>
-                                <VideoChat
-                                    socketRef={socketRef}
-                                    projectId={projectId}
-                                    user={user || { name: socketRef.current?.userName, isGuest: true }}
-                                />
+                            <div style={{ flex: 1, backgroundColor: '#0d1117', position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                <div style={{ color: 'var(--text-muted)', textAlign: 'center' }}>
+                                    <Video size={64} style={{ opacity: 0.1, marginBottom: '24px' }} />
+                                    <h3 style={{ fontSize: '18px', fontWeight: '800', color: 'white' }}>Meeting Active</h3>
+                                    <p style={{ opacity: 0.5, marginBottom: '24px' }}>The conference is running in persistent mode.</p>
+                                    <button
+                                        style={{ ...modalButtonStyle, width: 'auto', padding: '12px 24px' }}
+                                        onClick={() => setIsMeetingMinimized(false)}
+                                    >
+                                        Maximize Video
+                                    </button>
+                                </div>
                             </div>
                         ) : (
                             <ReflexContainer orientation="vertical" style={{ flex: 1, height: '100%', minHeight: 0 }}>
@@ -959,7 +977,7 @@ const ProjectPage = () => {
                                         <div style={{ flex: 1, position: 'relative', display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
                                             <div style={{ flex: isOutputVisible ? 0.6 : 1, position: 'relative' }}>
                                                 {activeFile ? (
-                                                    <EditorComp
+                                                    <ProjectEditor
                                                         key={activeFile.id}
                                                         socketRef={socketRef}
                                                         roomId={`project-${projectId}`}
@@ -967,10 +985,10 @@ const ProjectPage = () => {
                                                         onCodeChange={handleSaveFile}
                                                         code={activeFile.content}
                                                         filename={activeFile.name}
-                                                        lockLanguage={true}
                                                         language={activeFile.name.split('.').pop()}
                                                         settings={settings}
                                                         userName={user?.name || socketRef.current?.userName}
+                                                        isLightMode={isLightMode}
                                                     />
                                                 ) : (
                                                     <div style={emptyEditorStyle}>
@@ -1120,6 +1138,21 @@ const ProjectPage = () => {
                     </div>
                 )}
             </div>
+
+            {/* Persistent Video Overlay */}
+            <VideoChat
+                socketRef={socketRef}
+                projectId={projectId}
+                user={user || { name: socketRef.current?.userName, isGuest: true }}
+                isMinimized={isMeetingMinimized || (sidebarTab !== 'video' && activeTab !== 'video')}
+                onMinimizeToggle={(val) => {
+                    setIsMeetingMinimized(val);
+                    if (!val) {
+                        if (isMobile) setActiveTab('video');
+                        else setSidebarTab('video');
+                    }
+                }}
+            />
         </div>
     );
 };
