@@ -731,7 +731,7 @@ const ProjectPage = () => {
                     <div style={{ ...collaboratorAvatarsStyle, marginRight: '4px' }}>
                         {clients.slice(0, 3).map((client, i) => (
                             <div key={i} style={{ ...miniAvatarStyle, marginLeft: i > 0 ? '-8px' : '0' }} title={client.userName}>
-                                {client.userName[0]}
+                                {(client.userName || 'U')[0]}
                             </div>
                         ))}
                         {clients.length > 3 && (
