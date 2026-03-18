@@ -511,7 +511,6 @@ const VideoChat = ({ socketRef, projectId, user, isMinimized, onMinimizeToggle, 
                             <button style={controlCircle(false)} onClick={() => setIsExpanded(!isExpanded)}>
                                 {isExpanded ? <Minimize2 size={18} color="white" /> : <Maximize2 size={18} color="white" />}
                             </button>
-                            <button style={hangUpStyle} onClick={handleLeaveCallLocal}><PhoneOff size={20} color="white" /></button>
                         </div>
                     </div>
                 </div>

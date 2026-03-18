@@ -72,8 +72,8 @@ const ProjectPage = () => {
     const [showPreview, setShowPreview] = useState(false);
     const [activeTab, setActiveTab] = useState('code'); // 'code', 'files', 'chat', 'users', 'video'
     const [userInput, setUserInput] = useState("");
-    const [isMeetingMinimized, setIsMeetingMinimized] = useState(false);
-    const [isMeetingStarting, setIsMeetingStarting] = useState(false);
+    const [isMeetingMinimized, setIsMeetingMinimized] = useState(true);
+    const [isMeetingStarting, setIsMeetingStarting] = useState(true);
     // const [showInputPanel, setShowInputPanel] = useState(false);
 
     const socketRef = useRef(null);
@@ -118,6 +118,11 @@ const ProjectPage = () => {
                 if (!projRes.ok) throw new Error("Project not found");
                 const projData = await projRes.json();
                 setProject(projData);
+
+                if (projData.type === 'web') {
+                    setShowPreview(true);
+                    setIsOutputVisible(true);
+                }
 
                 const filesRes = await fetch(`${backendUrl}/api/projects/${projectId}/files`);
                 const filesData = await filesRes.json();
@@ -1112,7 +1117,7 @@ const ProjectPage = () => {
                                             {isOutputVisible && (
                                                 <div style={outputPaneStyle}>
                                                     <div style={outputHeaderStyle}>
-                                                        <span>{showPreview ? 'Live Preview' : 'Terminal Output'}</span>
+                                                        <span>{project?.type === 'web' ? 'LIVE PREVIEW' : (showPreview ? 'Live Preview' : 'Terminal Output')}</span>
                                                         <button style={{ background: 'none', border: 'none', color: 'white', cursor: 'pointer' }} onClick={() => { setIsOutputVisible(false); setShowPreview(false); }}>
                                                             <X size={14} />
                                                         </button>
@@ -1292,23 +1297,7 @@ const ProjectPage = () => {
                 </div>
 
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px', height: '100%' }}>
-                    {/* Compact Meeting Toggle */}
-                    <button
-                        onClick={() => setIsMeetingStarting(!isMeetingStarting)}
-                        title={isMeetingStarting ? "Leave Call" : "Join Conference"}
-                        style={{
-                            background: 'none',
-                            border: 'none',
-                            color: isMeetingStarting ? '#ef4444' : 'var(--text-muted)',
-                            cursor: 'pointer',
-                            display: 'flex',
-                            alignItems: 'center',
-                            padding: '4px',
-                            transition: 'all 0.2s'
-                        }}
-                    >
-                        {isMeetingStarting ? <PhoneOff size={14} /> : <Video size={14} />}
-                    </button>
+                    {/* Always-on conferencing (no leave button) */}
 
                     <div style={{ width: '1px', height: '12px', backgroundColor: 'var(--border-color)', margin: '0 4px' }} />
 
