@@ -1416,6 +1416,12 @@ const sidebarHeaderStyle = {
     height: '40px'
 };
 
+const trayIconsStyle = {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '2px'
+};
+
 const fileItemStyle = (active) => ({
     padding: '10px 12px',
     borderRadius: '6px',
