@@ -21,6 +21,7 @@ import {
     Palette,
     ChevronRight,
     Edit2,
+    Square,
     Mic,
     MicOff,
     VideoOff,
