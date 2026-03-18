@@ -1,29 +1,33 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { PhoneOff, Video, VideoOff, Mic, MicOff, User, ScreenShare, ScreenShareOff, Maximize2, Minimize2, Signal } from 'lucide-react';
+import {
+    PhoneOff, Video, VideoOff, Mic, MicOff, User,
+    ScreenShare, ScreenShareOff, Maximize2, Minimize2,
+    Signal, Radio
+} from 'lucide-react';
 import toast from 'react-hot-toast';
 import ACTIONS from '../Action';
 
 const VideoChat = ({ socketRef, projectId, user }) => {
     // --- State Management ---
-    const [stream, setStream] = useState(null);
-    const [remoteStreams, setRemoteStreams] = useState({}); // { socketId: { stream, name, isSpeaking, isMuted, isVideoOff, isScreenSharing } }
+    const [localStream, setLocalStream] = useState(null);
+    const [remoteUsers, setRemoteUsers] = useState({}); // { socketId: { stream, name, isMuted, isVideoOff, isScreenSharing } }
     const [isMuted, setIsMuted] = useState(false);
     const [isVideoOff, setIsVideoOff] = useState(false);
-    const [inCall, setInCall] = useState(false);
     const [isScreenSharing, setIsScreenSharing] = useState(false);
+    const [inCall, setInCall] = useState(false);
     const [activeSpeaker, setActiveSpeaker] = useState(null);
     const [isExpanded, setIsExpanded] = useState(false);
+    const [isConnecting, setIsConnecting] = useState(false);
 
-    // --- Refs ---
-    const peersRef = useRef({});
+    // --- Refs for WebRTC & Audio ---
+    const peersRef = useRef({}); // { socketId: RTCPeerConnection }
     const screenStreamRef = useRef(null);
-    const localVideoRef = useRef();
-    const audioAnalysersRef = useRef({});
-    const localAudioAnalyserRef = useRef(null);
     const audioContextRef = useRef(null);
+    const analysersRef = useRef({}); // { socketId: AnalyserNode }
 
-    // --- Actions helper ---
-    const emitMediaState = useCallback((state) => {
+    // --- Media Action Helper ---
+    const broadcastMediaState = useCallback((state) => {
+        if (!socketRef.current) return;
         socketRef.current.emit(ACTIONS.MEDIA_STATE_CHANGE, {
             roomId: `project-${projectId}`,
             state
@@ -31,7 +35,7 @@ const VideoChat = ({ socketRef, projectId, user }) => {
     }, [projectId, socketRef]);
 
     // --- Speaker Detection Logic ---
-    const initAudioDetection = useCallback((audioStream, id) => {
+    const setupAudioAnalysis = useCallback((stream, id) => {
         try {
             if (!audioContextRef.current) {
                 audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)();
@@ -40,132 +44,257 @@ const VideoChat = ({ socketRef, projectId, user }) => {
                 audioContextRef.current.resume();
             }
 
-            const source = audioContextRef.current.createMediaStreamSource(audioStream);
+            const source = audioContextRef.current.createMediaStreamSource(stream);
             const analyser = audioContextRef.current.createAnalyser();
             analyser.fftSize = 256;
             source.connect(analyser);
-
-            if (id === 'local') {
-                localAudioAnalyserRef.current = analyser;
-            } else {
-                audioAnalysersRef.current[id] = analyser;
-            }
+            analysersRef.current[id] = analyser;
         } catch (e) {
-            console.warn("Audio Context init failed", e);
+            console.warn("Audio analysis setup failed", e);
         }
-    }, [audioContextRef]);
+    }, []);
 
-    // --- Media Controls ---
-    const startCall = useCallback(async () => {
-        if (!socketRef || !socketRef.current) {
-            toast.error("Connecting to server...");
-            return;
+    // --- WebRTC Core Functions ---
+    const createPeer = useCallback((targetSocketId, name, stream) => {
+        const peer = new RTCPeerConnection({
+            iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+        });
+
+        // Add local tracks if they exist
+        if (stream) {
+            stream.getTracks().forEach(track => peer.addTrack(track, stream));
         }
 
-        if (!user && !socketRef.current?.userName) {
-            toast.error("Please enter a name first");
-            return;
-        }
+        peer.onicecandidate = (event) => {
+            if (event.candidate && socketRef.current) {
+                socketRef.current.emit('new-ice-candidate', {
+                    to: targetSocketId,
+                    candidate: event.candidate
+                });
+            }
+        };
 
-        if (!user || user.isGuest) {
-            // Guests can join to view
+        peer.ontrack = (event) => {
+            const remoteStream = event.streams[0];
+            setRemoteUsers(prev => ({
+                ...prev,
+                [targetSocketId]: { ...prev[targetSocketId], stream: remoteStream, name }
+            }));
+            setupAudioAnalysis(remoteStream, targetSocketId);
+        };
+
+        return peer;
+    }, [socketRef, setupAudioAnalysis]);
+
+    const handleJoinCall = useCallback(async () => {
+        if (!socketRef.current) return;
+        setIsConnecting(true);
+
+        try {
+            // Guests / Spectators don't need media
+            if (user?.isGuest) {
+                setInCall(true);
+                socketRef.current.emit('join-video-chat', {
+                    projectId,
+                    userId: socketRef.current.id,
+                    name: user?.name || "Guest",
+                    isSpectator: true
+                });
+                setIsConnecting(false);
+                return;
+            }
+
+            // Request Camera/Mic
+            const stream = await navigator.mediaDevices.getUserMedia({
+                video: { width: 1280, height: 720, frameRate: 30 },
+                audio: true
+            });
+
+            setLocalStream(stream);
             setInCall(true);
+            setupAudioAnalysis(stream, 'local');
+
+            // Signal entry to others
             socketRef.current.emit('join-video-chat', {
                 projectId,
                 userId: socketRef.current.id,
                 name: user?.name || socketRef.current.userName,
-                isSpectator: true
-            });
-            return;
-        }
-
-        try {
-            const localStream = await navigator.mediaDevices.getUserMedia({
-                video: { width: 1280, height: 720, frameRate: 24 },
-                audio: true
-            });
-            setStream(localStream);
-            setInCall(true);
-
-            initAudioDetection(localStream, 'local');
-
-            socketRef.current.emit('join-video-chat', {
-                projectId,
-                userId: socketRef.current.id,
-                name: user.name || socketRef.current.userName,
                 isSpectator: false
             });
-        } catch (err) {
-            console.error("Failed to get media", err);
-            toast.error("Could not access camera/microphone");
-        }
-    }, [projectId, socketRef, user, initAudioDetection]);
 
-    const endCall = () => {
-        if (stream) {
-            stream.getTracks().forEach(track => track.stop());
+        } catch (err) {
+            console.error("Camera access denied", err);
+            toast.error("Please enable camera & microphone to join.");
+        } finally {
+            setIsConnecting(false);
         }
-        if (screenStreamRef.current) {
-            screenStreamRef.current.getTracks().forEach(track => track.stop());
-        }
-        setStream(null);
+    }, [projectId, socketRef, user, setupAudioAnalysis]);
+
+    const handleLeaveCall = useCallback(() => {
+        // Stop all local tracks
+        if (localStream) localStream.getTracks().forEach(t => t.stop());
+        if (screenStreamRef.current) screenStreamRef.current.getTracks().forEach(t => t.stop());
+
+        // Close all peer connections
+        Object.values(peersRef.current).forEach(p => p.close());
+        peersRef.current = {};
+        analysersRef.current = {};
+
+        // Reset state
+        setLocalStream(null);
+        setRemoteUsers({});
         setInCall(false);
         setIsScreenSharing(false);
-
-        Object.values(peersRef.current).forEach(peer => peer.close());
-        peersRef.current = {};
-        setRemoteStreams({});
+        setActiveSpeaker(null);
 
         if (audioContextRef.current) {
             audioContextRef.current.close().catch(() => { });
             audioContextRef.current = null;
         }
 
-        socketRef.current.emit('leave-video-chat', { projectId });
-    };
+        if (socketRef.current) {
+            socketRef.current.emit('leave-video-chat', { projectId });
+        }
+    }, [localStream, projectId, socketRef]);
 
-    // --- WebRTC Logic ---
-    const addPeer = useCallback((userId, myId, localStream, remoteName) => {
-        const peer = new RTCPeerConnection({
-            iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
-        });
+    // --- Socket Signaling Handlers ---
+    useEffect(() => {
+        if (!socketRef.current) return;
+        const socket = socketRef.current;
 
-        peersRef.current[userId] = peer;
-        localStream.getTracks().forEach(track => peer.addTrack(track, localStream));
+        const onUserJoined = async ({ userId, name, isSpectator }) => {
+            if (userId === socket.id) return;
+            if (isSpectator) {
+                toast(`${name} is watching`);
+                return;
+            }
 
-        peer.onicecandidate = (event) => {
-            if (event.candidate) {
-                socketRef.current.emit('new-ice-candidate', { to: userId, candidate: event.candidate });
+            // If we have a stream, initiate an offer to the newcomer
+            if (localStream) {
+                const peer = createPeer(userId, name, localStream);
+                peersRef.current[userId] = peer;
+
+                try {
+                    const offer = await peer.createOffer();
+                    await peer.setLocalDescription(offer);
+                    socket.emit('video-offer', { to: userId, offer });
+                } catch (err) { console.error("Offer error", err); }
+            } else {
+                // We are spectators, just request their stream
+                socket.emit('request-streams', { to: userId });
             }
         };
 
-        peer.ontrack = (event) => {
-            const remoteStream = event.streams[0];
-            setRemoteStreams(prev => ({
-                ...prev,
-                [userId]: { ...prev[userId], stream: remoteStream, name: remoteName }
-            }));
-            initAudioDetection(remoteStream, userId);
+        const onVideoOffer = async ({ from, offer }) => {
+            const peer = createPeer(from, "User", localStream);
+            peersRef.current[from] = peer;
+
+            try {
+                await peer.setRemoteDescription(new RTCSessionDescription(offer));
+                const answer = await peer.createAnswer();
+                await peer.setLocalDescription(answer);
+                socket.emit('video-answer', { to: from, answer });
+            } catch (err) { console.error("Answer error", err); }
         };
 
-        return peer;
-    }, [socketRef, initAudioDetection]);
+        const onVideoAnswer = async ({ from, answer }) => {
+            const peer = peersRef.current[from];
+            if (peer) {
+                try {
+                    await peer.setRemoteDescription(new RTCSessionDescription(answer));
+                } catch (err) { console.error("Set remote description error", err); }
+            }
+        };
 
-    const createPeer = useCallback((userId, myId, localStream, remoteName) => {
-        const peer = addPeer(userId, myId, localStream, remoteName);
-        if (localStream) {
-            peer.createOffer().then(offer => {
-                peer.setLocalDescription(offer);
-                socketRef.current.emit('video-offer', { to: userId, offer });
+        const onIceCandidate = async ({ from, candidate }) => {
+            const peer = peersRef.current[from];
+            if (peer) {
+                try {
+                    await peer.addIceCandidate(new RTCIceCandidate(candidate));
+                } catch (err) { }
+            }
+        };
+
+        const onRequestStreams = ({ from }) => {
+            if (localStream) onUserJoined({ userId: from, name: "Remote", isSpectator: false });
+        };
+
+        const onUserLeft = ({ userId }) => {
+            if (peersRef.current[userId]) {
+                peersRef.current[userId].close();
+                delete peersRef.current[userId];
+                delete analysersRef.current[userId];
+                setRemoteUsers(prev => {
+                    const next = { ...prev };
+                    delete next[userId];
+                    return next;
+                });
+            }
+        };
+
+        const onMediaStateChange = ({ userId, state }) => {
+            setRemoteUsers(prev => ({
+                ...prev,
+                [userId]: { ...prev[userId], ...state }
+            }));
+        };
+
+        socket.on('user-joined-video', onUserJoined);
+        socket.on('video-offer', onVideoOffer);
+        socket.on('video-answer', onVideoAnswer);
+        socket.on('new-ice-candidate', onIceCandidate);
+        socket.on('request-streams', onRequestStreams);
+        socket.on('user-left-video', onUserLeft);
+        socket.on(ACTIONS.MEDIA_STATE_CHANGE, onMediaStateChange);
+
+        return () => {
+            socket.off('user-joined-video');
+            socket.off('video-offer');
+            socket.off('video-answer');
+            socket.off('new-ice-candidate');
+            socket.off('request-streams');
+            socket.off('user-left-video');
+            socket.off(ACTIONS.MEDIA_STATE_CHANGE);
+        };
+    }, [localStream, socketRef, createPeer]);
+
+    // --- Active Speaker Detection ---
+    useEffect(() => {
+        if (!inCall) return;
+        const interval = setInterval(() => {
+            let topVol = 0;
+            let currentSpeaker = null;
+
+            // Check Local
+            if (analysersRef.current['local'] && !isMuted) {
+                const data = new Uint8Array(analysersRef.current['local'].frequencyBinCount);
+                analysersRef.current['local'].getByteFrequencyData(data);
+                const vol = data.reduce((a, b) => a + b, 0) / data.length;
+                if (vol > 35) {
+                    topVol = vol;
+                    currentSpeaker = 'local';
+                }
+            }
+
+            // Check Remotes
+            Object.entries(analysersRef.current).forEach(([id, analyser]) => {
+                if (id === 'local' || remoteUsers[id]?.isMuted) return;
+                const data = new Uint8Array(analyser.frequencyBinCount);
+                analyser.getByteFrequencyData(data);
+                const vol = data.reduce((a, b) => a + b, 0) / data.length;
+                if (vol > topVol && vol > 35) {
+                    topVol = vol;
+                    currentSpeaker = id;
+                }
             });
-        } else {
-            // Spectator only
-            socketRef.current.emit('request-streams', { to: userId });
-        }
-        return peer;
-    }, [addPeer, socketRef]);
 
-    // --- Screen Sharing ---
+            if (currentSpeaker !== activeSpeaker) setActiveSpeaker(currentSpeaker);
+        }, 300);
+
+        return () => clearInterval(interval);
+    }, [inCall, activeSpeaker, isMuted, remoteUsers]);
+
+    // --- Screen Sharing Implementation ---
     const toggleScreenShare = async () => {
         try {
             if (!isScreenSharing) {
@@ -173,256 +302,143 @@ const VideoChat = ({ socketRef, projectId, user }) => {
                 screenStreamRef.current = screenStream;
                 const screenTrack = screenStream.getVideoTracks()[0];
 
+                // Replace track on all peer connections
                 Object.values(peersRef.current).forEach(peer => {
                     const sender = peer.getSenders().find(s => s.track && s.track.kind === 'video');
                     if (sender) sender.replaceTrack(screenTrack);
                 });
 
-                screenTrack.onended = () => stopScreenShare();
+                screenTrack.onended = () => handleStopScreenShare();
                 setIsScreenSharing(true);
-                socketRef.current.emit(ACTIONS.SCREEN_SHARE_START, { roomId: `project-${projectId}` });
+                broadcastMediaState({ isScreenSharing: true });
             } else {
-                stopScreenShare();
+                handleStopScreenShare();
             }
         } catch (err) {
-            console.error("Screen share error:", err);
+            console.error("Screen share fail", err);
         }
     };
 
-    const stopScreenShare = () => {
+    const handleStopScreenShare = () => {
         if (screenStreamRef.current) {
-            screenStreamRef.current.getTracks().forEach(track => track.stop());
+            screenStreamRef.current.getTracks().forEach(t => t.stop());
             screenStreamRef.current = null;
         }
-        const videoTrack = stream.getVideoTracks()[0];
+        const videoTrack = localStream.getVideoTracks()[0];
         Object.values(peersRef.current).forEach(peer => {
             const sender = peer.getSenders().find(s => s.track && s.track.kind === 'video');
             if (sender) sender.replaceTrack(videoTrack);
         });
         setIsScreenSharing(false);
-        socketRef.current.emit(ACTIONS.SCREEN_SHARE_STOP, { roomId: `project-${projectId}` });
+        broadcastMediaState({ isScreenSharing: false });
     };
 
-
-    useEffect(() => {
-        if (!inCall) return;
-        const interval = setInterval(() => {
-            let maxVol = 0;
-            let speakerId = null;
-
-            if (localAudioAnalyserRef.current && !isMuted) {
-                const data = new Uint8Array(localAudioAnalyserRef.current.frequencyBinCount);
-                localAudioAnalyserRef.current.getByteFrequencyData(data);
-                const volume = data.reduce((a, b) => a + b, 0) / data.length;
-                if (volume > 30) {
-                    maxVol = volume;
-                    speakerId = 'local';
-                }
-            }
-
-            Object.entries(audioAnalysersRef.current).forEach(([id, analyser]) => {
-                if (remoteStreams[id]?.isMuted) return;
-                const data = new Uint8Array(analyser.frequencyBinCount);
-                analyser.getByteFrequencyData(data);
-                const volume = data.reduce((a, b) => a + b, 0) / data.length;
-                if (volume > 30 && volume > maxVol) {
-                    maxVol = volume;
-                    speakerId = id;
-                }
-            });
-
-            if (speakerId !== activeSpeaker) {
-                setActiveSpeaker(speakerId);
-            }
-        }, 200);
-        return () => clearInterval(interval);
-    }, [inCall, activeSpeaker, isMuted, remoteStreams]);
-
-    // --- Socket Handlers ---
-    useEffect(() => {
-        if (!socketRef.current) return;
-        const socket = socketRef.current;
-
-        const handleUserJoined = ({ userId, name, isSpectator }) => {
-            if (userId === socket.id) return;
-            if (isSpectator) {
-                toast(`${name} is watching`);
-                return;
-            }
-            toast(`${name} joined video`);
-            if (stream) createPeer(userId, socket.id, stream, name);
-        };
-
-        const handleRequestStreams = ({ from }) => {
-            if (stream) createPeer(from, socket.id, stream, user?.name || socket.id);
-        };
-
-        const handleOffer = async ({ from, offer }) => {
-            const peer = addPeer(from, socket.id, stream, "User");
-            try {
-                await peer.setRemoteDescription(new RTCSessionDescription(offer));
-                const answer = await peer.createAnswer();
-                await peer.setLocalDescription(answer);
-                socket.emit('video-answer', { to: from, answer });
-            } catch (err) { console.error(err); }
-        };
-
-        const handleAnswer = async ({ from, answer }) => {
-            const peer = peersRef.current[from];
-            if (peer) try { await peer.setRemoteDescription(new RTCSessionDescription(answer)); } catch (err) { console.error(err); }
-        };
-
-        const handleCandidate = async ({ from, candidate }) => {
-            const peer = peersRef.current[from];
-            if (peer) try { await peer.addIceCandidate(new RTCIceCandidate(candidate)); } catch (err) { }
-        };
-
-        const handleMediaChange = ({ userId, state }) => {
-            setRemoteStreams(prev => ({
-                ...prev,
-                [userId]: { ...prev[userId], ...state }
-            }));
-        };
-
-        const handleScreenStart = ({ userId }) => {
-            setRemoteStreams(prev => ({
-                ...prev,
-                [userId]: { ...prev[userId], isScreenSharing: true }
-            }));
-        };
-
-        const handleScreenStop = ({ userId }) => {
-            setRemoteStreams(prev => ({
-                ...prev,
-                [userId]: { ...prev[userId], isScreenSharing: false }
-            }));
-        };
-
-        socket.on('user-joined-video', handleUserJoined);
-        socket.on('video-offer', handleOffer);
-        socket.on('video-answer', handleAnswer);
-        socket.on('new-ice-candidate', handleCandidate);
-        socket.on('request-streams', handleRequestStreams);
-        socket.on(ACTIONS.MEDIA_STATE_CHANGE, handleMediaChange);
-        socket.on(ACTIONS.SCREEN_SHARE_START, handleScreenStart);
-        socket.on(ACTIONS.SCREEN_SHARE_STOP, handleScreenStop);
-
-        socket.on('user-left-video', ({ userId }) => {
-            if (peersRef.current[userId]) {
-                peersRef.current[userId].close();
-                delete peersRef.current[userId];
-                delete audioAnalysersRef.current[userId];
-                setRemoteStreams(prev => {
-                    const next = { ...prev };
-                    delete next[userId];
-                    return next;
-                });
-            }
-        });
-
-        return () => {
-            socket.off('user-joined-video', handleUserJoined);
-            socket.off('video-offer', handleOffer);
-            socket.off('video-answer', handleAnswer);
-            socket.off('new-ice-candidate', handleCandidate);
-            socket.off('request-streams', handleRequestStreams);
-            socket.off(ACTIONS.MEDIA_STATE_CHANGE);
-            socket.off(ACTIONS.SCREEN_SHARE_START);
-            socket.off(ACTIONS.SCREEN_SHARE_STOP);
-            socket.off('user-left-video');
-        };
-    }, [stream, socketRef, createPeer, addPeer, user?.name]);
-
-    useEffect(() => {
-        if (inCall && stream && localVideoRef.current && !isVideoOff) {
-            localVideoRef.current.srcObject = stream;
-        }
-    }, [inCall, stream, isVideoOff]);
-
-    // Auto-join for guests/spectators
-    useEffect(() => {
-        if (!inCall && user?.isGuest) {
-            const timer = setTimeout(() => {
-                startCall();
-            }, 1500);
-            return () => clearTimeout(timer);
-        }
-    }, [user, inCall, startCall]);
-
-    // --- Layout Logic ---
-    const screenSharer = Object.entries(remoteStreams).find(([, r]) => r.isScreenSharing) || (isScreenSharing ? ['local', { name: 'You' }] : null);
-    const totalParticipants = Object.keys(remoteStreams).length + 1;
-    const gridCols = screenSharer ? 1 : (totalParticipants <= 1 ? 1 : totalParticipants <= 2 ? 1 : totalParticipants <= 4 ? 2 : 3);
+    // --- UI Render Helpers ---
+    const totalPeople = Object.keys(remoteUsers).length + (user?.isGuest ? 0 : 1);
+    const gridStyle = {
+        display: 'grid',
+        gridTemplateColumns: totalPeople <= 1 ? '1fr' : totalPeople <= 2 ? '1fr 1fr' : totalPeople <= 4 ? '1fr 1fr' : 'repeat(auto-fill, minmax(200px, 1fr))',
+        gap: '12px',
+        padding: '16px',
+        height: '100%',
+        width: '100%',
+        alignContent: 'start',
+        overflowY: 'auto'
+    };
 
     return (
         <div style={containerStyle(isExpanded)}>
             {!inCall ? (
-                <div style={preCallContainerStyle}>
-                    <div style={heroIconStyle}><Video size={48} color="var(--primary)" /></div>
-                    <h3 style={{ fontSize: '16px', fontWeight: '800', marginBottom: '8px' }}>Collaboration Call</h3>
-                    <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '24px', maxWidth: '240px', margin: '0 auto 24px' }}>
-                        {(!user || user.isGuest) ? "Connect as a guest to observe and chat." : "Join with audio and video to collaborate."}
-                    </p>
-                    <button onClick={startCall} style={mainJoinButtonStyle(user?.isGuest)} disabled={!user || user.isGuest}>
-                        <Video size={18} /><span>Join Meeting</span>
-                    </button>
+                <div style={welcomeScreenStyle}>
+                    <div className="glass-panel" style={welcomeCardStyle}>
+                        <div style={pulseIconStyle}><Radio size={32} color="var(--primary)" /></div>
+                        <h2 style={{ fontSize: '20px', fontWeight: '900', color: '#fff', marginBottom: '8px' }}>Collaboration Hub</h2>
+                        <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.5)', maxWidth: '240px', margin: '0 auto 24px' }}>
+                            Experience high-fidelity workspace communication with crystal clear video and screen sharing.
+                        </p>
+                        <button
+                            style={primaryJoinButtonStyle(isConnecting)}
+                            onClick={handleJoinCall}
+                            disabled={isConnecting}
+                        >
+                            {isConnecting ? "Negotiating..." : (user?.isGuest ? "Join as Spectator" : "Join Conference")}
+                        </button>
+                    </div>
                 </div>
             ) : (
-                <div style={activeCallContainerStyle}>
-                    <div style={videoGridStyle(gridCols, !!screenSharer)}>
-                        {/* Local Video - Only if not screen sharing or if it's NOT the primary stream */}
-                        <div style={videoWrapperStyle(activeSpeaker === 'local')}>
-                            {isVideoOff ? (
-                                <div style={avatarPlaceholderStyle}><div style={avatarCircleStyle}><User size={40} /></div></div>
-                            ) : (
-                                <video ref={localVideoRef} autoPlay muted playsInline style={videoStyle} />
-                            )}
-                            <div style={participantOverlaysStyle}>
-                                <span style={labelStyle}>You</span>
-                                {isMuted && <div style={mutedBadgeStyle}><MicOff size={10} color="white" /></div>}
+                <div style={callWorkspaceStyle}>
+                    <div style={gridStyle}>
+                        {/* LOCAL TILE */}
+                        {!user?.isGuest && (
+                            <div style={videoTileStyle(activeSpeaker === 'local')}>
+                                {isVideoOff ? (
+                                    <div style={avatarCenterStyle}><User size={48} opacity={0.1} /></div>
+                                ) : (
+                                    <video ref={(el) => { if (el) el.srcObject = localStream }} autoPlay muted playsInline style={videoElementStyle} />
+                                )}
+                                <div style={tileOverlayStyle}>
+                                    <div style={nameTagStyle}>You</div>
+                                    <div style={statusIconGroupStyle}>
+                                        {isMuted && <MicOff size={12} color="#f87171" />}
+                                        {isScreenSharing && <ScreenShare size={12} color="var(--primary)" />}
+                                    </div>
+                                </div>
                             </div>
-                        </div>
+                        )}
 
-                        {/* Remote Videos */}
-                        {Object.entries(remoteStreams).map(([id, remote]) => (
-                            <div key={id} style={videoWrapperStyle(activeSpeaker === id)}>
-                                <VideoElement stream={remote.stream} name={remote.name} isMuted={remote.isMuted} isVideoOff={remote.isVideoOff} />
+                        {/* REMOTE TILES */}
+                        {Object.entries(remoteUsers).map(([id, remote]) => (
+                            <div key={id} style={videoTileStyle(activeSpeaker === id)}>
+                                <RemoteVideo user={remote} />
                             </div>
                         ))}
                     </div>
 
-                    {/* Floating Controls */}
-                    <div style={controlBarWrapperStyle}>
-                        <div style={floatingControlBarStyle}>
-                            <button onClick={() => {
-                                const tr = stream.getAudioTracks()[0];
-                                tr.enabled = !tr.enabled;
-                                setIsMuted(!tr.enabled);
-                                emitMediaState({ isMuted: !tr.enabled });
-                            }} style={actionButtonStyle(isMuted, '#ef4444')} title={isMuted ? "Unmute" : "Mute"}>
-                                {isMuted ? <MicOff size={18} /> : <Mic size={18} />}
-                            </button>
+                    {/* CONTROL BAR */}
+                    <div style={controlDockWrapper}>
+                        <div className="glass-panel" style={controlDock}>
+                            {!user?.isGuest && (
+                                <>
+                                    <button
+                                        style={controlCircle(isMuted, '#ef4444')}
+                                        onClick={() => {
+                                            const tr = localStream.getAudioTracks()[0];
+                                            tr.enabled = !tr.enabled;
+                                            setIsMuted(!tr.enabled);
+                                            broadcastMediaState({ isMuted: !tr.enabled });
+                                        }}
+                                    >
+                                        {isMuted ? <MicOff size={18} /> : <Mic size={18} />}
+                                    </button>
 
-                            <button onClick={() => {
-                                const tr = stream.getVideoTracks()[0];
-                                tr.enabled = !tr.enabled;
-                                setIsVideoOff(!tr.enabled);
-                                emitMediaState({ isVideoOff: !tr.enabled });
-                            }} style={actionButtonStyle(isVideoOff, '#ef4444')} title={isVideoOff ? "Turn Camera On" : "Turn Camera Off"}>
-                                {isVideoOff ? <VideoOff size={18} /> : <Video size={18} />}
-                            </button>
+                                    <button
+                                        style={controlCircle(isVideoOff, '#ef4444')}
+                                        onClick={() => {
+                                            const tr = localStream.getVideoTracks()[0];
+                                            tr.enabled = !tr.enabled;
+                                            setIsVideoOff(!tr.enabled);
+                                            broadcastMediaState({ isVideoOff: !tr.enabled });
+                                        }}
+                                    >
+                                        {isVideoOff ? <VideoOff size={18} /> : <Video size={18} />}
+                                    </button>
 
-                            <button onClick={toggleScreenShare} style={actionButtonStyle(isScreenSharing, 'var(--primary)')} title={isScreenSharing ? "Stop Sharing" : "Share Screen"}>
-                                {isScreenSharing ? <ScreenShareOff size={18} /> : <ScreenShare size={18} />}
-                            </button>
+                                    <button
+                                        style={controlCircle(isScreenSharing, 'var(--primary)')}
+                                        onClick={toggleScreenShare}
+                                    >
+                                        {isScreenSharing ? <ScreenShareOff size={18} /> : <ScreenShare size={18} />}
+                                    </button>
 
-                            <div style={dividerStyle} />
+                                    <div style={{ width: '1px', height: '20px', backgroundColor: 'rgba(255,255,255,0.1)', margin: '0 8px' }} />
+                                </>
+                            )}
 
-                            <button onClick={() => setIsExpanded(!isExpanded)} style={actionButtonStyle(false)} title={isExpanded ? "Collapse" : "Expand"}>
+                            <button style={controlCircle(false)} onClick={() => setIsExpanded(!isExpanded)}>
                                 {isExpanded ? <Minimize2 size={18} /> : <Maximize2 size={18} />}
                             </button>
 
-                            <button onClick={endCall} style={hangUpButtonStyle} title="Leave Meeting"><PhoneOff size={20} /></button>
+                            <button style={hangUpStyle} onClick={handleLeaveCall}><PhoneOff size={20} /></button>
                         </div>
                     </div>
                 </div>
@@ -431,27 +447,26 @@ const VideoChat = ({ socketRef, projectId, user }) => {
     );
 };
 
-const VideoElement = ({ stream, name, isMuted, isVideoOff }) => {
-    const ref = useRef();
+const RemoteVideo = ({ user }) => {
+    const videoRef = useRef();
     useEffect(() => {
-        if (ref.current && stream) {
-            ref.current.srcObject = stream;
-            ref.current.play().catch(() => { });
+        if (videoRef.current && user.stream) {
+            videoRef.current.srcObject = user.stream;
         }
-    }, [stream]);
+    }, [user.stream]);
 
     return (
         <>
-            {isVideoOff ? (
-                <div style={avatarPlaceholderStyle}><div style={avatarCircleStyle}><User size={40} /></div></div>
+            {user.isVideoOff ? (
+                <div style={avatarCenterStyle}><User size={48} opacity={0.1} /></div>
             ) : (
-                <video ref={ref} autoPlay playsInline style={videoStyle} muted={false} />
+                <video ref={videoRef} autoPlay playsInline style={videoElementStyle} />
             )}
-            <div style={participantOverlaysStyle}>
-                <span style={labelStyle}>{name || "Participant"}</span>
-                <div style={{ display: 'flex', gap: '4px' }}>
-                    {isMuted && <div style={mutedBadgeStyle}><MicOff size={10} color="white" /></div>}
-                    <Signal size={12} color="#22c55e" />
+            <div style={tileOverlayStyle}>
+                <div style={nameTagStyle}>{user.name || "Participant"}</div>
+                <div style={statusIconGroupStyle}>
+                    {user.isMuted && <MicOff size={12} color="#f87171" />}
+                    {user.isScreenSharing && <ScreenShare size={12} color="var(--primary)" />}
                 </div>
             </div>
         </>
@@ -462,132 +477,69 @@ const VideoElement = ({ stream, name, isMuted, isVideoOff }) => {
 
 const containerStyle = (isExpanded) => ({
     backgroundColor: "#0d1117",
-    height: isExpanded ? "100%" : "320px",
+    height: isExpanded ? "100%" : "340px",
     display: "flex",
     flexDirection: "column",
-    transition: "height 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+    transition: "height 0.4s cubic-bezier(0.16, 1, 0.3, 1)",
     position: "relative",
     overflow: "hidden",
 });
 
-const preCallContainerStyle = {
-    flex: 1,
-    display: "flex",
-    flexDirection: "column",
-    alignItems: "center",
-    justifyContent: "center",
-    padding: "32px",
-    textAlign: "center",
-};
+const welcomeScreenStyle = { flex: 1, display: "flex", alignItems: "center", justifyContent: "center", padding: "24px" };
+const welcomeCardStyle = { borderRadius: "24px", padding: "48px 32px", textAlign: "center", border: "1px solid rgba(255,255,255,0.05)", maxWidth: "400px" };
 
-const heroIconStyle = {
-    width: "80px",
-    height: "80px",
-    borderRadius: "24px",
-    backgroundColor: "rgba(59, 130, 246, 0.1)",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: "20px",
-};
+const pulseIconStyle = { width: '80px', height: '80px', borderRadius: '50%', backgroundColor: 'rgba(59, 130, 246, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 24px', position: 'relative' };
 
-const mainJoinButtonStyle = (isGuest) => ({
-    display: "flex",
-    alignItems: "center",
-    gap: "12px",
-    padding: "12px 24px",
-    backgroundColor: isGuest ? "rgba(255,255,255,0.05)" : "var(--primary)",
-    color: "white",
+const primaryJoinButtonStyle = (loading) => ({
+    padding: "14px 28px",
+    backgroundColor: loading ? "rgba(255,255,255,0.05)" : "var(--primary)",
+    color: "#fff",
     border: "none",
-    borderRadius: "12px",
-    fontWeight: "700",
-    cursor: isGuest ? "not-allowed" : "pointer",
-    boxShadow: isGuest ? "none" : "0 8px 16px rgba(59, 130, 246, 0.3)",
+    borderRadius: "14px",
+    fontWeight: "800",
+    fontSize: "14px",
+    cursor: loading ? "wait" : "pointer",
+    boxShadow: loading ? "none" : "0 10px 20px rgba(59, 130, 246, 0.3)",
+    transition: "all 0.2s"
 });
 
-const activeCallContainerStyle = {
-    flex: 1,
-    display: "flex",
-    flexDirection: "column",
-    padding: "12px",
-    position: "relative",
-    minHeight: 0,
-};
+const callWorkspaceStyle = { flex: 1, display: "flex", flexDirection: "column", position: 'relative' };
 
-const videoGridStyle = (cols, hasScreenShare) => ({
-    display: "grid",
-    gridTemplateColumns: `repeat(${cols}, 1fr)`,
-    gap: "12px",
-    flex: 1,
-    minHeight: 0,
-    alignContent: "start",
-    overflowY: "auto",
-});
-
-const videoWrapperStyle = (isSpeaking) => ({
+const videoTileStyle = (active) => ({
     position: "relative",
-    borderRadius: "16px",
+    borderRadius: "20px",
     overflow: "hidden",
     backgroundColor: "#161b22",
     aspectRatio: "16/10",
-    border: isSpeaking ? "3px solid #3b82f6" : "1px solid rgba(255,255,255,0.05)",
-    boxShadow: isSpeaking ? "0 0 20px rgba(59, 130, 246, 0.2)" : "none",
-    transition: "all 0.2s ease",
+    border: active ? "3px solid var(--primary)" : "1px solid rgba(255,255,255,0.05)",
+    boxShadow: active ? "0 0 30px rgba(59, 130, 246, 0.2)" : "none",
+    transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)"
 });
 
-const videoStyle = { width: "100%", height: "100%", objectFit: "cover" };
+const videoElementStyle = { width: "100%", height: "100%", objectFit: "cover" };
+const avatarCenterStyle = { width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#0d1117' };
 
-const participantOverlaysStyle = {
-    position: "absolute",
-    bottom: "8px",
-    left: "8px",
-    right: "8px",
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    pointerEvents: "none",
-};
+const tileOverlayStyle = { position: "absolute", bottom: "12px", left: "12px", right: "12px", display: "flex", justifyContent: "space-between", alignItems: "center", pointerEvents: "none" };
+const nameTagStyle = { backgroundColor: "rgba(0,0,0,0.7)", backdropFilter: "blur(8px)", color: "#fff", fontSize: "11px", fontWeight: "700", padding: "4px 12px", borderRadius: "100px" };
+const statusIconGroupStyle = { display: "flex", gap: "6px", alignItems: "center", backgroundColor: "rgba(0,0,0,0.5)", padding: "4px 8px", borderRadius: "100px", backdropFilter: "blur(8px)" };
 
-const labelStyle = {
-    backgroundColor: "rgba(0,0,0,0.6)",
-    backdropFilter: "blur(4px)",
-    color: "white",
-    fontSize: "10px",
-    fontWeight: "600",
-    padding: "2px 8px",
-    borderRadius: "4px",
-};
+const controlDockWrapper = { position: "absolute", bottom: "32px", width: "100%", display: "flex", justifyContent: "center", pointerEvents: "none", zIndex: 10 };
+const controlDock = { display: "flex", alignItems: "center", gap: "10px", padding: "10px", borderRadius: "24px", pointerEvents: "auto", boxShadow: "0 20px 40px rgba(0,0,0,0.4)" };
 
-const mutedBadgeStyle = {
-    backgroundColor: "#ef4444",
-    padding: "3px",
-    borderRadius: "50%",
+const controlCircle = (active, color) => ({
+    width: "42px",
+    height: "42px",
+    borderRadius: "14px",
+    backgroundColor: active ? (color || "rgba(255,255,255,0.1)") : "rgba(255,255,255,0.03)",
+    color: "#fff",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
-};
-
-const avatarPlaceholderStyle = { width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", background: "#0d1117" };
-const avatarCircleStyle = { width: "70px", height: "70px", borderRadius: "50%", backgroundColor: "rgba(255,255,255,0.03)", display: "flex", alignItems: "center", justifyContent: "center", color: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.05)" };
-
-const controlBarWrapperStyle = { position: "absolute", bottom: "24px", left: 0, right: 0, display: "flex", justifyContent: "center", pointerEvents: "none" };
-const floatingControlBarStyle = { backgroundColor: "rgba(22, 27, 34, 0.8)", backdropFilter: "blur(12px)", padding: "8px", borderRadius: "18px", display: "flex", alignItems: "center", gap: "6px", border: "1px solid rgba(255,255,255,0.08)", pointerEvents: "auto", boxShadow: "0 8px 32px rgba(0,0,0,0.4)" };
-
-const actionButtonStyle = (isActive, activeColor) => ({
-    width: "38px",
-    height: "38px",
-    borderRadius: "12px",
-    backgroundColor: isActive ? (activeColor || "rgba(255,255,255,0.1)") : "transparent",
     border: "none",
-    color: isActive ? "white" : "var(--text-muted)",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
     cursor: "pointer",
-    transition: "all 0.2s",
+    transition: "all 0.2s"
 });
 
-const hangUpButtonStyle = { width: "50px", height: "38px", borderRadius: "12px", backgroundColor: "#ef4444", border: "none", color: "white", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", boxShadow: "0 4px 12px rgba(239, 68, 68, 0.2)" };
-const dividerStyle = { width: "1px", height: "20px", backgroundColor: "rgba(255,255,255,0.1)", margin: "0 4px" };
+const hangUpStyle = { width: "56px", height: "42px", borderRadius: "14px", backgroundColor: "#ef4444", color: "white", display: "flex", alignItems: "center", justifyContent: "center", border: "none", cursor: "pointer", boxShadow: "0 8px 16px rgba(239, 68, 68, 0.3)" };
 
 export default VideoChat;
