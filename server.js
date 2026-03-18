@@ -618,7 +618,28 @@ io.on("connection", (socket) => {
   // WebRTC Signaling
   socket.on('join-video-chat', ({ projectId, userId, name, isSpectator }) => {
     const roomId = `project-${projectId}`;
-    socket.to(roomId).emit('user-joined-video', { userId, name, isSpectator });
+    socket.join(roomId);
+
+    // Get all participants currently in this video room
+    const clients = [];
+    const room = io.sockets.adapter.rooms.get(roomId);
+    if (room) {
+      for (const id of room) {
+        if (id !== socket.id) {
+          clients.push({
+            userId: id,
+            name: userSocketMap[id] || "Participant",
+            isSpectator: false // We can refine this if needed
+          });
+        }
+      }
+    }
+
+    // Tell the new joiner who's already there
+    socket.emit('video-participants', { clients });
+
+    // Notify others that a new user joined
+    socket.to(roomId).emit('user-joined-video', { userId: socket.id, name, isSpectator });
   });
 
   socket.on('request-streams', ({ to }) => {
@@ -639,6 +660,7 @@ io.on("connection", (socket) => {
 
   socket.on('leave-video-chat', ({ projectId }) => {
     const roomId = `project-${projectId}`;
+    socket.leave(roomId);
     socket.to(roomId).emit('user-left-video', { userId: socket.id });
   });
 

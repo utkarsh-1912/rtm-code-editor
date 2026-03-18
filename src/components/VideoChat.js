@@ -173,6 +173,9 @@ const VideoChat = ({ socketRef, projectId, user, isMinimized, onMinimizeToggle, 
                 return;
             }
 
+            // Only create if we don't have this peer already
+            if (peersRef.current[userId]) return;
+
             if (localStream) {
                 const peer = createPeer(userId, name, localStream);
                 peersRef.current[userId] = peer;
@@ -241,6 +244,14 @@ const VideoChat = ({ socketRef, projectId, user, isMinimized, onMinimizeToggle, 
             }));
         };
 
+        const onParticipantsList = ({ clients }) => {
+            console.log("Existing participants:", clients);
+            clients.forEach(c => {
+                onUserJoined({ userId: c.userId, name: c.name, isSpectator: c.isSpectator });
+            });
+        };
+
+        socket.on('video-participants', onParticipantsList);
         socket.on('user-joined-video', onUserJoined);
         socket.on('video-offer', onVideoOffer);
         socket.on('video-answer', onVideoAnswer);
@@ -248,6 +259,17 @@ const VideoChat = ({ socketRef, projectId, user, isMinimized, onMinimizeToggle, 
         socket.on('request-streams', onRequestStreams);
         socket.on('user-left-video', onUserLeft);
         socket.on(ACTIONS.MEDIA_STATE_CHANGE, onMediaStateChange);
+
+        return () => {
+            socket.off('video-participants', onParticipantsList);
+            socket.off('user-joined-video', onUserJoined);
+            socket.off('video-offer', onVideoOffer);
+            socket.off('video-answer', onVideoAnswer);
+            socket.off('new-ice-candidate', onIceCandidate);
+            socket.off('request-streams', onRequestStreams);
+            socket.off('user-left-video', onUserLeft);
+            socket.off(ACTIONS.MEDIA_STATE_CHANGE, onMediaStateChange);
+        };
 
         return () => {
             socket.off('user-joined-video');
