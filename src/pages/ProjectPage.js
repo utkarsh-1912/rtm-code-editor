@@ -809,11 +809,8 @@ const ProjectPage = () => {
                             </button>
                         )}
                         <button
-                            className={`tray-btn ${(isMobile ? activeTab : sidebarTab) === 'video' ? 'active' : ''}`}
-                            onClick={() => {
-                                setSidebarTab('video');
-                                if (isMobile) setActiveTab('video');
-                            }}
+                            className={`tray-btn ${!isMeetingMinimized ? 'active' : ''}`}
+                            onClick={() => setIsMeetingMinimized(false)}
                             title="Streaming View"
                         >
                             <Video size={16} />
@@ -965,41 +962,11 @@ const ProjectPage = () => {
                                         ))}
                                     </div>
                                 )}
-
-                                {activeTab === 'video' && (
-                                    <div style={{ flex: 1, backgroundColor: '#000', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                        <div style={{ color: 'var(--text-muted)', textAlign: 'center', padding: '40px' }}>
-                                            <Video size={48} style={{ opacity: 0.1, marginBottom: '20px' }} />
-                                            <p style={{ fontSize: '14px', fontWeight: '600' }}>Call is active in the background.</p>
-                                            <button
-                                                style={{ ...modalButtonStyle, width: 'auto', padding: '10px 20px', marginTop: '20px' }}
-                                                onClick={() => setIsMeetingMinimized(false)}
-                                            >
-                                                Return to Meeting
-                                            </button>
-                                        </div>
-                                    </div>
-                                )}
                             </div>
                         </div>
                     ) : (
                         // Standard IDE Desktop Layout
-                        sidebarTab === 'video' ? (
-                            <div style={{ flex: 1, backgroundColor: '#0d1117', position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                <div style={{ color: 'var(--text-muted)', textAlign: 'center' }}>
-                                    <Video size={64} style={{ opacity: 0.1, marginBottom: '24px' }} />
-                                    <h3 style={{ fontSize: '18px', fontWeight: '800', color: 'white' }}>Meeting Active</h3>
-                                    <p style={{ opacity: 0.5, marginBottom: '24px' }}>The conference is running in persistent mode.</p>
-                                    <button
-                                        style={{ ...modalButtonStyle, width: 'auto', padding: '12px 24px' }}
-                                        onClick={() => setIsMeetingMinimized(false)}
-                                    >
-                                        Maximize Video
-                                    </button>
-                                </div>
-                            </div>
-                        ) : (
-                            <ReflexContainer orientation="vertical" style={{ flex: 1, height: '100%', minHeight: 0 }}>
+                        <ReflexContainer orientation="vertical" style={{ flex: 1, height: '100%', minHeight: 0 }}>
                                 {!isMobile && ['files', 'chat', 'users'].includes(sidebarTab) && (
                                     <ReflexElement flex={0.2} minSize={250} style={{ height: '100%', minHeight: 0, backgroundColor: 'var(--bg-card)', borderRight: '1px solid var(--border-color)' }}>
                                         <div style={{ height: '100%', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
@@ -1223,7 +1190,6 @@ const ProjectPage = () => {
                                     </div>
                                 </ReflexElement>
                             </ReflexContainer>
-                        )
                     )}
                 </div>
 

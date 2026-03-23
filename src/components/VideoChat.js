@@ -247,6 +247,16 @@ const VideoChat = ({
         }
     }, [externalInCall, inCall, handleJoinCall, handleLeaveCall]);
 
+    // Cleanup camera tracks faithfully on hard unmounts (e.g Sidebar routing to Dashboard)
+    useEffect(() => {
+        const currentStream = localStream;
+        return () => {
+            if (currentStream) {
+                currentStream.getTracks().forEach(t => t.stop());
+            }
+        };
+    }, [localStream]);
+
 
     // --- Socket Signaling Handlers ---
     useEffect(() => {
@@ -697,10 +707,11 @@ const RemoteVideo = ({ user, isMini }) => {
 // --- Styles ---
 const containerStyle = (isExpanded) => ({
     backgroundColor: "#0d1117",
-    height: isExpanded ? "100%" : "340px",
+    position: "fixed",
+    top: 0, left: 0, right: 0, bottom: 0,
+    zIndex: 9000,
     display: "flex", flexDirection: "column",
-    transition: "height 0.4s cubic-bezier(0.16, 1, 0.3, 1)",
-    position: "relative", overflow: "hidden",
+    overflow: "hidden",
 });
 
 const minimizedOverlayStyle = {
