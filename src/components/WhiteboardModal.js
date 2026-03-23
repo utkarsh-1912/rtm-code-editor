@@ -144,7 +144,7 @@ const WhiteboardModal = ({ isOpen, onClose, socketRef, roomId }) => {
         window.addEventListener('resize', resize);
         resize();
         return () => window.removeEventListener('resize', resize);
-    }, [isOpen]);
+    }, [isOpen, renderCanvas]);
 
     // --- Rendering Engine ---
     const drawElement = (ctx, el) => {

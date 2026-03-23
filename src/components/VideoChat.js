@@ -213,7 +213,7 @@ const VideoChat = ({
             console.error("Camera access denied", err);
             toast.error("Please enable camera & microphone to join.");
         }
-    }, [projectId, socketRef, user, setupAudioAnalysis]);
+    }, [projectId, socketRef, user, setupAudioAnalysis, initialAudioState, initialVideoState]);
 
     const handleLeaveCall = useCallback(() => {
         if (localStream) localStream.getTracks().forEach(t => t.stop());
@@ -369,7 +369,7 @@ const VideoChat = ({
             socket.off('user-left-video', onUserLeft);
             socket.off(ACTIONS.MEDIA_STATE_CHANGE, onMediaStateChange);
         };
-    }, [localStream, socketRef, createPeer]);
+    }, [localStream, socketRef, createPeer, projectId]);
 
     // --- Active Speaker Detection ---
     useEffect(() => {
