@@ -372,6 +372,7 @@ function HomePage() {
               handleEnterKey={handleEnterKey}
               joinRoom={joinRoom}
               createNewRoom={createNewRoom}
+              user={user}
             />
           </div>
 

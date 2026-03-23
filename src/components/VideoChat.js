@@ -6,12 +6,24 @@ import {
 import toast from 'react-hot-toast';
 import ACTIONS from '../Action';
 
-const VideoChat = ({ socketRef, projectId, user, isMinimized, onMinimizeToggle, externalInCall, onCallStateChange }) => {
+const VideoChat = ({ 
+    socketRef, 
+    projectId, 
+    user, 
+    isMinimized, 
+    onMinimizeToggle, 
+    externalInCall, 
+    onCallStateChange,
+    clients = [],
+    mediaStates = {},
+    initialAudioState = true,
+    initialVideoState = true
+}) => {
     // --- State Management ---
     const [localStream, setLocalStream] = useState(null);
     const [remoteUsers, setRemoteUsers] = useState({}); // { socketId: { stream, name, isMuted, isVideoOff, isScreenSharing } }
-    const [isMuted, setIsMuted] = useState(false);
-    const [isVideoOff, setIsVideoOff] = useState(false);
+    const [isMuted, setIsMuted] = useState(!initialAudioState);
+    const [isVideoOff, setIsVideoOff] = useState(!initialVideoState);
     const [isScreenSharing, setIsScreenSharing] = useState(false);
     const [inCall, setInCall] = useState(false);
     const [activeSpeaker, setActiveSpeaker] = useState(null);
@@ -27,6 +39,11 @@ const VideoChat = ({ socketRef, projectId, user, isMinimized, onMinimizeToggle, 
     const audioContextRef = useRef(null);
     const analysersRef = useRef({}); // { socketId: AnalyserNode }
 
+    const mediaStateRef = useRef({ isMuted, isVideoOff });
+    useEffect(() => {
+        mediaStateRef.current = { isMuted, isVideoOff };
+    }, [isMuted, isVideoOff]);
+
     // --- Media Action Helper ---
     const broadcastMediaState = useCallback((state) => {
         if (!socketRef.current) return;
@@ -35,6 +52,68 @@ const VideoChat = ({ socketRef, projectId, user, isMinimized, onMinimizeToggle, 
             state
         });
     }, [projectId, socketRef]);
+
+    // --- Screen Sharing Logic ---
+    const stopScreenShare = useCallback(async () => {
+        if (screenStreamRef.current) {
+            screenStreamRef.current.getTracks().forEach(track => track.stop());
+            screenStreamRef.current = null;
+        }
+
+        try {
+            if (!isVideoOff) {
+                const newStream = await navigator.mediaDevices.getUserMedia({
+                    video: { width: 1280, height: 720, frameRate: 30 }
+                });
+                const camTrack = newStream.getVideoTracks()[0];
+                
+                Object.values(peersRef.current).forEach(peer => {
+                    const sender = peer.getSenders().find(s => s.track && s.track.kind === 'video');
+                    if (sender) sender.replaceTrack(camTrack);
+                });
+
+                const currentAudio = localStream?.getAudioTracks()[0];
+                const displayStream = new MediaStream([camTrack]);
+                if (currentAudio) displayStream.addTrack(currentAudio);
+                setLocalStream(displayStream);
+            }
+            setIsScreenSharing(false);
+        } catch (err) {
+            console.error("Return to camera failed", err);
+            toast.error("Could not restore camera");
+            setIsScreenSharing(false);
+        }
+    }, [isVideoOff, localStream]);
+
+    const toggleScreenShare = useCallback(async () => {
+        if (!isScreenSharing) {
+            try {
+                const screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
+                const screenTrack = screenStream.getVideoTracks()[0];
+                screenStreamRef.current = screenStream;
+
+                screenTrack.onended = () => {
+                    stopScreenShare();
+                };
+
+                Object.values(peersRef.current).forEach(peer => {
+                    const sender = peer.getSenders().find(s => s.track && s.track.kind === 'video');
+                    if (sender) sender.replaceTrack(screenTrack);
+                });
+
+                const currentAudio = localStream?.getAudioTracks()[0];
+                const displayStream = new MediaStream([screenTrack]);
+                if (currentAudio) displayStream.addTrack(currentAudio);
+                setLocalStream(displayStream);
+                setIsScreenSharing(true);
+
+            } catch (err) {
+                console.error("Screen share failed", err);
+            }
+        } else {
+            await stopScreenShare();
+        }
+    }, [isScreenSharing, localStream, stopScreenShare]);
 
     // --- Speaker Detection Logic ---
     const setupAudioAnalysis = useCallback((stream, id) => {
@@ -102,14 +181,26 @@ const VideoChat = ({ socketRef, projectId, user, isMinimized, onMinimizeToggle, 
                 return;
             }
 
-            const stream = await navigator.mediaDevices.getUserMedia({
-                video: { width: 1280, height: 720, frameRate: 30 },
-                audio: true
-            });
+            let stream;
+            if (!initialVideoState && !initialAudioState) {
+                // If both are false, avoid getUserMedia throwing an error. Create an empty stream.
+                stream = new MediaStream();
+            } else {
+                stream = await navigator.mediaDevices.getUserMedia({
+                    video: initialVideoState ? { width: 1280, height: 720, frameRate: 30 } : false,
+                    audio: initialAudioState
+                });
+            }
 
             setLocalStream(stream);
             setInCall(true);
-            setupAudioAnalysis(stream, 'local');
+
+            // Handle edge case where initial state is explicitly false, setup dummy tracks if needed
+            // But usually getUserMedia with {video: false, audio: true} returns a stream with only an audio track.
+            // If they both are false, we shouldn't even call getUserMedia.
+            if (initialAudioState) {
+                setupAudioAnalysis(stream, 'local');
+            }
 
             socketRef.current.emit('join-video-chat', {
                 projectId,
@@ -180,6 +271,12 @@ const VideoChat = ({ socketRef, projectId, user, isMinimized, onMinimizeToggle, 
                     const offer = await peer.createOffer();
                     await peer.setLocalDescription(offer);
                     socket.emit('video-offer', { to: userId, offer });
+                    
+                    // Broadcast our current media state so the new user knows our status
+                    socket.emit(ACTIONS.MEDIA_STATE_CHANGE, {
+                        roomId: `project-${projectId}`,
+                        state: mediaStateRef.current
+                    });
                 } catch (err) { console.error("Offer error", err); }
             } else {
                 socket.emit('request-streams', { to: userId });
@@ -195,6 +292,12 @@ const VideoChat = ({ socketRef, projectId, user, isMinimized, onMinimizeToggle, 
                 const answer = await peer.createAnswer();
                 await peer.setLocalDescription(answer);
                 socket.emit('video-answer', { to: from, answer });
+
+                // Also broadcast our media state back so they have ours
+                socket.emit(ACTIONS.MEDIA_STATE_CHANGE, {
+                    roomId: `project-${projectId}`,
+                    state: mediaStateRef.current
+                });
             } catch (err) { console.error("Answer error", err); }
         };
 
@@ -331,41 +434,6 @@ const VideoChat = ({ socketRef, projectId, user, isMinimized, onMinimizeToggle, 
         });
     };
 
-    // --- Screen Sharing ---
-    const toggleScreenShare = async () => {
-        try {
-            if (!isScreenSharing) {
-                const screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
-                screenStreamRef.current = screenStream;
-                const screenTrack = screenStream.getVideoTracks()[0];
-
-                Object.values(peersRef.current).forEach(peer => {
-                    const sender = peer.getSenders().find(s => s.track && s.track.kind === 'video');
-                    if (sender) sender.replaceTrack(screenTrack);
-                });
-
-                screenTrack.onended = () => handleStopScreenShare();
-                setIsScreenSharing(true);
-                broadcastMediaState({ isScreenSharing: true });
-            } else {
-                handleStopScreenShare();
-            }
-        } catch (err) { console.error("Screen share fail", err); }
-    };
-
-    const handleStopScreenShare = () => {
-        if (screenStreamRef.current) {
-            screenStreamRef.current.getTracks().forEach(t => t.stop());
-            screenStreamRef.current = null;
-        }
-        const videoTrack = localStream.getVideoTracks()[0];
-        Object.values(peersRef.current).forEach(peer => {
-            const sender = peer.getSenders().find(s => s.track && s.track.kind === 'video');
-            if (sender) sender.replaceTrack(videoTrack);
-        });
-        setIsScreenSharing(false);
-        broadcastMediaState({ isScreenSharing: false });
-    };
 
     // --- UI Render Helpers ---
     const totalPeople = Object.keys(remoteUsers).length + (user?.isGuest ? 0 : 1);
@@ -428,6 +496,10 @@ const VideoChat = ({ socketRef, projectId, user, isMinimized, onMinimizeToggle, 
                                     const newTrack = newStream.getVideoTracks()[0];
                                     localStream.removeTrack(videoTrack);
                                     localStream.addTrack(newTrack);
+                                    
+                                    // Trigger state update to refresh all consumers/signaling handlers
+                                    setLocalStream(new MediaStream(localStream.getTracks()));
+
                                     Object.values(peersRef.current).forEach(peer => {
                                         const sender = peer.getSenders().find(s => s.track && s.track.kind === 'video');
                                         if (sender) sender.replaceTrack(newTrack);
@@ -475,24 +547,59 @@ const VideoChat = ({ socketRef, projectId, user, isMinimized, onMinimizeToggle, 
         <div style={containerStyle(isExpanded)}>
             {!inCall ? null : (
                 <div style={callWorkspaceStyle}>
-                    <div style={gridStyle(totalPeople)}>
-                        {!user?.isGuest && (
-                            <div style={{ ...videoTileStyle(activeSpeaker === 'local'), position: 'relative' }}>
-                                {isVideoOff ? (
-                                    <div style={avatarCenterStyle}><User size={48} opacity={0.1} /></div>
-                                ) : (
-                                    <video ref={(el) => { if (el) el.srcObject = localStream }} autoPlay muted playsInline style={videoElementStyle} />
+                    <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
+                        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', position: 'relative' }}>
+                            <div style={gridStyle(totalPeople)}>
+                                {!user?.isGuest && (
+                                    <div style={{ ...videoTileStyle(activeSpeaker === 'local'), position: 'relative' }}>
+                                        {isVideoOff ? (
+                                            <div style={avatarCenterStyle}><User size={48} opacity={0.1} /></div>
+                                        ) : (
+                                            <video ref={(el) => { if (el) el.srcObject = localStream }} autoPlay muted playsInline style={videoElementStyle} />
+                                        )}
+                                        <div style={tileOverlayStyle}>
+                                            <div style={nameTagStyle}>You</div>
+                                        </div>
+                                    </div>
                                 )}
-                                <div style={tileOverlayStyle}>
-                                    <div style={nameTagStyle}>You</div>
+                                {Object.entries(remoteUsers).map(([id, remote]) => (
+                                    <div key={id} style={{ ...videoTileStyle(activeSpeaker === id), position: 'relative' }}>
+                                        <RemoteVideo user={remote} />
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* Integrated Participants Sidebar (Desktop Expanded Mode) */}
+                        {isExpanded && (
+                            <div style={participantsSidebarStyle}>
+                                <div style={sidebarHeaderStyle}>
+                                    <h3 style={sidebarTitleStyle}>PARTICIPANTS ({clients.length})</h3>
+                                </div>
+                                <div style={participantsListStyle}>
+                                    {clients.map((client, i) => {
+                                        const media = mediaStates[client.socketId] || {};
+                                        const isMainUser = client.name === (user?.name || socketRef.current?.userName);
+                                        const currentMedia = isMainUser ? { isMuted, isVideoOff } : media;
+                                        
+                                        return (
+                                            <div key={i} style={participantItemStyle}>
+                                                <div style={avatarCircleStyle}>
+                                                    {(client.userName || client.name || 'U')[0]}
+                                                </div>
+                                                <span style={participantNameStyle}>
+                                                    {client.userName || client.name} {isMainUser && "(You)"}
+                                                </span>
+                                                <div style={participantStatusStyle}>
+                                                    {currentMedia.isMuted ? <MicOff size={14} color="#ef4444" /> : <Mic size={14} color="#10b981" />}
+                                                    {currentMedia.isVideoOff ? <VideoOff size={14} color="#ef4444" /> : <Video size={14} color="#10b981" />}
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
                                 </div>
                             </div>
                         )}
-                        {Object.entries(remoteUsers).map(([id, remote]) => (
-                            <div key={id} style={{ ...videoTileStyle(activeSpeaker === id), position: 'relative' }}>
-                                <RemoteVideo user={remote} />
-                            </div>
-                        ))}
                     </div>
 
                     <div style={controlDockWrapper}>
@@ -524,6 +631,9 @@ const VideoChat = ({ socketRef, projectId, user, isMinimized, onMinimizeToggle, 
                                                 // Replace in local stream
                                                 localStream.removeTrack(videoTrack);
                                                 localStream.addTrack(newTrack);
+                                                
+                                                // Trigger state update to refresh all consumers/signaling handlers
+                                                setLocalStream(new MediaStream(localStream.getTracks()));
 
                                                 // Replace in all peer connections
                                                 Object.values(peersRef.current).forEach(peer => {
@@ -541,7 +651,7 @@ const VideoChat = ({ socketRef, projectId, user, isMinimized, onMinimizeToggle, 
                                     }}>
                                         {isVideoOff ? <VideoOff size={18} color="#ef4444" /> : <Video size={18} color="white" />}
                                     </button>
-                                    <button style={controlCircle(isScreenSharing, 'var(--primary)')} onClick={toggleScreenShare}>
+                                    <button style={controlCircle(isScreenSharing, 'var(--primary)')} onClick={toggleScreenShare} title={isScreenSharing ? "Stop Sharing" : "Share Screen"}>
                                         {isScreenSharing ? <ScreenShareOff size={18} color="white" /> : <ScreenShare size={18} color="white" />}
                                     </button>
                                 </>
@@ -630,6 +740,77 @@ const gridStyle = (total) => {
         overflowY: 'auto',
         alignContent: 'center'
     };
+};
+
+const participantsSidebarStyle = {
+    width: '280px',
+    backgroundColor: '#0d1117',
+    borderLeft: '1px solid rgba(255,255,255,0.05)',
+    display: 'flex',
+    flexDirection: 'column',
+    height: '100%',
+    zIndex: 10
+};
+
+const sidebarHeaderStyle = {
+    padding: '24px 20px',
+    borderBottom: '1px solid rgba(255,255,255,0.05)'
+};
+
+const sidebarTitleStyle = {
+    margin: 0,
+    fontSize: '11px',
+    fontWeight: '800',
+    color: 'var(--primary)',
+    letterSpacing: '0.1em'
+};
+
+const participantsListStyle = {
+    flex: 1,
+    overflowY: 'auto',
+    padding: '12px'
+};
+
+const participantItemStyle = {
+    display: 'flex',
+    alignItems: 'center',
+    padding: '12px',
+    borderRadius: '12px',
+    backgroundColor: 'rgba(255,255,255,0.02)',
+    marginBottom: '8px',
+    gap: '12px',
+    border: '1px solid rgba(255,255,255,0.03)'
+};
+
+const avatarCircleStyle = {
+    width: '32px',
+    height: '32px',
+    borderRadius: '10px',
+    backgroundColor: 'var(--primary)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    fontSize: '12px',
+    fontWeight: '700',
+    color: 'white',
+    textTransform: 'uppercase'
+};
+
+const participantNameStyle = {
+    flex: 1,
+    fontSize: '13px',
+    fontWeight: '600',
+    color: 'white',
+    whiteSpace: 'nowrap',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis'
+};
+
+const participantStatusStyle = {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    opacity: 0.8
 };
 
 const videoTileStyle = (active) => ({

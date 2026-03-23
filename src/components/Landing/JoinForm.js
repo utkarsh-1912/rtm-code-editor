@@ -1,7 +1,7 @@
 import React from "react";
 import { ChevronRight } from "lucide-react";
 
-const JoinForm = ({ roomId, setRoomId, userName, setUserName, handleEnterKey, joinRoom, createNewRoom }) => {
+const JoinForm = ({ roomId, setRoomId, userName, setUserName, handleEnterKey, joinRoom, createNewRoom, user }) => {
     return (
         <div className="glass-card" style={{
             backgroundColor: "var(--bg-card-transparent)",
@@ -37,22 +37,30 @@ const JoinForm = ({ roomId, setRoomId, userName, setUserName, handleEnterKey, jo
                     />
                 </div>
 
-                <div style={{ textAlign: "left" }}>
-                    <label style={{ fontSize: "11px", fontWeight: "800", color: "var(--primary)", marginBottom: "10px", display: "block", textTransform: "uppercase", letterSpacing: "0.1em" }}>Display Name</label>
-                    <input
-                        type="text"
-                        placeholder="e.g. John Doe"
-                        value={userName}
-                        onChange={(e) => setUserName(e.target.value)}
-                        onKeyUp={handleEnterKey}
-                        style={{
-                            width: "100%", padding: "18px", borderRadius: "16px", border: "1px solid var(--border-color-soft)",
-                            backgroundColor: "var(--bg-input)", color: "var(--text-main)", fontSize: "16px", outline: "none",
-                            transition: "all 0.3s ease", boxShadow: "inset 0 2px 4px rgba(0,0,0,0.1)"
-                        }}
-                        className="premium-input"
-                    />
-                </div>
+                {user ? (
+                    <div style={{ textAlign: 'center', padding: '20px', backgroundColor: 'rgba(255,255,255,0.02)', borderRadius: '16px', border: '1px solid var(--border-color-soft)' }}>
+                        <img src={user.photoURL || `https://ui-avatars.com/api/?name=${user.name}&background=0D8ABC&color=fff`} alt="Avatar" style={{ width: '72px', height: '72px', borderRadius: '50%', marginBottom: '16px', border: '3px solid var(--primary)', objectFit: 'cover' }} />
+                        <h3 style={{ margin: 0, fontSize: '20px', color: 'var(--text-main)', fontWeight: '800' }}>{user.name}</h3>
+                        <p style={{ margin: '6px 0 0 0', fontSize: '14px', color: 'var(--text-muted)' }}>{user.email}</p>
+                    </div>
+                ) : (
+                    <div style={{ textAlign: "left" }}>
+                        <label style={{ fontSize: "11px", fontWeight: "800", color: "var(--primary)", marginBottom: "10px", display: "block", textTransform: "uppercase", letterSpacing: "0.1em" }}>Display Name</label>
+                        <input
+                            type="text"
+                            placeholder="e.g. John Doe"
+                            value={userName}
+                            onChange={(e) => setUserName(e.target.value)}
+                            onKeyUp={handleEnterKey}
+                            style={{
+                                width: "100%", padding: "18px", borderRadius: "16px", border: "1px solid var(--border-color-soft)",
+                                backgroundColor: "var(--bg-input)", color: "var(--text-main)", fontSize: "16px", outline: "none",
+                                transition: "all 0.3s ease", boxShadow: "inset 0 2px 4px rgba(0,0,0,0.1)"
+                            }}
+                            className="premium-input"
+                        />
+                    </div>
+                )}
 
                 <button
                     onClick={joinRoom}

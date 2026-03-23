@@ -594,6 +594,10 @@ io.on("connection", (socket) => {
     socket.in(roomId).emit(ACTIONS.FILE_CHANGE, { fileId, path, content });
   });
 
+  socket.on(ACTIONS.MEDIA_STATE_CHANGE, ({ roomId, state }) => {
+    socket.in(roomId).emit('media-state-update', { userId: socket.id, state });
+  });
+
   socket.on(ACTIONS.FOLLOW_MODE, ({ roomId, viewState, userName }) => {
     socket.in(roomId).emit(ACTIONS.FOLLOW_MODE, { viewState, userName });
   });

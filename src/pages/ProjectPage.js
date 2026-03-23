@@ -58,8 +58,14 @@ const ProjectPage = () => {
 
     const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
     const [clients, setClients] = useState([]);
-    const [showNamePrompt, setShowNamePrompt] = useState(false);
     const [guestName, setGuestName] = useState("");
+
+    // New Lobby States
+    const [showLobby, setShowLobby] = useState(false);
+    const [initialAudio, setInitialAudio] = useState(true);
+    const [initialVideo, setInitialVideo] = useState(true);
+    const lobbyVideoRef = useRef(null);
+    const lobbyStreamRef = useRef(null);
 
     const [sidebarTab, setSidebarTab] = useState('files');
     const [theme, setTheme] = useState(localStorage.getItem("app-theme") || "dark");
@@ -91,6 +97,55 @@ const ProjectPage = () => {
         openFilesRef.current = openFiles;
     }, [openFiles]);
 
+    // --- Lobby Media Preview ---
+    useEffect(() => {
+        if (showLobby) {
+            navigator.mediaDevices.getUserMedia({ video: true, audio: true })
+                .then(stream => {
+                    lobbyStreamRef.current = stream;
+                    if (lobbyVideoRef.current) {
+                        lobbyVideoRef.current.srcObject = stream;
+                    }
+                    setInitialAudio(true);
+                    setInitialVideo(true);
+                })
+                .catch(err => {
+                    console.error("Lobby camera error:", err);
+                    setInitialAudio(false);
+                    setInitialVideo(false);
+                });
+        } else {
+            if (lobbyStreamRef.current) {
+                lobbyStreamRef.current.getTracks().forEach(t => t.stop());
+                lobbyStreamRef.current = null;
+            }
+        }
+        return () => {
+            if (lobbyStreamRef.current) {
+                lobbyStreamRef.current.getTracks().forEach(t => t.stop());
+                lobbyStreamRef.current = null;
+            }
+        };
+    }, [showLobby]);
+
+    const toggleLobbyAudio = () => {
+        setInitialAudio(prev => {
+            if (lobbyStreamRef.current) {
+                lobbyStreamRef.current.getAudioTracks().forEach(t => t.enabled = !prev);
+            }
+            return !prev;
+        });
+    };
+
+    const toggleLobbyVideo = () => {
+        setInitialVideo(prev => {
+            if (lobbyStreamRef.current) {
+                lobbyStreamRef.current.getVideoTracks().forEach(t => t.enabled = !prev);
+            }
+            return !prev;
+        });
+    };
+
     const joinProject = React.useCallback((name) => {
         if (!socketRef.current || hasJoinedRef.current) return;
 
@@ -101,7 +156,6 @@ const ProjectPage = () => {
         });
 
         hasJoinedRef.current = true;
-        setShowNamePrompt(false);
     }, [projectId]);
 
     useEffect(() => {
@@ -202,11 +256,8 @@ const ProjectPage = () => {
                     navigate('/dashboard');
                 }
 
-                if (!user) {
-                    setShowNamePrompt(true);
-                } else {
-                    joinProject(user.name);
-                }
+                // Show Lobby instead of directly joining
+                setShowLobby(true);
 
                 // Load chat history from localstorage
                 const savedChat = localStorage.getItem(`project-chat-${projectId}`);
@@ -243,13 +294,14 @@ const ProjectPage = () => {
         }
     };
 
-    const handleGuestJoin = (e) => {
-        e.preventDefault();
-        if (!guestName.trim()) {
-            toast.error("Please enter a name");
+    const handleLobbyJoin = (e) => {
+        if (e) e.preventDefault();
+        if (!user && !guestName.trim()) {
+            toast.error("Please enter a display name to join.");
             return;
         }
-        joinProject(guestName.trim());
+        setShowLobby(false);
+        joinProject(user ? user.name : guestName.trim());
     };
 
     const handleFileClick = (file) => {
@@ -649,14 +701,19 @@ const ProjectPage = () => {
     };
 
     const generatePreviewDoc = () => {
-        const html = files.find(f => f.name === 'index.html')?.content || '';
+        let html = files.find(f => f.name === 'index.html')?.content || '';
         const css = files.find(f => f.name === 'style.css')?.content || '';
         const js = files.find(f => f.name === 'script.js')?.content || '';
+
+        // Strip tags that might cause 404s since we are inlining
+        html = html.replace(/<script\s+src=["']script\.js["']\s*><\/script>/gi, '');
+        html = html.replace(/<link\s+rel=["']stylesheet["']\s+href=["']style\.css["']\s*\/?>/gi, '');
 
         return `
             <!DOCTYPE html>
             <html>
                 <head>
+                    <meta charset="UTF-8">
                     <style>${css}</style>
                 </head>
                 <body>
@@ -741,90 +798,81 @@ const ProjectPage = () => {
                         )}
                     </div>
 
-                    {!isMobile && (
-                        <div className="icon-tray">
+                    <div className="icon-tray">
+                        {isMobile && (
                             <button
-                                className={`tray-btn ${sidebarTab === 'video' ? 'active' : ''}`}
-                                onClick={() => setSidebarTab('video')}
-                                title="Streaming View"
+                                className={`tray-btn ${activeTab === 'code' ? 'active' : ''}`}
+                                onClick={() => setActiveTab('code')}
+                                title="Code Editor"
                             >
-                                <Video size={16} />
+                                <FileCode size={16} />
                             </button>
-                            <div style={trayIconsStyle}>
-                                <button
-                                    style={{
-                                        ...toolRunButtonStyle,
-                                        width: '32px',
-                                        height: '32px',
-                                        padding: '0',
-                                        borderRadius: '8px',
-                                        background: isExecuting ? 'rgba(239, 68, 68, 0.1)' : 'rgba(59, 130, 246, 0.1)',
-                                        color: isExecuting ? '#ef4444' : '#3b82f6',
-                                        border: 'none',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                        marginRight: '8px'
-                                    }}
-                                    onClick={isExecuting ? () => setIsExecuting(false) : handleCompile}
-                                    title={isExecuting ? "Stop Running" : "Run Code"}
-                                >
-                                    {isExecuting ? <Square size={14} fill="currentColor" /> : <Play size={14} fill="currentColor" />}
-                                </button>
-                                <button className="tray-btn" onClick={() => setShowWhiteboard(true)} title="Whiteboard">
-                                    <Palette size={16} />
-                                </button>
-                                <div style={{ width: '1px', height: '16px', backgroundColor: 'var(--border-color)', margin: '0 8px 0 0' }} />
-                                <button
-                                    className={`tray-btn ${sidebarTab === 'files' ? 'active' : ''}`}
-                                    onClick={() => setSidebarTab('files')}
-                                    title="File Explorer"
-                                >
-                                    <Folder size={16} />
-                                </button>
-                                <button
-                                    className={`tray-btn ${sidebarTab === 'chat' ? 'active' : ''}`}
-                                    onClick={() => {
-                                        setSidebarTab('chat');
-                                    }}
-                                    title="Team Chat"
-                                >
-                                    <div style={{ position: 'relative' }}>
-                                        <MessageSquare size={16} />
-                                        {messages.length > 0 && <div style={{ ...notifDotStyle, top: '-2px', right: '-2px', width: '6px', height: '6px' }} />}
-                                    </div>
-                                </button>
-                                <button
-                                    className={`tray-btn ${sidebarTab === 'users' ? 'active' : ''}`}
-                                    onClick={() => setSidebarTab('users')}
-                                    title="Participants"
-                                >
-                                    <Users size={16} />
-                                </button>
-                                <div style={{ width: '1px', height: '16px', backgroundColor: 'var(--border-color)', margin: '0 2px' }} />
-                                <button className="tray-btn" onClick={toggleTheme} title="Toggle Theme">
-                                    {isLightMode ? <Sun size={16} /> : <Moon size={16} />}
-                                </button>
-                            </div>
-                        </div>
-                    )}
-
-                    {isMobile && activeTab === 'code' && (
+                        )}
                         <button
-                            onClick={handleCompile}
-                            disabled={isExecuting}
-                            className="tool-btn highlight"
-                            style={{
-                                ...toolRunButtonStyle,
-                                background: 'transparent',
-                                border: '1px solid var(--border-color)',
-                                color: 'var(--text-main)'
+                            className={`tray-btn ${(isMobile ? activeTab : sidebarTab) === 'video' ? 'active' : ''}`}
+                            onClick={() => {
+                                setSidebarTab('video');
+                                if (isMobile) setActiveTab('video');
                             }}
+                            title="Streaming View"
                         >
-                            <Play size={14} fill="currentColor" />
-                            <span>{isExecuting ? 'Running...' : 'Run'}</span>
+                            <Video size={16} />
                         </button>
-                    )}
+                        <div style={trayIconsStyle}>
+                            <button
+                                style={{
+                                    ...toolRunButtonStyle,
+                                    width: '32px',
+                                    height: '32px',
+                                    padding: '0',
+                                    borderRadius: '8px',
+                                    background: isExecuting ? 'rgba(239, 68, 68, 0.1)' : 'rgba(59, 130, 246, 0.1)',
+                                    color: isExecuting ? '#ef4444' : '#3b82f6',
+                                    border: 'none',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    marginRight: '8px'
+                                }}
+                                onClick={isExecuting ? () => setIsExecuting(false) : handleCompile}
+                                title={isExecuting ? "Stop Running" : "Run Code"}
+                            >
+                                {isExecuting ? <Square size={14} fill="currentColor" /> : <Play size={14} fill="currentColor" />}
+                            </button>
+                            <button className="tray-btn" onClick={() => setShowWhiteboard(true)} title="Whiteboard">
+                                <Palette size={16} />
+                            </button>
+                            <div style={{ width: '1px', height: '16px', backgroundColor: 'var(--border-color)', margin: '0 8px 0 0' }} />
+                            <button
+                                className={`tray-btn ${(isMobile ? activeTab : sidebarTab) === 'files' ? 'active' : ''}`}
+                                onClick={() => {
+                                    setSidebarTab('files');
+                                    if (isMobile) setActiveTab('files');
+                                }}
+                                title="File Explorer"
+                            >
+                                <Folder size={16} />
+                            </button>
+                            <button
+                                className={`tray-btn ${(isMobile ? activeTab : sidebarTab) === 'chat' ? 'active' : ''}`}
+                                onClick={() => {
+                                    setSidebarTab('chat');
+                                    if (isMobile) setActiveTab('chat');
+                                }}
+                                title="Team Chat"
+                            >
+                                <div style={{ position: 'relative' }}>
+                                    <MessageSquare size={16} />
+                                    {messages.length > 0 && <div style={{ ...notifDotStyle, top: '-2px', right: '-2px', width: '6px', height: '6px' }} />}
+                                </div>
+                            </button>
+                            <div style={{ width: '1px', height: '16px', backgroundColor: 'var(--border-color)', margin: '0 2px' }} />
+                            <button className="tray-btn" onClick={toggleTheme} title="Toggle Theme">
+                                {isLightMode ? <Sun size={16} /> : <Moon size={16} />}
+                            </button>
+                        </div>
+                    </div>
+
 
                     <button className="share-button" style={{
                         ...shareButtonStyle,
@@ -1038,33 +1086,12 @@ const ProjectPage = () => {
                                                     </div>
                                                 )}
 
-                                                {sidebarTab === 'users' && (
-                                                    <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                                        {clients.map((client, i) => {
-                                                            const media = mediaStates[client.socketId] || {};
-                                                            return (
-                                                                <div key={i} style={participantRowStyle}>
-                                                                    <div style={avatarCircleStyle}>{client.userName[0]}</div>
-                                                                    <div style={{ flex: 1 }}>
-                                                                        <div style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-main)' }}>{client.userName}</div>
-                                                                        <div style={{ fontSize: '9px', color: 'var(--primary)', fontWeight: '800', textTransform: 'uppercase' }}>{i === 0 ? 'Admin' : 'Member'}</div>
-                                                                    </div>
-                                                                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginRight: '8px' }}>
-                                                                        {media.isVideoOff ? <VideoOff size={12} color="#f87171" style={{ opacity: 0.5 }} /> : <Video size={12} color="#10b981" />}
-                                                                        {media.isMuted ? <MicOff size={12} color="#f87171" style={{ opacity: 0.5 }} /> : <Mic size={12} color="#10b981" />}
-                                                                    </div>
-                                                                    <div style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#10b981' }} />
-                                                                </div>
-                                                            );
-                                                        })}
-                                                    </div>
-                                                )}
                                             </div>
                                         </div>
                                     </ReflexElement>
                                 )}
 
-                                {!isMobile && ['files', 'chat', 'users'].includes(sidebarTab) && <ReflexSplitter style={splitterStyle} />}
+                                {!isMobile && ['files', 'chat'].includes(sidebarTab) && <ReflexSplitter style={splitterStyle} />}
 
                                 <ReflexElement flex={0.8} minSize={400} style={{ height: '100%' }}>
                                     <div style={{ height: '100%', display: 'flex', flexDirection: 'column', backgroundColor: '#0d1117' }}>
@@ -1200,22 +1227,84 @@ const ProjectPage = () => {
                     )}
                 </div>
 
-                {showNamePrompt && (
+                {showLobby && (
                     <div style={modalOverlayStyle}>
-                        <div style={modalContentStyle}>
-                            <h2 style={{ fontSize: '20px', fontWeight: '800', marginBottom: '8px' }}>Studio Access</h2>
-                            <p style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: '24px' }}>Enter your name to join the workspace.</p>
-                            <form onSubmit={handleGuestJoin}>
-                                <input
-                                    autoFocus
-                                    value={guestName}
-                                    onChange={(e) => setGuestName(e.target.value)}
-                                    style={modalInputStyle}
-                                    placeholder="Display Name"
-                                    required
-                                />
-                                <button type="submit" style={modalButtonStyle}>Enter Studio</button>
-                            </form>
+                        <div style={{ ...modalContentStyle, maxWidth: '600px', padding: '30px' }}>
+                            <h2 style={{ fontSize: '24px', fontWeight: '800', marginBottom: '8px', color: 'white' }}>Join Studio</h2>
+                            <p style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: '24px' }}>Configure your media before entering.</p>
+                            
+                            <div style={{ display: 'flex', gap: '24px', flexDirection: isMobile ? 'column' : 'row' }}>
+                                {/* Media Preview Column */}
+                                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                                    <div style={{ 
+                                        width: '100%', aspectRatio: '16/9', backgroundColor: '#000', 
+                                        borderRadius: '12px', overflow: 'hidden', position: 'relative',
+                                        border: '1px solid rgba(255,255,255,0.1)'
+                                    }}>
+                                        <video 
+                                            autoPlay 
+                                            muted 
+                                            playsInline 
+                                            ref={lobbyVideoRef} 
+                                            style={{ width: '100%', height: '100%', objectFit: 'cover', transform: 'scaleX(-1)', opacity: initialVideo ? 1 : 0 }} 
+                                        />
+                                        {!initialVideo && (
+                                            <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#1f2937' }}>
+                                                <VideoOff size={48} color="#4b5563" />
+                                            </div>
+                                        )}
+                                        
+                                        <div style={{ position: 'absolute', bottom: '12px', left: 0, right: 0, display: 'flex', justifyContent: 'center', gap: '12px' }}>
+                                            <button 
+                                                onClick={toggleLobbyAudio}
+                                                style={{
+                                                    width: '40px', height: '40px', borderRadius: '50%', border: 'none',
+                                                    backgroundColor: initialAudio ? 'rgba(0,0,0,0.6)' : '#ef4444',
+                                                    color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
+                                                    backdropFilter: 'blur(4px)', transition: 'all 0.2s'
+                                                }}
+                                            >
+                                                {initialAudio ? <Mic size={18} /> : <MicOff size={18} />}
+                                            </button>
+                                            <button 
+                                                onClick={toggleLobbyVideo}
+                                                style={{
+                                                    width: '40px', height: '40px', borderRadius: '50%', border: 'none',
+                                                    backgroundColor: initialVideo ? 'rgba(0,0,0,0.6)' : '#ef4444',
+                                                    color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
+                                                    backdropFilter: 'blur(4px)', transition: 'all 0.2s'
+                                                }}
+                                            >
+                                                {initialVideo ? <Video size={18} /> : <VideoOff size={18} />}
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Auth/Guest Form Column */}
+                                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                                    {user ? (
+                                        <div style={{ textAlign: 'center', padding: '20px', backgroundColor: 'rgba(255,255,255,0.02)', borderRadius: '12px', border: '1px solid var(--border-color)', marginBottom: '20px' }}>
+                                            <img src={user.photoURL || `https://ui-avatars.com/api/?name=${user.name}&background=0D8ABC&color=fff`} alt="Avatar" style={{ width: '64px', height: '64px', borderRadius: '50%', marginBottom: '12px', border: '3px solid var(--primary)' }} />
+                                            <h3 style={{ margin: 0, fontSize: '18px', color: 'white' }}>{user.name}</h3>
+                                            <p style={{ margin: '4px 0 0 0', fontSize: '13px', color: 'var(--text-muted)' }}>{user.email}</p>
+                                        </div>
+                                    ) : (
+                                        <form onSubmit={handleLobbyJoin} style={{ marginBottom: '20px', textAlign: 'left' }}>
+                                            <label style={{ display: 'block', textAlign: 'left', marginBottom: '8px', fontSize: '12px', color: 'var(--text-muted)', fontWeight: '600', textTransform: 'uppercase' }}>Join as Guest</label>
+                                            <input
+                                                autoFocus
+                                                value={guestName}
+                                                onChange={(e) => setGuestName(e.target.value)}
+                                                style={modalInputStyle}
+                                                placeholder="Enter Display Name"
+                                                required
+                                            />
+                                        </form>
+                                    )}
+                                    <button onClick={handleLobbyJoin} style={modalButtonStyle}>Join Studio</button>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 )}
@@ -1228,49 +1317,6 @@ const ProjectPage = () => {
                     user={user || { name: socketRef.current?.userName || "Guest" }}
                 />
 
-                {/* Bottom navigation for mobile */}
-                {isMobile && (
-                    <div className="mobile-bottom-bar">
-                        <button
-                            className={`bottom-bar-item ${activeTab === 'code' ? 'active' : ''}`}
-                            onClick={() => setActiveTab('code')}
-                        >
-                            <FileCode size={20} />
-                            <span>Code</span>
-                        </button>
-                        <button
-                            className={`bottom-bar-item ${activeTab === 'files' ? 'active' : ''}`}
-                            onClick={() => setActiveTab('files')}
-                        >
-                            <Folder size={20} />
-                            <span>Explorer</span>
-                        </button>
-                        <button
-                            className={`bottom-bar-item ${activeTab === 'chat' ? 'active' : ''}`}
-                            onClick={() => setActiveTab('chat')}
-                        >
-                            <div style={{ position: 'relative' }}>
-                                <MessageSquare size={20} />
-                                {messages.length > 0 && <div style={{ ...notifDotStyle, width: '10px', height: '10px' }} />}
-                            </div>
-                            <span>Chat</span>
-                        </button>
-                        <button
-                            className={`bottom-bar-item ${activeTab === 'video' ? 'active' : ''}`}
-                            onClick={() => setActiveTab('video')}
-                        >
-                            <Video size={20} />
-                            <span>Meeting</span>
-                        </button>
-                        <button
-                            className={`bottom-bar-item ${activeTab === 'users' ? 'active' : ''}`}
-                            onClick={() => setActiveTab('users')}
-                        >
-                            <Users size={20} />
-                            <span>People</span>
-                        </button>
-                    </div>
-                )}
             </div>
 
             {/* Minimal Studio Footer */}
@@ -1343,16 +1389,14 @@ const ProjectPage = () => {
                 socketRef={socketRef}
                 projectId={projectId}
                 user={user || { name: socketRef.current?.userName, isGuest: true }}
-                isMinimized={isMeetingMinimized || (sidebarTab !== 'video' && activeTab !== 'video')}
+                isMinimized={isMeetingMinimized}
+                onMinimizeToggle={setIsMeetingMinimized}
                 externalInCall={isMeetingStarting}
                 onCallStateChange={setIsMeetingStarting}
-                onMinimizeToggle={(val) => {
-                    setIsMeetingMinimized(val);
-                    if (!val) {
-                        if (isMobile) setActiveTab('video');
-                        else setSidebarTab('video');
-                    }
-                }}
+                clients={clients}
+                mediaStates={mediaStates}
+                initialAudioState={initialAudio}
+                initialVideoState={initialVideo}
             />
         </div>
     );
