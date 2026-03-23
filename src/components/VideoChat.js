@@ -485,7 +485,46 @@ const VideoChat = ({
     // --- UI Render Helpers ---
     const totalPeople = Object.keys(remoteUsers).length + (user?.isGuest ? 0 : 1);
 
-    if (!inCall) return null;
+    if (!inCall) {
+        if (isMinimized) {
+            return (
+                <div 
+                    className="glass-panel" 
+                    style={{ ...minimizedOverlayStyle, left: `${pipPosition.x}px`, top: `${pipPosition.y}px`, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(13, 17, 23, 0.8)' }}
+                    onMouseDown={startDragging}
+                >
+                    <button 
+                        style={{ background: 'var(--primary)', color: 'white', border: 'none', padding: '8px 16px', borderRadius: '8px', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}
+                        onClick={handleJoinCall}
+                    >
+                        Join Call
+                    </button>
+                    <div style={{ position: 'absolute', top: '8px', right: '8px' }}>
+                         <button style={miniBtn} onClick={(e) => { e.stopPropagation(); onMinimizeToggle(false); }} title="Expand">
+                            <Maximize2 size={12} color="white" />
+                        </button>
+                    </div>
+                </div>
+            );
+        }
+        return (
+            <div style={{ ...containerStyle(isExpanded), display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#0d1117' }}>
+                <div style={{ textAlign: 'center', padding: '40px' }}>
+                    <div style={{ width: '80px', height: '80px', borderRadius: '40px', background: 'rgba(59, 130, 246, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 24px' }}>
+                        <Video size={32} color="var(--primary)" />
+                    </div>
+                    <h2 style={{ color: 'white', marginBottom: '12px' }}>Video Conference</h2>
+                    <p style={{ color: 'var(--text-muted)', marginBottom: '32px' }}>Join the call to start collaborating with your team.</p>
+                    <button 
+                        style={{ background: 'var(--primary)', color: 'white', border: 'none', padding: '12px 32px', borderRadius: '12px', fontSize: '14px', fontWeight: '700', cursor: 'pointer' }}
+                        onClick={handleJoinCall}
+                    >
+                        Join Meeting
+                    </button>
+                </div>
+            </div>
+        );
+    }
 
     if (isMinimized) {
         return (

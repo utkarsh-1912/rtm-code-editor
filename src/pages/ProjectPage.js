@@ -83,7 +83,12 @@ const ProjectPage = () => {
     const [userInput, setUserInput] = useState("");
     const [isMeetingMinimized, setIsMeetingMinimized] = useState(true); // true = show PiP by default after joining
     const [isMeetingStarting, setIsMeetingStarting] = useState(false);
-    // const [showInputPanel, setShowInputPanel] = useState(false);
+    
+    // Portal nodes for stable persistent video
+    const [desktopPortalNode, setDesktopPortalNode] = useState(null);
+    const [mobilePortalNode, setMobilePortalNode] = useState(null);
+    const desktopPortalRef = React.useCallback(node => { if (node !== null) setDesktopPortalNode(node); }, []);
+    const mobilePortalRef = React.useCallback(node => { if (node !== null) setMobilePortalNode(node); }, []);
 
     const socketRef = useRef(null);
     const hasJoinedRef = useRef(false);
@@ -970,7 +975,7 @@ const ProjectPage = () => {
                                 )}
 
                                 {activeTab === 'video' && (
-                                    <div id="mobile-video-portal" style={{ flex: 1, height: '100%', overflow: 'hidden' }}>
+                                    <div ref={mobilePortalRef} id="mobile-video-portal" style={{ flex: 1, height: '100%', overflow: 'hidden' }}>
                                         {/* VideoChat will be portalled here */}
                                     </div>
                                 )}
@@ -979,7 +984,7 @@ const ProjectPage = () => {
                     ) : (
                         // Standard IDE Desktop Layout
                         sidebarTab === 'video' ? (
-                            <div id="desktop-video-portal" style={{ flex: 1, height: '100%', backgroundColor: '#0d1117', overflow: 'hidden' }}>
+                            <div ref={desktopPortalRef} id="desktop-video-portal" style={{ flex: 1, height: '100%', backgroundColor: '#0d1117', overflow: 'hidden' }}>
                                 {/* VideoChat will be portalled here */}
                             </div>
                         ) : (
@@ -1282,6 +1287,55 @@ const ProjectPage = () => {
                                         </div>
                                     </div>
                                 </ReflexElement>
+
+                                {/* Persistent Users Sidebar (Desktop only) */}
+                                {!isMobile && (
+                                    <>
+                                        <ReflexSplitter style={splitterStyle} />
+                                        <ReflexElement flex={0.15} minSize={200} style={{ height: '100%', backgroundColor: 'var(--bg-card)', borderLeft: '1px solid var(--border-color)' }}>
+                                            <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+                                                <div style={sidebarHeaderStyle}>
+                                                    <span style={{ fontSize: '10px', fontWeight: '800', letterSpacing: '0.1em', color: 'var(--primary)', textTransform: 'uppercase' }}>
+                                                        Collaborators
+                                                    </span>
+                                                </div>
+                                                <div style={{ padding: '12px', overflowY: 'auto' }}>
+                                                    {clients.map((client, i) => {
+                                                        const isMe = client.socketId === socketRef.current?.id;
+                                                        const isCreator = project?.created_by === client.userId || (i === 0 && project?.created_by === undefined);
+                                                        const isGuest = client.isGuest || (!client.userId && client.userName === 'Guest');
+                                                        const role = isCreator ? 'Admin' : (client.userId ? 'Member' : 'Guest');
+                                                        const roleBgColor = isCreator ? 'rgba(251,191,36,0.15)' : isGuest ? 'rgba(148,163,184,0.15)' : 'rgba(99,102,241,0.15)';
+                                                        const roleColor = isCreator ? '#fbbf24' : isGuest ? '#94a3b8' : 'var(--primary)';
+                                                        const currentFile = remoteCursors[client.socketId]?.fileId
+                                                            ? files.find(f => f.id === remoteCursors[client.socketId].fileId)?.name
+                                                            : isMe ? activeFile?.name : null;
+
+                                                        return (
+                                                            <div key={client.socketId} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px', marginBottom: '8px', borderRadius: '8px', background: 'rgba(255,255,255,0.02)' }}>
+                                                                <div style={{
+                                                                    width: '30px', height: '30px', borderRadius: '50%',
+                                                                    background: `linear-gradient(135deg, hsl(${(client.userName?.charCodeAt(0) * 47) % 360}, 70%, 45%), hsl(${(client.userName?.charCodeAt(0) * 47 + 60) % 360}, 70%, 35%))`,
+                                                                    display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: '800', color: 'white'
+                                                                }}>
+                                                                    {client.userName?.[0]?.toUpperCase() || '?'}
+                                                                </div>
+                                                                <div style={{ flex: 1, minWidth: 0 }}>
+                                                                    <div style={{ fontSize: '11px', color: 'var(--text-main)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                                                        {client.userName}
+                                                                    </div>
+                                                                    <span style={{ fontSize: '8px', fontWeight: '800', backgroundColor: roleBgColor, color: roleColor, padding: '1px 4px', borderRadius: '3px', textTransform: 'uppercase' }}>
+                                                                        {role}
+                                                                    </span>
+                                                                </div>
+                                                            </div>
+                                                        );
+                                                    })}
+                                                </div>
+                                            </div>
+                                        </ReflexElement>
+                                    </>
+                                )}
                             </ReflexContainer>
                         )
                     )}
@@ -1448,8 +1502,7 @@ const ProjectPage = () => {
             {!showLobby && hasJoinedRef.current && (
                 (() => {
                     const isVideoTabActive = activeTab === 'video' || sidebarTab === 'video';
-                    const targetId = isMobile ? 'mobile-video-portal' : 'desktop-video-portal';
-                    const targetEl = isVideoTabActive ? document.getElementById(targetId) : null;
+                    const targetNode = isMobile ? mobilePortalNode : desktopPortalNode;
 
                     const videoComponent = (
                         <div style={{ 
@@ -1478,8 +1531,8 @@ const ProjectPage = () => {
                         </div>
                     );
 
-                    if (isVideoTabActive && targetEl) {
-                        return createPortal(videoComponent, targetEl);
+                    if (isVideoTabActive && targetNode) {
+                        return createPortal(videoComponent, targetNode);
                     }
                     return videoComponent;
                 })()
@@ -1531,6 +1584,21 @@ const ProjectPage = () => {
                     >
                         <Video size={18} />
                         <span>Meet</span>
+                    </button>
+                    <button
+                        onClick={() => setShowInviteModal(true)}
+                        style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px', background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '8px', fontSize: '9px', fontWeight: '700', transition: 'all 0.2s' }}
+                    >
+                        <Plus size={18} />
+                        <span>Invite</span>
+                    </button>
+                    <button
+                        onClick={handleCompile}
+                        disabled={isExecuting}
+                        style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px', background: 'none', border: 'none', color: isExecuting ? 'var(--primary)' : 'var(--text-muted)', cursor: 'pointer', padding: '8px', fontSize: '9px', fontWeight: '700', transition: 'all 0.2s', opacity: isExecuting ? 0.5 : 1 }}
+                    >
+                        <Play size={18} />
+                        <span>Run</span>
                     </button>
                 </nav>
             )}
