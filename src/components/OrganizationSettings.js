@@ -3,7 +3,7 @@ import { X, Plus, Users, Shield, Mail } from 'lucide-react';
 import { getBackendUrl } from '../utils/api';
 import toast from 'react-hot-toast';
 
-const OrganizationSettings = ({ isOpen, onClose, userId }) => {
+const OrganizationSettings = ({ isOpen, onClose, userId, userName }) => {
     const [organizations, setOrganizations] = useState([]);
     const [loading, setLoading] = useState(true);
     const [showCreate, setShowCreate] = useState(false);
@@ -74,14 +74,24 @@ const OrganizationSettings = ({ isOpen, onClose, userId }) => {
             const response = await fetch(`${backendUrl}/api/organizations/${activeOrg.id}/members`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email: inviteEmail, role: 'member' })
+                body: JSON.stringify({ 
+                    email: inviteEmail, 
+                    role: 'member',
+                    orgName: activeOrg.name,
+                    inviterName: userName || 'A Team Admin'
+                })
             });
-            if (response.ok) {
-                toast.success("Member added");
+            const data = await response.json();
+            
+            if (response.ok || data.success) {
+                if (data.pendingSignup) {
+                    toast.success("Invite sent! They need to sign up first.");
+                } else {
+                    toast.success("Member added & notified!");
+                }
                 setInviteEmail('');
                 handleSelectOrg(activeOrg);
             } else {
-                const data = await response.json();
                 toast.error(data.error || "Failed to invite");
             }
         } catch (err) {

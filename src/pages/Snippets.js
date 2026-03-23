@@ -558,6 +558,7 @@ const Snippets = () => {
                 isOpen={showOrgSettings}
                 onClose={() => { setShowOrgSettings(false); fetchOrgs(); }}
                 userId={user?.uid}
+                userName={user?.name || user?.email?.split('@')[0]}
             />
 
             {showModal === 'delete' && (

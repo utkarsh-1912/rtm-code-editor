@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import { useParams, useNavigate } from "react-router-dom";
 import { ReflexContainer, ReflexSplitter, ReflexElement } from "react-reflex";
 import "react-reflex/styles.css";
@@ -47,7 +48,6 @@ const ProjectPage = () => {
     const [openFiles, setOpenFiles] = useState([]);
     const [loading, setLoading] = useState(true);
     const [messages, setMessages] = useState([]);
-    const [newMessage, setNewMessage] = useState("");
     const [showWhiteboard, setShowWhiteboard] = useState(false);
     const [settings] = useState({
         fontSize: 16,
@@ -970,20 +970,8 @@ const ProjectPage = () => {
                                 )}
 
                                 {activeTab === 'video' && (
-                                    <div style={{ flex: 1, height: '100%', overflow: 'hidden' }}>
-                                        <VideoChat
-                                            socketRef={socketRef}
-                                            projectId={projectId}
-                                            user={user || { name: socketRef.current?.userName, isGuest: true }}
-                                            isMinimized={false}
-                                            onMinimizeToggle={(v) => { if (v) setActiveTab('code'); }}
-                                            externalInCall={isMeetingStarting}
-                                            onCallStateChange={setIsMeetingStarting}
-                                            clients={clients}
-                                            mediaStates={mediaStates}
-                                            initialAudioState={initialAudio}
-                                            initialVideoState={initialVideo}
-                                        />
+                                    <div id="mobile-video-portal" style={{ flex: 1, height: '100%', overflow: 'hidden' }}>
+                                        {/* VideoChat will be portalled here */}
                                     </div>
                                 )}
                             </div>
@@ -991,20 +979,8 @@ const ProjectPage = () => {
                     ) : (
                         // Standard IDE Desktop Layout
                         sidebarTab === 'video' ? (
-                            <div style={{ flex: 1, height: '100%', backgroundColor: '#0d1117', overflow: 'hidden' }}>
-                                <VideoChat
-                                    socketRef={socketRef}
-                                    projectId={projectId}
-                                    user={user || { name: socketRef.current?.userName, isGuest: true }}
-                                    isMinimized={false}
-                                    onMinimizeToggle={(v) => { if (v) setSidebarTab('files'); }}
-                                    externalInCall={isMeetingStarting}
-                                    onCallStateChange={setIsMeetingStarting}
-                                    clients={clients}
-                                    mediaStates={mediaStates}
-                                    initialAudioState={initialAudio}
-                                    initialVideoState={initialVideo}
-                                />
+                            <div id="desktop-video-portal" style={{ flex: 1, height: '100%', backgroundColor: '#0d1117', overflow: 'hidden' }}>
+                                {/* VideoChat will be portalled here */}
                             </div>
                         ) : (
                             <ReflexContainer orientation="vertical" style={{ flex: 1, height: '100%', minHeight: 0 }}>
@@ -1012,8 +988,8 @@ const ProjectPage = () => {
                                     <ReflexElement flex={0.2} minSize={250} style={{ height: '100%', minHeight: 0, backgroundColor: 'var(--bg-card)', borderRight: '1px solid var(--border-color)' }}>
                                         <div style={{ height: '100%', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
                                             <div style={sidebarHeaderStyle}>
-                                                <span style={{ fontSize: '10px', fontWeight: '800', letterSpacing: '0.1em', color: 'var(--text-muted)', textTransform: 'uppercase' }}>
-                                                    {sidebarTab}
+                                                <span style={{ fontSize: '10px', fontWeight: '800', letterSpacing: '0.1em', color: 'var(--primary)', textTransform: 'uppercase' }}>
+                                                    {sidebarTab === 'chat' ? 'Messages' : sidebarTab}
                                                 </span>
                                                 {sidebarTab === 'files' && (
                                                     <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
@@ -1468,21 +1444,45 @@ const ProjectPage = () => {
                 </div>
             </footer>
 
-            {/* Persistent Video PiP Overlay (minimized mode only — only after joining) */}
-            {!showLobby && hasJoinedRef.current && isMeetingMinimized && (
-                <VideoChat
-                    socketRef={socketRef}
-                    projectId={projectId}
-                    user={user || { name: socketRef.current?.userName, isGuest: true }}
-                    isMinimized={true}
-                    onMinimizeToggle={setIsMeetingMinimized}
-                    externalInCall={isMeetingStarting}
-                    onCallStateChange={setIsMeetingStarting}
-                    clients={clients}
-                    mediaStates={mediaStates}
-                    initialAudioState={initialAudio}
-                    initialVideoState={initialVideo}
-                />
+            {/* Persistent Video Management (Single Instance) */}
+            {!showLobby && hasJoinedRef.current && (
+                (() => {
+                    const isVideoTabActive = activeTab === 'video' || sidebarTab === 'video';
+                    const targetId = isMobile ? 'mobile-video-portal' : 'desktop-video-portal';
+                    const targetEl = isVideoTabActive ? document.getElementById(targetId) : null;
+
+                    const videoComponent = (
+                        <div style={{ 
+                            display: (isMeetingMinimized || isVideoTabActive) ? 'block' : 'none',
+                            height: isVideoTabActive ? '100%' : 'auto'
+                        }}>
+                            <VideoChat
+                                socketRef={socketRef}
+                                projectId={projectId}
+                                user={user || { name: socketRef.current?.userName, isGuest: true }}
+                                isMinimized={isMeetingMinimized && !isVideoTabActive}
+                                onMinimizeToggle={(val) => {
+                                    setIsMeetingMinimized(val);
+                                    if (!val) {
+                                        if (isMobile) setActiveTab('video');
+                                        else setSidebarTab('video');
+                                    }
+                                }}
+                                externalInCall={isMeetingStarting}
+                                onCallStateChange={setIsMeetingStarting}
+                                clients={clients}
+                                mediaStates={mediaStates}
+                                initialAudioState={initialAudio}
+                                initialVideoState={initialVideo}
+                            />
+                        </div>
+                    );
+
+                    if (isVideoTabActive && targetEl) {
+                        return createPortal(videoComponent, targetEl);
+                    }
+                    return videoComponent;
+                })()
             )}
 
             {/* Mobile Bottom Navigation Bar */}

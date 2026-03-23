@@ -75,12 +75,6 @@ export default function ChatWindow({ socketRef, roomId, userName, isLightMode, i
 
     return (
         <div style={{ display: "flex", flexDirection: "column", height: "100%", backgroundColor: "var(--bg-dark)", borderRight: "1px solid var(--border-color)", position: "relative" }}>
-            <div style={{ padding: "16px", borderBottom: "1px solid var(--border-color)", display: "flex", alignItems: "center", justifyContent: "space-between", backgroundColor: "var(--bg-card)" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                    <BotMessageSquare size={20} color="var(--primary)" />
-                    <h2 style={{ fontSize: "16px", margin: 0, fontWeight: "600", color: "var(--text-main)" }}>Room Chat</h2>
-                </div>
-            </div>
 
             <div style={{ flex: 1, overflowY: "auto", padding: "16px", display: "flex", flexDirection: "column", gap: "12px" }}>
                 {messages.length === 0 ? (

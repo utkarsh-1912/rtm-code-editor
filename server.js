@@ -136,9 +136,72 @@ app.get("/api/organizations", async (req, res) => {
 
 app.post("/api/organizations/:id/members", async (req, res) => {
   try {
-    const { email, role } = req.body;
-    const member = await db.addOrgMember(req.params.id, email, role);
-    res.json(member);
+    const { email, role, orgName, inviterName } = req.body;
+    let member = null;
+    let isNewUser = false;
+    
+    try {
+      member = await db.addOrgMember(req.params.id, email, role);
+    } catch (e) {
+      if (e.message && e.message.includes("User with this email not found")) {
+        isNewUser = true;
+      } else {
+        throw e;
+      }
+    }
+
+    // Send Brevo Email
+    const BREVO_KEY = process.env.BREVO_API_KEY;
+    if (BREVO_KEY) {
+      const appUrl = process.env.APP_URL || "http://localhost:3000";
+      const actionUrl = isNewUser ? `${appUrl}/signup` : `${appUrl}/snippets`;
+      const actionText = isNewUser ? "Create Account & Join Team" : "View Team Vault";
+      const html = `<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    body{background:#0d1117;font-family:sans-serif;color:#e2e8f0;margin:0;padding:40px 0}
+    .wrap{max-width:560px;margin:0 auto;background:#161b22;border-radius:16px;overflow:hidden;border:1px solid #30363d}
+    .header{background:linear-gradient(135deg,#1e293b 0%,#0f172a 100%);padding:36px;text-align:center;border-bottom:1px solid #30363d}
+    .logo-text{font-size:26px;font-weight:900;color:#fff}
+    .body{padding:36px}
+    h1{font-size:22px;color:#f1f5f9;margin:0 0 10px;line-height:1.3}
+    p{font-size:15px;color:#94a3b8;line-height:1.6;margin:0 0 16px}
+    .cta{display:inline-block;padding:14px 24px;background:linear-gradient(135deg,#3b82f6,#2563eb);color:#fff;text-decoration:none;border-radius:10px;font-weight:700;margin:16px 0}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="header">
+      <div class="logo-text">RTM<span style="color:#3b82f6">.</span>Edit</div>
+    </div>
+    <div class="body">
+      <h1>${inviterName || 'A teammate'} invited you to join "${orgName || 'a Team Vault'}"</h1>
+      <p>You've been invited as a <strong>${role || 'member'}</strong> to collaborate on code snippets and components.</p>
+      ${isNewUser ? '<p>You don\'t have an account yet. Create one using this email, then let your team know you are ready to be added!</p>' : '<p>You have been successfully added. You can now access the team vault.</p>'}
+      <a href="${actionUrl}" class="cta">${actionText}</a>
+    </div>
+  </div>
+</body>
+</html>`;
+
+      await fetch("https://api.brevo.com/v3/smtp/email", {
+        method: "POST",
+        headers: { "api-key": BREVO_KEY, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sender: { name: "RTM.Edit", email: process.env.BREVO_FROM_EMAIL || "noreply@rtm-edit.com" },
+          to: [{ email }],
+          subject: `${inviterName || 'A teammate'} invited you to "${orgName || 'a Team Vault'}"`,
+          htmlContent: html
+        })
+      }).catch(console.error);
+    }
+
+    if (isNewUser) {
+      res.json({ success: true, pendingSignup: true, message: "Invite email sent! User needs to create an account." });
+    } else {
+      res.json(member);
+    }
   } catch (err) {
     res.status(500).json({ error: err.message || "Failed to add member" });
   }
