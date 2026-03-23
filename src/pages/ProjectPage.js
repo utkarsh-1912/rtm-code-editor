@@ -81,7 +81,7 @@ const ProjectPage = () => {
     const [showPreview, setShowPreview] = useState(false);
     const [activeTab, setActiveTab] = useState('code'); // 'code', 'files', 'chat', 'users', 'video'
     const [userInput, setUserInput] = useState("");
-    const [isMeetingMinimized, setIsMeetingMinimized] = useState(false); // false = not visible until user explicitly minimizes call
+    const [isMeetingMinimized, setIsMeetingMinimized] = useState(true); // true = show PiP by default after joining
     const [isMeetingStarting, setIsMeetingStarting] = useState(false);
     // const [showInputPanel, setShowInputPanel] = useState(false);
 
@@ -1453,7 +1453,7 @@ const ProjectPage = () => {
 
                     const videoComponent = (
                         <div style={{ 
-                            display: (isMeetingMinimized || isVideoTabActive) ? 'block' : 'none',
+                            display: 'block',
                             height: isVideoTabActive ? '100%' : 'auto'
                         }}>
                             <VideoChat
