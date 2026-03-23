@@ -809,8 +809,11 @@ const ProjectPage = () => {
                             </button>
                         )}
                         <button
-                            className={`tray-btn ${!isMeetingMinimized ? 'active' : ''}`}
-                            onClick={() => setIsMeetingMinimized(false)}
+                            className={`tray-btn ${(isMobile ? activeTab : sidebarTab) === 'video' ? 'active' : ''}`}
+                            onClick={() => {
+                                setSidebarTab('video');
+                                if (isMobile) setActiveTab('video');
+                            }}
                             title="Streaming View"
                         >
                             <Video size={16} />
@@ -962,11 +965,46 @@ const ProjectPage = () => {
                                         ))}
                                     </div>
                                 )}
+
+                                {activeTab === 'video' && (
+                                    <div style={{ flex: 1, height: '100%', overflow: 'hidden' }}>
+                                        <VideoChat
+                                            socketRef={socketRef}
+                                            projectId={projectId}
+                                            user={user || { name: socketRef.current?.userName, isGuest: true }}
+                                            isMinimized={false}
+                                            onMinimizeToggle={(v) => { if (v) setActiveTab('code'); }}
+                                            externalInCall={isMeetingStarting}
+                                            onCallStateChange={setIsMeetingStarting}
+                                            clients={clients}
+                                            mediaStates={mediaStates}
+                                            initialAudioState={initialAudio}
+                                            initialVideoState={initialVideo}
+                                        />
+                                    </div>
+                                )}
                             </div>
                         </div>
                     ) : (
                         // Standard IDE Desktop Layout
-                        <ReflexContainer orientation="vertical" style={{ flex: 1, height: '100%', minHeight: 0 }}>
+                        sidebarTab === 'video' ? (
+                            <div style={{ flex: 1, height: '100%', backgroundColor: '#0d1117', overflow: 'hidden' }}>
+                                <VideoChat
+                                    socketRef={socketRef}
+                                    projectId={projectId}
+                                    user={user || { name: socketRef.current?.userName, isGuest: true }}
+                                    isMinimized={false}
+                                    onMinimizeToggle={(v) => { if (v) setSidebarTab('files'); }}
+                                    externalInCall={isMeetingStarting}
+                                    onCallStateChange={setIsMeetingStarting}
+                                    clients={clients}
+                                    mediaStates={mediaStates}
+                                    initialAudioState={initialAudio}
+                                    initialVideoState={initialVideo}
+                                />
+                            </div>
+                        ) : (
+                            <ReflexContainer orientation="vertical" style={{ flex: 1, height: '100%', minHeight: 0 }}>
                                 {!isMobile && ['files', 'chat', 'users'].includes(sidebarTab) && (
                                     <ReflexElement flex={0.2} minSize={250} style={{ height: '100%', minHeight: 0, backgroundColor: 'var(--bg-card)', borderRight: '1px solid var(--border-color)' }}>
                                         <div style={{ height: '100%', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
@@ -1190,6 +1228,7 @@ const ProjectPage = () => {
                                     </div>
                                 </ReflexElement>
                             </ReflexContainer>
+                        )
                     )}
                 </div>
 
@@ -1350,20 +1389,72 @@ const ProjectPage = () => {
                 </div>
             </footer>
 
-            {/* Persistent Video Overlay */}
-            <VideoChat
-                socketRef={socketRef}
-                projectId={projectId}
-                user={user || { name: socketRef.current?.userName, isGuest: true }}
-                isMinimized={isMeetingMinimized}
-                onMinimizeToggle={setIsMeetingMinimized}
-                externalInCall={isMeetingStarting}
-                onCallStateChange={setIsMeetingStarting}
-                clients={clients}
-                mediaStates={mediaStates}
-                initialAudioState={initialAudio}
-                initialVideoState={initialVideo}
-            />
+            {/* Persistent Video PiP Overlay (minimized mode only) */}
+            {isMeetingMinimized && (
+                <VideoChat
+                    socketRef={socketRef}
+                    projectId={projectId}
+                    user={user || { name: socketRef.current?.userName, isGuest: true }}
+                    isMinimized={true}
+                    onMinimizeToggle={setIsMeetingMinimized}
+                    externalInCall={isMeetingStarting}
+                    onCallStateChange={setIsMeetingStarting}
+                    clients={clients}
+                    mediaStates={mediaStates}
+                    initialAudioState={initialAudio}
+                    initialVideoState={initialVideo}
+                />
+            )}
+
+            {/* Mobile Bottom Navigation Bar */}
+            {isMobile && (
+                <nav style={{
+                    position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 500,
+                    height: '56px', backgroundColor: 'var(--bg-card)',
+                    borderTop: '1px solid var(--border-color)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-around',
+                    padding: '0 8px',
+                    backdropFilter: 'blur(16px)',
+                    WebkitBackdropFilter: 'blur(16px)',
+                }}>
+                    <button
+                        onClick={() => setActiveTab('code')}
+                        style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px', background: 'none', border: 'none', color: activeTab === 'code' ? 'var(--primary)' : 'var(--text-muted)', cursor: 'pointer', padding: '8px', fontSize: '9px', fontWeight: '700', transition: 'all 0.2s' }}
+                    >
+                        <FileCode size={18} />
+                        <span>Code</span>
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('files')}
+                        style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px', background: 'none', border: 'none', color: activeTab === 'files' ? 'var(--primary)' : 'var(--text-muted)', cursor: 'pointer', padding: '8px', fontSize: '9px', fontWeight: '700', transition: 'all 0.2s' }}
+                    >
+                        <Folder size={18} />
+                        <span>Files</span>
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('chat')}
+                        style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px', background: 'none', border: 'none', color: activeTab === 'chat' ? 'var(--primary)' : 'var(--text-muted)', cursor: 'pointer', padding: '8px', fontSize: '9px', fontWeight: '700', transition: 'all 0.2s', position: 'relative' }}
+                    >
+                        <MessageSquare size={18} />
+                        {messages.length > 0 && <div style={{ position: 'absolute', top: '6px', right: '50%', transform: 'translateX(8px)', width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#ef4444' }} />}
+                        <span>Chat</span>
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('users')}
+                        style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px', background: 'none', border: 'none', color: activeTab === 'users' ? 'var(--primary)' : 'var(--text-muted)', cursor: 'pointer', padding: '8px', fontSize: '9px', fontWeight: '700', transition: 'all 0.2s' }}
+                    >
+                        <Users size={18} />
+                        <span>People</span>
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('video')}
+                        style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px', background: 'none', border: 'none', color: activeTab === 'video' ? 'var(--primary)' : 'var(--text-muted)', cursor: 'pointer', padding: '8px', fontSize: '9px', fontWeight: '700', transition: 'all 0.2s' }}
+                    >
+                        <Video size={18} />
+                        <span>Meet</span>
+                    </button>
+                </nav>
+            )}
         </div>
     );
 };

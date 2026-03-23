@@ -707,11 +707,10 @@ const RemoteVideo = ({ user, isMini }) => {
 // --- Styles ---
 const containerStyle = (isExpanded) => ({
     backgroundColor: "#0d1117",
-    position: "fixed",
-    top: 0, left: 0, right: 0, bottom: 0,
-    zIndex: 9000,
+    height: isExpanded ? "100%" : "340px",
     display: "flex", flexDirection: "column",
-    overflow: "hidden",
+    transition: "height 0.4s cubic-bezier(0.16, 1, 0.3, 1)",
+    position: "relative", overflow: "hidden",
 });
 
 const minimizedOverlayStyle = {
