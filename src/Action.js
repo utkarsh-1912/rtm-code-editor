@@ -25,6 +25,8 @@ const ACTIONS = {
   SCREEN_SHARE_START: "screen-share-start",
   SCREEN_SHARE_STOP: "screen-share-stop",
   MEDIA_STATE_CHANGE: "media-state-change",
+  WHITEBOARD_SYNC_REQUEST: "whiteboard-sync-request",
+  WHITEBOARD_SYNC: "whiteboard-sync",
 };
 
 module.exports = ACTIONS;

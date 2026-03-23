@@ -35,6 +35,7 @@ import ACTIONS from "../Action";
 import { initSocket } from "../socket";
 import VideoChat from "../components/VideoChat";
 import WhiteboardModal from "../components/WhiteboardModal";
+import ChatWindow from "../components/chatWindow";
 
 const ProjectPage = () => {
     const { projectId } = useParams();
@@ -59,6 +60,9 @@ const ProjectPage = () => {
     const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
     const [clients, setClients] = useState([]);
     const [guestName, setGuestName] = useState("");
+    const [remoteCursors, setRemoteCursors] = useState({}); // { socketId: { userName, fileId } }
+    const [editingMsgId, setEditingMsgId] = useState(null);
+    const [editMsgText, setEditMsgText] = useState("");
 
     // New Lobby States
     const [showLobby, setShowLobby] = useState(false);
@@ -77,8 +81,8 @@ const ProjectPage = () => {
     const [showPreview, setShowPreview] = useState(false);
     const [activeTab, setActiveTab] = useState('code'); // 'code', 'files', 'chat', 'users', 'video'
     const [userInput, setUserInput] = useState("");
-    const [isMeetingMinimized, setIsMeetingMinimized] = useState(true);
-    const [isMeetingStarting, setIsMeetingStarting] = useState(true);
+    const [isMeetingMinimized, setIsMeetingMinimized] = useState(false); // false = not visible until user explicitly minimizes call
+    const [isMeetingStarting, setIsMeetingStarting] = useState(false);
     // const [showInputPanel, setShowInputPanel] = useState(false);
 
     const socketRef = useRef(null);
@@ -211,6 +215,21 @@ const ProjectPage = () => {
                     if (socketRef.current.id === socketId) return;
                     setFiles(prev => prev.map(f => f.id === fileId ? { ...f, content } : f));
                     setActiveFile(prev => prev?.id === fileId ? { ...prev, content } : prev);
+                });
+
+                // Track which file each remote user is editing
+                socketRef.current.on(ACTIONS.CURSOR_MOVE, ({ socketId, fileId, userName: remoteName }) => {
+                    if (fileId) {
+                        setRemoteCursors(prev => ({ ...prev, [socketId]: { userName: remoteName, fileId } }));
+                    }
+                });
+
+                // Sync chat history when joining project room
+                socketRef.current.on(ACTIONS.SYNC_CHAT, ({ messages: history }) => {
+                    setMessages(prev => {
+                        if (prev.length > 0) return prev; // already loaded from localStorage
+                        return history;
+                    });
                 });
 
                 socketRef.current.on(ACTIONS.FOLLOW_MODE, ({ viewState, userName }) => {
@@ -376,26 +395,32 @@ const ProjectPage = () => {
     };
 
     const handleEditMessage = (messageId, oldText) => {
-        const newText = prompt("Edit message:", oldText);
-        if (newText !== null && newText.trim() && newText !== oldText) {
-            socketRef.current.emit(ACTIONS.EDIT_MESSAGE, { roomId: `project-${projectId}`, messageId, newText });
-            setMessages(prev => {
-                const updated = prev.map(m => m.id === messageId ? { ...m, text: newText, isEdited: true } : m);
-                localStorage.setItem(`project-chat-${projectId}`, JSON.stringify(updated));
-                return updated;
-            });
+        setEditingMsgId(messageId);
+        setEditMsgText(oldText);
+    };
+
+    const handleConfirmEdit = (messageId) => {
+        if (!editMsgText.trim() || editMsgText === (messages.find(m => m.id === messageId)?.text)) {
+            setEditingMsgId(null);
+            return;
         }
+        socketRef.current.emit(ACTIONS.EDIT_MESSAGE, { roomId: `project-${projectId}`, messageId, newText: editMsgText });
+        setMessages(prev => {
+            const updated = prev.map(m => m.id === messageId ? { ...m, text: editMsgText, isEdited: true } : m);
+            localStorage.setItem(`project-chat-${projectId}`, JSON.stringify(updated));
+            return updated;
+        });
+        setEditingMsgId(null);
+        setEditMsgText("");
     };
 
     const handleDeleteMessage = (messageId) => {
-        if (window.confirm("Delete this message?")) {
-            socketRef.current.emit(ACTIONS.DELETE_MESSAGE, { roomId: `project-${projectId}`, messageId });
-            setMessages(prev => {
-                const updated = prev.filter(m => m.id !== messageId);
-                localStorage.setItem(`project-chat-${projectId}`, JSON.stringify(updated));
-                return updated;
-            });
-        }
+        socketRef.current.emit(ACTIONS.DELETE_MESSAGE, { roomId: `project-${projectId}`, messageId });
+        setMessages(prev => {
+            const updated = prev.filter(m => m.id !== messageId);
+            localStorage.setItem(`project-chat-${projectId}`, JSON.stringify(updated));
+            return updated;
+        });
     };
 
     const handleCloseTab = (e, fileId) => {
@@ -910,59 +935,88 @@ const ProjectPage = () => {
                             <div style={{ flex: 1, overflowY: 'auto' }}>
                                 {activeTab === 'files' && (
                                     <div style={{ padding: '12px' }}>
-                                        {files.map(file => (
-                                            <div
-                                                key={file.id}
-                                                onClick={() => handleFileClick(file)}
-                                                style={fileItemStyle(activeFile?.id === file.id)}
-                                                className="file-item-hover"
-                                            >
-                                                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1 }}>
-                                                    <FileCode size={16} opacity={0.7} color={activeFile?.id === file.id ? 'var(--primary)' : 'inherit'} />
-                                                    <span style={{ fontSize: '14px', fontWeight: activeFile?.id === file.id ? '700' : '500' }}>{file.name}</span>
+                                        {files.map(file => {
+                                            const editingUsersM = Object.values(remoteCursors).filter(c => c.fileId === file.id);
+                                            return (
+                                                <div
+                                                    key={file.id}
+                                                    onClick={() => handleFileClick(file)}
+                                                    style={fileItemStyle(activeFile?.id === file.id)}
+                                                    className="file-item-hover"
+                                                >
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1 }}>
+                                                        <FileCode size={16} opacity={0.7} color={activeFile?.id === file.id ? 'var(--primary)' : 'inherit'} />
+                                                        <span style={{ fontSize: '14px', fontWeight: activeFile?.id === file.id ? '700' : '500' }}>{file.name}</span>
+                                                    </div>
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
+                                                        {editingUsersM.map((u, idx) => (
+                                                            <div key={idx} title={`${u.userName} editing`} style={{
+                                                                width: '18px', height: '18px', borderRadius: '50%',
+                                                                backgroundColor: `hsl(${(u.userName.charCodeAt(0) * 47) % 360}, 70%, 50%)`,
+                                                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                                                fontSize: '9px', fontWeight: '700', color: 'white'
+                                                            }}>
+                                                                {u.userName[0]?.toUpperCase()}
+                                                            </div>
+                                                        ))}
+                                                    </div>
                                                 </div>
-                                            </div>
-                                        ))}
+                                            );
+                                        })}
                                     </div>
                                 )}
 
                                 {activeTab === 'chat' && (
-                                    <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-                                        <div style={{ flex: 1, padding: '20px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                                            {messages.map((msg, i) => (
-                                                <div key={i} style={messageBoxStyle(msg.userName === (user?.name || socketRef.current?.userName))}>
-                                                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
-                                                        <span style={{ fontSize: '11px', fontWeight: '900', color: 'var(--primary)' }}>{msg.userName}</span>
-                                                        <span style={{ fontSize: '10px', opacity: 0.4 }}>{msg.timestamp}</span>
-                                                    </div>
-                                                    <p style={{ margin: 0, fontSize: '13px', lineHeight: '1.6', color: 'var(--text-main)' }}>{msg.text}</p>
-                                                </div>
-                                            ))}
-                                        </div>
-                                        <div style={{ padding: '16px', borderTop: '1px solid var(--border-color)', backgroundColor: 'var(--bg-card)', paddingBottom: isMobile ? '64px' : '16px' }}>
-                                            <input
-                                                style={{ ...chatInputStyle, height: '44px', borderRadius: '22px', padding: '0 20px', backgroundColor: 'var(--bg-dark)' }}
-                                                placeholder="Message workspace..."
-                                                value={newMessage}
-                                                onChange={(e) => setNewMessage(e.target.value)}
-                                                onKeyPress={handleSendMessage}
-                                            />
-                                        </div>
+                                    <div style={{ flex: 1, height: '100%', overflow: 'hidden' }}>
+                                        <ChatWindow
+                                            socketRef={socketRef}
+                                            roomId={`project-${projectId}`}
+                                            userName={user?.name || socketRef.current?.userName || 'Guest'}
+                                            isLightMode={isLightMode}
+                                            isMobile={true}
+                                            messages={messages}
+                                            setMessages={setMessages}
+                                        />
                                     </div>
                                 )}
 
                                 {activeTab === 'users' && (
-                                    <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                                        {clients.map((client, i) => (
-                                            <div key={i} style={{ ...participantRowStyle, padding: '12px', backgroundColor: 'var(--bg-card)' }}>
-                                                <div style={avatarCircleStyle}>{client.userName[0]}</div>
-                                                <div style={{ flex: 1 }}>
-                                                    <div style={{ fontSize: '14px', fontWeight: '700', color: 'var(--text-main)' }}>{client.userName}</div>
-                                                    <div style={{ fontSize: '10px', color: 'var(--primary)', fontWeight: '900', textTransform: 'uppercase' }}>{i === 0 ? 'Admin' : 'Member'}</div>
+                                    <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                                        {clients.map((client, i) => {
+                                            const isMe = client.socketId === socketRef.current?.id;
+                                            const isCreator = i === 0;
+                                            const isGuestUser = !client.userName || client.userName === 'Guest';
+                                            const role = isCreator ? 'Admin' : isGuestUser ? 'Guest' : 'Member';
+                                            const roleColor = isCreator ? '#fbbf24' : isGuestUser ? '#94a3b8' : 'var(--primary)';
+                                            return (
+                                                <div key={client.socketId || i} style={{
+                                                    display: 'flex', alignItems: 'center', gap: '12px',
+                                                    padding: '12px', borderRadius: '10px',
+                                                    backgroundColor: 'var(--bg-card)',
+                                                    border: isMe ? '1px solid var(--primary)' : '1px solid var(--border-color)'
+                                                }}>
+                                                    {isMe && user?.photoURL ? (
+                                                        <img src={user.photoURL} alt="avatar" style={{ width: '38px', height: '38px', borderRadius: '50%', objectFit: 'cover' }} />
+                                                    ) : (
+                                                        <div style={{
+                                                            width: '38px', height: '38px', borderRadius: '50%',
+                                                            background: `linear-gradient(135deg, hsl(${(client.userName?.charCodeAt(0) * 47) % 360}, 70%, 45%), hsl(${(client.userName?.charCodeAt(0) * 47 + 60) % 360}, 70%, 35%))`,
+                                                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                                            fontSize: '15px', fontWeight: '800', color: 'white', flexShrink: 0
+                                                        }}>
+                                                            {client.userName?.[0]?.toUpperCase() || '?'}
+                                                        </div>
+                                                    )}
+                                                    <div style={{ flex: 1 }}>
+                                                        <div style={{ fontSize: '14px', fontWeight: '700', color: 'var(--text-main)' }}>
+                                                            {client.userName} {isMe && <span style={{ opacity: 0.4, fontSize: '11px' }}>(you)</span>}
+                                                        </div>
+                                                        <div style={{ fontSize: '10px', color: roleColor, fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{role}</div>
+                                                    </div>
+                                                    <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#10b981' }} />
                                                 </div>
-                                                <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#10b981' }} />
-                                            </div>
-                                        ))}
+                                            );
+                                        })}
                                     </div>
                                 )}
 
@@ -1023,71 +1077,130 @@ const ProjectPage = () => {
                                                 )}
                                             </div>
 
-                                            <div style={{ flex: 1, overflowY: 'auto' }}>
+                                            <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
                                                 {sidebarTab === 'files' && (
                                                     <div style={{ padding: '8px' }}>
-                                                        {files.map(file => (
-                                                            <div
-                                                                key={file.id}
-                                                                onClick={() => handleFileClick(file)}
-                                                                style={fileItemStyle(activeFile?.id === file.id)}
-                                                                className="file-item-hover"
-                                                            >
-                                                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1 }}>
-                                                                    <FileCode size={13} opacity={0.6} color={activeFile?.id === file.id ? 'var(--primary)' : 'inherit'} />
-                                                                    <span style={{ fontSize: '12px', fontWeight: activeFile?.id === file.id ? '700' : '500' }}>{file.name}</span>
+                                                        {files.map(file => {
+                                                            const editingUsers = Object.values(remoteCursors).filter(c => c.fileId === file.id);
+                                                            return (
+                                                                <div
+                                                                    key={file.id}
+                                                                    onClick={() => handleFileClick(file)}
+                                                                    style={fileItemStyle(activeFile?.id === file.id)}
+                                                                    className="file-item-hover"
+                                                                >
+                                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1 }}>
+                                                                        <FileCode size={13} opacity={0.6} color={activeFile?.id === file.id ? 'var(--primary)' : 'inherit'} />
+                                                                        <span style={{ fontSize: '12px', fontWeight: activeFile?.id === file.id ? '700' : '500' }}>{file.name}</span>
+                                                                    </div>
+                                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
+                                                                        {/* Remote cursor avatars on file */}
+                                                                        {editingUsers.map((u, idx) => (
+                                                                            <div key={idx} title={`${u.userName} is editing`} style={{
+                                                                                width: '16px', height: '16px', borderRadius: '50%',
+                                                                                backgroundColor: `hsl(${(u.userName.charCodeAt(0) * 47) % 360}, 70%, 50%)`,
+                                                                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                                                                fontSize: '8px', fontWeight: '700', color: 'white',
+                                                                                border: '1px solid var(--bg-card)'
+                                                                            }}>
+                                                                                {u.userName[0]?.toUpperCase()}
+                                                                            </div>
+                                                                        ))}
+                                                                        <div style={{ display: 'flex', gap: '4px', opacity: 0, transition: 'opacity 0.2s' }} className="file-actions">
+                                                                            <RotateCcw
+                                                                                size={12}
+                                                                                style={{ cursor: 'pointer', color: 'var(--text-muted)' }}
+                                                                                onClick={(e) => { e.stopPropagation(); handleResetFile(file); }}
+                                                                                title="Reset to Default"
+                                                                            />
+                                                                            <Trash2
+                                                                                size={12}
+                                                                                style={{ cursor: 'pointer', color: '#f87171' }}
+                                                                                onClick={(e) => handleDeleteFile(e, file)}
+                                                                            />
+                                                                        </div>
+                                                                    </div>
                                                                 </div>
-                                                                <div style={{ display: 'flex', gap: '4px', opacity: 0, transition: 'opacity 0.2s' }} className="file-actions">
-                                                                    <RotateCcw
-                                                                        size={12}
-                                                                        style={{ cursor: 'pointer', color: 'var(--text-muted)' }}
-                                                                        onClick={(e) => { e.stopPropagation(); handleResetFile(file); }}
-                                                                        title="Reset to Default"
-                                                                    />
-                                                                    <Trash2
-                                                                        size={12}
-                                                                        style={{ cursor: 'pointer', color: '#f87171' }}
-                                                                        onClick={(e) => handleDeleteFile(e, file)}
-                                                                    />
-                                                                </div>
-                                                            </div>
-                                                        ))}
+                                                            );
+                                                        })}
                                                     </div>
                                                 )}
 
                                                 {sidebarTab === 'chat' && (
-                                                    <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-                                                        <div style={{ flex: 1, padding: '16px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                                                            {messages.map((msg, i) => (
-                                                                <div key={i} style={messageBoxStyle(msg.userName === (user?.name || socketRef.current?.userName))} className="chat-msg">
-                                                                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
-                                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                                                            <span style={{ fontSize: '10px', fontWeight: '800', color: 'var(--primary)' }}>{msg.userName}</span>
-                                                                            {msg.isEdited && <span style={{ fontSize: '8px', opacity: 0.3, fontStyle: 'italic' }}>(edited)</span>}
+                                                    <ChatWindow
+                                                        socketRef={socketRef}
+                                                        roomId={`project-${projectId}`}
+                                                        userName={user?.name || socketRef.current?.userName || 'Guest'}
+                                                        isLightMode={isLightMode}
+                                                        isMobile={isMobile}
+                                                        messages={messages}
+                                                        setMessages={setMessages}
+                                                    />
+                                                )}
+
+                                                {sidebarTab === 'users' && (
+                                                    <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                                                        {clients.map((client, i) => {
+                                                            const isMe = client.socketId === socketRef.current?.id;
+                                                            const isCreator = project?.created_by && (client.socketId === clients[0]?.socketId || i === 0);
+                                                            const isGuest = !client.userName || client.userName === 'Guest' || client.isGuest;
+                                                            const role = isCreator ? 'Admin' : isGuest ? 'Guest' : 'Member';
+                                                            const roleBgColor = isCreator ? 'rgba(251,191,36,0.15)' : isGuest ? 'rgba(148,163,184,0.15)' : 'rgba(99,102,241,0.15)';
+                                                            const roleColor = isCreator ? '#fbbf24' : isGuest ? '#94a3b8' : 'var(--primary)';
+                                                            const editingFile = Object.values(remoteCursors).find(c => {
+                                                                return clients.find(cl => cl.socketId === c?.socketId && cl.socketId === client.socketId);
+                                                            });
+                                                            const currentFile = remoteCursors[client.socketId]?.fileId
+                                                                ? files.find(f => f.id === remoteCursors[client.socketId].fileId)?.name
+                                                                : isMe ? activeFile?.name : null;
+
+                                                            return (
+                                                                <div key={client.socketId} style={{
+                                                                    display: 'flex', alignItems: 'center', gap: '12px',
+                                                                    padding: '10px 12px', borderRadius: '10px',
+                                                                    backgroundColor: 'var(--bg-card)',
+                                                                    border: isMe ? '1px solid var(--primary)' : '1px solid var(--border-color)',
+                                                                    transition: 'all 0.2s'
+                                                                }}>
+                                                                    {/* Avatar */}
+                                                                    {isMe && user?.photoURL ? (
+                                                                        <img src={user.photoURL} alt="avatar" style={{ width: '36px', height: '36px', borderRadius: '50%', objectFit: 'cover', border: '2px solid var(--primary)' }} />
+                                                                    ) : (
+                                                                        <div style={{
+                                                                            width: '36px', height: '36px', borderRadius: '50%',
+                                                                            background: `linear-gradient(135deg, hsl(${(client.userName?.charCodeAt(0) * 47) % 360}, 70%, 45%), hsl(${(client.userName?.charCodeAt(0) * 47 + 60) % 360}, 70%, 35%))`,
+                                                                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                                                            fontSize: '14px', fontWeight: '800', color: 'white',
+                                                                            border: isMe ? '2px solid var(--primary)' : '2px solid var(--border-color)',
+                                                                            flexShrink: 0
+                                                                        }}>
+                                                                            {client.userName?.[0]?.toUpperCase() || '?'}
                                                                         </div>
-                                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                                                            <span style={{ fontSize: '9px', opacity: 0.4 }}>{msg.timestamp}</span>
-                                                                            {msg.userName === (user?.name || socketRef.current?.userName) && (
-                                                                                <div style={{ display: 'flex', gap: '6px' }} className="msg-actions">
-                                                                                    <Edit2 size={10} style={{ cursor: 'pointer', opacity: 0.5 }} onClick={() => handleEditMessage(msg.id, msg.text)} />
-                                                                                    <Trash2 size={10} style={{ cursor: 'pointer', color: '#f87171', opacity: 0.5 }} onClick={() => handleDeleteMessage(msg.id)} />
-                                                                                </div>
+                                                                    )}
+
+                                                                    <div style={{ flex: 1, minWidth: 0 }}>
+                                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '3px' }}>
+                                                                            <span style={{ fontSize: '13px', fontWeight: '700', color: 'var(--text-main)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                                                                {client.userName} {isMe && <span style={{ opacity: 0.5, fontWeight: '400', fontSize: '11px' }}>(you)</span>}
+                                                                            </span>
+                                                                        </div>
+                                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                                            <span style={{ fontSize: '9px', fontWeight: '800', backgroundColor: roleBgColor, color: roleColor, padding: '2px 6px', borderRadius: '4px', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+                                                                                {role}
+                                                                            </span>
+                                                                            {currentFile && (
+                                                                                <span style={{ fontSize: '9px', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                                                                    · {currentFile}
+                                                                                </span>
                                                                             )}
                                                                         </div>
                                                                     </div>
-                                                                    <p style={{ margin: 0, fontSize: '12px', lineHeight: '1.5', color: 'var(--text-main)' }}>{msg.text}</p>
+
+                                                                    {/* Online indicator */}
+                                                                    <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#10b981', boxShadow: '0 0 6px rgba(16,185,129,0.5)', flexShrink: 0 }} />
                                                                 </div>
-                                                            ))}
-                                                        </div>
-                                                        <div style={{ padding: '12px', borderTop: '1px solid var(--border-color)', backgroundColor: 'rgba(255,255,255,0.01)' }}>
-                                                            <input
-                                                                style={chatInputStyle}
-                                                                placeholder="Type message..."
-                                                                value={newMessage}
-                                                                onChange={(e) => setNewMessage(e.target.value)}
-                                                                onKeyPress={handleSendMessage}
-                                                            />
-                                                        </div>
+                                                            );
+                                                        })}
                                                     </div>
                                                 )}
 
@@ -1111,119 +1224,139 @@ const ProjectPage = () => {
                                             {openFiles.length === 0 && <div style={{ height: '36px' }} />}
                                         </div>
                                         <div style={{ flex: 1, position: 'relative', display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
-                                            <div style={{ flex: isOutputVisible ? 0.6 : 1, position: 'relative', height: '100%', minHeight: 0, overflow: 'hidden' }}>
-                                                {activeFile ? (
-                                                    <div style={{ height: '100%', width: '100%', overflow: 'hidden' }}>
-                                                        <ProjectEditor
-                                                            key={activeFile.id}
-                                                            socketRef={socketRef}
-                                                            roomId={`project-${projectId}`}
-                                                            fileId={activeFile.id}
-                                                            onCodeChange={handleSaveFile}
-                                                            code={activeFile.content}
-                                                            filename={activeFile.name}
-                                                            language={activeFile.name.split('.').pop()}
-                                                            settings={settings}
-                                                            userName={user?.name || socketRef.current?.userName}
-                                                            isLightMode={isLightMode}
-                                                            userInput={userInput}
-                                                            setUserInput={setUserInput}
-                                                        />
-                                                    </div>
-                                                ) : (
-                                                    <div style={emptyEditorStyle}>
-                                                        <Terminal size={48} style={{ opacity: 0.05, marginBottom: '20px' }} />
-                                                        <p style={{ color: 'var(--text-muted)', fontSize: '12px', fontWeight: '600', letterSpacing: '0.1em' }}>SELECT A MODULE TO BEGIN</p>
-                                                    </div>
-                                                )}
-                                            </div>
-
-                                            {isOutputVisible && (
-                                                <div style={outputPaneStyle}>
-                                                    <div style={outputHeaderStyle}>
-                                                        <span>{project?.type === 'web' ? 'LIVE PREVIEW' : (showPreview ? 'Live Preview' : 'Terminal Output')}</span>
-                                                        <button style={{ background: 'none', border: 'none', color: 'white', cursor: 'pointer' }} onClick={() => { setIsOutputVisible(false); setShowPreview(false); }}>
-                                                            <X size={14} />
-                                                        </button>
-                                                    </div>
-                                                    <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: isMobile ? 'column' : 'row' }}>
-                                                        {showPreview ? (
-                                                            <iframe
-                                                                title="Preview"
-                                                                style={{ width: '100%', height: '100%', border: 'none', background: 'white' }}
-                                                                srcDoc={generatePreviewDoc()}
+                                            <ReflexContainer orientation="horizontal" style={{ flex: 1, minHeight: 0 }}>
+                                                {/* ── Editor pane ── */}
+                                                <ReflexElement flex={isOutputVisible ? 0.6 : 1} minSize={120} style={{ overflow: 'hidden' }}>
+                                                    {activeFile ? (
+                                                        <div style={{ height: '100%', width: '100%', overflow: 'hidden' }}>
+                                                            <ProjectEditor
+                                                                key={activeFile.id}
+                                                                socketRef={socketRef}
+                                                                roomId={`project-${projectId}`}
+                                                                fileId={activeFile.id}
+                                                                onCodeChange={handleSaveFile}
+                                                                code={activeFile.content}
+                                                                filename={activeFile.name}
+                                                                language={activeFile.name.split('.').pop()}
+                                                                settings={settings}
+                                                                userName={user?.name || socketRef.current?.userName}
+                                                                isLightMode={isLightMode}
+                                                                userInput={userInput}
+                                                                setUserInput={setUserInput}
                                                             />
-                                                        ) : (
-                                                            <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-                                                                <div style={{ display: 'flex', backgroundColor: 'rgba(255,255,255,0.02)', borderBottom: '1px solid var(--border-color)', height: '28px' }}>
-                                                                    <button
-                                                                        onClick={() => setTerminalTab('output')}
-                                                                        style={{
-                                                                            padding: '0 16px',
-                                                                            height: '100%',
-                                                                            backgroundColor: terminalTab === 'output' ? 'rgba(255,255,255,0.05)' : 'transparent',
-                                                                            border: 'none',
-                                                                            borderBottom: terminalTab === 'output' ? '2px solid var(--primary)' : 'none',
-                                                                            color: terminalTab === 'output' ? 'var(--primary)' : 'var(--text-muted)',
-                                                                            fontSize: '9px',
-                                                                            fontWeight: '800',
-                                                                            cursor: 'pointer',
-                                                                            textTransform: 'uppercase',
-                                                                            letterSpacing: '0.05em'
-                                                                        }}
-                                                                    >
-                                                                        OUTPUT
-                                                                    </button>
-                                                                    {project?.type !== 'web' && (
-                                                                        <button
-                                                                            onClick={() => setTerminalTab('input')}
-                                                                            style={{
-                                                                                padding: '0 16px',
-                                                                                height: '100%',
-                                                                                backgroundColor: terminalTab === 'input' ? 'rgba(255,255,255,0.05)' : 'transparent',
-                                                                                border: 'none',
-                                                                                borderBottom: terminalTab === 'input' ? '2px solid var(--primary)' : 'none',
-                                                                                color: terminalTab === 'input' ? 'var(--primary)' : 'var(--text-muted)',
-                                                                                fontSize: '9px',
-                                                                                fontWeight: '800',
-                                                                                cursor: 'pointer',
-                                                                                textTransform: 'uppercase',
-                                                                                letterSpacing: '0.05em'
-                                                                            }}
-                                                                        >
-                                                                            INPUT (STDIN)
-                                                                        </button>
-                                                                    )}
-                                                                </div>
-                                                                <div style={{ flex: 1, overflow: 'auto', position: 'relative' }}>
-                                                                    {terminalTab === 'output' ? (
-                                                                        <pre style={outputTextStyle}>{output}</pre>
-                                                                    ) : (
-                                                                        <textarea
-                                                                            value={userInput}
-                                                                            onChange={(e) => setUserInput(e.target.value)}
-                                                                            placeholder="Enter program input here..."
-                                                                            style={{
-                                                                                width: '100%',
-                                                                                height: '100%',
-                                                                                backgroundColor: 'transparent',
-                                                                                border: 'none',
-                                                                                color: '#d1d5db',
-                                                                                padding: '12px',
-                                                                                fontSize: '12px',
-                                                                                fontFamily: 'monospace',
-                                                                                outline: 'none',
-                                                                                resize: 'none',
-                                                                                display: 'block'
-                                                                            }}
-                                                                        />
-                                                                    )}
-                                                                </div>
+                                                        </div>
+                                                    ) : (
+                                                        <div style={emptyEditorStyle}>
+                                                            <Terminal size={48} style={{ opacity: 0.05, marginBottom: '20px' }} />
+                                                            <p style={{ color: 'var(--text-muted)', fontSize: '12px', fontWeight: '600', letterSpacing: '0.1em' }}>SELECT A MODULE TO BEGIN</p>
+                                                        </div>
+                                                    )}
+                                                </ReflexElement>
+
+                                                {/* ── Draggable splitter ── */}
+                                                {isOutputVisible && (
+                                                    <ReflexSplitter style={{
+                                                        ...splitterStyle,
+                                                        height: '6px',
+                                                        width: '100%',
+                                                        cursor: 'row-resize',
+                                                        backgroundColor: 'var(--border-color)',
+                                                        borderTop: '1px solid rgba(255,255,255,0.04)',
+                                                        borderBottom: '1px solid rgba(255,255,255,0.04)',
+                                                        transition: 'background-color 0.15s',
+                                                    }} />
+                                                )}
+
+                                                {/* ── Output / Preview pane ── */}
+                                                {isOutputVisible && (
+                                                    <ReflexElement flex={0.4} minSize={80} style={{ overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+                                                        <div style={{ ...outputPaneStyle, flex: 1, height: '100%' }}>
+                                                            <div style={outputHeaderStyle}>
+                                                                <span>{project?.type === 'web' ? 'LIVE PREVIEW' : (showPreview ? 'Live Preview' : 'Terminal Output')}</span>
+                                                                <button style={{ background: 'none', border: 'none', color: 'white', cursor: 'pointer' }} onClick={() => { setIsOutputVisible(false); setShowPreview(false); }}>
+                                                                    <X size={14} />
+                                                                </button>
                                                             </div>
-                                                        )}
-                                                    </div>
-                                                </div>
-                                            )}
+                                                            <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: isMobile ? 'column' : 'row' }}>
+                                                                {showPreview ? (
+                                                                    <iframe
+                                                                        title="Preview"
+                                                                        style={{ width: '100%', height: '100%', border: 'none', background: 'white' }}
+                                                                        srcDoc={generatePreviewDoc()}
+                                                                    />
+                                                                ) : (
+                                                                    <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+                                                                        <div style={{ display: 'flex', backgroundColor: 'rgba(255,255,255,0.02)', borderBottom: '1px solid var(--border-color)', height: '28px' }}>
+                                                                            <button
+                                                                                onClick={() => setTerminalTab('output')}
+                                                                                style={{
+                                                                                    padding: '0 16px',
+                                                                                    height: '100%',
+                                                                                    backgroundColor: terminalTab === 'output' ? 'rgba(255,255,255,0.05)' : 'transparent',
+                                                                                    border: 'none',
+                                                                                    borderBottom: terminalTab === 'output' ? '2px solid var(--primary)' : 'none',
+                                                                                    color: terminalTab === 'output' ? 'var(--primary)' : 'var(--text-muted)',
+                                                                                    fontSize: '9px',
+                                                                                    fontWeight: '800',
+                                                                                    cursor: 'pointer',
+                                                                                    textTransform: 'uppercase',
+                                                                                    letterSpacing: '0.05em'
+                                                                                }}
+                                                                            >
+                                                                                OUTPUT
+                                                                            </button>
+                                                                            {project?.type !== 'web' && (
+                                                                                <button
+                                                                                    onClick={() => setTerminalTab('input')}
+                                                                                    style={{
+                                                                                        padding: '0 16px',
+                                                                                        height: '100%',
+                                                                                        backgroundColor: terminalTab === 'input' ? 'rgba(255,255,255,0.05)' : 'transparent',
+                                                                                        border: 'none',
+                                                                                        borderBottom: terminalTab === 'input' ? '2px solid var(--primary)' : 'none',
+                                                                                        color: terminalTab === 'input' ? 'var(--primary)' : 'var(--text-muted)',
+                                                                                        fontSize: '9px',
+                                                                                        fontWeight: '800',
+                                                                                        cursor: 'pointer',
+                                                                                        textTransform: 'uppercase',
+                                                                                        letterSpacing: '0.05em'
+                                                                                    }}
+                                                                                >
+                                                                                    INPUT (STDIN)
+                                                                                </button>
+                                                                            )}
+                                                                        </div>
+                                                                        <div style={{ flex: 1, overflow: 'auto', position: 'relative' }}>
+                                                                            {terminalTab === 'output' ? (
+                                                                                <pre style={outputTextStyle}>{output}</pre>
+                                                                            ) : (
+                                                                                <textarea
+                                                                                    value={userInput}
+                                                                                    onChange={(e) => setUserInput(e.target.value)}
+                                                                                    placeholder="Enter program input here..."
+                                                                                    style={{
+                                                                                        width: '100%',
+                                                                                        height: '100%',
+                                                                                        backgroundColor: 'transparent',
+                                                                                        border: 'none',
+                                                                                        color: '#d1d5db',
+                                                                                        padding: '12px',
+                                                                                        fontSize: '12px',
+                                                                                        fontFamily: 'monospace',
+                                                                                        outline: 'none',
+                                                                                        resize: 'none',
+                                                                                        display: 'block'
+                                                                                    }}
+                                                                                />
+                                                                            )}
+                                                                        </div>
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    </ReflexElement>
+                                                )}
+                                            </ReflexContainer>
                                         </div>
                                     </div>
                                 </ReflexElement>
@@ -1389,8 +1522,8 @@ const ProjectPage = () => {
                 </div>
             </footer>
 
-            {/* Persistent Video PiP Overlay (minimized mode only) */}
-            {isMeetingMinimized && (
+            {/* Persistent Video PiP Overlay (minimized mode only — only after joining) */}
+            {!showLobby && hasJoinedRef.current && isMeetingMinimized && (
                 <VideoChat
                     socketRef={socketRef}
                     projectId={projectId}

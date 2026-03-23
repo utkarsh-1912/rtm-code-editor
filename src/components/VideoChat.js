@@ -38,6 +38,7 @@ const VideoChat = ({
     const screenStreamRef = useRef(null);
     const audioContextRef = useRef(null);
     const analysersRef = useRef({}); // { socketId: AnalyserNode }
+    const pendingCandidatesRef = useRef({}); // Bug 2: ICE candidate queue per peer
 
     const mediaStateRef = useRef({ isMuted, isVideoOff });
     useEffect(() => {
@@ -138,8 +139,28 @@ const VideoChat = ({
     // --- WebRTC Core Functions ---
     const createPeer = useCallback((targetSocketId, name, stream) => {
         const peer = new RTCPeerConnection({
-            iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+            // Bug 3: Added STUN + Open TURN relay for NAT traversal reliability
+            iceServers: [
+                { urls: 'stun:stun.l.google.com:19302' },
+                { urls: 'stun:stun1.l.google.com:19302' },
+                {
+                    urls: 'turn:openrelay.metered.ca:80',
+                    username: 'openrelayproject',
+                    credential: 'openrelayproject'
+                },
+                {
+                    urls: 'turn:openrelay.metered.ca:443',
+                    username: 'openrelayproject',
+                    credential: 'openrelayproject'
+                },
+            ],
+            iceTransportPolicy: 'all',
         });
+
+        // Bug 2: Initialize candidate queue for this peer
+        if (!pendingCandidatesRef.current[targetSocketId]) {
+            pendingCandidatesRef.current[targetSocketId] = [];
+        }
 
         if (stream) {
             stream.getTracks().forEach(track => peer.addTrack(track, stream));
@@ -303,6 +324,13 @@ const VideoChat = ({
                 await peer.setLocalDescription(answer);
                 socket.emit('video-answer', { to: from, answer });
 
+                // Bug 2: Drain buffered ICE candidates now that remote description is set
+                const pending = pendingCandidatesRef.current[from] || [];
+                for (const candidate of pending) {
+                    try { await peer.addIceCandidate(new RTCIceCandidate(candidate)); } catch (e) { }
+                }
+                pendingCandidatesRef.current[from] = [];
+
                 // Also broadcast our media state back so they have ours
                 socket.emit(ACTIONS.MEDIA_STATE_CHANGE, {
                     roomId: `project-${projectId}`,
@@ -316,16 +344,25 @@ const VideoChat = ({
             if (peer) {
                 try {
                     await peer.setRemoteDescription(new RTCSessionDescription(answer));
+                    // Bug 2: Drain buffered ICE candidates now that remote description is set
+                    const pending = pendingCandidatesRef.current[from] || [];
+                    for (const candidate of pending) {
+                        try { await peer.addIceCandidate(new RTCIceCandidate(candidate)); } catch (e) { }
+                    }
+                    pendingCandidatesRef.current[from] = [];
                 } catch (err) { console.error("Set remote description error", err); }
             }
         };
 
         const onIceCandidate = async ({ from, candidate }) => {
             const peer = peersRef.current[from];
-            if (peer) {
-                try {
-                    await peer.addIceCandidate(new RTCIceCandidate(candidate));
-                } catch (err) { }
+            if (!peer) return;
+            // Bug 2: If remote description not yet set, buffer the candidate
+            if (!peer.remoteDescription || !peer.remoteDescription.type) {
+                if (!pendingCandidatesRef.current[from]) pendingCandidatesRef.current[from] = [];
+                pendingCandidatesRef.current[from].push(candidate);
+            } else {
+                try { await peer.addIceCandidate(new RTCIceCandidate(candidate)); } catch (err) { }
             }
         };
 

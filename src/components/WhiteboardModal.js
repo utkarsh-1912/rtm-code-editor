@@ -13,6 +13,9 @@ const WhiteboardModal = ({ isOpen, onClose, socketRef, roomId }) => {
     const [elements, setElements] = useState([]);
     const [history, setHistory] = useState([[]]);
     const [historyIndex, setHistoryIndex] = useState(0);
+    // Bug 7: Refs to avoid stale closures in network callbacks
+    const historyRef = useRef([[]]);
+    const historyIndexRef = useRef(0);
 
     const [tool, setTool] = useState("pencil");
     const [color, setColor] = useState("#3b82f6");
@@ -34,20 +37,40 @@ const WhiteboardModal = ({ isOpen, onClose, socketRef, roomId }) => {
         if (!isOpen || !socketRef.current) return;
         const socket = socketRef.current;
 
+        // Bug 6: Request current whiteboard state from server when opening
+        socket.emit(ACTIONS.WHITEBOARD_SYNC_REQUEST, { roomId });
+
+        const onSync = ({ elements: serverElements }) => {
+            if (serverElements && serverElements.length > 0) {
+                setElements(serverElements);
+                const newHistory = [serverElements];
+                setHistory(newHistory);
+                setHistoryIndex(0);
+                historyRef.current = newHistory;
+                historyIndexRef.current = 0;
+            }
+        };
+
         const onDraw = ({ action, payload }) => {
             if (action === 'ADD') {
                 setElements(prev => {
                     const newElements = [...prev, payload];
-                    const newHistory = history.slice(0, historyIndex + 1);
+                    // Bug 7: Use refs to avoid stale closures
+                    const newHistory = historyRef.current.slice(0, historyIndexRef.current + 1);
                     newHistory.push(newElements);
+                    historyRef.current = newHistory;
+                    historyIndexRef.current = newHistory.length - 1;
                     setHistory(newHistory);
                     setHistoryIndex(newHistory.length - 1);
                     return newElements;
                 });
             } else if (action === 'CLEAR') {
                 setElements([]);
-                setHistory([[]]);
+                const reset = [[]];
+                setHistory(reset);
                 setHistoryIndex(0);
+                historyRef.current = reset;
+                historyIndexRef.current = 0;
             } else if (action === 'STREAM') {
                 setRemoteStreams(prev => ({ ...prev, [payload.socketId]: payload.element }));
             } else if (action === 'STREAM_END') {
@@ -57,13 +80,13 @@ const WhiteboardModal = ({ isOpen, onClose, socketRef, roomId }) => {
                     return next;
                 });
             } else if (action === 'UNDO' || action === 'REDO') {
-                // If we want collaborative undo, we must sync the entire elements array or use CRDTs.
-                // For now, simpler to just sync ADD and CLEAR, and let Undo/Redo be local or sync full state.
                 if (payload && payload.elements) {
                     setElements(payload.elements);
-                    // Reset history to avoid complex conflict resolution
-                    setHistory([payload.elements]);
+                    const newHistory = [payload.elements];
+                    setHistory(newHistory);
                     setHistoryIndex(0);
+                    historyRef.current = newHistory;
+                    historyIndexRef.current = 0;
                 }
             }
         };
@@ -85,44 +108,50 @@ const WhiteboardModal = ({ isOpen, onClose, socketRef, roomId }) => {
             });
         };
 
+        socket.on(ACTIONS.WHITEBOARD_SYNC, onSync);
         socket.on(ACTIONS.WHITEBOARD_DRAW, onDraw);
         socket.on(ACTIONS.WHITEBOARD_CURSOR, onCursor);
         socket.on(ACTIONS.DISCONNECTED, onDisconnected);
 
         return () => {
+            socket.off(ACTIONS.WHITEBOARD_SYNC, onSync);
             socket.off(ACTIONS.WHITEBOARD_DRAW, onDraw);
             socket.off(ACTIONS.WHITEBOARD_CURSOR, onCursor);
             socket.off(ACTIONS.DISCONNECTED, onDisconnected);
         };
-    }, [isOpen, socketRef, history, historyIndex]);
+    }, [isOpen, socketRef, roomId]); // Bug 7: removed history/historyIndex from deps
 
     // --- History Management ---
     const commitAction = useCallback((newElements) => {
         setElements(newElements);
-        const newHistory = history.slice(0, historyIndex + 1);
+        const newHistory = historyRef.current.slice(0, historyIndexRef.current + 1);
         newHistory.push(newElements);
+        historyRef.current = newHistory;
+        historyIndexRef.current = newHistory.length - 1;
         setHistory(newHistory);
         setHistoryIndex(newHistory.length - 1);
-    }, [history, historyIndex]);
+    }, []);
 
     const handleUndo = () => {
-        if (historyIndex > 0) {
-            const newIndex = historyIndex - 1;
+        if (historyIndexRef.current > 0) {
+            const newIndex = historyIndexRef.current - 1;
+            historyIndexRef.current = newIndex;
             setHistoryIndex(newIndex);
-            setElements(history[newIndex]);
+            setElements(historyRef.current[newIndex]);
             socketRef.current?.emit(ACTIONS.WHITEBOARD_DRAW, {
-                roomId, action: 'UNDO', payload: { elements: history[newIndex] }
+                roomId, action: 'UNDO', payload: { elements: historyRef.current[newIndex] }
             });
         }
     };
 
     const handleRedo = () => {
-        if (historyIndex < history.length - 1) {
-            const newIndex = historyIndex + 1;
+        if (historyIndexRef.current < historyRef.current.length - 1) {
+            const newIndex = historyIndexRef.current + 1;
+            historyIndexRef.current = newIndex;
             setHistoryIndex(newIndex);
-            setElements(history[newIndex]);
+            setElements(historyRef.current[newIndex]);
             socketRef.current?.emit(ACTIONS.WHITEBOARD_DRAW, {
-                roomId, action: 'REDO', payload: { elements: history[newIndex] }
+                roomId, action: 'REDO', payload: { elements: historyRef.current[newIndex] }
             });
         }
     };

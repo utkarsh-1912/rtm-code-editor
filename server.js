@@ -373,6 +373,7 @@ app.use((req, res, next) => {
 
 const userSocketMap = {};
 const roomChatHistory = {};
+const roomWhiteboardState = {}; // In-memory whiteboard state per room
 
 const getAllClients = (roomId) => {
   return Array.from(io.sockets.adapter.rooms.get(roomId) || []).map(
@@ -462,6 +463,35 @@ io.on("connection", (socket) => {
     socket.join(roomId);
 
     console.log(`User ${userName} joined project room: ${roomId}`);
+
+    // Bug 5: Send current file contents to the new joiner
+    try {
+      const files = await db.getProjectFiles(projectId);
+      if (files && files.length > 0) {
+        files.forEach(file => {
+          socket.emit(ACTIONS.FILE_CHANGE, {
+            fileId: file.id,
+            path: file.path,
+            content: file.content,
+            socketId: 'server' // Mark as server-origin so editor doesn't echo it
+          });
+        });
+      }
+    } catch (err) {
+      console.error("Project file sync error:", err);
+    }
+
+    // Bug 8: Send chat history to the new joiner
+    const chatHistory = roomChatHistory[roomId] || [];
+    if (chatHistory.length > 0) {
+      socket.emit(ACTIONS.SYNC_CHAT, { messages: chatHistory });
+    }
+
+    // Bug 6: Send current whiteboard state to the new joiner
+    const wbState = roomWhiteboardState[roomId];
+    if (wbState && wbState.length > 0) {
+      socket.emit(ACTIONS.WHITEBOARD_SYNC, { elements: wbState });
+    }
 
     const clients = getAllClients(roomId);
     clients.forEach(({ socketId }) => {
@@ -595,7 +625,8 @@ io.on("connection", (socket) => {
   });
 
   socket.on(ACTIONS.MEDIA_STATE_CHANGE, ({ roomId, state }) => {
-    socket.in(roomId).emit('media-state-update', { userId: socket.id, state });
+    // Bug 4: emit the same event name the client listens for (ACTIONS.MEDIA_STATE_CHANGE)
+    socket.in(roomId).emit(ACTIONS.MEDIA_STATE_CHANGE, { userId: socket.id, state });
   });
 
   socket.on(ACTIONS.FOLLOW_MODE, ({ roomId, viewState, userName }) => {
@@ -603,8 +634,24 @@ io.on("connection", (socket) => {
   });
 
   socket.on(ACTIONS.WHITEBOARD_DRAW, (data) => {
-    const { roomId } = data;
+    const { roomId, action, payload } = data;
+    // Bug 6: Persist whiteboard state server-side
+    if (!roomWhiteboardState[roomId]) roomWhiteboardState[roomId] = [];
+    if (action === 'ADD') {
+      roomWhiteboardState[roomId].push(payload);
+    } else if (action === 'CLEAR') {
+      roomWhiteboardState[roomId] = [];
+    } else if (action === 'UNDO' || action === 'REDO') {
+      // Sync by replacing full elements array
+      if (payload && payload.elements) roomWhiteboardState[roomId] = payload.elements;
+    }
     socket.in(roomId).emit(ACTIONS.WHITEBOARD_DRAW, data);
+  });
+
+  // Bug 6: Handle whiteboard sync requests from late joiners
+  socket.on(ACTIONS.WHITEBOARD_SYNC_REQUEST, ({ roomId }) => {
+    const elements = roomWhiteboardState[roomId] || [];
+    socket.emit(ACTIONS.WHITEBOARD_SYNC, { elements });
   });
 
   socket.on(ACTIONS.WHITEBOARD_CLEAR, ({ roomId }) => {
@@ -675,10 +722,7 @@ io.on("connection", (socket) => {
   socket.on(ACTIONS.SCREEN_SHARE_STOP, ({ roomId }) => {
     socket.to(roomId).emit(ACTIONS.SCREEN_SHARE_STOP, { userId: socket.id });
   });
-
-  socket.on(ACTIONS.MEDIA_STATE_CHANGE, ({ roomId, state }) => {
-    socket.to(roomId).emit(ACTIONS.MEDIA_STATE_CHANGE, { userId: socket.id, state });
-  });
+  // Note: MEDIA_STATE_CHANGE is handled above (Bug 1: removed duplicate handler)
 });
 
 // Initialize Database & Start Server
