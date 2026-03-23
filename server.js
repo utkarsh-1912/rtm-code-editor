@@ -367,9 +367,106 @@ app.delete("/api/projects/:id", async (req, res) => {
   }
 });
 
+
+// ─── Team Invite via Brevo ───────────────────────────────────────────────────
+app.post("/api/projects/:id/invite", async (req, res) => {
+  try {
+    const { email, inviterName, projectName, role } = req.body;
+    if (!email) return res.status(400).json({ error: "Email required" });
+
+    const projectId = req.params.id;
+    const projectUrl = `${process.env.APP_URL || "http://localhost:3000"}/project/${projectId}`;
+    const acceptUrl = `${projectUrl}?invite=1&email=${encodeURIComponent(email)}&role=${role || "member"}`;
+
+    const html = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{background:#0d1117;font-family:'Segoe UI',Helvetica,Arial,sans-serif;color:#e2e8f0}
+    .wrap{max-width:560px;margin:40px auto;background:#161b22;border-radius:16px;overflow:hidden;border:1px solid #30363d}
+    .header{background:linear-gradient(135deg,#1e293b 0%,#0f172a 100%);padding:36px 40px;text-align:center;border-bottom:1px solid #30363d}
+    .logo-text{font-size:26px;font-weight:900;letter-spacing:-0.5px;color:#fff}
+    .logo-dot{color:#3b82f6}
+    .tagline{font-size:11px;color:#64748b;margin-top:4px;letter-spacing:0.12em;text-transform:uppercase}
+    .body{padding:36px 40px}
+    .avatar{width:60px;height:60px;border-radius:50%;background:linear-gradient(135deg,#3b82f6,#8b5cf6);display:inline-flex;align-items:center;justify-content:center;font-size:24px;font-weight:800;color:#fff;margin-bottom:20px}
+    h1{font-size:22px;font-weight:700;color:#f1f5f9;margin-bottom:10px;line-height:1.3}
+    p{font-size:15px;color:#94a3b8;line-height:1.65;margin-bottom:16px}
+    .role-badge{display:inline-block;padding:3px 10px;background:rgba(59,130,246,0.15);color:#60a5fa;border-radius:20px;font-size:12px;font-weight:700;letter-spacing:0.05em;text-transform:uppercase;margin-bottom:20px}
+    .cta{display:block;width:100%;padding:16px;background:linear-gradient(135deg,#3b82f6,#2563eb);color:#fff;text-decoration:none;text-align:center;border-radius:12px;font-size:16px;font-weight:700;letter-spacing:0.02em;margin:24px 0}
+    .divider{border:none;border-top:1px solid #21262d;margin:28px 0}
+    .notes{font-size:13px;color:#475569;line-height:1.6}
+    .notes a{color:#60a5fa;text-decoration:none}
+    .footer{background:#0d1117;padding:24px 40px;text-align:center;border-top:1px solid #21262d}
+    .footer p{font-size:12px;color:#4b5563;line-height:1.7}
+    .footer a{color:#60a5fa;text-decoration:none}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="header">
+      <div class="logo-text">RTM<span class="logo-dot">.</span>Edit</div>
+      <div class="tagline">Real-Time Collaborative Code Editor</div>
+    </div>
+    <div class="body">
+      <div class="avatar">${inviterName?.[0]?.toUpperCase() || '?'}</div>
+      <h1>${inviterName || 'Someone'} invited you to collaborate</h1>
+      <p>You've been invited to join the project <strong style="color:#f1f5f9">"${projectName}"</strong> on RTM.Edit — a real-time collaborative coding environment.</p>
+      <div class="role-badge">Role: ${role || 'Member'}</div>
+      <p>Click below to accept the invitation and start coding together. If you don't have an account yet, you'll be guided to create one first—then automatically added to the project.</p>
+      <a href="${acceptUrl}" class="cta">✅ Accept Invitation &amp; Join Project</a>
+      <hr class="divider"/>
+      <div class="notes">
+        <p>Or copy this link into your browser:</p>
+        <p><a href="${acceptUrl}">${acceptUrl}</a></p>
+        <p style="margin-top:12px">This invitation was sent by <strong>${inviterName}</strong>. If you weren't expecting this, you can safely ignore this email.</p>
+      </div>
+    </div>
+    <div class="footer">
+      <p>RTM.Edit · Real-Time Multiplayer Code Environment</p>
+      <p>© ${new Date().getFullYear()} RTM.Edit · <a href="${process.env.APP_URL || "http://localhost:3000"}/privacy">Privacy</a> · <a href="${process.env.APP_URL || "http://localhost:3000"}/terms">Terms</a></p>
+    </div>
+  </div>
+</body>
+</html>`;
+
+    const BREVO_KEY = process.env.BREVO_API_KEY;
+    if (!BREVO_KEY) {
+      console.warn("BREVO_API_KEY not set — invite email not sent");
+      return res.json({ success: true, warned: "No BREVO_API_KEY set. Email not sent." });
+    }
+
+    const brevoRes = await fetch("https://api.brevo.com/v3/smtp/email", {
+      method: "POST",
+      headers: { "api-key": BREVO_KEY, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        sender: { name: "RTM.Edit", email: process.env.BREVO_FROM_EMAIL || "noreply@rtm-edit.com" },
+        to: [{ email }],
+        subject: `${inviterName} invited you to "${projectName}" on RTM.Edit`,
+        htmlContent: html
+      })
+    });
+
+    if (!brevoRes.ok) {
+      const errBody = await brevoRes.text();
+      console.error("Brevo error:", errBody);
+      return res.status(500).json({ error: "Failed to send invite email", detail: errBody });
+    }
+
+    res.json({ success: true, message: "Invite sent!" });
+  } catch (err) {
+    console.error("Invite API Error:", err);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+});
+
 app.use((req, res, next) => {
   res.sendFile(__dirname + "/build/index.html");
 });
+
 
 const userSocketMap = {};
 const roomChatHistory = {};

@@ -20,7 +20,6 @@ import {
     RotateCcw,
     Palette,
     ChevronRight,
-    Edit2,
     Square,
     Mic,
     MicOff,
@@ -36,6 +35,7 @@ import { initSocket } from "../socket";
 import VideoChat from "../components/VideoChat";
 import WhiteboardModal from "../components/WhiteboardModal";
 import ChatWindow from "../components/chatWindow";
+import InviteModal from "../components/InviteModal";
 
 const ProjectPage = () => {
     const { projectId } = useParams();
@@ -61,8 +61,8 @@ const ProjectPage = () => {
     const [clients, setClients] = useState([]);
     const [guestName, setGuestName] = useState("");
     const [remoteCursors, setRemoteCursors] = useState({}); // { socketId: { userName, fileId } }
-    const [editingMsgId, setEditingMsgId] = useState(null);
-    const [editMsgText, setEditMsgText] = useState("");
+    const [showInviteModal, setShowInviteModal] = useState(false);
+
 
     // New Lobby States
     const [showLobby, setShowLobby] = useState(false);
@@ -373,54 +373,6 @@ const ProjectPage = () => {
                 console.error("Failed to persist file changes", err);
             }
         }, 1500);
-    };
-
-    const handleSendMessage = (e) => {
-        if ((e.key === "Enter" || e.type === "click") && newMessage.trim()) {
-            const msg = {
-                id: Date.now() + Math.random(),
-                text: newMessage,
-                userName: user?.name || socketRef.current?.userName,
-                timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-                avatar: user?.photoURL
-            };
-            setMessages(prev => {
-                const updated = [...prev, msg];
-                localStorage.setItem(`project-chat-${projectId}`, JSON.stringify(updated));
-                return updated;
-            });
-            socketRef.current.emit(ACTIONS.SEND_MESSAGE, { roomId: `project-${projectId}`, message: msg });
-            setNewMessage("");
-        }
-    };
-
-    const handleEditMessage = (messageId, oldText) => {
-        setEditingMsgId(messageId);
-        setEditMsgText(oldText);
-    };
-
-    const handleConfirmEdit = (messageId) => {
-        if (!editMsgText.trim() || editMsgText === (messages.find(m => m.id === messageId)?.text)) {
-            setEditingMsgId(null);
-            return;
-        }
-        socketRef.current.emit(ACTIONS.EDIT_MESSAGE, { roomId: `project-${projectId}`, messageId, newText: editMsgText });
-        setMessages(prev => {
-            const updated = prev.map(m => m.id === messageId ? { ...m, text: editMsgText, isEdited: true } : m);
-            localStorage.setItem(`project-chat-${projectId}`, JSON.stringify(updated));
-            return updated;
-        });
-        setEditingMsgId(null);
-        setEditMsgText("");
-    };
-
-    const handleDeleteMessage = (messageId) => {
-        socketRef.current.emit(ACTIONS.DELETE_MESSAGE, { roomId: `project-${projectId}`, messageId });
-        setMessages(prev => {
-            const updated = prev.filter(m => m.id !== messageId);
-            localStorage.setItem(`project-chat-${projectId}`, JSON.stringify(updated));
-            return updated;
-        });
     };
 
     const handleCloseTab = (e, fileId) => {
@@ -903,10 +855,7 @@ const ProjectPage = () => {
                         ...shareButtonStyle,
                         padding: isMobile ? '8px' : '8px 16px',
                         borderRadius: '8px'
-                    }} onClick={() => {
-                        navigator.clipboard.writeText(window.location.href);
-                        toast.success("Invite link copied!");
-                    }}>
+                    }} onClick={() => setShowInviteModal(true)}>
                         <Users size={14} /> {!isMobile && <span>Invite</span>}
                     </button>
                 </div>
@@ -1147,9 +1096,6 @@ const ProjectPage = () => {
                                                             const role = isCreator ? 'Admin' : isGuest ? 'Guest' : 'Member';
                                                             const roleBgColor = isCreator ? 'rgba(251,191,36,0.15)' : isGuest ? 'rgba(148,163,184,0.15)' : 'rgba(99,102,241,0.15)';
                                                             const roleColor = isCreator ? '#fbbf24' : isGuest ? '#94a3b8' : 'var(--primary)';
-                                                            const editingFile = Object.values(remoteCursors).find(c => {
-                                                                return clients.find(cl => cl.socketId === c?.socketId && cl.socketId === client.socketId);
-                                                            });
                                                             const currentFile = remoteCursors[client.socketId]?.fileId
                                                                 ? files.find(f => f.id === remoteCursors[client.socketId].fileId)?.name
                                                                 : isMe ? activeFile?.name : null;
@@ -1588,6 +1534,15 @@ const ProjectPage = () => {
                     </button>
                 </nav>
             )}
+            {/* Team Invite Modal */}
+            <InviteModal
+                isOpen={showInviteModal}
+                onClose={() => setShowInviteModal(false)}
+                projectId={projectId}
+                projectName={project?.name || "this project"}
+                inviterName={user?.name || socketRef.current?.userName}
+            />
+
         </div>
     );
 };
@@ -1708,48 +1663,6 @@ const studioFooterStyle = {
     letterSpacing: '0.08em'
 };
 
-const messageBoxStyle = (own) => ({
-    padding: '12px',
-    backgroundColor: own ? 'rgba(59, 130, 246, 0.05)' : 'rgba(255,255,255,0.02)',
-    borderRadius: '6px',
-    border: own ? '1px solid rgba(59, 130, 246, 0.1)' : '1px solid var(--border-color)'
-});
-
-const chatInputStyle = {
-    width: '100%',
-    padding: '10px 14px',
-    backgroundColor: 'var(--bg-dark)',
-    border: '1px solid var(--border-color)',
-    borderRadius: '10px',
-    color: 'white',
-    fontSize: '13px',
-    outline: 'none',
-    transition: 'border 0.2s'
-};
-
-const participantRowStyle = {
-    padding: '10px',
-    display: 'flex',
-    alignItems: 'center',
-    gap: '12px',
-    borderRadius: '6px',
-    backgroundColor: 'rgba(255,255,255,0.02)',
-    border: '1px solid transparent',
-    transition: 'all 0.2s'
-};
-
-const avatarCircleStyle = {
-    width: '32px',
-    height: '32px',
-    borderRadius: '50%',
-    backgroundColor: 'var(--primary)',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    color: 'white',
-    fontWeight: '800',
-    fontSize: '12px'
-};
 
 const emptyEditorStyle = {
     height: '100%',
