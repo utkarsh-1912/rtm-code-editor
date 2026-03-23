@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
-import { BotMessageSquare, Send, Smile, Edit2, Trash2, X, Check } from "lucide-react";
+import { Send, Smile, Edit2, Trash2, X, Check } from "lucide-react";
 import { v4 as uuidv4 } from "uuid";
 import EmojiPicker, { SuggestionMode } from "emoji-picker-react";
 import ACTIONS from "../Action";
