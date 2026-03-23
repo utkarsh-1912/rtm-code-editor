@@ -127,24 +127,6 @@ const WhiteboardModal = ({ isOpen, onClose, socketRef, roomId }) => {
         }
     };
 
-    // --- Resize Canvas ---
-    useLayoutEffect(() => {
-        if (!isOpen) return;
-        const canvas = canvasRef.current;
-        const parent = canvas.parentElement;
-
-        const resize = () => {
-            canvas.width = parent.clientWidth * window.devicePixelRatio;
-            canvas.height = parent.clientHeight * window.devicePixelRatio;
-            canvas.style.width = `${parent.clientWidth}px`;
-            canvas.style.height = `${parent.clientHeight}px`;
-            renderCanvas();
-        };
-
-        window.addEventListener('resize', resize);
-        resize();
-        return () => window.removeEventListener('resize', resize);
-    }, [isOpen, renderCanvas]);
 
     // --- Rendering Engine ---
     const drawElement = (ctx, el) => {
@@ -220,6 +202,25 @@ const WhiteboardModal = ({ isOpen, onClose, socketRef, roomId }) => {
     useEffect(() => {
         renderCanvas();
     }, [renderCanvas]);
+
+    // --- Resize Canvas ---
+    useLayoutEffect(() => {
+        if (!isOpen) return;
+        const canvas = canvasRef.current;
+        const parent = canvas.parentElement;
+
+        const resize = () => {
+            canvas.width = parent.clientWidth * window.devicePixelRatio;
+            canvas.height = parent.clientHeight * window.devicePixelRatio;
+            canvas.style.width = `${parent.clientWidth}px`;
+            canvas.style.height = `${parent.clientHeight}px`;
+            renderCanvas();
+        };
+
+        window.addEventListener('resize', resize);
+        resize();
+        return () => window.removeEventListener('resize', resize);
+    }, [isOpen, renderCanvas]);
 
     // --- Mouse / Touch Handlers ---
     const getMousePos = (e) => {
