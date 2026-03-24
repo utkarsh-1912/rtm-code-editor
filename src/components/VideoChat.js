@@ -365,13 +365,22 @@ const VideoChat = ({
         }
     }, [localStream, projectId, socketRef, onCallStateChange]);
 
+    const hasAutoJoinedRef = useRef(false);
+
     useEffect(() => {
-        if (externalInCall && !inCall) {
+        if (!inCall && !isMinimized && !hasAutoJoinedRef.current) {
+            hasAutoJoinedRef.current = true;
             handleJoinCall();
+        }
+    }, [inCall, isMinimized, handleJoinCall]);
+
+    useEffect(() => {
+        if (externalInCall && !inCall && hasAutoJoinedRef.current) {
+            // Already handled by auto-join or should be joined
         } else if (!externalInCall && inCall) {
             handleLeaveCall();
         }
-    }, [externalInCall, inCall, handleJoinCall, handleLeaveCall]);
+    }, [externalInCall, inCall, handleLeaveCall]);
 
     // Cleanup camera tracks faithfully on hard unmounts (e.g Sidebar routing to Dashboard)
     useEffect(() => {
@@ -595,17 +604,21 @@ const VideoChat = ({
         return (
             <div style={{ ...containerStyle(isExpanded), display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#0d1117' }}>
                 <div style={{ textAlign: 'center', padding: '40px' }}>
-                    <div style={{ width: '80px', height: '80px', borderRadius: '40px', background: 'rgba(59, 130, 246, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 24px' }}>
-                        <Video size={32} color="var(--primary)" />
+                    <div style={{ 
+                        width: '80px', height: '80px', borderRadius: '50%', 
+                        background: 'linear-gradient(135deg, var(--primary), #a855f7)', 
+                        display: 'flex', alignItems: 'center', justifyContent: 'center', 
+                        margin: '0 auto 24px',
+                        boxShadow: '0 8px 32px rgba(99, 102, 241, 0.3)'
+                    }}>
+                        <Video size={40} color="white" />
                     </div>
-                    <h2 style={{ color: 'white', marginBottom: '12px' }}>Video Conference</h2>
-                    <p style={{ color: 'var(--text-muted)', marginBottom: '32px' }}>Join the call to start collaborating with your team.</p>
-                    <button 
-                        style={{ background: 'var(--primary)', color: 'white', border: 'none', padding: '12px 32px', borderRadius: '12px', fontSize: '14px', fontWeight: '700', cursor: 'pointer' }}
-                        onClick={handleJoinCall}
-                    >
-                        Join Meeting
-                    </button>
+                    <h2 style={{ color: 'white', marginBottom: '12px', fontSize: '24px', fontWeight: '800', letterSpacing: '-0.02em' }}>
+                        Joining Video Conference...
+                    </h2>
+                    <p style={{ color: 'var(--text-muted)', marginBottom: '32px', maxWidth: '300px', lineHeight: '1.6', margin: '0 auto' }}>
+                        Connecting you to the room and requesting media access.
+                    </p>
                 </div>
             </div>
         );

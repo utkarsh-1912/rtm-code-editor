@@ -773,80 +773,64 @@ const ProjectPage = () => {
                         )}
                     </div>
 
-                    <div className="icon-tray">
-                        {isMobile && (
+                    {!isMobile && (
+                        <div className="icon-tray">
                             <button
-                                className={`tray-btn ${activeTab === 'code' ? 'active' : ''}`}
-                                onClick={() => setActiveTab('code')}
-                                title="Code Editor"
+                                className={`tray-btn ${sidebarTab === 'video' ? 'active' : ''}`}
+                                onClick={() => setSidebarTab('video')}
+                                title="Streaming View"
                             >
-                                <FileCode size={16} />
+                                <Video size={16} />
                             </button>
-                        )}
-                        <button
-                            className={`tray-btn ${(isMobile ? activeTab : sidebarTab) === 'video' ? 'active' : ''}`}
-                            onClick={() => {
-                                setSidebarTab('video');
-                                if (isMobile) setActiveTab('video');
-                            }}
-                            title="Streaming View"
-                        >
-                            <Video size={16} />
-                        </button>
-                        <div style={trayIconsStyle}>
-                            <button
-                                style={{
-                                    ...toolRunButtonStyle,
-                                    width: '32px',
-                                    height: '32px',
-                                    padding: '0',
-                                    borderRadius: '8px',
-                                    background: isExecuting ? 'rgba(239, 68, 68, 0.1)' : 'rgba(59, 130, 246, 0.1)',
-                                    color: isExecuting ? '#ef4444' : '#3b82f6',
-                                    border: 'none',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    marginRight: '8px'
-                                }}
-                                onClick={isExecuting ? () => setIsExecuting(false) : handleCompile}
-                                title={isExecuting ? "Stop Running" : "Run Code"}
-                            >
-                                {isExecuting ? <Square size={14} fill="currentColor" /> : <Play size={14} fill="currentColor" />}
-                            </button>
-                            <button className="tray-btn" onClick={() => setShowWhiteboard(true)} title="Whiteboard">
-                                <Palette size={16} />
-                            </button>
-                            <div style={{ width: '1px', height: '16px', backgroundColor: 'var(--border-color)', margin: '0 8px 0 0' }} />
-                            <button
-                                className={`tray-btn ${(isMobile ? activeTab : sidebarTab) === 'files' ? 'active' : ''}`}
-                                onClick={() => {
-                                    setSidebarTab('files');
-                                    if (isMobile) setActiveTab('files');
-                                }}
-                                title="File Explorer"
-                            >
-                                <Folder size={16} />
-                            </button>
-                            <button
-                                className={`tray-btn ${(isMobile ? activeTab : sidebarTab) === 'chat' ? 'active' : ''}`}
-                                onClick={() => {
-                                    setSidebarTab('chat');
-                                    if (isMobile) setActiveTab('chat');
-                                }}
-                                title="Team Chat"
-                            >
-                                <div style={{ position: 'relative' }}>
-                                    <MessageSquare size={16} />
-                                    {messages.length > 0 && <div style={{ ...notifDotStyle, top: '-2px', right: '-2px', width: '6px', height: '6px' }} />}
-                                </div>
-                            </button>
-                            <div style={{ width: '1px', height: '16px', backgroundColor: 'var(--border-color)', margin: '0 2px' }} />
-                            <button className="tray-btn" onClick={toggleTheme} title="Toggle Theme">
-                                {isLightMode ? <Sun size={16} /> : <Moon size={16} />}
-                            </button>
+                            <div style={trayIconsStyle}>
+                                <button
+                                    style={{
+                                        ...toolRunButtonStyle,
+                                        width: '32px',
+                                        height: '32px',
+                                        padding: '0',
+                                        borderRadius: '8px',
+                                        background: isExecuting ? 'rgba(239, 68, 68, 0.1)' : 'rgba(59, 130, 246, 0.1)',
+                                        color: isExecuting ? '#ef4444' : '#3b82f6',
+                                        border: 'none',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        marginRight: '8px'
+                                    }}
+                                    onClick={isExecuting ? () => setIsExecuting(false) : handleCompile}
+                                    title={isExecuting ? "Stop Running" : "Run Code"}
+                                >
+                                    {isExecuting ? <Square size={14} fill="currentColor" /> : <Play size={14} fill="currentColor" />}
+                                </button>
+                                <button className="tray-btn" onClick={() => setShowWhiteboard(true)} title="Whiteboard">
+                                    <Palette size={16} />
+                                </button>
+                                <div style={{ width: '1px', height: '16px', backgroundColor: 'var(--border-color)', margin: '0 8px 0 0' }} />
+                                <button
+                                    className={`tray-btn ${sidebarTab === 'files' ? 'active' : ''}`}
+                                    onClick={() => setSidebarTab('files')}
+                                    title="File Explorer"
+                                >
+                                    <Folder size={16} />
+                                </button>
+                                <button
+                                    className={`tray-btn ${sidebarTab === 'chat' ? 'active' : ''}`}
+                                    onClick={() => setSidebarTab('chat')}
+                                    title="Team Chat"
+                                >
+                                    <div style={{ position: 'relative' }}>
+                                        <MessageSquare size={16} />
+                                        {messages.length > 0 && <div style={{ ...notifDotStyle, top: '-2px', right: '-2px', width: '6px', height: '6px' }} />}
+                                    </div>
+                                </button>
+                                <div style={{ width: '1px', height: '16px', backgroundColor: 'var(--border-color)', margin: '0 2px' }} />
+                                <button className="tray-btn" onClick={toggleTheme} title="Toggle Theme">
+                                    {isLightMode ? <Sun size={16} /> : <Moon size={16} />}
+                                </button>
+                            </div>
                         </div>
-                    </div>
+                    )}
 
 
                     <button className="share-button" style={{
