@@ -167,6 +167,26 @@ const VideoChat = ({
         }
     }, [isVideoOff, localStream, broadcastMediaState]);
 
+    // --- Speaker Detection Logic ---
+    const setupAudioAnalysis = useCallback((stream, id) => {
+        try {
+            if (!audioContextRef.current) {
+                audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            if (audioContextRef.current.state === 'suspended') {
+                audioContextRef.current.resume();
+            }
+
+            const source = audioContextRef.current.createMediaStreamSource(stream);
+            const analyser = audioContextRef.current.createAnalyser();
+            analyser.fftSize = 256;
+            source.connect(analyser);
+            analysersRef.current[id] = analyser;
+        } catch (e) {
+            console.warn("Audio analysis setup failed", e);
+        }
+    }, []);
+
     const handleToggleAudio = useCallback(async (e) => {
         if (e) e.stopPropagation();
         
@@ -217,26 +237,6 @@ const VideoChat = ({
             broadcastMediaState({ isMuted: false });
         }
     }, [isMuted, localStream, broadcastMediaState, setupAudioAnalysis]);
-
-    // --- Speaker Detection Logic ---
-    const setupAudioAnalysis = useCallback((stream, id) => {
-        try {
-            if (!audioContextRef.current) {
-                audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)();
-            }
-            if (audioContextRef.current.state === 'suspended') {
-                audioContextRef.current.resume();
-            }
-
-            const source = audioContextRef.current.createMediaStreamSource(stream);
-            const analyser = audioContextRef.current.createAnalyser();
-            analyser.fftSize = 256;
-            source.connect(analyser);
-            analysersRef.current[id] = analyser;
-        } catch (e) {
-            console.warn("Audio analysis setup failed", e);
-        }
-    }, []);
 
     // --- WebRTC Core Functions ---
     const createPeer = useCallback((targetSocketId, name, stream) => {

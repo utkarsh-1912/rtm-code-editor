@@ -1310,7 +1310,6 @@ const ProjectPage = () => {
                                                 </div>
                                                 <div style={{ padding: '12px', overflowY: 'auto' }}>
                                                     {clients.map((client, i) => {
-                                                        const isMe = client.socketId === socketRef.current?.id;
                                                         const isCreator = project?.created_by === client.userId || (i === 0 && project?.created_by === undefined);
                                                         const isGuest = client.isGuest || (!client.userId && client.userName === 'Guest');
                                                         const role = isCreator ? 'Admin' : (client.userId ? 'Member' : 'Guest');
