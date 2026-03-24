@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useRef } from "react";
-import { createPortal } from "react-dom";
 import { useParams, useNavigate } from "react-router-dom";
 import { ReflexContainer, ReflexSplitter, ReflexElement } from "react-reflex";
 import "react-reflex/styles.css";
@@ -81,14 +80,8 @@ const ProjectPage = () => {
     const [showPreview, setShowPreview] = useState(false);
     const [activeTab, setActiveTab] = useState('code'); // 'code', 'files', 'chat', 'users', 'video'
     const [userInput, setUserInput] = useState("");
-    const [isMeetingMinimized, setIsMeetingMinimized] = useState(true); // true = show PiP by default after joining
+    const [isMeetingMinimized, setIsMeetingMinimized] = useState(false); // false = no PiP until user explicitly minimizes an active call
     const [isMeetingStarting, setIsMeetingStarting] = useState(false);
-    
-    // Portal nodes for stable persistent video
-    const [desktopPortalNode, setDesktopPortalNode] = useState(null);
-    const [mobilePortalNode, setMobilePortalNode] = useState(null);
-    const desktopPortalRef = React.useCallback(node => { if (node !== null) setDesktopPortalNode(node); }, []);
-    const mobilePortalRef = React.useCallback(node => { if (node !== null) setMobilePortalNode(node); }, []);
 
     const socketRef = useRef(null);
     const hasJoinedRef = useRef(false);
@@ -975,8 +968,20 @@ const ProjectPage = () => {
                                 )}
 
                                 {activeTab === 'video' && (
-                                    <div ref={mobilePortalRef} id="mobile-video-portal" style={{ flex: 1, height: '100%', overflow: 'hidden' }}>
-                                        {/* VideoChat will be portalled here */}
+                                    <div style={{ flex: 1, height: '100%', overflow: 'hidden' }}>
+                                        <VideoChat
+                                            socketRef={socketRef}
+                                            projectId={projectId}
+                                            user={user || { name: socketRef.current?.userName, isGuest: true }}
+                                            isMinimized={false}
+                                            onMinimizeToggle={(v) => { if (v) setActiveTab('code'); setIsMeetingMinimized(v); }}
+                                            externalInCall={isMeetingStarting}
+                                            onCallStateChange={setIsMeetingStarting}
+                                            clients={clients}
+                                            mediaStates={mediaStates}
+                                            initialAudioState={initialAudio}
+                                            initialVideoState={initialVideo}
+                                        />
                                     </div>
                                 )}
                             </div>
@@ -984,8 +989,20 @@ const ProjectPage = () => {
                     ) : (
                         // Standard IDE Desktop Layout
                         sidebarTab === 'video' ? (
-                            <div ref={desktopPortalRef} id="desktop-video-portal" style={{ flex: 1, height: '100%', backgroundColor: '#0d1117', overflow: 'hidden' }}>
-                                {/* VideoChat will be portalled here */}
+                            <div style={{ flex: 1, height: '100%', backgroundColor: '#0d1117', overflow: 'hidden' }}>
+                                <VideoChat
+                                    socketRef={socketRef}
+                                    projectId={projectId}
+                                    user={user || { name: socketRef.current?.userName, isGuest: true }}
+                                    isMinimized={false}
+                                    onMinimizeToggle={(v) => { if (v) setSidebarTab('files'); setIsMeetingMinimized(v); }}
+                                    externalInCall={isMeetingStarting}
+                                    onCallStateChange={setIsMeetingStarting}
+                                    clients={clients}
+                                    mediaStates={mediaStates}
+                                    initialAudioState={initialAudio}
+                                    initialVideoState={initialVideo}
+                                />
                             </div>
                         ) : (
                             <ReflexContainer orientation="vertical" style={{ flex: 1, height: '100%', minHeight: 0 }}>
@@ -1077,9 +1094,6 @@ const ProjectPage = () => {
                                                             const role = isCreator ? 'Admin' : isGuest ? 'Guest' : 'Member';
                                                             const roleBgColor = isCreator ? 'rgba(251,191,36,0.15)' : isGuest ? 'rgba(148,163,184,0.15)' : 'rgba(99,102,241,0.15)';
                                                             const roleColor = isCreator ? '#fbbf24' : isGuest ? '#94a3b8' : 'var(--primary)';
-                                                            const currentFile = remoteCursors[client.socketId]?.fileId
-                                                                ? files.find(f => f.id === remoteCursors[client.socketId].fileId)?.name
-                                                                : isMe ? activeFile?.name : null;
 
                                                             return (
                                                                 <div key={client.socketId} style={{
@@ -1115,11 +1129,6 @@ const ProjectPage = () => {
                                                                             <span style={{ fontSize: '9px', fontWeight: '800', backgroundColor: roleBgColor, color: roleColor, padding: '2px 6px', borderRadius: '4px', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
                                                                                 {role}
                                                                             </span>
-                                                                            {currentFile && (
-                                                                                <span style={{ fontSize: '9px', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                                                                    · {currentFile}
-                                                                                </span>
-                                                                            )}
                                                                         </div>
                                                                     </div>
 
@@ -1307,9 +1316,6 @@ const ProjectPage = () => {
                                                         const role = isCreator ? 'Admin' : (client.userId ? 'Member' : 'Guest');
                                                         const roleBgColor = isCreator ? 'rgba(251,191,36,0.15)' : isGuest ? 'rgba(148,163,184,0.15)' : 'rgba(99,102,241,0.15)';
                                                         const roleColor = isCreator ? '#fbbf24' : isGuest ? '#94a3b8' : 'var(--primary)';
-                                                        const currentFile = remoteCursors[client.socketId]?.fileId
-                                                            ? files.find(f => f.id === remoteCursors[client.socketId].fileId)?.name
-                                                            : isMe ? activeFile?.name : null;
 
                                                         return (
                                                             <div key={client.socketId} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px', marginBottom: '8px', borderRadius: '8px', background: 'rgba(255,255,255,0.02)' }}>
@@ -1498,44 +1504,27 @@ const ProjectPage = () => {
                 </div>
             </footer>
 
-            {/* Persistent Video Management (Single Instance) */}
-            {!showLobby && hasJoinedRef.current && (
-                (() => {
-                    const isVideoTabActive = activeTab === 'video' || sidebarTab === 'video';
-                    const targetNode = isMobile ? mobilePortalNode : desktopPortalNode;
-
-                    const videoComponent = (
-                        <div style={{ 
-                            display: 'block',
-                            height: isVideoTabActive ? '100%' : 'auto'
-                        }}>
-                            <VideoChat
-                                socketRef={socketRef}
-                                projectId={projectId}
-                                user={user || { name: socketRef.current?.userName, isGuest: true }}
-                                isMinimized={isMeetingMinimized && !isVideoTabActive}
-                                onMinimizeToggle={(val) => {
-                                    setIsMeetingMinimized(val);
-                                    if (!val) {
-                                        if (isMobile) setActiveTab('video');
-                                        else setSidebarTab('video');
-                                    }
-                                }}
-                                externalInCall={isMeetingStarting}
-                                onCallStateChange={setIsMeetingStarting}
-                                clients={clients}
-                                mediaStates={mediaStates}
-                                initialAudioState={initialAudio}
-                                initialVideoState={initialVideo}
-                            />
-                        </div>
-                    );
-
-                    if (isVideoTabActive && targetNode) {
-                        return createPortal(videoComponent, targetNode);
-                    }
-                    return videoComponent;
-                })()
+            {/* Video PiP Overlay — shown when minimized and user has joined */}
+            {!showLobby && hasJoinedRef.current && isMeetingMinimized && (
+                <VideoChat
+                    socketRef={socketRef}
+                    projectId={projectId}
+                    user={user || { name: socketRef.current?.userName, isGuest: true }}
+                    isMinimized={true}
+                    onMinimizeToggle={(val) => {
+                        setIsMeetingMinimized(val);
+                        if (!val) {
+                            if (isMobile) setActiveTab('video');
+                            else setSidebarTab('video');
+                        }
+                    }}
+                    externalInCall={isMeetingStarting}
+                    onCallStateChange={setIsMeetingStarting}
+                    clients={clients}
+                    mediaStates={mediaStates}
+                    initialAudioState={initialAudio}
+                    initialVideoState={initialVideo}
+                />
             )}
 
             {/* Mobile Bottom Navigation Bar */}

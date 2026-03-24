@@ -116,6 +116,108 @@ const VideoChat = ({
         }
     }, [isScreenSharing, localStream, stopScreenShare]);
 
+    const handleToggleVideo = useCallback(async (e) => {
+        if (e) e.stopPropagation();
+        
+        const videoTrack = localStream?.getVideoTracks()[0];
+        
+        if (!isVideoOff) {
+            // Turning OFF
+            if (videoTrack) {
+                videoTrack.enabled = false;
+                videoTrack.stop();
+            }
+            setIsVideoOff(true);
+            broadcastMediaState({ isVideoOff: true });
+        } else {
+            // Turning ON
+            try {
+                const newStream = await navigator.mediaDevices.getUserMedia({
+                    video: { width: 1280, height: 720, frameRate: 30 }
+                });
+                const newTrack = newStream.getVideoTracks()[0];
+
+                let updatedStream = localStream;
+                if (!updatedStream) {
+                    updatedStream = new MediaStream();
+                }
+
+                if (videoTrack) {
+                    updatedStream.removeTrack(videoTrack);
+                }
+                updatedStream.addTrack(newTrack);
+                
+                setLocalStream(new MediaStream(updatedStream.getTracks()));
+
+                Object.values(peersRef.current).forEach(peer => {
+                    const sender = peer.getSenders().find(s => s.track && s.track.kind === 'video');
+                    if (sender) {
+                        sender.replaceTrack(newTrack);
+                    } else {
+                        peer.addTrack(newTrack, updatedStream);
+                    }
+                });
+
+                setIsVideoOff(false);
+                broadcastMediaState({ isVideoOff: false });
+            } catch (err) {
+                console.error("Failed to restart camera", err);
+                toast.error("Could not restart camera");
+            }
+        }
+    }, [isVideoOff, localStream, broadcastMediaState]);
+
+    const handleToggleAudio = useCallback(async (e) => {
+        if (e) e.stopPropagation();
+        
+        let audioTrack = localStream?.getAudioTracks()[0];
+        
+        if (!isMuted) {
+            // Muting
+            if (audioTrack) {
+                audioTrack.enabled = false;
+            }
+            setIsMuted(true);
+            broadcastMediaState({ isMuted: true });
+        } else {
+            // Unmuting
+            if (!audioTrack) {
+                // Track doesn't exist (joined muted natively), need to get it
+                try {
+                    const newAudioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    audioTrack = newAudioStream.getAudioTracks()[0];
+                    
+                    let updatedStream = localStream;
+                    if (!updatedStream) {
+                        updatedStream = new MediaStream();
+                    }
+                    updatedStream.addTrack(audioTrack);
+                    setLocalStream(new MediaStream(updatedStream.getTracks()));
+                    
+                    Object.values(peersRef.current).forEach(peer => {
+                        const sender = peer.getSenders().find(s => s.track && s.track.kind === 'audio');
+                        if (sender) {
+                            sender.replaceTrack(audioTrack);
+                        } else {
+                            peer.addTrack(audioTrack, updatedStream);
+                        }
+                    });
+                    
+                    setupAudioAnalysis(updatedStream, 'local');
+                } catch (err) {
+                    console.error("Failed to get microphone", err);
+                    toast.error("Could not access microphone");
+                    return;
+                }
+            } else {
+                audioTrack.enabled = true;
+            }
+            
+            setIsMuted(false);
+            broadcastMediaState({ isMuted: false });
+        }
+    }, [isMuted, localStream, broadcastMediaState, setupAudioAnalysis]);
+
     // --- Speaker Detection Logic ---
     const setupAudioAnalysis = useCallback((stream, id) => {
         try {
@@ -193,6 +295,7 @@ const VideoChat = ({
         try {
             if (user?.isGuest) {
                 setInCall(true);
+                onCallStateChange(true);
                 socketRef.current.emit('join-video-chat', {
                     projectId,
                     userId: socketRef.current.id,
@@ -215,6 +318,7 @@ const VideoChat = ({
 
             setLocalStream(stream);
             setInCall(true);
+            onCallStateChange(true);
 
             // Handle edge case where initial state is explicitly false, setup dummy tracks if needed
             // But usually getUserMedia with {video: false, audio: true} returns a stream with only an audio track.
@@ -234,7 +338,7 @@ const VideoChat = ({
             console.error("Camera access denied", err);
             toast.error("Please enable camera & microphone to join.");
         }
-    }, [projectId, socketRef, user, setupAudioAnalysis, initialAudioState, initialVideoState]);
+    }, [projectId, socketRef, user, setupAudioAnalysis, initialAudioState, initialVideoState, onCallStateChange]);
 
     const handleLeaveCall = useCallback(() => {
         if (localStream) localStream.getTracks().forEach(t => t.stop());
@@ -247,6 +351,7 @@ const VideoChat = ({
         setLocalStream(null);
         setRemoteUsers({});
         setInCall(false);
+        onCallStateChange(false);
         setIsScreenSharing(false);
         setActiveSpeaker(null);
 
@@ -258,7 +363,7 @@ const VideoChat = ({
         if (socketRef.current) {
             socketRef.current.emit('leave-video-chat', { projectId });
         }
-    }, [localStream, projectId, socketRef]);
+    }, [localStream, projectId, socketRef, onCallStateChange]);
 
     useEffect(() => {
         if (externalInCall && !inCall) {
@@ -486,27 +591,7 @@ const VideoChat = ({
     const totalPeople = Object.keys(remoteUsers).length + (user?.isGuest ? 0 : 1);
 
     if (!inCall) {
-        if (isMinimized) {
-            return (
-                <div 
-                    className="glass-panel" 
-                    style={{ ...minimizedOverlayStyle, left: `${pipPosition.x}px`, top: `${pipPosition.y}px`, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(13, 17, 23, 0.8)' }}
-                    onMouseDown={startDragging}
-                >
-                    <button 
-                        style={{ background: 'var(--primary)', color: 'white', border: 'none', padding: '8px 16px', borderRadius: '8px', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}
-                        onClick={handleJoinCall}
-                    >
-                        Join Call
-                    </button>
-                    <div style={{ position: 'absolute', top: '8px', right: '8px' }}>
-                         <button style={miniBtn} onClick={(e) => { e.stopPropagation(); onMinimizeToggle(false); }} title="Expand">
-                            <Maximize2 size={12} color="white" />
-                        </button>
-                    </div>
-                </div>
-            );
-        }
+        if (isMinimized) return null;
         return (
             <div style={{ ...containerStyle(isExpanded), display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#0d1117' }}>
                 <div style={{ textAlign: 'center', padding: '40px' }}>
@@ -565,53 +650,14 @@ const VideoChat = ({
                     </button>
                     <button
                         style={{ ...miniBtn, color: isVideoOff ? '#ef4444' : 'white' }}
-                        onClick={async (e) => {
-                            e.stopPropagation();
-                            const videoTrack = localStream?.getVideoTracks()[0];
-                            if (!videoTrack) return;
-
-                            if (!isVideoOff) {
-                                videoTrack.stop();
-                                setIsVideoOff(true);
-                                broadcastMediaState({ isVideoOff: true });
-                            } else {
-                                try {
-                                    const newStream = await navigator.mediaDevices.getUserMedia({
-                                        video: { width: 1280, height: 720, frameRate: 30 }
-                                    });
-                                    const newTrack = newStream.getVideoTracks()[0];
-                                    localStream.removeTrack(videoTrack);
-                                    localStream.addTrack(newTrack);
-                                    
-                                    // Trigger state update to refresh all consumers/signaling handlers
-                                    setLocalStream(new MediaStream(localStream.getTracks()));
-
-                                    Object.values(peersRef.current).forEach(peer => {
-                                        const sender = peer.getSenders().find(s => s.track && s.track.kind === 'video');
-                                        if (sender) sender.replaceTrack(newTrack);
-                                    });
-                                    setIsVideoOff(false);
-                                    broadcastMediaState({ isVideoOff: false });
-                                } catch (err) {
-                                    console.error("Failed to restart camera from PiP", err);
-                                }
-                            }
-                        }}
+                        onClick={handleToggleVideo}
                         title={isVideoOff ? "Turn Camera On" : "Turn Camera Off"}
                     >
                         {isVideoOff ? <VideoOff size={12} /> : <Video size={12} />}
                     </button>
                     <button
                         style={{ ...miniBtn, color: isMuted ? '#ef4444' : 'white' }}
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            const tr = localStream?.getAudioTracks()[0];
-                            if (tr) {
-                                tr.enabled = !tr.enabled;
-                                setIsMuted(!tr.enabled);
-                                broadcastMediaState({ isMuted: !tr.enabled });
-                            }
-                        }}
+                        onClick={handleToggleAudio}
                         title={isMuted ? "Unmute" : "Mute"}
                     >
                         {isMuted ? <MicOff size={12} /> : <Mic size={12} />}
@@ -644,7 +690,10 @@ const VideoChat = ({
                                             <video ref={(el) => { if (el) el.srcObject = localStream }} autoPlay muted playsInline style={videoElementStyle} />
                                         )}
                                         <div style={tileOverlayStyle}>
-                                            <div style={nameTagStyle}>You</div>
+                                            <div style={{ ...nameTagStyle, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                {isMuted ? <MicOff size={14} color="#ef4444" /> : <Mic size={14} color="#10b981" />}
+                                                <span>You</span>
+                                            </div>
                                         </div>
                                     </div>
                                 )}
@@ -692,49 +741,10 @@ const VideoChat = ({
                         <div className="glass-panel" style={controlDock}>
                             {!user?.isGuest && (
                                 <>
-                                    <button style={controlCircle(isMuted, '#ef4444')} onClick={() => {
-                                        const tr = localStream.getAudioTracks()[0];
-                                        tr.enabled = !tr.enabled;
-                                        setIsMuted(!tr.enabled);
-                                        broadcastMediaState({ isMuted: !tr.enabled });
-                                    }}>
+                                    <button style={controlCircle(isMuted, '#ef4444')} onClick={handleToggleAudio} title={isMuted ? "Unmute" : "Mute"}>
                                         {isMuted ? <MicOff size={18} color="#ef4444" /> : <Mic size={18} color="white" />}
                                     </button>
-                                    <button style={controlCircle(isVideoOff, '#ef4444')} onClick={async () => {
-                                        const videoTrack = localStream.getVideoTracks()[0];
-                                        if (!isVideoOff) {
-                                            // Stop the track to turn off LED
-                                            videoTrack.stop();
-                                            setIsVideoOff(true);
-                                            broadcastMediaState({ isVideoOff: true });
-                                        } else {
-                                            try {
-                                                const newStream = await navigator.mediaDevices.getUserMedia({
-                                                    video: { width: 1280, height: 720, frameRate: 30 }
-                                                });
-                                                const newTrack = newStream.getVideoTracks()[0];
-
-                                                // Replace in local stream
-                                                localStream.removeTrack(videoTrack);
-                                                localStream.addTrack(newTrack);
-                                                
-                                                // Trigger state update to refresh all consumers/signaling handlers
-                                                setLocalStream(new MediaStream(localStream.getTracks()));
-
-                                                // Replace in all peer connections
-                                                Object.values(peersRef.current).forEach(peer => {
-                                                    const sender = peer.getSenders().find(s => s.track && s.track.kind === 'video');
-                                                    if (sender) sender.replaceTrack(newTrack);
-                                                });
-
-                                                setIsVideoOff(false);
-                                                broadcastMediaState({ isVideoOff: false });
-                                            } catch (err) {
-                                                console.error("Failed to restart camera", err);
-                                                toast.error("Could not restart camera");
-                                            }
-                                        }
-                                    }}>
+                                    <button style={controlCircle(isVideoOff, '#ef4444')} onClick={handleToggleVideo} title={isVideoOff ? "Turn Camera On" : "Turn Camera Off"}>
                                         {isVideoOff ? <VideoOff size={18} color="#ef4444" /> : <Video size={18} color="white" />}
                                     </button>
                                     <button style={controlCircle(isScreenSharing, 'var(--primary)')} onClick={toggleScreenShare} title={isScreenSharing ? "Stop Sharing" : "Share Screen"}>
@@ -773,7 +783,10 @@ const RemoteVideo = ({ user, isMini }) => {
             )}
             {!isMini && (
                 <div style={tileOverlayStyle}>
-                    <div style={nameTagStyle}>{user.name || "Participant"}</div>
+                    <div style={{ ...nameTagStyle, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        {user.isMuted ? <MicOff size={14} color="#ef4444" /> : <Mic size={14} color="#10b981" />}
+                        <span>{user.name || "Participant"}</span>
+                    </div>
                 </div>
             )}
         </>
