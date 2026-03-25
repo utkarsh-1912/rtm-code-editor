@@ -368,11 +368,11 @@ const VideoChat = ({
     const hasAutoJoinedRef = useRef(false);
 
     useEffect(() => {
-        if (!inCall && !isMinimized && !hasAutoJoinedRef.current) {
+        if (!inCall && !hasAutoJoinedRef.current) {
             hasAutoJoinedRef.current = true;
             handleJoinCall();
         }
-    }, [inCall, isMinimized, handleJoinCall]);
+    }, [inCall, handleJoinCall]);
 
     useEffect(() => {
         if (externalInCall && !inCall && hasAutoJoinedRef.current) {
@@ -600,7 +600,13 @@ const VideoChat = ({
     const totalPeople = Object.keys(remoteUsers).length + (user?.isGuest ? 0 : 1);
 
     if (!inCall) {
-        if (isMinimized) return null;
+        if (isMinimized) {
+            return (
+                <div style={{ ...minimizedOverlayStyle, left: `${pipPosition.x}px`, top: `${pipPosition.y}px`, bottom: 'auto', right: 'auto', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#0d1117', border: '1px solid var(--primary)', borderRadius: '12px' }}>
+                    <div style={{ color: 'var(--primary)', fontSize: '10px', fontWeight: 'bold' }}>JOINING...</div>
+                </div>
+            );
+        }
         return (
             <div style={{ ...containerStyle(isExpanded), display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#0d1117' }}>
                 <div style={{ textAlign: 'center', padding: '40px' }}>
