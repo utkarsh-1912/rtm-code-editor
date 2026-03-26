@@ -6,8 +6,7 @@ import {
     Loader2,
     ShieldCheck,
     Zap,
-    BellOff,
-    Shield
+    BellOff
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import ContentLayout from '../components/ContentLayout';
