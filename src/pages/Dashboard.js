@@ -12,7 +12,8 @@ import {
     Users,
     Zap,
     Folder,
-    ChevronRight
+    ChevronRight,
+    ChevronLeft
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import AppLayout from '../components/AppLayout';
@@ -39,6 +40,18 @@ const Dashboard = () => {
     const [newProjectName, setNewProjectName] = useState('');
     const [newProjectDesc, setNewProjectDesc] = useState('');
     const [newProjectType, setNewProjectType] = useState('web');
+
+    // Refs for Carousel
+    const carouselRef = React.useRef(null);
+
+    const scrollCarousel = (direction) => {
+        if (!carouselRef.current) return;
+        const scrollAmount = 340; // card width + gap
+        carouselRef.current.scrollBy({
+            left: direction === 'right' ? scrollAmount : -scrollAmount,
+            behavior: 'smooth'
+        });
+    };
 
     // Click outside listener for dropdown
     useEffect(() => {
@@ -322,36 +335,84 @@ const Dashboard = () => {
                                 <div style={{ width: '8px', height: '24px', backgroundColor: 'var(--primary)', borderRadius: '4px' }} />
                                 <h2 style={{ fontSize: '22px', fontWeight: '900', margin: 0, letterSpacing: '-0.02em' }}>Recent Activity</h2>
                             </div>
+                            
+                            <div style={{ display: 'flex', gap: '8px' }}>
+                                <button 
+                                    onClick={() => scrollCarousel('left')}
+                                    style={{
+                                        border: '1px solid var(--border-color)',
+                                        background: 'var(--bg-card)',
+                                        color: 'var(--text-main)',
+                                        padding: '8px',
+                                        borderRadius: '8px',
+                                        cursor: 'pointer',
+                                        transition: 'all 0.2s'
+                                    }}
+                                    onMouseOver={(e) => e.currentTarget.style.borderColor = 'var(--primary)'}
+                                    onMouseOut={(e) => e.currentTarget.style.borderColor = 'var(--border-color)'}
+                                >
+                                    <ChevronLeft size={20} />
+                                </button>
+                                <button 
+                                    onClick={() => scrollCarousel('right')}
+                                    style={{
+                                        border: '1px solid var(--border-color)',
+                                        background: 'var(--bg-card)',
+                                        color: 'var(--text-main)',
+                                        padding: '8px',
+                                        borderRadius: '8px',
+                                        cursor: 'pointer',
+                                        transition: 'all 0.2s'
+                                    }}
+                                    onMouseOver={(e) => e.currentTarget.style.borderColor = 'var(--primary)'}
+                                    onMouseOut={(e) => e.currentTarget.style.borderColor = 'var(--border-color)'}
+                                >
+                                    <ChevronRight size={20} />
+                                </button>
+                            </div>
                         </div>
 
-                        <div style={{
-                            display: 'grid',
-                            gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
-                            gap: '24px'
-                        }}>
-                            {/* Balanced Recent Activity: At least one of each if available */}
+                        <div 
+                            ref={carouselRef}
+                            style={{
+                                display: 'flex',
+                                gap: '24px',
+                                overflowX: 'auto',
+                                paddingBottom: '20px',
+                                paddingRight: '20px',
+                                scrollSnapType: 'x mandatory',
+                                scrollbarWidth: 'none',
+                                msOverflowStyle: 'none'
+                            }}
+                            className="activity-carousel"
+                        >
+                            <style>{`
+                                .activity-carousel::-webkit-scrollbar { display: none; }
+                            `}</style>
+
                             {[
-                                ...projects.slice(0, 2).map(p => ({ ...p, type: 'project' })),
-                                ...recentRooms.slice(0, 2).map(r => ({ ...r, type: 'room' }))
+                                ...projects.slice(0, 10).map(p => ({ ...p, type: 'project' })),
+                                ...recentRooms.slice(0, 10).map(r => ({ ...r, type: 'room' }))
                             ].sort((a, b) => new Date(b.updatedAt || Date.now()) - new Date(a.updatedAt || Date.now()))
-                            .slice(0, 4)
                             .map(item => (
                                 <div
                                     key={`recent-${item.type}-${item.id}`}
                                     onClick={() => navigate(item.type === 'project' ? `/project/${item.id}` : `/editor/${item.id}`)}
                                     className="activity-card"
                                     style={{
+                                        flex: '0 0 320px',
                                         padding: '20px',
                                         backgroundColor: 'var(--bg-card)',
                                         border: '1px solid var(--border-color)',
-                                        borderRadius: '8px',
+                                        borderRadius: '12px',
                                         cursor: 'pointer',
                                         transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
                                         display: 'flex',
                                         flexDirection: 'column',
                                         gap: '16px',
                                         position: 'relative',
-                                        overflow: 'hidden'
+                                        overflow: 'hidden',
+                                        scrollSnapAlign: 'start'
                                     }}
                                 >
                                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
