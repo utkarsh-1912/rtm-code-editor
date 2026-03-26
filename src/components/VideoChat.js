@@ -32,6 +32,8 @@ const VideoChat = ({
     const [isDragging, setIsDragging] = useState(false);
     const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
     const [isHoveringMini, setIsHoveringMini] = useState(false);
+    const [page, setPage] = useState(0);
+    const pageSize = 6;
 
     // --- Refs for WebRTC & Audio ---
     const peersRef = useRef({}); // { socketId: RTCPeerConnection }
@@ -131,6 +133,10 @@ const VideoChat = ({
             broadcastMediaState({ isVideoOff: true });
         } else {
             // Turning ON
+            if (!inCall) {
+                handleJoinCall();
+                return;
+            }
             try {
                 const newStream = await navigator.mediaDevices.getUserMedia({
                     video: { width: 1280, height: 720, frameRate: 30 }
@@ -201,6 +207,10 @@ const VideoChat = ({
             broadcastMediaState({ isMuted: true });
         } else {
             // Unmuting
+            if (!inCall) {
+                handleJoinCall();
+                return;
+            }
             if (!audioTrack) {
                 // Track doesn't exist (joined muted natively), need to get it
                 try {
@@ -290,7 +300,7 @@ const VideoChat = ({
     }, [socketRef, setupAudioAnalysis]);
 
     const handleJoinCall = useCallback(async () => {
-        if (!socketRef.current) return;
+        if (!socketRef.current || inCall) return;
 
         try {
             if (user?.isGuest) {
@@ -333,6 +343,9 @@ const VideoChat = ({
                 name: user?.name || socketRef.current.userName,
                 isSpectator: false
             });
+
+            // Immediate broadcast of current state
+            broadcastMediaState({ isMuted, isVideoOff });
 
         } catch (err) {
             console.error("Camera access denied", err);
@@ -560,7 +573,17 @@ const VideoChat = ({
                 }
             });
 
-            if (currentSpeaker !== activeSpeaker) setActiveSpeaker(currentSpeaker);
+            if (currentSpeaker !== activeSpeaker) {
+                setActiveSpeaker(currentSpeaker);
+                // "You are muted" speaking detection
+                if (currentSpeaker === 'local' && isMuted) {
+                    toast("You are muted. Click the microphone to unmute.", {
+                        id: 'mute-warning',
+                        icon: '🔇',
+                        duration: 3000
+                    });
+                }
+            }
         }, 300);
 
         return () => clearInterval(interval);
@@ -597,7 +620,13 @@ const VideoChat = ({
 
 
     // --- UI Render Helpers ---
-    const totalPeople = Object.keys(remoteUsers).length + (user?.isGuest ? 0 : 1);
+    const allParticipants = [
+        ...(!user?.isGuest ? [{ id: 'local', isLocal: true }] : []),
+        ...Object.entries(remoteUsers).map(([id, data]) => ({ id, ...data }))
+    ];
+    const totalPeople = allParticipants.length;
+    const paginatedParticipants = allParticipants.slice(page * pageSize, (page + 1) * pageSize);
+    const totalPages = Math.ceil(totalPeople / pageSize);
 
     if (!inCall) {
         if (isMinimized) {
@@ -699,30 +728,45 @@ const VideoChat = ({
             {!inCall ? null : (
                 <div style={callWorkspaceStyle}>
                     <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
-                        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', position: 'relative' }}>
-                            <div style={gridStyle(totalPeople)}>
-                                {!user?.isGuest && (
-                                    <div style={{ ...videoTileStyle(activeSpeaker === 'local'), position: 'relative' }}>
-                                        {isVideoOff ? (
-                                            <div style={avatarCenterStyle}><User size={48} opacity={0.1} /></div>
+                            <div style={gridStyle(paginatedParticipants.length)}>
+                                {paginatedParticipants.map((p) => (
+                                    <div key={p.id} style={{ ...videoTileStyle(activeSpeaker === p.id), position: 'relative' }}>
+                                        {p.isLocal ? (
+                                            <>
+                                                {isVideoOff ? (
+                                                    <div style={avatarCenterStyle}><User size={48} opacity={0.1} /></div>
+                                                ) : (
+                                                    <video ref={(el) => { if (el) el.srcObject = localStream }} autoPlay muted playsInline style={videoElementStyle} />
+                                                )}
+                                                <div style={tileOverlayStyle}>
+                                                    <div style={{ ...nameTagStyle, display: 'flex', alignItems: 'center', gap: '6px', border: isMuted ? '1px solid #ef4444' : '1px solid rgba(255,255,255,0.1)' }}>
+                                                        {isMuted ? <MicOff size={14} color="#ef4444" /> : <Mic size={14} color="#10b981" />}
+                                                        <span>You</span>
+                                                    </div>
+                                                </div>
+                                            </>
                                         ) : (
-                                            <video ref={(el) => { if (el) el.srcObject = localStream }} autoPlay muted playsInline style={videoElementStyle} />
+                                            <RemoteVideo user={p} />
                                         )}
-                                        <div style={tileOverlayStyle}>
-                                            <div style={{ ...nameTagStyle, display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                                {isMuted ? <MicOff size={14} color="#ef4444" /> : <Mic size={14} color="#10b981" />}
-                                                <span>You</span>
-                                            </div>
-                                        </div>
-                                    </div>
-                                )}
-                                {Object.entries(remoteUsers).map(([id, remote]) => (
-                                    <div key={id} style={{ ...videoTileStyle(activeSpeaker === id), position: 'relative' }}>
-                                        <RemoteVideo user={remote} />
                                     </div>
                                 ))}
                             </div>
-                        </div>
+
+                            {totalPages > 1 && (
+                                <div style={{ display: 'flex', justifyContent: 'center', gap: '8px', padding: '10px', zIndex: 10 }}>
+                                    {[...Array(totalPages)].map((_, i) => (
+                                        <div
+                                            key={i}
+                                            onClick={() => setPage(i)}
+                                            style={{
+                                                width: '8px', height: '8px', borderRadius: '50%',
+                                                backgroundColor: page === i ? 'var(--primary)' : 'rgba(255,255,255,0.2)',
+                                                cursor: 'pointer', transition: 'all 0.3s'
+                                            }}
+                                        />
+                                    ))}
+                                </div>
+                            )}
 
                         {/* Integrated Participants Sidebar (Desktop Expanded Mode) */}
                         {isExpanded && (
@@ -800,13 +844,19 @@ const RemoteVideo = ({ user, isMini }) => {
             ) : (
                 <video ref={videoRef} autoPlay playsInline style={isMini ? miniVideoElement : videoElementStyle} />
             )}
-            {!isMini && (
+            {!isMini ? (
                 <div style={tileOverlayStyle}>
-                    <div style={{ ...nameTagStyle, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <div style={{ ...nameTagStyle, display: 'flex', alignItems: 'center', gap: '6px', border: user.isMuted ? '1px solid #ef4444' : '1px solid rgba(255,255,255,0.1)' }}>
                         {user.isMuted ? <MicOff size={14} color="#ef4444" /> : <Mic size={14} color="#10b981" />}
                         <span>{user.name || "Participant"}</span>
                     </div>
                 </div>
+            ) : (
+                user.isMuted && (
+                    <div style={{ position: 'absolute', top: '8px', right: '8px', backgroundColor: 'rgba(239, 68, 68, 0.8)', padding: '4px', borderRadius: '50%', zIndex: 10 }}>
+                        <MicOff size={10} color="white" />
+                    </div>
+                )
             )}
         </>
     );
@@ -839,23 +889,24 @@ const miniBtn = { width: '24px', height: '24px', borderRadius: '6px', border: 'n
 
 const callWorkspaceStyle = { flex: 1, display: "flex", flexDirection: "column", position: 'relative' };
 
-const gridStyle = (total) => {
+const gridStyle = (count) => {
     let cols = 1;
-    if (total === 2) cols = 2;
-    else if (total <= 4) cols = 2;
+    if (count === 2) cols = 2;
+    else if (count <= 4) cols = 2;
     else cols = 3;
 
     return {
         display: 'grid',
         gridTemplateColumns: `repeat(${cols}, 1fr)`,
-        gridAutoRows: 'min-content',
-        gap: '20px',
-        padding: '32px',
-        height: '100%',
+        gridAutoRows: count > 2 ? '1fr' : 'auto',
+        gap: '16px',
+        padding: '24px',
+        flex: 1,
         width: '100%',
-        maxWidth: '1200px',
+        height: '100%',
+        maxWidth: '1400px',
         margin: '0 auto',
-        overflowY: 'auto',
+        overflow: 'hidden',
         alignContent: 'center'
     };
 };

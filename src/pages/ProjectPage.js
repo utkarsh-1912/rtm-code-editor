@@ -1089,7 +1089,7 @@ const ProjectPage = () => {
                                     />
                                 ) : (
                                     <ReflexContainer orientation="vertical" style={{ flex: 1, height: '100%', minHeight: 0 }}>
-                                        {isSidebarVisible && ['files', 'chat', 'users'].includes(sidebarTab) && (
+                                        {!isMobile && isSidebarVisible && ['files', 'chat', 'users'].includes(sidebarTab) && (
                                             <ReflexElement flex={0.2} minSize={250} style={{ height: '100%', minHeight: 0, backgroundColor: 'var(--bg-card)', borderRight: '1px solid var(--border-color)' }}>
                                                 <div style={{ height: '100%', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
                                                     <div style={sidebarHeaderStyle}>
