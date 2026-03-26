@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import {
     Video, VideoOff, Mic, MicOff, Maximize2, Minimize2,
-    ChevronDown, User, ScreenShare, ScreenShareOff
+    ChevronDown, User, ScreenShare, ScreenShareOff, LogOut, Radio, StopCircle
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import ACTIONS from '../Action';
@@ -28,6 +28,10 @@ const VideoChat = ({
     const [inCall, setInCall] = useState(false);
     const [activeSpeaker, setActiveSpeaker] = useState(null);
     const [isExpanded, setIsExpanded] = useState(false);
+    const [isStreaming, setIsStreaming] = useState(false);
+    const [rtmpKey, setRtmpKey] = useState('');
+    const [showStreamModal, setShowStreamModal] = useState(false);
+    const mediaRecorderRef = useRef(null);
     const [pipPosition, setPipPosition] = useState({ x: window.innerWidth - 240, y: window.innerHeight - 200 });
     const [isDragging, setIsDragging] = useState(false);
     const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
@@ -301,6 +305,49 @@ const VideoChat = ({
     }, [isMuted, localStream, broadcastMediaState, setupAudioAnalysis, inCall, handleJoinCall]);
 
     // --- WebRTC Core Functions ---
+    const startStreaming = useCallback(() => {
+        if (!localStream || !rtmpKey) return;
+        
+        try {
+            const options = { mimeType: 'video/webm; codecs=vp8,opus' };
+            const recorder = new MediaRecorder(localStream, options);
+            mediaRecorderRef.current = recorder;
+
+            socketRef.current.emit(ACTIONS.START_STREAMING, {
+                projectId,
+                rtmpKey,
+                platform: rtmpKey.startsWith('rtmp://a.rtmp.youtube.com') ? 'youtube' : 'twitch'
+            });
+
+            recorder.ondataavailable = (event) => {
+                if (event.data && event.data.size > 0) {
+                    socketRef.current.emit(ACTIONS.STREAM_DATA, {
+                        projectId,
+                        chunk: event.data
+                    });
+                }
+            };
+
+            recorder.start(1000); // 1-second chunks
+            setIsStreaming(true);
+            setShowStreamModal(false);
+            toast.success("Streaming started!");
+        } catch (err) {
+            console.error("Streaming error:", err);
+            toast.error("Failed to start streaming. Browser might not support this format.");
+        }
+    }, [localStream, rtmpKey, projectId, socketRef]);
+
+    const stopStreaming = useCallback(() => {
+        if (mediaRecorderRef.current) {
+            mediaRecorderRef.current.stop();
+            mediaRecorderRef.current = null;
+        }
+        socketRef.current.emit(ACTIONS.STOP_STREAMING, { projectId });
+        setIsStreaming(false);
+        toast("Streaming stopped.");
+    }, [projectId, socketRef]);
+
     const createPeer = useCallback((targetSocketId, name, stream) => {
         const peer = new RTCPeerConnection({
             // Bug 3: Added STUN + Open TURN relay for NAT traversal reliability
@@ -412,9 +459,9 @@ const VideoChat = ({
 
         const onUserJoined = async ({ userId, name, isSpectator }) => {
             if (userId === socket.id) return;
+            // Spectators don't show joined toast, they just join the mesh
             if (isSpectator) {
-                toast(`${name} is watching`);
-                return;
+                console.log(`${name} is watching`);
             }
 
             // Only create if we don't have this peer already
@@ -726,46 +773,46 @@ const VideoChat = ({
         <div style={containerStyle(isExpanded)}>
             {!inCall ? null : (
                 <div style={callWorkspaceStyle}>
-                    <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
-                            <div style={gridStyle(paginatedParticipants.length)}>
-                                {paginatedParticipants.map((p) => (
-                                    <div key={p.id} style={{ ...videoTileStyle(activeSpeaker === p.id), position: 'relative' }}>
-                                        {p.isLocal ? (
-                                            <>
-                                                {isVideoOff ? (
-                                                    <div style={avatarCenterStyle}><User size={48} opacity={0.1} /></div>
-                                                ) : (
-                                                    <video ref={(el) => { if (el) el.srcObject = localStream }} autoPlay muted playsInline style={videoElementStyle} />
-                                                )}
-                                                <div style={tileOverlayStyle}>
-                                                    <div style={{ ...nameTagStyle, display: 'flex', alignItems: 'center', gap: '6px', border: isMuted ? '1px solid #ef4444' : '1px solid rgba(255,255,255,0.1)' }}>
-                                                        {isMuted ? <MicOff size={14} color="#ef4444" /> : <Mic size={14} color="#10b981" />}
-                                                        <span>You</span>
+                    <div style={{ flex: 1, display: 'flex', overflow: 'hidden', position: 'relative' }}>
+                        <div style={gridStyle(paginatedParticipants.length)}>
+                            {paginatedParticipants.map((p) => (
+                                <div key={p.id} style={{ ...videoTileStyle(activeSpeaker === p.id), position: 'relative' }}>
+                                    {p.isLocal ? (
+                                        <>
+                                            {isVideoOff ? (
+                                                <div style={avatarCenterStyle}>
+                                                    <div style={avatarCircle(64)}>
+                                                        {(user?.name || socketRef.current?.userName || 'U')[0].toUpperCase()}
                                                     </div>
                                                 </div>
-                                            </>
-                                        ) : (
-                                            <RemoteVideo user={p} />
-                                        )}
-                                    </div>
+                                            ) : (
+                                                <video ref={(el) => { if (el) el.srcObject = localStream }} autoPlay muted playsInline style={videoElementStyle} />
+                                            )}
+                                            <div style={tileOverlayStyle}>
+                                                <div style={nameTagStyle(isMuted)}>
+                                                    {isMuted ? <MicOff size={14} color="#ef4444" /> : <Mic size={14} color="#10b981" />}
+                                                    <span>You</span>
+                                                </div>
+                                            </div>
+                                        </>
+                                    ) : (
+                                        <RemoteVideo user={p} />
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+
+                        {totalPages > 1 && (
+                            <div style={paginationWrapper}>
+                                {[...Array(totalPages)].map((_, i) => (
+                                    <div
+                                        key={i}
+                                        onClick={() => setPage(i)}
+                                        style={paginationDot(page === i)}
+                                    />
                                 ))}
                             </div>
-
-                            {totalPages > 1 && (
-                                <div style={{ display: 'flex', justifyContent: 'center', gap: '8px', padding: '10px', zIndex: 10 }}>
-                                    {[...Array(totalPages)].map((_, i) => (
-                                        <div
-                                            key={i}
-                                            onClick={() => setPage(i)}
-                                            style={{
-                                                width: '8px', height: '8px', borderRadius: '50%',
-                                                backgroundColor: page === i ? 'var(--primary)' : 'rgba(255,255,255,0.2)',
-                                                cursor: 'pointer', transition: 'all 0.3s'
-                                            }}
-                                        />
-                                    ))}
-                                </div>
-                            )}
+                        )}
 
                         {/* Integrated Participants Sidebar (Desktop Expanded Mode) */}
                         {isExpanded && (
@@ -781,8 +828,8 @@ const VideoChat = ({
                                         
                                         return (
                                             <div key={i} style={participantItemStyle}>
-                                                <div style={avatarCircleStyle}>
-                                                    {(client.userName || client.name || 'U')[0]}
+                                                <div style={avatarCircle(32)}>
+                                                    {(client.userName || client.name || 'U')[0].toUpperCase()}
                                                 </div>
                                                 <span style={participantNameStyle}>
                                                     {client.userName || client.name} {isMainUser && "(You)"}
@@ -800,28 +847,61 @@ const VideoChat = ({
                     </div>
 
                     <div style={controlDockWrapper}>
-                        <div className="glass-panel" style={controlDock}>
+                        <div style={controlDock}>
                             {!user?.isGuest && (
                                 <>
                                     <button style={controlCircle(isMuted, '#ef4444')} onClick={handleToggleAudio} title={isMuted ? "Unmute" : "Mute"}>
-                                        {isMuted ? <MicOff size={18} color="#ef4444" /> : <Mic size={18} color="white" />}
+                                        {isMuted ? <MicOff size={20} color="white" /> : <Mic size={20} color="white" />}
                                     </button>
                                     <button style={controlCircle(isVideoOff, '#ef4444')} onClick={handleToggleVideo} title={isVideoOff ? "Turn Camera On" : "Turn Camera Off"}>
-                                        {isVideoOff ? <VideoOff size={18} color="#ef4444" /> : <Video size={18} color="white" />}
+                                        {isVideoOff ? <VideoOff size={20} color="white" /> : <Video size={20} color="white" />}
                                     </button>
                                     <button style={controlCircle(isScreenSharing, 'var(--primary)')} onClick={toggleScreenShare} title={isScreenSharing ? "Stop Sharing" : "Share Screen"}>
-                                        {isScreenSharing ? <ScreenShareOff size={18} color="white" /> : <ScreenShare size={18} color="white" />}
+                                        {isScreenSharing ? <ScreenShareOff size={20} color="white" /> : <ScreenShare size={20} color="white" />}
                                     </button>
                                 </>
                             )}
-                            <button style={controlCircle(false)} onClick={() => onMinimizeToggle(true)} title="Minimize to Overlay">
-                                <ChevronDown size={18} color="white" />
+                            <div style={dividerStyle} />
+                            <button style={controlCircle(false)} onClick={() => onMinimizeToggle(true)} title="Minimize">
+                                <ChevronDown size={20} color="white" />
                             </button>
-                            <button style={controlCircle(false)} onClick={() => setIsExpanded(!isExpanded)}>
-                                {isExpanded ? <Minimize2 size={18} color="white" /> : <Maximize2 size={18} color="white" />}
+                            <button style={controlCircle(false)} onClick={() => setIsExpanded(!isExpanded)} title={isExpanded ? "Collapse" : "Expand"}>
+                                {isExpanded ? <Minimize2 size={20} color="white" /> : <Maximize2 size={20} color="white" />}
+                            </button>
+                            <button 
+                                style={controlCircle(isStreaming, '#3b82f6')} 
+                                onClick={isStreaming ? stopStreaming : () => setShowStreamModal(true)} 
+                                title={isStreaming ? "Stop Streaming" : "Go Live"}
+                            >
+                                {isStreaming ? <StopCircle size={20} color="white" /> : <Radio size={20} color="white" />}
+                            </button>
+                            <button style={controlCircle(true, '#ef4444')} onClick={handleLeaveCall} title="Leave Meeting">
+                                <LogOut size={20} color="white" />
                             </button>
                         </div>
                     </div>
+
+                    {showStreamModal && (
+                        <div style={modalOverlay}>
+                            <div className="glass-panel" style={modalContent}>
+                                <h3 style={{ margin: '0 0 16px', color: 'white' }}>Stream Setup</h3>
+                                <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.6)', marginBottom: '16px' }}>
+                                    Enter your RTMP URL + Stream Key (e.g. rtmp://a.rtmp.youtube.com/live2/XXXX)
+                                </p>
+                                <input 
+                                    style={inputStyle}
+                                    type="text" 
+                                    placeholder="RTMP Endpoint / Key" 
+                                    value={rtmpKey}
+                                    onChange={(e) => setRtmpKey(e.target.value)}
+                                />
+                                <div style={{ display: 'flex', gap: '12px', marginTop: '20px' }}>
+                                    <button style={cancelBtn} onClick={() => setShowStreamModal(false)}>Cancel</button>
+                                    <button style={startBtn} onClick={startStreaming}>Go Live</button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
                 </div>
             )}
         </div>
@@ -831,7 +911,9 @@ const VideoChat = ({
 const RemoteVideo = ({ user, isMini }) => {
     const videoRef = useRef();
     useEffect(() => {
-        if (videoRef.current && user?.stream) videoRef.current.srcObject = user.stream;
+        if (videoRef.current && user?.stream) {
+            videoRef.current.srcObject = user.stream;
+        }
     }, [user?.stream]);
 
     if (!user) return null;
@@ -839,20 +921,24 @@ const RemoteVideo = ({ user, isMini }) => {
     return (
         <>
             {user.isVideoOff ? (
-                <div style={avatarCenterStyle}><User size={isMini ? 24 : 48} opacity={0.1} /></div>
+                <div style={avatarCenterStyle}>
+                    <div style={avatarCircle(isMini ? 32 : 64)}>
+                        {(user.userName || user.name || 'U')[0].toUpperCase()}
+                    </div>
+                </div>
             ) : (
                 <video ref={videoRef} autoPlay playsInline style={isMini ? miniVideoElement : videoElementStyle} />
             )}
             {!isMini ? (
                 <div style={tileOverlayStyle}>
-                    <div style={{ ...nameTagStyle, display: 'flex', alignItems: 'center', gap: '6px', border: user.isMuted ? '1px solid #ef4444' : '1px solid rgba(255,255,255,0.1)' }}>
+                    <div style={nameTagStyle(user.isMuted)}>
                         {user.isMuted ? <MicOff size={14} color="#ef4444" /> : <Mic size={14} color="#10b981" />}
                         <span>{user.name || "Participant"}</span>
                     </div>
                 </div>
             ) : (
                 user.isMuted && (
-                    <div style={{ position: 'absolute', top: '8px', right: '8px', backgroundColor: 'rgba(239, 68, 68, 0.8)', padding: '4px', borderRadius: '50%', zIndex: 10 }}>
+                    <div style={miniMuteIcon}>
                         <MicOff size={10} color="white" />
                     </div>
                 )
@@ -864,27 +950,28 @@ const RemoteVideo = ({ user, isMini }) => {
 // --- Styles ---
 const containerStyle = (isExpanded) => ({
     backgroundColor: "#0d1117",
-    height: isExpanded ? "100%" : "340px",
+    height: isExpanded ? "100%" : "400px",
     display: "flex", flexDirection: "column",
     transition: "height 0.4s cubic-bezier(0.16, 1, 0.3, 1)",
     position: "relative", overflow: "hidden",
 });
 
 const minimizedOverlayStyle = {
-    position: 'fixed', bottom: '80px', right: '24px', width: '220px', height: '140px',
-    borderRadius: '16px', zIndex: 9999, overflow: 'hidden', display: 'flex', flexDirection: 'column',
-    boxShadow: '0 20px 40px rgba(0,0,0,0.5)', cursor: 'move', userSelect: 'none'
+    position: 'fixed', bottom: '80px', right: '24px', width: '240px', height: '160px',
+    borderRadius: '20px', zIndex: 9999, overflow: 'hidden', display: 'flex', flexDirection: 'column',
+    boxShadow: '0 20px 50px rgba(0,0,0,0.6)', cursor: 'move', userSelect: 'none',
+    border: '2px solid rgba(255,255,255,0.1)', backdropFilter: 'blur(20px)'
 };
 
 const minifiedGridStyle = { flex: 1, backgroundColor: '#000', position: 'relative' };
 const miniVideoElement = { width: '100%', height: '100%', objectFit: 'cover', pointerEvents: 'none' };
 const miniControls = {
-    position: 'absolute', bottom: '10px', left: '50%', transform: 'translateX(-50%)',
-    display: 'flex', gap: '8px', padding: '6px', borderRadius: '12px',
-    backgroundColor: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)',
-    border: '1px solid rgba(255,255,255,0.1)', zIndex: 2
+    position: 'absolute', bottom: '12px', left: '50%', transform: 'translateX(-50%)',
+    display: 'flex', gap: '8px', padding: '8px', borderRadius: '14px',
+    backgroundColor: 'rgba(15, 23, 42, 0.7)', backdropFilter: 'blur(12px)',
+    border: '1px solid rgba(255,255,255,0.15)', zIndex: 2
 };
-const miniBtn = { width: '24px', height: '24px', borderRadius: '6px', border: 'none', backgroundColor: 'rgba(255,255,255,0.1)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' };
+const miniBtn = { width: '28px', height: '28px', borderRadius: '8px', border: 'none', backgroundColor: 'rgba(255,255,255,0.1)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: 'background 0.2s' };
 
 const callWorkspaceStyle = { flex: 1, display: "flex", flexDirection: "column", position: 'relative' };
 
@@ -898,12 +985,11 @@ const gridStyle = (count) => {
         display: 'grid',
         gridTemplateColumns: `repeat(${cols}, 1fr)`,
         gridAutoRows: count > 2 ? '1fr' : 'auto',
-        gap: '16px',
-        padding: '24px',
+        gap: '20px',
+        padding: '30px',
         flex: 1,
         width: '100%',
         height: '100%',
-        maxWidth: '1400px',
         margin: '0 auto',
         overflow: 'hidden',
         alignContent: 'center'
@@ -911,9 +997,10 @@ const gridStyle = (count) => {
 };
 
 const participantsSidebarStyle = {
-    width: '280px',
-    backgroundColor: '#0d1117',
-    borderLeft: '1px solid rgba(255,255,255,0.05)',
+    width: '300px',
+    backgroundColor: 'rgba(13, 17, 23, 0.8)',
+    backdropFilter: 'blur(20px)',
+    borderLeft: '1px solid rgba(255,255,255,0.08)',
     display: 'flex',
     flexDirection: 'column',
     height: '100%',
@@ -921,54 +1008,56 @@ const participantsSidebarStyle = {
 };
 
 const sidebarHeaderStyle = {
-    padding: '24px 20px',
-    borderBottom: '1px solid rgba(255,255,255,0.05)'
+    padding: '28px 24px',
+    borderBottom: '1px solid rgba(255,255,255,0.08)'
 };
 
 const sidebarTitleStyle = {
     margin: 0,
-    fontSize: '11px',
+    fontSize: '12px',
     fontWeight: '800',
     color: 'var(--primary)',
-    letterSpacing: '0.1em'
+    letterSpacing: '0.12em',
+    textTransform: 'uppercase'
 };
 
 const participantsListStyle = {
     flex: 1,
     overflowY: 'auto',
-    padding: '12px'
+    padding: '16px'
 };
 
 const participantItemStyle = {
     display: 'flex',
     alignItems: 'center',
-    padding: '12px',
-    borderRadius: '12px',
-    backgroundColor: 'rgba(255,255,255,0.02)',
-    marginBottom: '8px',
-    gap: '12px',
-    border: '1px solid rgba(255,255,255,0.03)'
+    padding: '14px',
+    borderRadius: '16px',
+    backgroundColor: 'rgba(255,255,255,0.03)',
+    marginBottom: '10px',
+    gap: '14px',
+    border: '1px solid rgba(255,255,255,0.05)',
+    transition: 'transform 0.2s ease'
 };
 
-const avatarCircleStyle = {
-    width: '32px',
-    height: '32px',
-    borderRadius: '10px',
-    backgroundColor: 'var(--primary)',
+const avatarCircle = (size) => ({
+    width: `${size}px`,
+    height: `${size}px`,
+    borderRadius: size > 40 ? '24%' : '10px',
+    background: 'linear-gradient(135deg, var(--primary) 0%, #4f46e5 100%)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    fontSize: '12px',
-    fontWeight: '700',
+    fontSize: `${size/2.5}px`,
+    fontWeight: '800',
     color: 'white',
-    textTransform: 'uppercase'
-};
+    boxShadow: '0 4px 12px rgba(59, 130, 246, 0.3)'
+});
 
 const participantNameStyle = {
     flex: 1,
-    fontSize: '13px',
+    fontSize: '14px',
     fontWeight: '600',
-    color: 'white',
+    color: '#f1f5f9',
     whiteSpace: 'nowrap',
     overflow: 'hidden',
     textOverflow: 'ellipsis'
@@ -977,27 +1066,61 @@ const participantNameStyle = {
 const participantStatusStyle = {
     display: 'flex',
     alignItems: 'center',
-    gap: '8px',
-    opacity: 0.8
+    gap: '10px',
+    opacity: 0.9
 };
 
 const videoTileStyle = (active) => ({
-    borderRadius: "16px",
+    borderRadius: "24px",
     overflow: "hidden",
-    backgroundColor: "#161b22",
+    backgroundColor: "#1e293b",
     aspectRatio: "16/9",
-    border: active ? "3px solid var(--primary)" : "1px solid rgba(255,255,255,0.05)",
-    boxShadow: active ? "0 0 20px rgba(59, 130, 246, 0.4)" : "0 8px 16px rgba(0,0,0,0.2)",
-    transition: "all 0.3s cubic-bezier(0.16, 1, 0.3, 1)",
+    border: active ? "3px solid var(--primary)" : "1px solid rgba(255,255,255,0.08)",
+    boxShadow: active ? "0 0 30px rgba(59, 130, 246, 0.5)" : "0 12px 24px rgba(0,0,0,0.3)",
+    transition: "all 0.4s cubic-bezier(0.16, 1, 0.3, 1)",
     position: 'relative'
 });
 
-const videoElementStyle = { width: "100%", height: "100%", objectFit: "cover", transform: 'scale(1.01)' };
-const avatarCenterStyle = { width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#0d1117', color: 'rgba(255,255,255,0.1)' };
-const tileOverlayStyle = { position: "absolute", bottom: "16px", left: "16px", pointerEvents: "none", zIndex: 5 };
-const nameTagStyle = { backgroundColor: "rgba(13, 17, 23, 0.8)", backdropFilter: "blur(12px)", color: "#fff", fontSize: "11px", fontWeight: "700", padding: "6px 14px", borderRadius: "8px", border: '1px solid rgba(255,255,255,0.1)' };
+const videoElementStyle = { width: "100%", height: "100%", objectFit: "cover" };
+const avatarCenterStyle = { width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#0f172a' };
+const tileOverlayStyle = { position: "absolute", bottom: "18px", left: "18px", pointerEvents: "none", zIndex: 5 };
+const nameTagStyle = (muted) => ({
+    display: 'flex', alignItems: 'center', gap: '8px',
+    backgroundColor: "rgba(15, 23, 42, 0.75)", backdropFilter: "blur(12px)",
+    color: "#fff", fontSize: "12px", fontWeight: "700", padding: "8px 16px",
+    borderRadius: "12px", border: muted ? "1px solid rgba(239, 68, 68, 0.4)" : "1px solid rgba(255,255,255,0.12)"
+});
+
 const controlDockWrapper = { position: "absolute", bottom: "40px", width: "100%", display: "flex", justifyContent: "center", pointerEvents: "none", zIndex: 100 };
-const controlDock = { display: "flex", alignItems: "center", gap: "12px", padding: "12px", borderRadius: "24px", border: '1px solid rgba(255,255,255,0.1)', pointerEvents: "auto" };
-const controlCircle = (active, color) => ({ width: "48px", height: "48px", borderRadius: "16px", backgroundColor: active ? (color || "rgba(255,255,255,0.1)") : "rgba(255,255,255,0.05)", color: "#fff", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", transition: 'all 0.2s' });
+const controlDock = {
+    display: "flex", alignItems: "center", gap: "10px", padding: "10px",
+    borderRadius: "24px", backgroundColor: "rgba(15, 23, 42, 0.8)", backdropFilter: "blur(16px)",
+    border: '1px solid rgba(255,255,255,0.15)', pointerEvents: "auto",
+    boxShadow: '0 20px 40px rgba(0,0,0,0.4)'
+};
+
+const controlCircle = (active, color) => ({
+    width: "44px", height: "44px", borderRadius: "14px",
+    backgroundColor: active ? (color || "rgba(255,255,255,0.1)") : "rgba(255,255,255,0.08)",
+    color: "#fff", border: "none", cursor: "pointer", display: "flex",
+    alignItems: "center", justifyContent: "center", transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
+    transform: active ? 'scale(1.05)' : 'scale(1)'
+});
+
+const dividerStyle = { width: '1px', height: '24px', backgroundColor: 'rgba(255,255,255,0.15)', margin: '0 4px' };
+const miniMuteIcon = { position: 'absolute', top: '10px', right: '10px', backgroundColor: 'rgba(239, 68, 68, 0.9)', padding: '5px', borderRadius: '50%', zIndex: 10, boxShadow: '0 4px 8px rgba(0,0,0,0.3)' };
+const paginationWrapper = { position: 'absolute', right: '24px', top: '50%', transform: 'translateY(-50%)', display: 'flex', flexDirection: 'column', gap: '10px', zIndex: 10 };
+const paginationDot = (active) => ({
+    width: '10px', height: '10px', borderRadius: '50%',
+    backgroundColor: active ? 'var(--primary)' : 'rgba(255,255,255,0.25)',
+    cursor: 'pointer', transition: 'all 0.3s',
+    transform: active ? 'scale(1.3)' : 'scale(1)'
+});
+
+const modalOverlay = { position: 'absolute', inset: 0, backgroundColor: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 };
+const modalContent = { width: '400px', padding: '30px', borderRadius: '24px', backgroundColor: 'rgba(15, 23, 42, 0.9)', border: '1px solid rgba(255,255,255,0.1)' };
+const inputStyle = { width: '100%', padding: '12px 16px', borderRadius: '12px', backgroundColor: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'white', fontSize: '14px' };
+const cancelBtn = { flex: 1, padding: '12px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.1)', backgroundColor: 'transparent', color: 'white', cursor: 'pointer' };
+const startBtn = { flex: 1, padding: '12px', borderRadius: '12px', border: 'none', backgroundColor: 'var(--primary)', color: 'white', fontWeight: '700', cursor: 'pointer' };
 
 export default VideoChat;

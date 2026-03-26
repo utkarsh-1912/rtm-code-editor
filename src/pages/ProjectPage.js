@@ -1029,7 +1029,7 @@ const ProjectPage = () => {
                                                     ) : (
                                                         <div style={{
                                                             width: '38px', height: '38px', borderRadius: '50%',
-                                                            background: `linear-gradient(135deg, hsl(${(client.userName?.charCodeAt(0) * 47) % 360}, 70%, 45%), hsl(${(client.userName?.charCodeAt(0) * 47 + 60) % 360}, 70%, 35%))`,
+                                                            background: `linear-gradient(135deg, hsl(${( (client.userName?.[0]?.charCodeAt(0) || i || 0) * 47) % 360}, 70%, 45%), hsl(${( (client.userName?.[0]?.charCodeAt(0) || i || 0) * 47 + 60) % 360}, 70%, 35%))`,
                                                             display: 'flex', alignItems: 'center', justifyContent: 'center',
                                                             fontSize: '15px', fontWeight: '800', color: 'white', flexShrink: 0
                                                         }}>
@@ -1054,7 +1054,7 @@ const ProjectPage = () => {
                                         <VideoChat
                                             socketRef={socketRef}
                                             projectId={projectId}
-                                            user={user || { name: socketRef.current?.userName, isGuest: true }}
+                                            user={user || { name: socketRef.current?.userName || "Guest", isGuest: true }}
                                             isMinimized={false}
                                             onMinimizeToggle={(v) => { if (v) setActiveTab('code'); setIsMeetingMinimized(v); }}
                                             externalInCall={isMeetingStarting}
@@ -1074,7 +1074,7 @@ const ProjectPage = () => {
                                     <VideoChat
                                         socketRef={socketRef}
                                         projectId={projectId}
-                                        user={user || { name: socketRef.current?.userName, isGuest: true }}
+                                        user={user || { name: socketRef.current?.userName || "Guest", isGuest: true }}
                                         isMinimized={false}
                                         onMinimizeToggle={(v) => { 
                                             if (v) setSidebarTab('files'); 
@@ -1127,12 +1127,12 @@ const ProjectPage = () => {
                                                                                 {editingUsers.map((u, idx) => (
                                                                                     <div key={idx} title={`${u.userName} is editing`} style={{
                                                                                         width: '16px', height: '16px', borderRadius: '50%',
-                                                                                        backgroundColor: `hsl(${(u.userName.charCodeAt(0) * 47) % 360}, 70%, 50%)`,
+                                                                                        backgroundColor: `hsl(${( (u.userName?.charCodeAt(0) || 0) * 47) % 360}, 70%, 50%)`,
                                                                                         display: 'flex', alignItems: 'center', justifyContent: 'center',
                                                                                         fontSize: '8px', fontWeight: '700', color: 'white',
                                                                                         border: '1px solid var(--bg-card)'
                                                                                     }}>
-                                                                                        {u.userName[0]?.toUpperCase()}
+                                                                                        {u.userName?.[0]?.toUpperCase() || '?'}
                                                                                     </div>
                                                                                 ))}
                                                                                 <div style={{ display: 'flex', gap: '4px', opacity: 0, transition: 'opacity 0.2s' }} className="file-actions">
@@ -1190,7 +1190,7 @@ const ProjectPage = () => {
                                                                             ) : (
                                                                                 <div style={{
                                                                                     width: '36px', height: '36px', borderRadius: '50%',
-                                                                                    background: `linear-gradient(135deg, hsl(${(client.userName?.charCodeAt(0) * 47) % 360}, 70%, 45%), hsl(${(client.userName?.charCodeAt(0) * 47 + 60) % 360}, 70%, 35%))`,
+                                                                                    background: `linear-gradient(135deg, hsl(${( (client.userName?.[0]?.charCodeAt(0) || i || 0) * 47) % 360}, 70%, 45%), hsl(${( (client.userName?.[0]?.charCodeAt(0) || i || 0) * 47 + 60) % 360}, 70%, 35%))`,
                                                                                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                                                                                     fontSize: '14px', fontWeight: '800', color: 'white',
                                                                                     border: isMe ? '2px solid var(--primary)' : '2px solid var(--border-color)',

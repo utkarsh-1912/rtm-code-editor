@@ -494,7 +494,7 @@ const WhiteboardModal = ({ isOpen, onClose, socketRef, roomId }) => {
                         <div key={id} style={{ position: "absolute", left: cur.x, top: cur.y, pointerEvents: "none", zIndex: 10, transition: "top 0.08s, left 0.08s" }}>
                             <div style={{ border: "2px solid white", backgroundColor: "var(--primary)", borderRadius: "50%", width: "10px", height: "10px" }} />
                             <div style={{ backgroundColor: "var(--primary)", color: "white", padding: "2px 6px", borderRadius: "5px", fontSize: "10px", fontWeight: "700", marginTop: "3px", whiteSpace: "nowrap" }}>
-                                {cur.userName}
+                                {cur.userName || "Guest"}
                             </div>
                         </div>
                     ))}

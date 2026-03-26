@@ -27,6 +27,9 @@ const ACTIONS = {
   MEDIA_STATE_CHANGE: "media-state-change",
   WHITEBOARD_SYNC_REQUEST: "whiteboard-sync-request",
   WHITEBOARD_SYNC: "whiteboard-sync",
+  START_STREAMING: "start-streaming",
+  STOP_STREAMING: "stop-streaming",
+  STREAM_DATA: "stream-data",
 };
 
 module.exports = ACTIONS;
