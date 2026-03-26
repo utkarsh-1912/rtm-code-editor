@@ -760,6 +760,7 @@ module.exports = {
     deleteProject,
     deleteAccount,
     deleteOrganization,
-    isRoomGuest,
-    deleteRoomPermanently
+    deleteRoomPermanently,
+    unsubscribeUser,
+    isUserUnsubscribed
 };
