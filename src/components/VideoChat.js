@@ -171,7 +171,7 @@ const VideoChat = ({
                 toast.error("Could not restart camera");
             }
         }
-    }, [isVideoOff, localStream, broadcastMediaState]);
+    }, [isVideoOff, localStream, broadcastMediaState, inCall, handleJoinCall]);
 
     // --- Speaker Detection Logic ---
     const setupAudioAnalysis = useCallback((stream, id) => {
@@ -246,7 +246,7 @@ const VideoChat = ({
             setIsMuted(false);
             broadcastMediaState({ isMuted: false });
         }
-    }, [isMuted, localStream, broadcastMediaState, setupAudioAnalysis]);
+    }, [isMuted, localStream, broadcastMediaState, setupAudioAnalysis, inCall, handleJoinCall]);
 
     // --- WebRTC Core Functions ---
     const createPeer = useCallback((targetSocketId, name, stream) => {
@@ -351,7 +351,7 @@ const VideoChat = ({
             console.error("Camera access denied", err);
             toast.error("Please enable camera & microphone to join.");
         }
-    }, [projectId, socketRef, user, setupAudioAnalysis, initialAudioState, initialVideoState, onCallStateChange]);
+    }, [projectId, socketRef, user, setupAudioAnalysis, initialAudioState, initialVideoState, onCallStateChange, inCall, broadcastMediaState, isMuted, isVideoOff]);
 
     const handleLeaveCall = useCallback(() => {
         if (localStream) localStream.getTracks().forEach(t => t.stop());
