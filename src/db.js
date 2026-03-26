@@ -88,6 +88,22 @@ async function findOrCreateUser(firebaseUser) {
 }
 
 /**
+ * Subscription Management
+ */
+async function unsubscribeUser(email, unsubscribed = true) {
+    return await sql`
+        UPDATE users 
+        SET is_unsubscribed = ${unsubscribed} 
+        WHERE email = ${email}
+    `;
+}
+
+async function isUserUnsubscribed(email) {
+    const users = await sql`SELECT is_unsubscribed FROM users WHERE email = ${email}`;
+    return users[0]?.is_unsubscribed || false;
+}
+
+/**
  * Organization Management
  */
 async function createOrganization(userId, name) {

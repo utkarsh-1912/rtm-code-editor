@@ -1,70 +1,83 @@
 import React from "react";
 import ContentLayout from "../components/ContentLayout";
-import { Code, Zap, Users, Shield, MousePointer2, Terminal, Settings, Eye } from "lucide-react";
+import { 
+    Video, 
+    Zap, 
+    Users, 
+    Shield, 
+    Monitor, 
+    Cpu, 
+    Globe, 
+    Lock,
+    MessageSquare,
+    Terminal,
+    Layers
+} from "lucide-react";
 
 export default function About() {
     return (
-        <ContentLayout title="About Utkristi Colabs">
-            <p>
-                Utkristi Colabs is a state-of-the-art real-time collaborative code editor designed for developers who value speed, efficiency, and seamless teamwork. Whether you are pair programming, mentoring, or conducting technical interviews, our platform provides the tools you need to code together, anywhere in the world.
-            </p>
-
-            <h2 style={{ color: "var(--text-main)", marginTop: "40px", marginBottom: "20px" }}>Core Features</h2>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "30px", marginTop: "20px" }}>
-                <div>
-                    <h3 style={{ display: "flex", alignItems: "center", gap: "10px", fontSize: "18px", color: "var(--primary)" }}>
-                        <Code size={20} /> Pro IDE Workspace
-                    </h3>
-                    <p>Sub-millisecond latency for real-time sync, now featuring multi-file Project support. Your code, file structure, and chat history are saved automatically.</p>
-                </div>
-                <div>
-                    <h3 style={{ display: "flex", alignItems: "center", gap: "10px", fontSize: "18px", color: "#f87171" }}>
-                        <Zap size={20} /> Advanced Collaboration
-                    </h3>
-                    <p>Go beyond text with built-in WebRTC Voice and Video chat. Use "Follow Me" mode to lead your team or see their presence with Shared Pointers.</p>
-                </div>
-                <div>
-                    <h3 style={{ display: "flex", alignItems: "center", gap: "10px", fontSize: "18px", color: "#fbbf24" }}>
-                        <MousePointer2 size={20} /> Collaborative Whiteboard
-                    </h3>
-                    <p>Sketch architectural diagrams in real-time. Our dual-canvas engine ensures smooth, synchronized drawing with multi-user support.</p>
-                </div>
-                <div>
-                    <h3 style={{ display: "flex", alignItems: "center", gap: "10px", fontSize: "18px", color: "#a855f7" }}>
-                        <Terminal size={20} /> Snippets Library
-                    </h3>
-                    <p>Build your personal vault of reusable code. Save, organize, and search through your code snippets with our built-in Snippets Library.</p>
-                </div>
-                <div>
-                    <h3 style={{ display: "flex", alignItems: "center", gap: "10px", fontSize: "18px", color: "#ec4899" }}>
-                        <Settings size={20} /> Power User Tools
-                    </h3>
-                    <p>Boost productivity with Vim and Emacs keybindings. Real-time linting provides instant feedback as you type in our premium IDE environment.</p>
-                </div>
-                <div>
-                    <h3 style={{ display: "flex", alignItems: "center", gap: "10px", fontSize: "18px", color: "#60a5fa" }}>
-                        <Eye size={20} /> Live Preview
-                    </h3>
-                    <p>See your changes instantly. Our integrated real-time preview renders HTML, CSS, and JS projects as you type, right inside the workspace.</p>
-                </div>
-                <div>
-                    <h3 style={{ display: "flex", alignItems: "center", gap: "10px", fontSize: "18px", color: "#4ade80" }}>
-                        <Users size={20} /> Team Discussions
-                    </h3>
-                    <p>Communicate effectively with integrated project-level discussions. Keep your team aligned with synchronized chats and persistent history.</p>
-                </div>
-                <div>
-                    <h3 style={{ display: "flex", alignItems: "center", gap: "10px", fontSize: "18px", color: "var(--text-muted)" }}>
-                        <Shield size={20} /> Security & Privacy
-                    </h3>
-                    <p>Manage your account security with ease. Track active sessions across devices and remotely sign out for complete control over your data.</p>
-                </div>
+        <ContentLayout title="The RTM Studio Vision">
+            <div style={{ marginBottom: '60px' }}>
+                <p style={{ fontSize: '20px', lineHeight: '1.6', color: 'var(--text-main)', fontWeight: '500' }}>
+                    RTM Studio (Utkristi Colabs) is a next-generation collaborative IDE engineered for the highest tier of technical teams. 
+                    We've eliminated the friction of remote engineering by fusing high-performance code synchronization with cinematic video communication and enterprise-grade reliability.
+                </p>
             </div>
 
-            <h2 style={{ color: "var(--text-main)", marginTop: "40px", marginBottom: "20px" }}>Our Mission</h2>
-            <p>
-                To break down the barriers of remote collaboration by providing a fast, reliable, and beautiful coding environment that feels as natural as sitting next to your teammate.
-            </p>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '40px' }}>
+                <section>
+                    <h2 style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: '22px', fontWeight: '800', marginBottom: '16px', color: 'var(--primary)' }}>
+                        <Video size={24} /> Cinematic Video
+                    </h2>
+                    <p style={{ color: 'var(--text-muted)', lineHeight: '1.7' }}>
+                        Experience 4K, low-latency video conferencing integrated directly into your workspace. 
+                        Our cinematic 16:9 grid intelligently scales to provide an immersive pair-programming experience without ever clipping or cluttered layouts.
+                    </p>
+                </section>
+
+                <section>
+                    <h2 style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: '22px', fontWeight: '800', marginBottom: '16px', color: '#10b981' }}>
+                        <Layers size={24} /> Multi-File Projects
+                    </h2>
+                    <p style={{ color: 'var(--text-muted)', lineHeight: '1.7' }}>
+                        Move beyond simple one-off snippets. Utkristi Colabs supports persistent, hierarchical project directories 
+                        synced across all participants with sub-millisecond precision using our advanced Operational Transformation engine.
+                    </p>
+                </section>
+
+                <section>
+                    <h2 style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: '22px', fontWeight: '800', marginBottom: '16px', color: '#8b5cf6' }}>
+                        <Lock size={24} /> Enterprise Communication
+                    </h2>
+                    <p style={{ color: 'var(--text-muted)', lineHeight: '1.7' }}>
+                        Collaborate with confidence. Our enterprise-grade notification system handles project invitations with 
+                        professional branding, reliable delivery, and full self-service subscription management to respect user privacy and compliance.
+                    </p>
+                </section>
+
+                <section>
+                    <h2 style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: '22px', fontWeight: '800', marginBottom: '16px', color: '#f59e0b' }}>
+                        <Cpu size={24} /> High-Performance Stack
+                    </h2>
+                    <p style={{ color: 'var(--text-muted)', lineHeight: '1.7' }}>
+                        Built on an uncompromising infrastructure of Node.js, WebSockets (Socket.io), and Neon PostgreSQL. 
+                        We ensure that every keystroke, cursor movement, and whiteboard stroke is persistent and real-time.
+                    </p>
+                </section>
+            </div>
+
+            <div style={{ marginTop: '80px', padding: '40px', borderRadius: '24px', background: 'var(--bg-main)', border: '1px solid var(--border-color)', textAlign: 'center' }}>
+                <h2 style={{ fontSize: '28px', fontWeight: '900', marginBottom: '16px' }}>Engineered for Excellence</h2>
+                <p style={{ color: 'var(--text-muted)', maxWidth: '700px', margin: '0 auto 30px', fontSize: '18px' }}>
+                    Whether you're conducting a critical technical interview or architecting the next unicorn, 
+                    RTM Studio provides the premium environment your team deserves.
+                </p>
+                <div style={{ display: 'flex', justifyContent: 'center', gap: '20px', flexWrap: 'wrap' }}>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px', fontWeight: '700', color: 'var(--text-muted)' }}><Shield size={16} /> SOC2 Compliant Logic</span>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px', fontWeight: '700', color: 'var(--text-muted)' }}><Globe size={16} /> Global Relay Network</span>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px', fontWeight: '700', color: 'var(--text-muted)' }}><Zap size={16} /> 99.9% Uptime SLA</span>
+                </div>
+            </div>
         </ContentLayout>
     );
 }

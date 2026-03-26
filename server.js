@@ -50,7 +50,7 @@ const fetchRelay = async (url, body, apiKey) => {
 };
 
 // Enterprise Email Template
-const getEmailTemplate = ({ title, message, ctaText, ctaUrl, inviterName, inviterPhoto }) => {
+const getEmailTemplate = ({ title, message, ctaText, ctaUrl, inviterName, inviterPhoto, recipientEmail }) => {
   const logoUrl = "https://utkristi-colabs.onrender.com/utkristi-colabs.png";
   const inviterInitials = (inviterName || "U").charAt(0).toUpperCase();
   
@@ -60,51 +60,50 @@ const getEmailTemplate = ({ title, message, ctaText, ctaUrl, inviterName, invite
 <head>
   <meta charset="utf-8">
   <style>
-    body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #f1f5f9; margin: 0; padding: 0; -webkit-font-smoothing: antialiased; }
-    .wrapper { width: 100%; table-layout: fixed; background-color: #f1f5f9; padding: 48px 0; }
-    .main { background-color: #ffffff; margin: 0 auto; width: 100%; max-width: 600px; border-radius: 24px; overflow: hidden; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.08); border: 1px solid rgba(226, 232, 240, 0.8); }
+    body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #f8fafc; margin: 0; padding: 0; -webkit-font-smoothing: antialiased; }
+    .wrapper { width: 100%; table-layout: fixed; background-color: #f8fafc; padding: 60px 0; }
+    .main { background-color: #ffffff; margin: 0 auto; width: 100%; max-width: 600px; border-radius: 32px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05), 0 20px 25px -5px rgba(0,0,0,0.05); border: 1px solid #e2e8f0; }
     
-    .hero-banner { background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); padding: 60px 40px; text-align: center; position: relative; }
-    .logo { height: 32px; width: auto; margin-bottom: 40px; filter: drop-shadow(0 4px 6px rgba(0,0,0,0.2)); }
+    .header { padding: 48px 40px 32px; text-align: center; }
+    .logo { height: 28px; width: auto; margin-bottom: 32px; }
     
-    .inviter-badge { display: inline-flex; align-items: center; background: rgba(255,255,255,0.1); backdrop-filter: blur(8px); padding: 8px 16px; border-radius: 100px; border: 1px solid rgba(255,255,255,0.1); margin: 0 auto; }
-    .avatar-mini { width: 32px; height: 32px; border-radius: 50%; background: #3b82f6; color: white; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 800; margin-right: 12px; overflow: hidden; }
+    .inviter-pill { display: inline-flex; align-items: center; background: #f1f5f9; padding: 6px 14px; border-radius: 100px; border: 1px solid #e2e8f0; margin-bottom: 24px; }
+    .avatar-mini { width: 24px; height: 24px; border-radius: 50%; background: #2563eb; color: white; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 800; margin-right: 10px; overflow: hidden; }
     .avatar-mini img { width: 100%; height: 100%; object-fit: cover; }
-    .inviter-text { color: rgba(255,255,255,0.9); font-size: 13px; font-weight: 600; }
+    .inviter-text { color: #475569; font-size: 12px; font-weight: 600; }
     
-    .hero-title { color: #ffffff; font-size: 32px; font-weight: 900; margin: 24px 0 12px; letter-spacing: -0.04em; }
-    .hero-subtitle { color: rgba(255,255,255,0.6); font-size: 16px; margin: 0; }
+    .hero-title { color: #0f172a; font-size: 30px; font-weight: 800; margin: 0 0 16px; letter-spacing: -0.02em; line-height: 1.2; }
+    .hero-subtitle { color: #64748b; font-size: 16px; margin: 0; line-height: 1.5; }
     
-    .content { padding: 48px; color: #334155; }
-    .message-body { font-size: 17px; line-height: 1.7; color: #475569; margin-bottom: 40px; text-align: center; }
+    .content { padding: 0 48px 48px; color: #334155; }
+    .message-body { font-size: 16px; line-height: 1.8; color: #475569; margin-bottom: 40px; text-align: center; background: #f8fafc; padding: 32px; border-radius: 20px; border: 1px dashed #e2e8f0; }
     
     .cta-area { text-align: center; margin-bottom: 48px; }
-    .btn { display: inline-block; background: #2563eb; color: #ffffff !important; padding: 18px 44px; border-radius: 16px; text-decoration: none; font-weight: 800; font-size: 16px; box-shadow: 0 15px 30px -5px rgba(37, 99, 235, 0.4); transform: perspective(1px) translateZ(0); }
+    .btn { display: inline-block; background: #2563eb; color: #ffffff !important; padding: 20px 48px; border-radius: 18px; text-decoration: none; font-weight: 700; font-size: 16px; transition: all 0.2s; }
     
-    .feature-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 40px; padding-top: 40px; border-top: 1px solid #f1f5f9; }
+    .feature-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-top: 48px; padding-top: 48px; border-top: 1px solid #f1f5f9; }
     .feature-item { text-align: left; }
-    .feature-icon { font-size: 20px; margin-bottom: 8px; }
-    .feature-title { font-size: 14px; font-weight: 700; color: #0f172a; margin-bottom: 4px; }
-    .feature-desc { font-size: 12px; color: #94a3b8; line-height: 1.5; }
+    .feature-title { font-size: 14px; font-weight: 700; color: #0f172a; margin-bottom: 6px; display: flex; align-items: center; gap: 8px; }
+    .feature-desc { font-size: 12px; color: #64748b; line-height: 1.6; }
     
-    .footer { padding: 48px; text-align: center; background-color: #f8fafc; border-top: 1px solid #f1f5f9; }
-    .footer-links { margin-top: 24px; padding-top: 24px; border-top: 1px solid #e2e8f0; font-size: 11px; color: #cbd5e1; line-height: 1.8; }
-    .unsubscribe { color: #2563eb; text-decoration: none; font-weight: 700; }
+    .footer { padding: 48px; text-align: center; background-color: #ffffff; border-top: 1px solid #f1f5f9; }
+    .footer-links { margin-top: 24px; padding-top: 24px; border-top: 1px solid #f1f5f9; font-size: 11px; color: #94a3b8; line-height: 2; }
+    .unsubscribe { color: #2563eb; text-decoration: none; font-weight: 600; }
   </style>
 </head>
 <body>
   <div class="wrapper">
     <div class="main">
-      <div class="hero-banner">
+      <div class="header">
         <img src="${logoUrl}" alt="Utkristi Colabs" class="logo">
-        <div class="inviter-badge">
+        <div class="inviter-pill">
           <div class="avatar-mini">
             ${inviterPhoto ? `<img src="${inviterPhoto}" alt="${inviterName}">` : inviterInitials}
           </div>
           <span class="inviter-text">${inviterName || 'A teammate'} is inviting you</span>
         </div>
         <h1 class="hero-title">${title}</h1>
-        <p class="hero-subtitle">Experience the future of collaborative engineering.</p>
+        <p class="hero-subtitle">The workspace where high-performance engineering happens.</p>
       </div>
       
       <div class="content">
@@ -118,32 +117,32 @@ const getEmailTemplate = ({ title, message, ctaText, ctaUrl, inviterName, invite
         
         <div class="feature-grid">
           <div class="feature-item">
-            <div class="feature-title">⚡ Real-time Collaboration</div>
-            <div class="feature-desc">Code, debug, and ship together with zero latency sync.</div>
+            <div class="feature-title">⚡ High-Speed Sync</div>
+            <div class="feature-desc">Zero-latency collaborative engine optimized for speed.</div>
           </div>
           <div class="feature-item">
-            <div class="feature-title">🎥 Professional Video</div>
-            <div class="feature-desc">Integrated 4K conferencing with cinematic grid layouts.</div>
+            <div class="feature-title">🎥 Cinematic Video</div>
+            <div class="feature-desc">Integrated HD conferencing with professional grids.</div>
           </div>
           <div class="feature-item">
-            <div class="feature-title">🤖 AI-Powered Engine</div>
-            <div class="feature-desc">Intelligent code suggestions and automated workflows.</div>
+            <div class="feature-title">🤖 AI-Ready Environment</div>
+            <div class="feature-desc">Engineered for the modern, AI-augmented developer.</div>
           </div>
           <div class="feature-item">
-            <div class="feature-title">🔒 Enterprise Security</div>
-            <div class="feature-desc">Bank-grade encryption and granular access control.</div>
+            <div class="feature-title">🔒 Bank-Grade Trust</div>
+            <div class="feature-desc">Persistent, encrypted workspaces with SOC2-ready logic.</div>
           </div>
         </div>
       </div>
       
       <div class="footer">
-        <p style="font-weight: 800; color: #64748b; margin-bottom: 4px;">Utkristi Colabs</p>
-        <p style="font-size: 11px; margin-bottom: 12px;">The World's Most Advanced Collaborative IDE</p>
-        <p>Innovation Plaza, Digital District, Bangalore, KA 560103</p>
+        <p style="font-weight: 700; color: #475569; margin-bottom: 4px; font-size: 14px;">Utkristi Colabs</p>
+        <p style="font-size: 11px; color: #94a3b8; margin-bottom: 12px;">The World's Most Advanced Collaborative IDE</p>
+        <p style="font-size: 11px; color: #cbd5e1;">Innovation Plaza, Digital District, Bangalore, KA 560103</p>
         <div class="footer-links">
-          This invitation was generated by a member of your technical organization. 
+          This secure communication was intended for <strong>${recipientEmail}</strong>. 
           <br>
-          <a href="#" class="unsubscribe">Manage Notifications</a> &middot; <a href="#" style="color: inherit; text-decoration: none;">Security Center</a> &middot; <a href="#" style="color: inherit; text-decoration: none;">Privacy Policy</a>
+          <a href="${process.env.APP_URL || 'http://localhost:5000'}/unsubscribe?email=${encodeURIComponent(recipientEmail)}" class="unsubscribe">Manage Preferences</a> &middot; <a href="#" style="color: inherit; text-decoration: none;">Security Hub</a> &middot; <a href="#" style="color: inherit; text-decoration: none;">Privacy Policy</a>
         </div>
       </div>
     </div>
@@ -158,33 +157,34 @@ app.get("/api/ping", (req, res) => {
   res.json({ success: true, message: "pong" });
 });
 
-app.get("/api/test-email", async (req, res) => {
+app.get("/api/welcome-new-user", async (req, res) => {
   try {
-    const { email } = req.query;
+    const { email, name } = req.query;
     if (!email) return res.status(400).json({ error: "Missing email query parameter" });
     
     const BREVO_KEY = process.env.BREVO_API_KEY;
     if (!BREVO_KEY) return res.status(500).json({ error: "BREVO_API_KEY not configured" });
 
     const html = getEmailTemplate({
-      title: "Connection Perfected",
-      message: "The RTM Studio mailing relay is now optimized for the enterprise. You can now invite collaborators with a premium, branded experience.",
-      ctaText: "Open Dashboard",
+      title: `Welcome to the Studio, ${name || 'Engineer'}`,
+      message: "We're thrilled to have you here. Utkristi Colabs is designed to be the fastest, most immersive workspace for your technical team. Start by creating a project or joining a team vault.",
+      ctaText: "Launch Workspace",
       ctaUrl: process.env.APP_URL || "http://localhost:5000",
-      inviterName: "System Diagnostics"
+      inviterName: "RTM Onboarding",
+      recipientEmail: email
     });
 
     const result = await fetchRelay("https://api.brevo.com/v3/smtp/email", {
       sender: { name: "Utkristi Colabs", email: process.env.BREVO_FROM_EMAIL || "noreply@rtm-edit.com" },
       to: [{ email }],
-      subject: "RTM Studio - Relay verified successfully",
+      subject: "Welcome to RTM Studio - Let's build together",
       htmlContent: html
     }, BREVO_KEY);
 
-    res.json({ success: true, brevoStatus: result.status, detail: result.body });
+    res.json({ success: true, message: "Welcome email dispatched", status: result.status });
   } catch (err) {
-    console.error("[TestEmail] Error:", err);
-    res.status(500).json({ error: "Test email failed", message: err.message });
+    console.error("[WelcomeEmail] Error:", err);
+    res.status(500).json({ error: "Failed to send welcome", message: err.message });
   }
 });
 
@@ -209,6 +209,29 @@ app.delete("/api/remove-room", async (req, res) => {
   } catch (err) {
     console.error("Delete API Error:", err);
     res.status(500).json({ error: "Internal Server Error" });
+  }
+});
+
+app.post("/api/unsubscribe", async (req, res) => {
+  try {
+    const { email, unsubscribed } = req.body;
+    if (!email) return res.status(400).json({ error: "Email required" });
+    await db.unsubscribeUser(email, unsubscribed !== false);
+    res.json({ success: true, message: unsubscribed === false ? "Successfully resubscribed" : "Successfully unsubscribed" });
+  } catch (err) {
+    console.error("Unsubscribe Error:", err);
+    res.status(500).json({ error: "Operation failed" });
+  }
+});
+
+app.get("/api/user-subscription", async (req, res) => {
+  try {
+    const { email } = req.query;
+    if (!email) return res.status(400).json({ error: "Email required" });
+    const isUnsubscribed = await db.isUserUnsubscribed(email);
+    res.json({ email, isUnsubscribed });
+  } catch (err) {
+    res.status(500).json({ error: "Failed to fetch status" });
   }
 });
 
@@ -302,10 +325,17 @@ app.post("/api/organizations/:id/members", async (req, res) => {
 
     const BREVO_KEY = process.env.BREVO_API_KEY;
     if (BREVO_KEY) {
-      const appUrl = process.env.APP_URL || "http://localhost:3000";
+      const appUrl = process.env.APP_URL || "http://localhost:5000";
       const actionUrl = isNewUser ? `${appUrl}/signup` : `${appUrl}/snippets`;
       const actionText = isNewUser ? "Create Account & Join Team" : "View Team Vault";
-      const html = `<!DOCTYPE html><html><head><style>body{background:#0d1117;font-family:sans-serif;color:#e2e8f0;margin:0;padding:40px 0}.wrap{max-width:560px;margin:0 auto;background:#161b22;border-radius:16px;overflow:hidden;border:1px solid #30363d}.header{background:linear-gradient(135deg,#1e293b 0%,#0f172a 100%);padding:36px;text-align:center;border-bottom:1px solid #30363d}.logo-text{font-size:26px;font-weight:900;color:#fff}.body{padding:36px}h1{font-size:22px;color:#f1f5f9;margin:0 0 10px;line-height:1.3}p{font-size:15px;color:#94a3b8;line-height:1.6;margin:0 0 16px}.cta{display:inline-block;padding:14px 24px;background:linear-gradient(135deg,#3b82f6,#2563eb);color:#fff;text-decoration:none;border-radius:10px;font-weight:700;margin:16px 0}</style></head><body><div class="wrap"><div class="header"><div class="logo-text">RTM<span style="color:#3b82f6">.</span>Edit</div></div><div class="body"><h1>${inviterName || 'A teammate'} invited you to join "${orgName || 'a Team Vault'}"</h1><p>You've been invited as a <strong>${role || 'member'}</strong> to collaborate on code snippets and components.</p>${isNewUser ? '<p>You don\'t have an account yet. Create one using this email, then let your team know you are ready to be added!</p>' : '<p>You have been successfully added. You can now access the team vault.</p>'}<a href="${actionUrl}" class="cta">${actionText}</a></div></div></body></html>`;
+      const html = getEmailTemplate({
+        title: `Team Invitation: ${orgName || 'Team Vault'}`,
+        message: `You've been invited by ${inviterName || 'a teammate'} to join <strong>${orgName || 'a Team Vault'}</strong> as a <strong>${role || 'member'}</strong>. ${isNewUser ? "Create an account to start collaborating on shared snippets and projects." : "Access the team vault now to view shared resources."}`,
+        ctaText: actionText,
+        ctaUrl: actionUrl,
+        inviterName: inviterName || "Teammate",
+        recipientEmail: email
+      });
 
       fetchRelay("https://api.brevo.com/v3/smtp/email", {
         sender: { name: "RTM.Edit", email: process.env.BREVO_FROM_EMAIL || "noreply@rtm-edit.com" },
@@ -492,11 +522,19 @@ app.post("/api/projects/:id/invite", async (req, res) => {
       ctaText: "Access Project",
       ctaUrl: acceptUrl,
       inviterName: inviterName,
-      inviterPhoto: req.body.inviterPhoto
+      inviterPhoto: req.body.inviterPhoto,
+      recipientEmail: email
     });
 
     const BREVO_KEY = process.env.BREVO_API_KEY;
     if (BREVO_KEY) {
+      // Check subscription before sending
+      const isUnsubscribed = await db.isUserUnsubscribed(email);
+      if (isUnsubscribed) {
+        console.log(`[EmailSkipped] User ${email} is unsubscribed.`);
+        return res.json({ success: true, message: "Invite recorded, but email skipped due to user preference." });
+      }
+
       fetchRelay("https://api.brevo.com/v3/smtp/email", {
         sender: { name: "Utkristi Colabs", email: process.env.BREVO_FROM_EMAIL || "noreply@rtm-edit.com" },
         to: [{ email }],

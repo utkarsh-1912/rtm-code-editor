@@ -1,73 +1,64 @@
-# Utkristi Colabs 🚀
+# RTM Studio 🚀
 
-Utkristi Colabs is a **real-time collaborative code editor** designed for high-performance teams. Built with a focus on speed, persistence, and developer experience, it enables seamless pair programming, technical interviews, and team collaboration.
+RTM Studio (Utkristi Colabs) is a **world-class real-time collaborative IDE** engineered for high-performance engineering teams. It merges professional-grade code synchronization with cinematic video conferencing and a premium developer experience.
 
-![Utkristi Colabs Logo](https://raw.githubusercontent.com/utkarsh-1912/rtm-code-editor/main/public/utkristi-colabs.png)
+![RTM Studio Banner](https://utkristi-colabs.onrender.com/utkristi-colabs.png)
 
-## ✨ Key Features
+## ✨ Enterprise-Grade Features
 
-- **🚀 Pro IDE Workspace**: Transition from single-file rooms to full multi-file projects with persistent directory structures.
-- **⚡ Next-Gen Collaboration**: Real-time cursor tracking, Shared Pointer mode, and built-in WebRTC Voice/Video conferencing.
-- **🎨 Collaborative Whiteboard**: An integrated architectural sketching tool with dual-canvas synchronization and name-tagged drawing cursors.
-- **🔥 Power User Tools**: Support for Vim/Emacs keybindings and real-time linting for JavaScript, HTML, and CSS.
-- **💾 Persistent Workspaces**: Built on PostgreSQL (Neon DB), your rooms, projects, chat history, and whiteboards are saved automatically.
-- **🛠️ Multi-Language Support**: Execute code in Python, C++, Java, and JavaScript using the Judge0 API.
-- **📚 Snippets Library**: Save reusable code snippets to personal or team vaults and import them instantly.
-- **📱 Universal Compatibility**: Fully responsive experience on mobile devices with touch-enabled whiteboard and tabbed project views.
-- **🛡️ Enterprise Security**: Firebase Authentication with advanced session management. Track and manage active devices.
+- **🎥 Cinematic Video Conferencing**: Low-latency 4K video with an intelligent 16:9 grid that auto-scales across all devices without clipping.
+- **🚀 Pro Project Workspaces**: Persistent multi-file directory structures built on Neon PostgreSQL with sub-millisecond Keystroke Sync.
+- **🎨 Advanced Architectural Whiteboard**: Real-time sketching with dual-canvas synchronization and user-tagged cursors.
+- **🛡️ Enterprise Communication**: A localized email engine using Brevo, featuring high-fidelity invitations and self-service compliance management.
+- **📱 Universal Mobile Focus**: Fully optimized mobile IDE with a specialized navigation tray and zero-clutter headers.
+- **💾 Global State Persistence**: Automatically saved room states, chat histories, and snippet vaults ensuring zero data loss.
+- **🛠️ Multi-Runtime Support**: Instant code execution via Judge0 for Python, C++, Java, and JavaScript.
 
 ## 🛠️ Tech Stack
 
-- **Frontend**: React.js, CodeMirror 6, Lucide Icons, React Reflex (Resizables), Tailwind-inspired Custom CSS.
-- **Backend**: Node.js, Express.js, Socket.io (WebSockets).
-- **Database**: PostgreSQL (via Neon DB Serverless).
-- **Auth**: Firebase Authentication.
-- **Styles**: Modern CSS with Glassmorphism and Dynamic Theme Support (Dark/Light).
+- **Frontend**: React.js, CodeMirror 6, Lucide Icons, React-Router-Dom v6.
+- **Backend**: Node.js 22+, Express.js, Socket.io (Real-time).
+- **Communication**: Brevo API (Transactional Emails), WebRTC (Video/Audio).
+- **Database**: PostgreSQL (Neon Serverless).
+- **Security**: Firebase Identity Management with session tracking.
 
-## 🚀 Getting Started
+## 🚀 Quick Start
 
 ### Prerequisites
-
-- Node.js (version 18 or higher)
-- A Neon DB (PostgreSQL) connection string
-- Firebase project credentials
+- Node.js v18+
+- Neon DB Connection String
+- Firebase Project Credentials
+- Brevo API Key
 
 ### Installation
-
-1. Clone the repository:
+1. Clone & Install:
    ```bash
    git clone https://github.com/utkarsh-1912/rtm-code-editor.git
    cd rtm-code-editor
-   ```
-
-2. Install dependencies:
-   ```bash
    npm install
    ```
 
-3. Configure Environment Variables:
-   Create a `.env` file in the root directory:
+2. Configuration (`.env`):
    ```env
-   REACT_APP_BACKEND_URL=your_backend_url
-   DATABASE_URL=your_neon_db_url
-   # Add Firebase config as needed
+   DATABASE_URL=your_postgresql_url
+   BREVO_API_KEY=your_brevo_key
+   BREVO_FROM_EMAIL=noreply@yourdomain.com
+   APP_URL=https://your-deployment.com
    ```
 
-4. Start Development:
+3. Run Environment:
    ```bash
-   # Start Backend
-   npm run server:dev
-
-   # Start Frontend
-   npm run start:front
+   # Production-ready Server
+   node server.js
    ```
 
-## 📐 Architecture
+## 📐 Enterprise Architecture
 
-Utkristi Colabs uses a hybrid synchronization model:
-- **State Persistence**: Room metadata, chat history, and snippets are stored in the PostgreSQL database.
-- **Real-time Sync**: Operational transformations and cursor movements are handled via WebSockets for zero-lag interaction.
+RTM Studio uses a **Tri-Sync Topology**:
+1. **Keystroke Layer**: WebSockets handle OT-like synchronization for immediate feedback.
+2. **Persistence Layer**: All project artifacts are written to PostgreSQL on every significant change.
+3. **Media Layer**: Peer-to-peer WebRTC handles the heavy lifting of video conferencing, offloading server resources.
 
 ---
 
-Developed with ❤️ by [Utkristi.io](https://utkristi-io.netlify.app) & [utkarsh-1912](https://github.com/utkarsh-1912)
+Developed with ❤️ for the global developer community by **[Utkristi.io](https://utkristi-io.netlify.app)**
