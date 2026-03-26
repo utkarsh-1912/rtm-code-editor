@@ -118,10 +118,9 @@
         flex-direction: column;
     }
 
-    /* Full-screen Tool View for Mobile */
+    /* Full-screen Tool View for Mobile - accounts for header (50px) and bottom navbar (56px) */
     .workspace-content {
-        height: calc(100vh - 50px) !important;
-        /* Header only */
+        height: calc(100vh - 106px) !important;
         overflow: hidden;
     }
     

@@ -49,6 +49,63 @@ const fetchRelay = async (url, body, apiKey) => {
   return { status: res.status, body: resBody };
 };
 
+// Enterprise Email Template
+const getEmailTemplate = ({ title, message, ctaText, ctaUrl, inviterName }) => {
+  const logoUrl = "https://utkristi-colabs.onrender.com/utkristi-colabs.png";
+  return `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    body { font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f1f5f9; margin: 0; padding: 0; -webkit-font-smoothing: antialiased; }
+    .wrapper { width: 100%; table-layout: fixed; background-color: #f1f5f9; padding: 40px 0; }
+    .main { background-color: #ffffff; margin: 0 auto; width: 100%; max-width: 600px; border-radius: 16px; overflow: hidden; box-shadow: 0 20px 50px rgba(0,0,0,0.05); }
+    .header { padding: 40px; text-align: center; border-bottom: 1px solid #f1f5f9; }
+    .logo { height: 32px; width: auto; display: block; margin: 0 auto; }
+    .content { padding: 40px; color: #334155; line-height: 1.6; }
+    .title { font-size: 24px; font-weight: 800; color: #0f172a; margin: 0 0 16px; letter-spacing: -0.02em; }
+    .message { font-size: 16px; color: #475569; margin: 0 0 32px; }
+    .cta-container { text-align: center; margin: 40px 0 20px; }
+    .btn { display: inline-block; background-color: #2563eb; color: #ffffff !important; padding: 14px 32px; border-radius: 12px; text-decoration: none; font-weight: 700; font-size: 15px; box-shadow: 0 10px 15px -3px rgba(37, 99, 235, 0.3); }
+    .divider { height: 1px; background-color: #f1f5f9; margin: 40px 0; }
+    .footer { padding: 0 40px 40px; text-align: center; font-size: 12px; color: #94a3b8; }
+    .footer p { margin: 8px 0; }
+    .legal-links { color: #cbd5e1; margin-top: 24px; border-top: 1px solid #f1f5f9; padding-top: 24px; }
+    .unsubscribe { color: #2563eb; text-decoration: none; font-weight: 600; }
+  </style>
+</head>
+<body>
+  <div class="wrapper">
+    <div class="main">
+      <div class="header">
+        <img src="${logoUrl}" alt="Utkristi Colabs" class="logo">
+      </div>
+      <div class="content">
+        <h1 class="title">${title}</h1>
+        <p class="message">${message}</p>
+        <div class="cta-container">
+          <a href="${ctaUrl}" class="btn">${ctaText}</a>
+        </div>
+        <div class="divider"></div>
+        <p style="font-size: 13px; margin: 0;">Sent via <strong>Utkristi Colabs</strong> by ${inviterName || 'a teammate'}.</p>
+      </div>
+      <div class="footer">
+        <p>&copy; 2026 Utkristi Colabs. All rights reserved.</p>
+        <p>Enterprise Plaza, Digital District, Bangalore</p>
+        <div class="legal-links">
+          This is a mandatory system notification regarding your project workspace.
+          <br><br>
+          <a href="#" class="unsubscribe">Unsubscribe</a> from these alerts &middot; <a href="#" style="color: inherit; text-decoration: none;">Privacy Policy</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
+  `.trim();
+};
+
 // API Routes
 app.get("/api/ping", (req, res) => {
   res.json({ success: true, message: "pong" });
@@ -62,11 +119,19 @@ app.get("/api/test-email", async (req, res) => {
     const BREVO_KEY = process.env.BREVO_API_KEY;
     if (!BREVO_KEY) return res.status(500).json({ error: "BREVO_API_KEY not configured" });
 
+    const html = getEmailTemplate({
+      title: "Connection Verified",
+      message: "Your Brevo mailing relay is now successfully configured with the enterprise template. You can now invite collaborators to your projects.",
+      ctaText: "Go to Dashboard",
+      ctaUrl: process.env.APP_URL || "http://localhost:5000",
+      inviterName: "System Diagnostics"
+    });
+
     const result = await fetchRelay("https://api.brevo.com/v3/smtp/email", {
-      sender: { name: "Utkristi Colabs Test", email: process.env.BREVO_FROM_EMAIL || "noreply@rtm-edit.com" },
+      sender: { name: "Utkristi Colabs", email: process.env.BREVO_FROM_EMAIL || "noreply@rtm-edit.com" },
       to: [{ email }],
-      subject: "RTM Studio - Test Email",
-      htmlContent: "<h1>Brevo Relay Working!</h1><p>This is a test email from RTM Studio.</p>"
+      subject: "RTM Studio - Email Relay Active",
+      htmlContent: html
     }, BREVO_KEY);
 
     res.json({ success: true, brevoStatus: result.status, detail: result.body });
@@ -373,7 +438,14 @@ app.post("/api/projects/:id/invite", async (req, res) => {
 
     const appUrl = process.env.APP_URL || "http://localhost:3000";
     const acceptUrl = `${appUrl}/project/${req.params.id}?invite=1&email=${encodeURIComponent(email)}&role=${role || "member"}`;
-    const html = `<!DOCTYPE html><html><body style="background:#0d1117;color:#fff;padding:40px;font-family:sans-serif"><h1>Invite to ${projectName}</h1><p>${inviterName || 'A teammate'} invited you to join the project as ${role || 'collaborator'}</p><a href="${acceptUrl}" style="display:inline-block;padding:12px 24px;background:#3b82f6;color:#fff;text-decoration:none;border-radius:8px;font-weight:700">Join Project</a></body></html>`;
+    
+    const html = getEmailTemplate({
+      title: `Join ${projectName}`,
+      message: `${inviterName || 'A teammate'} has invited you to collaborate on the project <strong>${projectName}</strong> as a <strong>${role || 'collaborator'}</strong>. Click below to accept the invitation.`,
+      ctaText: "Accept Invitation",
+      ctaUrl: acceptUrl,
+      inviterName: inviterName
+    });
 
     const BREVO_KEY = process.env.BREVO_API_KEY;
     if (BREVO_KEY) {

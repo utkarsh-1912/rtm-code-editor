@@ -824,18 +824,20 @@ const ProjectPage = () => {
 
                 {/* Right Section: Unified Icon Tray & Actions */}
                 <div className="header-right">
-                    <div style={{ ...collaboratorAvatarsStyle, marginRight: '4px' }}>
-                        {clients.slice(0, 3).map((client, i) => (
-                            <div key={i} style={{ ...miniAvatarStyle, marginLeft: i > 0 ? '-8px' : '0' }} title={client.userName}>
-                                {(client.userName || 'U')[0]}
-                            </div>
-                        ))}
-                        {clients.length > 3 && (
-                            <div style={{ ...miniAvatarStyle, marginLeft: '-8px', backgroundColor: 'var(--bg-dark)', fontSize: '8px' }}>
-                                +{clients.length - 3}
-                            </div>
-                        )}
-                    </div>
+                    {!isMobile && (
+                        <div style={{ ...collaboratorAvatarsStyle, marginRight: '4px' }}>
+                            {clients.slice(0, 3).map((client, i) => (
+                                <div key={i} style={{ ...miniAvatarStyle, marginLeft: i > 0 ? '-8px' : '0' }} title={client.userName}>
+                                    {(client.userName || 'U')[0]}
+                                </div>
+                            ))}
+                            {clients.length > 3 && (
+                                <div style={{ ...miniAvatarStyle, marginLeft: '-8px', backgroundColor: 'var(--bg-dark)', fontSize: '8px' }}>
+                                    +{clients.length - 3}
+                                </div>
+                            )}
+                        </div>
+                    )}
 
                     {!isMobile && (
                         <div className="icon-tray">
@@ -931,13 +933,15 @@ const ProjectPage = () => {
                     )}
 
 
-                    <button className="share-button" style={{
-                        ...shareButtonStyle,
-                        padding: isMobile ? '8px' : '8px 16px',
-                        borderRadius: '8px'
-                    }} onClick={() => setShowInviteModal(true)}>
-                        <Users size={14} /> {!isMobile && <span>Invite</span>}
-                    </button>
+                    {!isMobile && (
+                        <button className="share-button" style={{
+                            ...shareButtonStyle,
+                            padding: '8px 16px',
+                            borderRadius: '8px'
+                        }} onClick={() => setShowInviteModal(true)}>
+                            <Users size={14} /> <span>Invite</span>
+                        </button>
+                    )}
                 </div>
             </header>
 
