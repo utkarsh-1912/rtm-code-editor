@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
-import { CheckCircle, XCircle, Mail, ArrowLeft, Loader2 } from 'lucide-react';
+import { XCircle, Mail, ArrowLeft, Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 const Unsubscribe = () => {

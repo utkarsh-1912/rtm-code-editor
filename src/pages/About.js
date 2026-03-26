@@ -3,14 +3,10 @@ import ContentLayout from "../components/ContentLayout";
 import { 
     Video, 
     Zap, 
-    Users, 
     Shield, 
-    Monitor, 
     Cpu, 
     Globe, 
     Lock,
-    MessageSquare,
-    Terminal,
     Layers
 } from "lucide-react";
 
