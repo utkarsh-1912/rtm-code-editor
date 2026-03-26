@@ -29,14 +29,6 @@ const Dashboard = () => {
     const [stats, setStats] = useState({ totalRooms: 0, sessions: 0, hours: 0 });
     const [searchTerm, setSearchTerm] = useState('');
 
-    // Carousel Items
-    const activityItems = React.useMemo(() => {
-        return [
-            ...projects.slice(0, 10).map(p => ({ ...p, type: 'project' })),
-            ...recentRooms.slice(0, 10).map(r => ({ ...r, type: 'room' }))
-        ].sort((a, b) => new Date(b.updatedAt || Date.now()) - new Date(a.updatedAt || Date.now()));
-    }, [projects, recentRooms]);
-
     // UI States
     const [showActionMenu, setShowActionMenu] = useState(null);
     const [showRenameModal, setShowRenameModal] = useState(null);
@@ -48,6 +40,14 @@ const Dashboard = () => {
     const [newProjectName, setNewProjectName] = useState('');
     const [newProjectDesc, setNewProjectDesc] = useState('');
     const [newProjectType, setNewProjectType] = useState('web');
+
+    // Carousel Items
+    const activityItems = React.useMemo(() => {
+        return [
+            ...projects.slice(0, 10).map(p => ({ ...p, type: 'project' })),
+            ...recentRooms.slice(0, 10).map(r => ({ ...r, type: 'room' }))
+        ].sort((a, b) => new Date(b.updatedAt || Date.now()) - new Date(a.updatedAt || Date.now()));
+    }, [projects, recentRooms]);
 
     // Refs for Carousel
     const carouselRef = React.useRef(null);
