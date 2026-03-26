@@ -56,6 +56,28 @@ app.get("/api/ping", (req, res) => {
   res.json({ success: true, message: "pong" });
 });
 
+app.get("/api/test-email", async (req, res) => {
+  try {
+    const { email } = req.query;
+    if (!email) return res.status(400).json({ error: "Missing email query parameter" });
+    
+    const BREVO_KEY = process.env.BREVO_API_KEY;
+    if (!BREVO_KEY) return res.status(500).json({ error: "BREVO_API_KEY not configured" });
+
+    const result = await fetchRelay("https://api.brevo.com/v3/smtp/email", {
+      sender: { name: "Utkristi Colabs Test", email: process.env.BREVO_FROM_EMAIL || "noreply@rtm-edit.com" },
+      to: [{ email }],
+      subject: "RTM Studio - Test Email",
+      htmlContent: "<h1>Brevo Relay Working!</h1><p>This is a test email from RTM Studio.</p>"
+    }, BREVO_KEY);
+
+    res.json({ success: true, brevoStatus: result.status, detail: result.body });
+  } catch (err) {
+    console.error("[TestEmail] Error:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.get("/api/user-dashboard", async (req, res) => {
   try {
     const { userId } = req.query;
@@ -174,7 +196,7 @@ app.post("/api/organizations/:id/members", async (req, res) => {
       const actionUrl = isNewUser ? `${appUrl}/signup` : `${appUrl}/snippets`;
       const actionText = isNewUser ? "Create Account & Join Team" : "View Team Vault";
       const html = `<!DOCTYPE html><html><head><style>body{background:#0d1117;font-family:sans-serif;color:#e2e8f0;margin:0;padding:40px 0}.wrap{max-width:560px;margin:0 auto;background:#161b22;border-radius:16px;overflow:hidden;border:1px solid #30363d}.header{background:linear-gradient(135deg,#1e293b 0%,#0f172a 100%);padding:36px;text-align:center;border-bottom:1px solid #30363d}.logo-text{font-size:26px;font-weight:900;color:#fff}.body{padding:36px}h1{font-size:22px;color:#f1f5f9;margin:0 0 10px;line-height:1.3}p{font-size:15px;color:#94a3b8;line-height:1.6;margin:0 0 16px}.cta{display:inline-block;padding:14px 24px;background:linear-gradient(135deg,#3b82f6,#2563eb);color:#fff;text-decoration:none;border-radius:10px;font-weight:700;margin:16px 0}</style></head><body><div class="wrap"><div class="header"><div class="logo-text">RTM<span style="color:#3b82f6">.</span>Edit</div></div><div class="body"><h1>${inviterName || 'A teammate'} invited you to join "${orgName || 'a Team Vault'}"</h1><p>You've been invited as a <strong>${role || 'member'}</strong> to collaborate on code snippets and components.</p>${isNewUser ? '<p>You don\'t have an account yet. Create one using this email, then let your team know you are ready to be added!</p>' : '<p>You have been successfully added. You can now access the team vault.</p>'}<a href="${actionUrl}" class="cta">${actionText}</a></div></div></body></html>`;
-      
+
       fetchRelay("https://api.brevo.com/v3/smtp/email", {
         sender: { name: "RTM.Edit", email: process.env.BREVO_FROM_EMAIL || "noreply@rtm-edit.com" },
         to: [{ email }],
@@ -354,11 +376,11 @@ app.post("/api/projects/:id/invite", async (req, res) => {
     const appUrl = process.env.APP_URL || "http://localhost:3000";
     const acceptUrl = `${appUrl}/project/${req.params.id}?invite=1&email=${encodeURIComponent(email)}&role=${role || "member"}`;
     const html = `<!DOCTYPE html><html><body style="background:#0d1117;color:#fff;padding:40px;font-family:sans-serif"><h1>Invite to ${projectName}</h1><p>${inviterName || 'A teammate'} invited you to join the project as ${role || 'collaborator'}</p><a href="${acceptUrl}" style="display:inline-block;padding:12px 24px;background:#3b82f6;color:#fff;text-decoration:none;border-radius:8px;font-weight:700">Join Project</a></body></html>`;
-    
+
     const BREVO_KEY = process.env.BREVO_API_KEY;
     if (BREVO_KEY) {
       fetchRelay("https://api.brevo.com/v3/smtp/email", {
-        sender: { name: "RTM Studio", email: process.env.BREVO_FROM_EMAIL || "noreply@rtm-edit.com" },
+        sender: { name: "Utkristi Colabs", email: process.env.BREVO_FROM_EMAIL || "noreply@rtm-edit.com" },
         to: [{ email }],
         subject: `${inviterName || 'A teammate'} invited you to ${projectName}`,
         htmlContent: html
@@ -400,7 +422,7 @@ io.on("connection", (socket) => {
     const finalUserName = userName || "Guest";
     userSocketMap[socket.id] = finalUserName;
     socket.join(roomId);
-    
+
     let dbRoom = await db.getRoom(roomId);
     if (dbRoom) {
       if (!roomChatHistory[roomId]) roomChatHistory[roomId] = dbRoom.chat_history || [];
@@ -439,7 +461,7 @@ io.on("connection", (socket) => {
 
   socket.on(ACTIONS.CODE_CHANGE, safeSocket(({ roomId, code }) => {
     socket.in(roomId).emit(ACTIONS.CODE_CHANGE, { code });
-    db.updateRoomCode(roomId, code).catch(() => {});
+    db.updateRoomCode(roomId, code).catch(() => { });
   }));
 
   socket.on(ACTIONS.SYNC_CODE, safeSocket(({ socketId, code }) => {
@@ -462,13 +484,13 @@ io.on("connection", (socket) => {
       if (roomId === socket.id) return;
       socket.in(roomId).emit(ACTIONS.DISCONNECTED, { socketId: socket.id, userName: userSocketMap[socket.id] || "Guest" });
       if (roomId.startsWith('project-')) socket.in(roomId).emit('user-left-video', { userId: socket.id });
-      
+
       const remaining = getAllClients(roomId);
       if (remaining.length <= 1) {
         delete roomChatHistory[roomId];
         db.isRoomGuest(roomId).then(isGuest => {
           if (isGuest && !roomId.startsWith('project-')) db.deleteRoomPermanently(roomId);
-        }).catch(() => {});
+        }).catch(() => { });
       }
     });
     delete userSocketMap[socket.id];
@@ -522,9 +544,9 @@ io.on("connection", (socket) => {
   // RTMP Streaming Handlers
   socket.on(ACTIONS.START_STREAMING, safeSocket(({ projectId, rtmpKey }) => {
     if (!rtmpKey) return;
-    
+
     console.log(`Starting RTMP stream for project ${projectId} to ${rtmpKey}`);
-    
+
     if (streamingProcesses[projectId]) {
       streamingProcesses[projectId].kill();
     }
@@ -532,7 +554,7 @@ io.on("connection", (socket) => {
     // FFmpeg command to transcode WebM/VP8 to H.264/AAC for RTMP
     const ffmpeg = spawn('ffmpeg', [
       '-i', '-', // Input from stdin
-      '-c:v', 'libx264', '-preset', 'veryfast', '-b:v', '3000k', 
+      '-c:v', 'libx264', '-preset', 'veryfast', '-b:v', '3000k',
       '-maxrate', '3000k', '-bufsize', '6000k',
       '-pix_fmt', 'yuv420p', '-g', '50',
       '-c:a', 'aac', '-b:a', '128k', '-ar', '44100',
