@@ -479,10 +479,10 @@ const ProjectPage = () => {
             else if (file.name === 'style.css') defaultContent = 'body {\n  background-color: #f0f0f0;\n  font-family: sans-serif;\n}';
             else if (file.name === 'script.js') defaultContent = 'console.log("Hello from script.js");';
         } else if (type === "cpp") {
-            if (file.name === 'main.cpp') defaultContent = '#include <iostream>\n\nint main() {\n    std::cout << "Hello RTM Studio!" << std::endl;\n    return 0;\n}';
+            if (file.name === 'main.cpp') defaultContent = '#include <iostream>\n\nint main() {\n    std::cout << "Hello Utkristi Colabs!" << std::endl;\n    return 0;\n}';
             else if (file.name === 'utils.h') defaultContent = '// Utility functions\n#ifndef UTILS_H\n#define UTILS_H\n\nvoid greet();\n\n#endif';
         } else if (type === "python") {
-            if (file.name === 'main.py') defaultContent = 'def main():\n    print("Hello from RTM Studio!")\n\nif __name__ == "__main__":\n    main()';
+            if (file.name === 'main.py') defaultContent = 'def main():\n    print("Hello from Utkristi Colabs!")\n\nif __name__ == "__main__":\n    main()';
         } else if (type === "java") {
             if (file.name === 'Main.java') defaultContent = 'public class Main {\n    public static void main(String[] args) {\n        System.out.println("Hello from Java!");\n    }\n}';
         }
@@ -791,15 +791,15 @@ const ProjectPage = () => {
 
                 {isMobile && (
                     <div style={{ display: 'flex', gap: '8px', marginRight: '8px' }}>
-                        <button 
-                            className="tray-btn" 
-                            onClick={() => setShowWhiteboard(true)} 
+                        <button
+                            className="tray-btn"
+                            onClick={() => setShowWhiteboard(true)}
                             style={{ width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '8px', backgroundColor: 'rgba(255,255,255,0.05)', border: 'none', color: 'white' }}
                         >
                             <Palette size={16} />
                         </button>
-                        <button 
-                            className="tray-btn" 
+                        <button
+                            className="tray-btn"
                             onClick={toggleTheme}
                             style={{ width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '8px', backgroundColor: 'rgba(255,255,255,0.05)', border: 'none', color: 'white' }}
                         >
@@ -1033,7 +1033,7 @@ const ProjectPage = () => {
                                                     ) : (
                                                         <div style={{
                                                             width: '38px', height: '38px', borderRadius: '50%',
-                                                            background: `linear-gradient(135deg, hsl(${( (client.userName?.[0]?.charCodeAt(0) || i || 0) * 47) % 360}, 70%, 45%), hsl(${( (client.userName?.[0]?.charCodeAt(0) || i || 0) * 47 + 60) % 360}, 70%, 35%))`,
+                                                            background: `linear-gradient(135deg, hsl(${((client.userName?.[0]?.charCodeAt(0) || i || 0) * 47) % 360}, 70%, 45%), hsl(${((client.userName?.[0]?.charCodeAt(0) || i || 0) * 47 + 60) % 360}, 70%, 35%))`,
                                                             display: 'flex', alignItems: 'center', justifyContent: 'center',
                                                             fontSize: '15px', fontWeight: '800', color: 'white', flexShrink: 0
                                                         }}>
@@ -1072,245 +1072,264 @@ const ProjectPage = () => {
                                 )}
                             </div>
                         </div>
-                        ) : (
-                            <div style={{ flex: 1, height: '100%', display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
-                                {sidebarTab === 'video' ? (
-                                    <VideoChat
-                                        socketRef={socketRef}
-                                        projectId={projectId}
-                                        user={user || { name: socketRef.current?.userName || "Guest", isGuest: true }}
-                                        isMinimized={false}
-                                        onMinimizeToggle={(v) => { 
-                                            if (v) setSidebarTab('files'); 
-                                            setIsMeetingMinimized(v); 
-                                        }}
-                                        externalInCall={isMeetingStarting}
-                                        onCallStateChange={setIsMeetingStarting}
-                                        clients={clients}
-                                        mediaStates={mediaStates}
-                                        initialAudioState={initialAudio}
-                                        initialVideoState={initialVideo}
-                                    />
-                                ) : (
-                                    <ReflexContainer orientation="vertical" style={{ flex: 1, height: '100%', minHeight: 0 }}>
-                                        {!isMobile && isSidebarVisible && ['files', 'chat', 'users'].includes(sidebarTab) && (
-                                            <ReflexElement flex={0.2} minSize={250} style={{ height: '100%', minHeight: 0, backgroundColor: 'var(--bg-card)', borderRight: '1px solid var(--border-color)' }}>
-                                                <div style={{ height: '100%', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
-                                                    <div style={sidebarHeaderStyle}>
-                                                        <span style={{ fontSize: '10px', fontWeight: '800', letterSpacing: '0.1em', color: 'var(--primary)', textTransform: 'uppercase' }}>
-                                                            {sidebarTab === 'chat' ? 'Messages' : sidebarTab === 'users' ? 'Team' : sidebarTab}
-                                                        </span>
-                                                        {sidebarTab === 'files' && (
-                                                            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                                                                <label style={{ cursor: 'pointer', opacity: 0.6 }} title="Import File">
-                                                                    <FileText size={14} />
-                                                                    <input type="file" style={{ display: 'none' }} onChange={handleImportFile} />
-                                                                </label>
-                                                                <Plus size={14} style={{ cursor: 'pointer', opacity: 0.6 }} onClick={handleAddFile} title="New File" />
-                                                            </div>
-                                                        )}
-                                                    </div>
-
-                                                    <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
-                                                        {sidebarTab === 'files' && (
-                                                            <div style={{ padding: '8px' }}>
-                                                                {files.map(file => {
-                                                                    const editingUsers = Object.values(remoteCursors).filter(c => c.fileId === file.id);
-                                                                    return (
-                                                                        <div
-                                                                            key={file.id}
-                                                                            onClick={() => handleFileClick(file)}
-                                                                            style={fileItemStyle(activeFile?.id === file.id)}
-                                                                            className="file-item-hover"
-                                                                        >
-                                                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1 }}>
-                                                                                <FileCode size={13} opacity={0.6} color={activeFile?.id === file.id ? 'var(--primary)' : 'inherit'} />
-                                                                                <span style={{ fontSize: '12px', fontWeight: activeFile?.id === file.id ? '700' : '500' }}>{file.name}</span>
-                                                                            </div>
-                                                                            <div style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
-                                                                                {editingUsers.map((u, idx) => (
-                                                                                    <div key={idx} title={`${u.userName} is editing`} style={{
-                                                                                        width: '16px', height: '16px', borderRadius: '50%',
-                                                                                        backgroundColor: `hsl(${( (u.userName?.charCodeAt(0) || 0) * 47) % 360}, 70%, 50%)`,
-                                                                                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                                                                        fontSize: '8px', fontWeight: '700', color: 'white',
-                                                                                        border: '1px solid var(--bg-card)'
-                                                                                    }}>
-                                                                                        {u.userName?.[0]?.toUpperCase() || '?'}
-                                                                                    </div>
-                                                                                ))}
-                                                                                <div style={{ display: 'flex', gap: '4px', opacity: 0, transition: 'opacity 0.2s' }} className="file-actions">
-                                                                                    <RotateCcw
-                                                                                        size={12}
-                                                                                        style={{ cursor: 'pointer', color: 'var(--text-muted)' }}
-                                                                                        onClick={(e) => { e.stopPropagation(); handleResetFile(file); }}
-                                                                                        title="Reset to Default"
-                                                                                    />
-                                                                                    <Trash2
-                                                                                        size={12}
-                                                                                        style={{ cursor: 'pointer', color: '#f87171' }}
-                                                                                        onClick={(e) => handleDeleteFile(e, file)}
-                                                                                    />
-                                                                                </div>
-                                                                            </div>
-                                                                        </div>
-                                                                    );
-                                                                })}
-                                                            </div>
-                                                        )}
-
-                                                        {sidebarTab === 'chat' && (
-                                                            <ChatWindow
-                                                                socketRef={socketRef}
-                                                                roomId={`project-${projectId}`}
-                                                                userName={user?.name || socketRef.current?.userName || 'Guest'}
-                                                                isLightMode={isLightMode}
-                                                                isMobile={isMobile}
-                                                                messages={messages}
-                                                                setMessages={setMessages}
-                                                            />
-                                                        )}
-
-                                                        {sidebarTab === 'users' && (
-                                                            <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                                                                {clients.map((client, i) => {
-                                                                    const isMe = client.socketId === socketRef.current?.id;
-                                                                    const isCreator = project?.created_by && (client.userId === project.created_by || i === 0);
-                                                                    const isGuest = !client.userName || client.userName === 'Guest' || client.isGuest;
-                                                                    const role = isCreator ? 'Admin' : isGuest ? 'Guest' : 'Member';
-                                                                    const roleBgColor = isCreator ? 'rgba(251,191,36,0.15)' : isGuest ? 'rgba(148,163,184,0.15)' : 'rgba(99,102,241,0.15)';
-                                                                    const roleColor = isCreator ? '#fbbf24' : isGuest ? '#94a3b8' : 'var(--primary)';
-
-                                                                    return (
-                                                                        <div key={client.socketId} style={{
-                                                                            display: 'flex', alignItems: 'center', gap: '12px',
-                                                                            padding: '10px 12px', borderRadius: '10px',
-                                                                            backgroundColor: 'var(--bg-card)',
-                                                                            border: isMe ? '1px solid var(--primary)' : '1px solid var(--border-color)',
-                                                                            transition: 'all 0.2s'
-                                                                        }}>
-                                                                            {isMe && user?.photoURL ? (
-                                                                                <img src={user.photoURL} alt="avatar" style={{ width: '36px', height: '36px', borderRadius: '50%', objectFit: 'cover', border: '2px solid var(--primary)' }} />
-                                                                            ) : (
-                                                                                <div style={{
-                                                                                    width: '36px', height: '36px', borderRadius: '50%',
-                                                                                    background: `linear-gradient(135deg, hsl(${( (client.userName?.[0]?.charCodeAt(0) || i || 0) * 47) % 360}, 70%, 45%), hsl(${( (client.userName?.[0]?.charCodeAt(0) || i || 0) * 47 + 60) % 360}, 70%, 35%))`,
-                                                                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                                                                    fontSize: '14px', fontWeight: '800', color: 'white',
-                                                                                    border: isMe ? '2px solid var(--primary)' : '2px solid var(--border-color)',
-                                                                                    flexShrink: 0
-                                                                                }}>
-                                                                                    {client.userName?.[0]?.toUpperCase() || '?'}
-                                                                                </div>
-                                                                            )}
-
-                                                                            <div style={{ flex: 1, minWidth: 0 }}>
-                                                                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '3px' }}>
-                                                                                    <span style={{ fontSize: '13px', fontWeight: '700', color: 'var(--text-main)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                                                                        {client.userName} {isMe && <span style={{ opacity: 0.5, fontWeight: '400', fontSize: '11px' }}>(you)</span>}
-                                                                                    </span>
-                                                                                </div>
-                                                                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                                                                    <span style={{ fontSize: '9px', fontWeight: '800', backgroundColor: roleBgColor, color: roleColor, padding: '2px 6px', borderRadius: '4px', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
-                                                                                        {role}
-                                                                                    </span>
-                                                                                </div>
-                                                                            </div>
-                                                                            <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#10b981', boxShadow: '0 0 6px rgba(16,185,129,0.5)', flexShrink: 0 }} />
-                                                                        </div>
-                                                                    );
-                                                                })}
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                </div>
-                                            </ReflexElement>
-                                        )}
-
-                                        {isSidebarVisible && ['files', 'chat', 'users'].includes(sidebarTab) && <ReflexSplitter style={splitterStyle} />}
-
-                                        <ReflexElement flex={isSidebarVisible && ['files', 'chat', 'users'].includes(sidebarTab) ? 0.8 : 1} minSize={400} style={{ height: '100%' }}>
-                                            <div style={{ height: '100%', display: 'flex', flexDirection: 'column', backgroundColor: '#0d1117' }}>
-                                                <div style={studioTabContainerStyle}>
-                                                    {openFiles.map(file => (
-                                                        <div key={file.id} onClick={() => handleFileClick(file)} style={studioTabStyle(activeFile?.id === file.id, isLightMode)}>
-                                                            <FileText size={12} opacity={0.7} />
-                                                            <span>{file.name}</span>
-                                                            <button style={closeTabStyle} onClick={(e) => handleCloseTab(e, file.id)}><X size={10} /></button>
+                    ) : (
+                        <div style={{ flex: 1, height: '100%', display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
+                            {sidebarTab === 'video' ? (
+                                <VideoChat
+                                    socketRef={socketRef}
+                                    projectId={projectId}
+                                    user={user || { name: socketRef.current?.userName || "Guest", isGuest: true }}
+                                    isMinimized={false}
+                                    onMinimizeToggle={(v) => {
+                                        if (v) setSidebarTab('files');
+                                        setIsMeetingMinimized(v);
+                                    }}
+                                    externalInCall={isMeetingStarting}
+                                    onCallStateChange={setIsMeetingStarting}
+                                    clients={clients}
+                                    mediaStates={mediaStates}
+                                    initialAudioState={initialAudio}
+                                    initialVideoState={initialVideo}
+                                />
+                            ) : (
+                                <ReflexContainer orientation="vertical" style={{ flex: 1, height: '100%', minHeight: 0 }}>
+                                    {!isMobile && isSidebarVisible && ['files', 'chat', 'users'].includes(sidebarTab) && (
+                                        <ReflexElement flex={0.2} minSize={250} style={{ height: '100%', minHeight: 0, backgroundColor: 'var(--bg-card)', borderRight: '1px solid var(--border-color)' }}>
+                                            <div style={{ height: '100%', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+                                                <div style={sidebarHeaderStyle}>
+                                                    <span style={{ fontSize: '10px', fontWeight: '800', letterSpacing: '0.1em', color: 'var(--primary)', textTransform: 'uppercase' }}>
+                                                        {sidebarTab === 'chat' ? 'Messages' : sidebarTab === 'users' ? 'Team' : sidebarTab}
+                                                    </span>
+                                                    {sidebarTab === 'files' && (
+                                                        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                                            <label style={{ cursor: 'pointer', opacity: 0.6 }} title="Import File">
+                                                                <FileText size={14} />
+                                                                <input type="file" style={{ display: 'none' }} onChange={handleImportFile} />
+                                                            </label>
+                                                            <Plus size={14} style={{ cursor: 'pointer', opacity: 0.6 }} onClick={handleAddFile} title="New File" />
                                                         </div>
-                                                    ))}
-                                                    {openFiles.length === 0 && <div style={{ height: '36px' }} />}
+                                                    )}
                                                 </div>
-                                                <div style={{ flex: 1, position: 'relative', display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
-                                                    <ReflexContainer orientation="horizontal" style={{ flex: 1, minHeight: 0 }}>
-                                                        <ReflexElement flex={isOutputVisible ? 0.6 : 1} minSize={120} style={{ overflow: 'hidden' }}>
-                                                            {activeFile ? (
-                                                                <div style={{ height: '100%', width: '100%', overflow: 'hidden' }}>
-                                                                    <ProjectEditor
-                                                                        key={activeFile.id}
-                                                                        socketRef={socketRef}
-                                                                        roomId={`project-${projectId}`}
-                                                                        fileId={activeFile.id}
-                                                                        onCodeChange={handleSaveFile}
-                                                                        code={activeFile.content}
-                                                                        filename={activeFile.name}
-                                                                        language={activeFile.name.split('.').pop()}
-                                                                        settings={settings}
-                                                                        userName={user?.name || socketRef.current?.userName}
-                                                                        isLightMode={isLightMode}
-                                                                        userInput={userInput}
-                                                                        setUserInput={setUserInput}
-                                                                    />
-                                                                </div>
-                                                            ) : (
-                                                                <div style={emptyEditorStyle}>
-                                                                    <Terminal size={48} style={{ opacity: 0.05, marginBottom: '20px' }} />
-                                                                    <p style={{ color: 'var(--text-muted)', fontSize: '12px', fontWeight: '600', letterSpacing: '0.1em' }}>SELECT A MODULE TO BEGIN</p>
-                                                                </div>
-                                                            )}
-                                                        </ReflexElement>
 
-                                                        {isOutputVisible && (
-                                                            <ReflexSplitter style={{
-                                                                ...splitterStyle,
-                                                                height: '6px',
-                                                                width: '100%',
-                                                                cursor: 'row-resize',
-                                                                backgroundColor: 'var(--border-color)',
-                                                                borderTop: '1px solid rgba(255,255,255,0.04)',
-                                                                borderBottom: '1px solid rgba(255,255,255,0.04)',
-                                                                transition: 'background-color 0.15s',
-                                                            }} />
-                                                        )}
-
-                                                        {isOutputVisible && (
-                                                            <ReflexElement flex={0.4} minSize={80} style={{ overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-                                                                <div style={{ ...outputPaneStyle, flex: 1, height: '100%' }}>
-                                                                    <div style={outputHeaderStyle}>
-                                                                        <span>{project?.type === 'web' ? 'LIVE PREVIEW' : (showPreview ? 'Live Preview' : 'Terminal Output')}</span>
-                                                                        <button style={{ background: 'none', border: 'none', color: 'white', cursor: 'pointer' }} onClick={() => { setIsOutputVisible(false); setShowPreview(false); }}>
-                                                                            <X size={14} />
-                                                                        </button>
+                                                <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+                                                    {sidebarTab === 'files' && (
+                                                        <div style={{ padding: '8px' }}>
+                                                            {files.map(file => {
+                                                                const editingUsers = Object.values(remoteCursors).filter(c => c.fileId === file.id);
+                                                                return (
+                                                                    <div
+                                                                        key={file.id}
+                                                                        onClick={() => handleFileClick(file)}
+                                                                        style={fileItemStyle(activeFile?.id === file.id)}
+                                                                        className="file-item-hover"
+                                                                    >
+                                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1 }}>
+                                                                            <FileCode size={13} opacity={0.6} color={activeFile?.id === file.id ? 'var(--primary)' : 'inherit'} />
+                                                                            <span style={{ fontSize: '12px', fontWeight: activeFile?.id === file.id ? '700' : '500' }}>{file.name}</span>
+                                                                        </div>
+                                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
+                                                                            {editingUsers.map((u, idx) => (
+                                                                                <div key={idx} title={`${u.userName} is editing`} style={{
+                                                                                    width: '16px', height: '16px', borderRadius: '50%',
+                                                                                    backgroundColor: `hsl(${((u.userName?.charCodeAt(0) || 0) * 47) % 360}, 70%, 50%)`,
+                                                                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                                                                    fontSize: '8px', fontWeight: '700', color: 'white',
+                                                                                    border: '1px solid var(--bg-card)'
+                                                                                }}>
+                                                                                    {u.userName?.[0]?.toUpperCase() || '?'}
+                                                                                </div>
+                                                                            ))}
+                                                                            <div style={{ display: 'flex', gap: '4px', opacity: 0, transition: 'opacity 0.2s' }} className="file-actions">
+                                                                                <RotateCcw
+                                                                                    size={12}
+                                                                                    style={{ cursor: 'pointer', color: 'var(--text-muted)' }}
+                                                                                    onClick={(e) => { e.stopPropagation(); handleResetFile(file); }}
+                                                                                    title="Reset to Default"
+                                                                                />
+                                                                                <Trash2
+                                                                                    size={12}
+                                                                                    style={{ cursor: 'pointer', color: '#f87171' }}
+                                                                                    onClick={(e) => handleDeleteFile(e, file)}
+                                                                                />
+                                                                            </div>
+                                                                        </div>
                                                                     </div>
-                                                                    <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: isMobile ? 'column' : 'row' }}>
-                                                                        {showPreview ? (
-                                                                            <iframe
-                                                                                title="Preview"
-                                                                                style={{ width: '100%', height: '100%', border: 'none', background: 'white' }}
-                                                                                srcDoc={generatePreviewDoc()}
-                                                                            />
+                                                                );
+                                                            })}
+                                                        </div>
+                                                    )}
+
+                                                    {sidebarTab === 'chat' && (
+                                                        <ChatWindow
+                                                            socketRef={socketRef}
+                                                            roomId={`project-${projectId}`}
+                                                            userName={user?.name || socketRef.current?.userName || 'Guest'}
+                                                            isLightMode={isLightMode}
+                                                            isMobile={isMobile}
+                                                            messages={messages}
+                                                            setMessages={setMessages}
+                                                        />
+                                                    )}
+
+                                                    {sidebarTab === 'users' && (
+                                                        <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                                                            {clients.map((client, i) => {
+                                                                const isMe = client.socketId === socketRef.current?.id;
+                                                                const isCreator = project?.created_by && (client.userId === project.created_by || i === 0);
+                                                                const isGuest = !client.userName || client.userName === 'Guest' || client.isGuest;
+                                                                const role = isCreator ? 'Admin' : isGuest ? 'Guest' : 'Member';
+                                                                const roleBgColor = isCreator ? 'rgba(251,191,36,0.15)' : isGuest ? 'rgba(148,163,184,0.15)' : 'rgba(99,102,241,0.15)';
+                                                                const roleColor = isCreator ? '#fbbf24' : isGuest ? '#94a3b8' : 'var(--primary)';
+
+                                                                return (
+                                                                    <div key={client.socketId} style={{
+                                                                        display: 'flex', alignItems: 'center', gap: '12px',
+                                                                        padding: '10px 12px', borderRadius: '10px',
+                                                                        backgroundColor: 'var(--bg-card)',
+                                                                        border: isMe ? '1px solid var(--primary)' : '1px solid var(--border-color)',
+                                                                        transition: 'all 0.2s'
+                                                                    }}>
+                                                                        {isMe && user?.photoURL ? (
+                                                                            <img src={user.photoURL} alt="avatar" style={{ width: '36px', height: '36px', borderRadius: '50%', objectFit: 'cover', border: '2px solid var(--primary)' }} />
                                                                         ) : (
-                                                                            <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-                                                                                <div style={{ display: 'flex', backgroundColor: 'rgba(255,255,255,0.02)', borderBottom: '1px solid var(--border-color)', height: '28px' }}>
+                                                                            <div style={{
+                                                                                width: '36px', height: '36px', borderRadius: '50%',
+                                                                                background: `linear-gradient(135deg, hsl(${((client.userName?.[0]?.charCodeAt(0) || i || 0) * 47) % 360}, 70%, 45%), hsl(${((client.userName?.[0]?.charCodeAt(0) || i || 0) * 47 + 60) % 360}, 70%, 35%))`,
+                                                                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                                                                fontSize: '14px', fontWeight: '800', color: 'white',
+                                                                                border: isMe ? '2px solid var(--primary)' : '2px solid var(--border-color)',
+                                                                                flexShrink: 0
+                                                                            }}>
+                                                                                {client.userName?.[0]?.toUpperCase() || '?'}
+                                                                            </div>
+                                                                        )}
+
+                                                                        <div style={{ flex: 1, minWidth: 0 }}>
+                                                                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '3px' }}>
+                                                                                <span style={{ fontSize: '13px', fontWeight: '700', color: 'var(--text-main)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                                                                    {client.userName} {isMe && <span style={{ opacity: 0.5, fontWeight: '400', fontSize: '11px' }}>(you)</span>}
+                                                                                </span>
+                                                                            </div>
+                                                                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                                                <span style={{ fontSize: '9px', fontWeight: '800', backgroundColor: roleBgColor, color: roleColor, padding: '2px 6px', borderRadius: '4px', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+                                                                                    {role}
+                                                                                </span>
+                                                                            </div>
+                                                                        </div>
+                                                                        <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#10b981', boxShadow: '0 0 6px rgba(16,185,129,0.5)', flexShrink: 0 }} />
+                                                                    </div>
+                                                                );
+                                                            })}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </ReflexElement>
+                                    )}
+
+                                    {isSidebarVisible && ['files', 'chat', 'users'].includes(sidebarTab) && <ReflexSplitter style={splitterStyle} />}
+
+                                    <ReflexElement flex={isSidebarVisible && ['files', 'chat', 'users'].includes(sidebarTab) ? 0.8 : 1} minSize={400} style={{ height: '100%' }}>
+                                        <div style={{ height: '100%', display: 'flex', flexDirection: 'column', backgroundColor: '#0d1117' }}>
+                                            <div style={studioTabContainerStyle}>
+                                                {openFiles.map(file => (
+                                                    <div key={file.id} onClick={() => handleFileClick(file)} style={studioTabStyle(activeFile?.id === file.id, isLightMode)}>
+                                                        <FileText size={12} opacity={0.7} />
+                                                        <span>{file.name}</span>
+                                                        <button style={closeTabStyle} onClick={(e) => handleCloseTab(e, file.id)}><X size={10} /></button>
+                                                    </div>
+                                                ))}
+                                                {openFiles.length === 0 && <div style={{ height: '36px' }} />}
+                                            </div>
+                                            <div style={{ flex: 1, position: 'relative', display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
+                                                <ReflexContainer orientation="horizontal" style={{ flex: 1, minHeight: 0 }}>
+                                                    <ReflexElement flex={isOutputVisible ? 0.6 : 1} minSize={120} style={{ overflow: 'hidden' }}>
+                                                        {activeFile ? (
+                                                            <div style={{ height: '100%', width: '100%', overflow: 'hidden' }}>
+                                                                <ProjectEditor
+                                                                    key={activeFile.id}
+                                                                    socketRef={socketRef}
+                                                                    roomId={`project-${projectId}`}
+                                                                    fileId={activeFile.id}
+                                                                    onCodeChange={handleSaveFile}
+                                                                    code={activeFile.content}
+                                                                    filename={activeFile.name}
+                                                                    language={activeFile.name.split('.').pop()}
+                                                                    settings={settings}
+                                                                    userName={user?.name || socketRef.current?.userName}
+                                                                    isLightMode={isLightMode}
+                                                                    userInput={userInput}
+                                                                    setUserInput={setUserInput}
+                                                                />
+                                                            </div>
+                                                        ) : (
+                                                            <div style={emptyEditorStyle}>
+                                                                <Terminal size={48} style={{ opacity: 0.05, marginBottom: '20px' }} />
+                                                                <p style={{ color: 'var(--text-muted)', fontSize: '12px', fontWeight: '600', letterSpacing: '0.1em' }}>SELECT A MODULE TO BEGIN</p>
+                                                            </div>
+                                                        )}
+                                                    </ReflexElement>
+
+                                                    {isOutputVisible && (
+                                                        <ReflexSplitter style={{
+                                                            ...splitterStyle,
+                                                            height: '6px',
+                                                            width: '100%',
+                                                            cursor: 'row-resize',
+                                                            backgroundColor: 'var(--border-color)',
+                                                            borderTop: '1px solid rgba(255,255,255,0.04)',
+                                                            borderBottom: '1px solid rgba(255,255,255,0.04)',
+                                                            transition: 'background-color 0.15s',
+                                                        }} />
+                                                    )}
+
+                                                    {isOutputVisible && (
+                                                        <ReflexElement flex={0.4} minSize={80} style={{ overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+                                                            <div style={{ ...outputPaneStyle, flex: 1, height: '100%' }}>
+                                                                <div style={outputHeaderStyle}>
+                                                                    <span>{project?.type === 'web' ? 'LIVE PREVIEW' : (showPreview ? 'Live Preview' : 'Terminal Output')}</span>
+                                                                    <button style={{ background: 'none', border: 'none', color: 'white', cursor: 'pointer' }} onClick={() => { setIsOutputVisible(false); setShowPreview(false); }}>
+                                                                        <X size={14} />
+                                                                    </button>
+                                                                </div>
+                                                                <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: isMobile ? 'column' : 'row' }}>
+                                                                    {showPreview ? (
+                                                                        <iframe
+                                                                            title="Preview"
+                                                                            style={{ width: '100%', height: '100%', border: 'none', background: 'white' }}
+                                                                            srcDoc={generatePreviewDoc()}
+                                                                        />
+                                                                    ) : (
+                                                                        <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+                                                                            <div style={{ display: 'flex', backgroundColor: 'rgba(255,255,255,0.02)', borderBottom: '1px solid var(--border-color)', height: '28px' }}>
+                                                                                <button
+                                                                                    onClick={() => setTerminalTab('output')}
+                                                                                    style={{
+                                                                                        padding: '0 16px',
+                                                                                        height: '100%',
+                                                                                        backgroundColor: terminalTab === 'output' ? 'rgba(255,255,255,0.05)' : 'transparent',
+                                                                                        border: 'none',
+                                                                                        borderBottom: terminalTab === 'output' ? '2px solid var(--primary)' : 'none',
+                                                                                        color: terminalTab === 'output' ? 'var(--primary)' : 'var(--text-muted)',
+                                                                                        fontSize: '9px',
+                                                                                        fontWeight: '800',
+                                                                                        cursor: 'pointer',
+                                                                                        textTransform: 'uppercase',
+                                                                                        letterSpacing: '0.05em'
+                                                                                    }}
+                                                                                >
+                                                                                    OUTPUT
+                                                                                </button>
+                                                                                {project?.type !== 'web' && (
                                                                                     <button
-                                                                                        onClick={() => setTerminalTab('output')}
+                                                                                        onClick={() => setTerminalTab('input')}
                                                                                         style={{
                                                                                             padding: '0 16px',
                                                                                             height: '100%',
-                                                                                            backgroundColor: terminalTab === 'output' ? 'rgba(255,255,255,0.05)' : 'transparent',
+                                                                                            backgroundColor: terminalTab === 'input' ? 'rgba(255,255,255,0.05)' : 'transparent',
                                                                                             border: 'none',
-                                                                                            borderBottom: terminalTab === 'output' ? '2px solid var(--primary)' : 'none',
-                                                                                            color: terminalTab === 'output' ? 'var(--primary)' : 'var(--text-muted)',
+                                                                                            borderBottom: terminalTab === 'input' ? '2px solid var(--primary)' : 'none',
+                                                                                            color: terminalTab === 'input' ? 'var(--primary)' : 'var(--text-muted)',
                                                                                             fontSize: '9px',
                                                                                             fontWeight: '800',
                                                                                             cursor: 'pointer',
@@ -1318,67 +1337,48 @@ const ProjectPage = () => {
                                                                                             letterSpacing: '0.05em'
                                                                                         }}
                                                                                     >
-                                                                                        OUTPUT
+                                                                                        INPUT (STDIN)
                                                                                     </button>
-                                                                                    {project?.type !== 'web' && (
-                                                                                        <button
-                                                                                            onClick={() => setTerminalTab('input')}
-                                                                                            style={{
-                                                                                                padding: '0 16px',
-                                                                                                height: '100%',
-                                                                                                backgroundColor: terminalTab === 'input' ? 'rgba(255,255,255,0.05)' : 'transparent',
-                                                                                                border: 'none',
-                                                                                                borderBottom: terminalTab === 'input' ? '2px solid var(--primary)' : 'none',
-                                                                                                color: terminalTab === 'input' ? 'var(--primary)' : 'var(--text-muted)',
-                                                                                                fontSize: '9px',
-                                                                                                fontWeight: '800',
-                                                                                                cursor: 'pointer',
-                                                                                                textTransform: 'uppercase',
-                                                                                                letterSpacing: '0.05em'
-                                                                                            }}
-                                                                                        >
-                                                                                            INPUT (STDIN)
-                                                                                        </button>
-                                                                                    )}
-                                                                                </div>
-                                                                                <div style={{ flex: 1, overflow: 'auto', position: 'relative' }}>
-                                                                                    {terminalTab === 'output' ? (
-                                                                                        <pre style={outputTextStyle}>{output}</pre>
-                                                                                    ) : (
-                                                                                        <textarea
-                                                                                            value={userInput}
-                                                                                            onChange={(e) => setUserInput(e.target.value)}
-                                                                                            placeholder="Enter program input here..."
-                                                                                            style={{
-                                                                                                width: '100%',
-                                                                                                height: '100%',
-                                                                                                backgroundColor: 'transparent',
-                                                                                                border: 'none',
-                                                                                                color: '#d1d5db',
-                                                                                                padding: '12px',
-                                                                                                fontSize: '12px',
-                                                                                                fontFamily: 'monospace',
-                                                                                                outline: 'none',
-                                                                                                resize: 'none',
-                                                                                                display: 'block'
-                                                                                            }}
-                                                                                        />
-                                                                                    )}
-                                                                                </div>
+                                                                                )}
                                                                             </div>
-                                                                        )}
-                                                                    </div>
+                                                                            <div style={{ flex: 1, overflow: 'auto', position: 'relative' }}>
+                                                                                {terminalTab === 'output' ? (
+                                                                                    <pre style={outputTextStyle}>{output}</pre>
+                                                                                ) : (
+                                                                                    <textarea
+                                                                                        value={userInput}
+                                                                                        onChange={(e) => setUserInput(e.target.value)}
+                                                                                        placeholder="Enter program input here..."
+                                                                                        style={{
+                                                                                            width: '100%',
+                                                                                            height: '100%',
+                                                                                            backgroundColor: 'transparent',
+                                                                                            border: 'none',
+                                                                                            color: '#d1d5db',
+                                                                                            padding: '12px',
+                                                                                            fontSize: '12px',
+                                                                                            fontFamily: 'monospace',
+                                                                                            outline: 'none',
+                                                                                            resize: 'none',
+                                                                                            display: 'block'
+                                                                                        }}
+                                                                                    />
+                                                                                )}
+                                                                            </div>
+                                                                        </div>
+                                                                    )}
                                                                 </div>
-                                                            </ReflexElement>
-                                                        )}
-                                                    </ReflexContainer>
-                                                </div>
+                                                            </div>
+                                                        </ReflexElement>
+                                                    )}
+                                                </ReflexContainer>
                                             </div>
-                                        </ReflexElement>
-                                    </ReflexContainer>
-                                )}
-                            </div>
-                        )
+                                        </div>
+                                    </ReflexElement>
+                                </ReflexContainer>
+                            )}
+                        </div>
+                    )
                     }
                 </div>
 
@@ -1387,30 +1387,30 @@ const ProjectPage = () => {
                         <div style={{ ...modalContentStyle, maxWidth: '600px', padding: '30px' }}>
                             <h2 style={{ fontSize: '24px', fontWeight: '800', marginBottom: '8px', color: 'white' }}>Join Studio</h2>
                             <p style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: '24px' }}>Configure your media before entering.</p>
-                            
+
                             <div style={{ display: 'flex', gap: '24px', flexDirection: isMobile ? 'column' : 'row' }}>
                                 {/* Media Preview Column */}
                                 <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                                    <div style={{ 
-                                        width: '100%', aspectRatio: '16/9', backgroundColor: '#000', 
+                                    <div style={{
+                                        width: '100%', aspectRatio: '16/9', backgroundColor: '#000',
                                         borderRadius: '12px', overflow: 'hidden', position: 'relative',
                                         border: '1px solid rgba(255,255,255,0.1)'
                                     }}>
-                                        <video 
-                                            autoPlay 
-                                            muted 
-                                            playsInline 
-                                            ref={lobbyVideoRef} 
-                                            style={{ width: '100%', height: '100%', objectFit: 'cover', transform: 'scaleX(-1)', opacity: initialVideo ? 1 : 0 }} 
+                                        <video
+                                            autoPlay
+                                            muted
+                                            playsInline
+                                            ref={lobbyVideoRef}
+                                            style={{ width: '100%', height: '100%', objectFit: 'cover', transform: 'scaleX(-1)', opacity: initialVideo ? 1 : 0 }}
                                         />
                                         {!initialVideo && (
                                             <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#1f2937' }}>
                                                 <VideoOff size={48} color="#4b5563" />
                                             </div>
                                         )}
-                                        
+
                                         <div style={{ position: 'absolute', bottom: '12px', left: 0, right: 0, display: 'flex', justifyContent: 'center', gap: '12px' }}>
-                                            <button 
+                                            <button
                                                 onClick={toggleLobbyAudio}
                                                 style={{
                                                     width: '40px', height: '40px', borderRadius: '50%', border: 'none',
@@ -1421,7 +1421,7 @@ const ProjectPage = () => {
                                             >
                                                 {initialAudio ? <Mic size={18} /> : <MicOff size={18} />}
                                             </button>
-                                            <button 
+                                            <button
                                                 onClick={toggleLobbyVideo}
                                                 style={{
                                                     width: '40px', height: '40px', borderRadius: '50%', border: 'none',

@@ -1,8 +1,8 @@
-# RTM Studio 🚀
+# Utkristi Colabs 🚀
 
-RTM Studio (Utkristi Colabs) is a **world-class real-time collaborative IDE** engineered for high-performance engineering teams. It merges professional-grade code synchronization with cinematic video conferencing and a premium developer experience.
+Utkristi Colabs is a **world-class real-time collaborative IDE** engineered for high-performance engineering teams. It merges professional-grade code synchronization with cinematic video conferencing and a premium developer experience.
 
-![RTM Studio Banner](https://utkristi-colabs.onrender.com/utkristi-colabs.png)
+![Utkristi Colabs Banner](https://utkristi-colabs.onrender.com/utkristi-colabs.png)
 
 ## ✨ Enterprise-Grade Features
 
@@ -54,7 +54,7 @@ RTM Studio (Utkristi Colabs) is a **world-class real-time collaborative IDE** en
 
 ## 📐 Enterprise Architecture
 
-RTM Studio uses a **Tri-Sync Topology**:
+Utkristi Colabs uses a **Tri-Sync Topology**:
 1. **Keystroke Layer**: WebSockets handle OT-like synchronization for immediate feedback.
 2. **Persistence Layer**: All project artifacts are written to PostgreSQL on every significant change.
 3. **Media Layer**: Peer-to-peer WebRTC handles the heavy lifting of video conferencing, offloading server resources.

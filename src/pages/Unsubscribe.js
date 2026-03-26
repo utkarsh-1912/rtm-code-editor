@@ -91,7 +91,7 @@ const Unsubscribe = () => {
                     <XCircle style={{ color: '#ef4444', marginBottom: '24px' }} size={64} strokeWidth={1.5} />
                     <p style={{ color: 'var(--text-main)', fontSize: '18px', lineHeight: 1.6, marginBottom: '32px' }}>
                         This subscription management link is missing required authentication parameters.
-                        Please access your preferences via the link provided in your latest RTM Studio email.
+                        Please access your preferences via the link provided in your latest Utkristi Colabs email.
                     </p>
                     <Link to="/" style={{ color: 'var(--primary)', fontWeight: '700', textDecoration: 'none' }}>
                         Back to Workspace

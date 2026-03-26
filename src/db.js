@@ -643,13 +643,13 @@ async function createProject(userId, name, description = "", type = "web") {
         await sql`
             INSERT INTO project_files (project_id, name, path, content)
             VALUES 
-                (${projectId}, 'main.cpp', 'main.cpp', '#include <iostream>\n\nint main() {\n    std::cout << "Hello RTM Studio!" << std::endl;\n    return 0;\n}'),
+                (${projectId}, 'main.cpp', 'main.cpp', '#include <iostream>\n\nint main() {\n    std::cout << "Hello Utkristi Colabs!" << std::endl;\n    return 0;\n}'),
                 (${projectId}, 'utils.h', 'utils.h', '// Utility functions\n#ifndef UTILS_H\n#define UTILS_H\n\nvoid greet();\n\n#endif')
         `;
     } else if (type === "python") {
         await sql`
             INSERT INTO project_files (project_id, name, path, content)
-            VALUES (${projectId}, 'main.py', 'main.py', 'def main():\n    print("Hello from RTM Studio!")\n\nif __name__ == "__main__":\n    main()')
+            VALUES (${projectId}, 'main.py', 'main.py', 'def main():\n    print("Hello from Utkristi Colabs!")\n\nif __name__ == "__main__":\n    main()')
         `;
     } else if (type === "java") {
         await sql`

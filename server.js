@@ -53,7 +53,7 @@ const fetchRelay = async (url, body, apiKey) => {
 const getEmailTemplate = ({ title, message, ctaText, ctaUrl, inviterName, inviterPhoto, recipientEmail, isWelcome = false }) => {
   const logoUrl = "https://utkristi-colabs.onrender.com/utkristi-colabs.png";
   const inviterInitials = (inviterName || "U").charAt(0).toUpperCase();
-  
+
   return `
 <!DOCTYPE html>
 <html>
@@ -176,7 +176,7 @@ const getEmailTemplate = ({ title, message, ctaText, ctaUrl, inviterName, invite
         <div class="footer-links">
           This secure communication was intended for <strong>${recipientEmail}</strong>. 
           <br>
-          <a href="${process.env.APP_URL || 'http://localhost:5000'}/unsubscribe?email=${encodeURIComponent(recipientEmail)}" class="unsubscribe">Manage Notifications</a> &middot; <a href="#" style="color: inherit; text-decoration: none;">Security Center</a> &middot; <a href="#" style="color: inherit; text-decoration: none;">Privacy Statement</a>
+          <a href="${process.env.APP_URL || 'http://localhost:5000'}/unsubscribe?email=${encodeURIComponent(recipientEmail)}" class="unsubscribe">Manage Notifications</a> &middot; <a href="${process.env.APP_URL || 'http://localhost:5000'}/terms" style="color: inherit; text-decoration: none;">Security Center</a> &middot; <a href="${process.env.APP_URL || 'http://localhost:5000'}/privacy" style="color: inherit; text-decoration: none;">Privacy Statement</a>
         </div>
       </div>
     </div>
@@ -195,7 +195,7 @@ app.get("/api/welcome-new-user", async (req, res) => {
   try {
     const { email, name } = req.query;
     if (!email) return res.status(400).json({ error: "Missing email query parameter" });
-    
+
     const BREVO_KEY = process.env.BREVO_API_KEY;
     if (!BREVO_KEY) return res.status(500).json({ error: "BREVO_API_KEY not configured" });
 
@@ -212,7 +212,7 @@ app.get("/api/welcome-new-user", async (req, res) => {
     const result = await fetchRelay("https://api.brevo.com/v3/smtp/email", {
       sender: { name: "Utkristi Colabs", email: process.env.BREVO_FROM_EMAIL || "noreply@rtm-edit.com" },
       to: [{ email }],
-      subject: "Welcome to RTM Studio - Let's build together",
+      subject: "Welcome to Utkristi Colabs - Let's build together",
       htmlContent: html
     }, BREVO_KEY);
 
@@ -550,7 +550,7 @@ app.post("/api/projects/:id/invite", async (req, res) => {
 
     const appUrl = process.env.APP_URL || "http://localhost:3000";
     const acceptUrl = `${appUrl}/project/${req.params.id}?invite=1&email=${encodeURIComponent(email)}&role=${role || "member"}`;
-    
+
     const html = getEmailTemplate({
       title: "Confirm Your Invitation",
       message: `<strong>${inviterName || 'A teammate'}</strong> has invited you to join the project workspace <strong>${projectName}</strong> as a <strong>${role || 'collaborator'}</strong>. Get started by clicking the button below.`,
