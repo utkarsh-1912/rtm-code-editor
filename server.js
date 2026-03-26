@@ -62,46 +62,48 @@ const getEmailTemplate = ({ title, message, ctaText, ctaUrl, inviterName, invite
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <style>
     body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #f8fafc; margin: 0; padding: 0; -webkit-font-smoothing: antialiased; }
-    .wrapper { width: 100%; table-layout: fixed; background-color: #f8fafc; padding: 60px 0; }
-    .main { background-color: #ffffff; margin: 0 auto; width: 100%; max-width: 600px; border-radius: 32px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05), 0 20px 25px -5px rgba(0,0,0,0.05); border: 1px solid #e2e8f0; }
+    .wrapper { width: 100%; table-layout: fixed; background-color: #f8fafc; padding: 80px 0; }
+    .main { background-color: #ffffff; margin: 0 auto; width: 100%; max-width: 600px; border-radius: 40px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05), 0 20px 25px -5px rgba(0,0,0,0.05); border: 1px solid #e2e8f0; }
     
-    .header { padding: 56px 40px 40px; text-align: center; }
-    .logo { height: 26px; width: auto; margin: 0 auto 40px; display: block; }
+    .header { padding: 64px 64px 48px; text-align: center; }
+    .logo { height: 24px; width: auto; margin: 0 auto 48px; display: block; }
     
-    .inviter-pill { display: inline-block; background: #f1f5f9; padding: 8px 16px; border-radius: 100px; border: 1px solid #e2e8f0; margin: 0 auto 32px; text-align: center; }
-    .avatar-mini { width: 24px; height: 24px; border-radius: 50%; background: #2563eb; color: #ffffff; display: inline-block; vertical-align: middle; font-size: 11px; font-weight: 800; line-height: 24px; margin-right: 10px; overflow: hidden; text-align: center; }
+    .inviter-pill { display: inline-block; background: #f8fafc; padding: 10px 20px; border-radius: 100px; border: 1px solid #e2e8f0; margin: 0 auto 40px; text-align: center; }
+    .avatar-mini { width: 28px; height: 28px; border-radius: 50%; background: #2563eb; color: #ffffff; display: inline-block; vertical-align: middle; font-size: 12px; font-weight: 800; line-height: 28px; margin-right: 12px; overflow: hidden; text-align: center; }
     .avatar-mini img { width: 100%; height: 100%; object-fit: cover; display: block; }
-    .inviter-text { color: #475569; font-size: 12px; font-weight: 600; display: inline-block; vertical-align: middle; line-height: 24px; }
+    .inviter-text { color: #475569; font-size: 13px; font-weight: 600; display: inline-block; vertical-align: middle; line-height: 28px; }
     
-    .hero-title { color: #0f172a; font-size: 32px; font-weight: 800; margin: 0 0 16px; letter-spacing: -0.02em; line-height: 1.25; }
-    .hero-subtitle { color: #64748b; font-size: 16px; margin: 0; line-height: 1.6; }
+    .hero-title { color: #0f172a; font-size: 34px; font-weight: 800; margin: 0 0 20px; letter-spacing: -0.03em; line-height: 1.2; }
+    .hero-subtitle { color: #64748b; font-size: 17px; margin: 0; line-height: 1.6; }
     
-    .content { padding: 0 48px 56px; color: #334155; }
-    .message-body { font-size: 17px; line-height: 1.85; color: #475569; margin-bottom: 48px; text-align: center; background: #f8fafc; padding: 40px; border-radius: 24px; border: 1px dashed #e2e8f0; }
+    .content { padding: 0 64px 64px; color: #334155; }
+    .message-body { font-size: 18px; line-height: 1.9; color: #475569; margin-bottom: 56px; text-align: center; background: #f8fafc; padding: 48px; border-radius: 32px; border: 1px solid #f1f5f9; }
     
-    .cta-area { text-align: center; margin-bottom: 56px; }
-    .btn { display: inline-block; background: #2563eb; color: #ffffff !important; padding: 22px 56px; border-radius: 20px; text-decoration: none; font-weight: 700; font-size: 16px; box-shadow: 0 10px 15px -3px rgba(37, 99, 235, 0.2); }
+    .cta-area { text-align: center; margin-bottom: 64px; }
+    .btn { display: inline-block; background: #2563eb; color: #ffffff !important; padding: 24px 64px; border-radius: 24px; text-decoration: none; font-weight: 700; font-size: 16px; box-shadow: 0 10px 15px -3px rgba(37, 99, 235, 0.2); }
     
-    .feature-grid { width: 100%; border-top: 1px solid #f1f5f9; padding-top: 56px; }
-    .feature-item { width: 48%; display: inline-block; vertical-align: top; margin-bottom: 32px; box-sizing: border-box; }
-    .feature-item-inner { padding-right: 16px; }
-    .feature-title { font-size: 14px; font-weight: 700; color: #0f172a; margin-bottom: 8px; line-height: 1.4; }
-    .feature-icon { font-size: 18px; margin-bottom: 8px; display: block; }
-    .feature-desc { font-size: 12px; color: #64748b; line-height: 1.65; }
+    .feature-grid { width: 100%; border-top: 1px solid #f1f5f9; padding-top: 64px; margin-top: 0; }
+    .feature-item { width: 48%; display: inline-block; vertical-align: top; margin-bottom: 40px; box-sizing: border-box; }
+    .feature-item-inner { padding-right: 20px; }
+    .feature-title { font-size: 15px; font-weight: 700; color: #0f172a; margin-bottom: 10px; line-height: 1.4; }
+    .feature-icon { font-size: 20px; margin-bottom: 12px; display: block; }
+    .feature-desc { font-size: 13px; color: #64748b; line-height: 1.7; }
     
-    .footer { padding: 56px 48px; text-align: center; background-color: #ffffff; border-top: 1px solid #f1f5f9; }
-    .footer-links { margin-top: 32px; padding-top: 32px; border-top: 1px solid #f1f5f9; font-size: 11px; color: #94a3b8; line-height: 2.2; }
+    .footer { padding: 64px; text-align: center; background-color: #ffffff; border-top: 1px solid #f1f5f9; }
+    .footer-links { margin-top: 40px; padding-top: 40px; border-top: 1px solid #f1f5f9; font-size: 12px; color: #94a3b8; line-height: 2.2; }
     .unsubscribe { color: #2563eb; text-decoration: none; font-weight: 600; }
 
-    @media only screen and (max-width: 600px) {
-      .wrapper { padding: 20px 0; }
+    @media only screen and (max-width: 640px) {
+      .wrapper { padding: 24px 0; }
       .main { border-radius: 0; border-left: none; border-right: none; }
-      .header { padding: 40px 24px 32px; }
-      .hero-title { font-size: 26px; }
-      .content { padding: 0 24px 40px; }
-      .message-body { padding: 24px; font-size: 16px; }
-      .feature-item { width: 100%; display: block; margin-bottom: 24px; }
-      .footer { padding: 40px 24px; }
+      .header { padding: 56px 32px 40px; }
+      .hero-title { font-size: 28px; }
+      .content { padding: 0 32px 48px; }
+      .message-body { padding: 32px; font-size: 16px; margin-bottom: 40px; }
+      .cta-area { margin-bottom: 48px; }
+      .btn { padding: 20px 48px; width: 100%; box-sizing: border-box; }
+      .feature-item { width: 100%; display: block; margin-bottom: 32px; }
+      .footer { padding: 48px 32px; }
     }
   </style>
 </head>
@@ -118,8 +120,8 @@ const getEmailTemplate = ({ title, message, ctaText, ctaUrl, inviterName, invite
           <span class="inviter-text">${inviterName || 'A teammate'} is inviting you</span>
         </div>
         ` : `
-        <div class="inviter-pill" style="background: #ecfdf5; border-color: #d1fae5;">
-          <span class="inviter-text" style="color: #065f46; margin: 0;">🚀 System Onboarding Active</span>
+        <div class="inviter-pill" style="background: #f0fdf4; border-color: #dcfce7; color: #166534;">
+          <span class="inviter-text" style="color: #166534; margin: 0;">🚀 System Onboarding Active</span>
         </div>
         `}
         <h1 class="hero-title">${title}</h1>
@@ -140,36 +142,36 @@ const getEmailTemplate = ({ title, message, ctaText, ctaUrl, inviterName, invite
             <div class="feature-item-inner">
               <span class="feature-icon">⚡</span>
               <div class="feature-title">High-Speed Sync</div>
-              <div class="feature-desc">Zero-latency collaborative engine optimized for rapid delivery.</div>
+              <div class="feature-desc">Zero-latency collaborative engine optimized for rapid delivery and execution.</div>
             </div>
           </div>
           <div class="feature-item">
             <div class="feature-item-inner">
               <span class="feature-icon">🎥</span>
               <div class="feature-title">Cinematic Video</div>
-              <div class="feature-desc">Integrated HD conferencing with professional layout controls.</div>
+              <div class="feature-desc">Integrated HD conferencing with professional 16:9 cinematic layout controls.</div>
             </div>
           </div>
           <div class="feature-item">
             <div class="feature-item-inner">
               <span class="feature-icon">🤖</span>
               <div class="feature-title">AI-Ready Flow</div>
-              <div class="feature-desc">Engineered for the modern, AI-augmented software engineer.</div>
+              <div class="feature-desc">Intelligent environment engineered for the modern, AI-augmented developer.</div>
             </div>
           </div>
           <div class="feature-item">
             <div class="feature-item-inner">
               <span class="feature-icon">🔒</span>
-              <div class="feature-title">Security First</div>
-              <div class="feature-desc">Encrypted workspaces with granular, enterprise-grade logic.</div>
+              <div class="feature-title">Enterprise Security</div>
+              <div class="feature-desc">Persistent, encrypted workspaces with granular security and access logic.</div>
             </div>
           </div>
         </div>
       </div>
       
       <div class="footer">
-        <p style="font-weight: 700; color: #475569; margin-bottom: 6px; font-size: 14px;">Utkristi Colabs</p>
-        <p style="font-size: 11px; color: #94a3b8; margin-bottom: 16px;">The World's Most Advanced Collaborative IDE</p>
+        <p style="font-weight: 700; color: #475569; margin-bottom: 8px; font-size: 15px;">Utkristi Colabs</p>
+        <p style="font-size: 12px; color: #94a3b8; margin-bottom: 16px;">The World's Most Advanced Collaborative IDE</p>
         <p style="font-size: 11px; color: #cbd5e1;">Innovation Plaza, Digital District, Bangalore, KA 560103</p>
         <div class="footer-links">
           This secure communication was intended for <strong>${recipientEmail}</strong>. 
