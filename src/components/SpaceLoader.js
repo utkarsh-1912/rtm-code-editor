@@ -112,7 +112,7 @@ const SpaceLoader = () => {
                 }
                 @keyframes progress {
                     0% { width: 0%; transform: translateX(-100%); }
-                    50% { width: 70%; transform: translateX(0); }
+                    50% { width: 100%; transform: translateX(0); }
                     100% { width: 0%; transform: translateX(100%); }
                 }
             `}</style>

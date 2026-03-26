@@ -745,6 +745,7 @@ module.exports = {
     getSessions,
     createSession,
     deleteOtherSessions,
+    isRoomGuest,
     updateLastRoom,
     createOrganization,
     getOrganizations,
