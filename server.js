@@ -49,8 +49,6 @@ const fetchRelay = async (url, body, apiKey) => {
   return { status: res.status, body: resBody };
 };
 
-app.use(express.static("build"));
-
 // API Routes
 app.get("/api/ping", (req, res) => {
   res.json({ success: true, message: "pong" });
@@ -74,7 +72,7 @@ app.get("/api/test-email", async (req, res) => {
     res.json({ success: true, brevoStatus: result.status, detail: result.body });
   } catch (err) {
     console.error("[TestEmail] Error:", err);
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: "Test email failed", message: err.message });
   }
 });
 
@@ -393,6 +391,7 @@ app.post("/api/projects/:id/invite", async (req, res) => {
   }
 });
 
+app.use(express.static("build"));
 app.use((req, res) => { res.sendFile(path.join(__dirname, "build", "index.html")); });
 
 // Global Error Handler

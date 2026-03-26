@@ -950,7 +950,8 @@ const RemoteVideo = ({ user, isMini }) => {
 // --- Styles ---
 const containerStyle = (isExpanded) => ({
     backgroundColor: "#0d1117",
-    height: isExpanded ? "100%" : "400px",
+    height: "100%",
+    width: "100%",
     display: "flex", flexDirection: "column",
     transition: "height 0.4s cubic-bezier(0.16, 1, 0.3, 1)",
     position: "relative", overflow: "hidden",
@@ -1073,7 +1074,7 @@ const videoTileStyle = (active) => ({
     overflow: "hidden",
     backgroundColor: "#161b22",
     aspectRatio: "16 / 9",
-    maxHeight: 'calc(100vh - 250px)', // Prevent tile from becoming taller than viewport
+    maxHeight: 'min(450px, 50vh)', // Senseful max height for tiles
     border: active ? "3px solid var(--primary)" : "1px solid rgba(255,255,255,0.08)",
     boxShadow: active ? "0 0 40px rgba(59, 130, 246, 0.4)" : "0 15px 35px rgba(0,0,0,0.4)",
     transition: "all 0.4s cubic-bezier(0.16, 1, 0.3, 1)",
