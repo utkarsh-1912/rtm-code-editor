@@ -988,7 +988,7 @@ const gridStyle = (count) => {
         maxWidth: '1800px',
         margin: '0 auto',
         overflowY: 'auto',
-        alignContent: 'center',
+        alignContent: 'start', // Changed to start to prevent top-clipping on overflow
         scrollbarWidth: 'none',
         msOverflowStyle: 'none'
     };
@@ -1073,6 +1073,7 @@ const videoTileStyle = (active) => ({
     overflow: "hidden",
     backgroundColor: "#161b22",
     aspectRatio: "16 / 9",
+    maxHeight: 'calc(100vh - 250px)', // Prevent tile from becoming taller than viewport
     border: active ? "3px solid var(--primary)" : "1px solid rgba(255,255,255,0.08)",
     boxShadow: active ? "0 0 40px rgba(59, 130, 246, 0.4)" : "0 15px 35px rgba(0,0,0,0.4)",
     transition: "all 0.4s cubic-bezier(0.16, 1, 0.3, 1)",
