@@ -117,6 +117,77 @@ const VideoChat = ({
             await stopScreenShare();
         }
     }, [isScreenSharing, localStream, stopScreenShare]);
+    
+    // --- Core Media Logic (Defined first for hoisting) ---
+    const setupAudioAnalysis = useCallback((stream, id) => {
+        try {
+            if (!audioContextRef.current) {
+                audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            if (audioContextRef.current.state === 'suspended') {
+                audioContextRef.current.resume();
+            }
+
+            const source = audioContextRef.current.createMediaStreamSource(stream);
+            const analyser = audioContextRef.current.createAnalyser();
+            analyser.fftSize = 256;
+            source.connect(analyser);
+            analysersRef.current[id] = analyser;
+        } catch (e) {
+            console.warn("Audio analysis setup failed", e);
+        }
+    }, []);
+
+    const handleJoinCall = useCallback(async () => {
+        if (!socketRef.current || inCall) return;
+
+        try {
+            if (user?.isGuest) {
+                setInCall(true);
+                onCallStateChange(true);
+                socketRef.current.emit('join-video-chat', {
+                    projectId,
+                    userId: socketRef.current.id,
+                    name: user?.name || "Guest",
+                    isSpectator: true
+                });
+                return;
+            }
+
+            let stream;
+            if (!initialVideoState && !initialAudioState) {
+                // If both are false, avoid getUserMedia throwing an error. Create an empty stream.
+                stream = new MediaStream();
+            } else {
+                stream = await navigator.mediaDevices.getUserMedia({
+                    video: initialVideoState ? { width: 1280, height: 720, frameRate: 30 } : false,
+                    audio: initialAudioState
+                });
+            }
+
+            setLocalStream(stream);
+            setInCall(true);
+            onCallStateChange(true);
+
+            if (initialAudioState) {
+                setupAudioAnalysis(stream, 'local');
+            }
+
+            socketRef.current.emit('join-video-chat', {
+                projectId,
+                userId: socketRef.current.id,
+                name: user?.name || socketRef.current.userName,
+                isSpectator: false
+            });
+
+            // Immediate broadcast of current state
+            broadcastMediaState({ isMuted, isVideoOff });
+
+        } catch (err) {
+            console.error("Camera access denied", err);
+            toast.error("Please enable camera & microphone to join.");
+        }
+    }, [projectId, socketRef, user, setupAudioAnalysis, initialAudioState, initialVideoState, onCallStateChange, inCall, broadcastMediaState, isMuted, isVideoOff]);
 
     const handleToggleVideo = useCallback(async (e) => {
         if (e) e.stopPropagation();
@@ -173,25 +244,6 @@ const VideoChat = ({
         }
     }, [isVideoOff, localStream, broadcastMediaState, inCall, handleJoinCall]);
 
-    // --- Speaker Detection Logic ---
-    const setupAudioAnalysis = useCallback((stream, id) => {
-        try {
-            if (!audioContextRef.current) {
-                audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)();
-            }
-            if (audioContextRef.current.state === 'suspended') {
-                audioContextRef.current.resume();
-            }
-
-            const source = audioContextRef.current.createMediaStreamSource(stream);
-            const analyser = audioContextRef.current.createAnalyser();
-            analyser.fftSize = 256;
-            source.connect(analyser);
-            analysersRef.current[id] = analyser;
-        } catch (e) {
-            console.warn("Audio analysis setup failed", e);
-        }
-    }, []);
 
     const handleToggleAudio = useCallback(async (e) => {
         if (e) e.stopPropagation();
@@ -299,59 +351,6 @@ const VideoChat = ({
         return peer;
     }, [socketRef, setupAudioAnalysis]);
 
-    const handleJoinCall = useCallback(async () => {
-        if (!socketRef.current || inCall) return;
-
-        try {
-            if (user?.isGuest) {
-                setInCall(true);
-                onCallStateChange(true);
-                socketRef.current.emit('join-video-chat', {
-                    projectId,
-                    userId: socketRef.current.id,
-                    name: user?.name || "Guest",
-                    isSpectator: true
-                });
-                return;
-            }
-
-            let stream;
-            if (!initialVideoState && !initialAudioState) {
-                // If both are false, avoid getUserMedia throwing an error. Create an empty stream.
-                stream = new MediaStream();
-            } else {
-                stream = await navigator.mediaDevices.getUserMedia({
-                    video: initialVideoState ? { width: 1280, height: 720, frameRate: 30 } : false,
-                    audio: initialAudioState
-                });
-            }
-
-            setLocalStream(stream);
-            setInCall(true);
-            onCallStateChange(true);
-
-            // Handle edge case where initial state is explicitly false, setup dummy tracks if needed
-            // But usually getUserMedia with {video: false, audio: true} returns a stream with only an audio track.
-            // If they both are false, we shouldn't even call getUserMedia.
-            if (initialAudioState) {
-                setupAudioAnalysis(stream, 'local');
-            }
-
-            socketRef.current.emit('join-video-chat', {
-                projectId,
-                userId: socketRef.current.id,
-                name: user?.name || socketRef.current.userName,
-                isSpectator: false
-            });
-
-            // Immediate broadcast of current state
-            broadcastMediaState({ isMuted, isVideoOff });
-
-        } catch (err) {
-            console.error("Camera access denied", err);
-            toast.error("Please enable camera & microphone to join.");
-        }
-    }, [projectId, socketRef, user, setupAudioAnalysis, initialAudioState, initialVideoState, onCallStateChange, inCall, broadcastMediaState, isMuted, isVideoOff]);
 
     const handleLeaveCall = useCallback(() => {
         if (localStream) localStream.getTracks().forEach(t => t.stop());
