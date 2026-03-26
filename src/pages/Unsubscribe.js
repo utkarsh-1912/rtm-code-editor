@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
-import { 
-    XCircle, 
-    Mail, 
-    Loader2, 
-    ShieldCheck, 
-    Zap, 
-    BellOff, 
+import {
+    XCircle,
+    Mail,
+    Loader2,
+    ShieldCheck,
+    Zap,
+    BellOff,
     Shield
 } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -91,7 +91,7 @@ const Unsubscribe = () => {
                 <div style={{ textAlign: 'center', padding: '40px 0' }}>
                     <XCircle style={{ color: '#ef4444', marginBottom: '24px' }} size={64} strokeWidth={1.5} />
                     <p style={{ color: 'var(--text-main)', fontSize: '18px', lineHeight: 1.6, marginBottom: '32px' }}>
-                        This subscription management link is missing required authentication parameters. 
+                        This subscription management link is missing required authentication parameters.
                         Please access your preferences via the link provided in your latest RTM Studio email.
                     </p>
                     <Link to="/" style={{ color: 'var(--primary)', fontWeight: '700', textDecoration: 'none' }}>
@@ -106,7 +106,7 @@ const Unsubscribe = () => {
         <ContentLayout title={isUnsubscribed ? "Preferences Set" : "Management Hub"}>
             <div style={{ marginBottom: '48px' }}>
                 <p style={{ fontSize: '18px', lineHeight: '1.6', color: 'var(--text-main)', fontWeight: '500', marginBottom: '20px' }}>
-                    {isUnsubscribed 
+                    {isUnsubscribed
                         ? "Your preferences have been updated. You will no longer receive communications at:"
                         : "Configure how you receive project invites and technical updates for:"
                     }
@@ -116,32 +116,12 @@ const Unsubscribe = () => {
                 </div>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '32px', marginBottom: '60px' }}>
-                <section style={{ backgroundColor: 'var(--bg-card)', padding: '32px', borderRadius: '24px', border: '1px solid var(--border-color)' }}>
-                    <h3 style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: '18px', fontWeight: '800', marginBottom: '16px', color: 'var(--primary)' }}>
-                        <Zap size={20} /> Project Updates
-                    </h3>
-                    <p style={{ color: 'var(--text-muted)', fontSize: '14px', lineHeight: '1.6' }}>
-                        Stay in sync with your team. Receive instant alerts when collaborators push changes or invite you to new workspaces.
-                    </p>
-                </section>
-
-                <section style={{ backgroundColor: 'var(--bg-card)', padding: '32px', borderRadius: '24px', border: '1px solid var(--border-color)' }}>
-                    <h3 style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: '18px', fontWeight: '800', marginBottom: '16px', color: '#10b981' }}>
-                        <Shield size={20} /> Security & Audits
-                    </h3>
-                    <p style={{ color: 'var(--text-muted)', fontSize: '14px', lineHeight: '1.6' }}>
-                        Protect your workspace. Get notified about security audits, access changes, and critical system maintenance.
-                    </p>
-                </section>
-            </div>
-
             <div style={{ backgroundColor: 'var(--bg-card)', padding: '48px', borderRadius: '32px', border: '1px solid var(--border-color)', textAlign: 'center' }}>
-                <div style={{ 
-                    width: '72px', 
-                    height: '72px', 
-                    borderRadius: '20px', 
-                    backgroundColor: isUnsubscribed ? 'rgba(245, 158, 11, 0.1)' : 'rgba(59, 130, 246, 0.1)', 
+                <div style={{
+                    width: '72px',
+                    height: '72px',
+                    borderRadius: '20px',
+                    backgroundColor: isUnsubscribed ? 'rgba(245, 158, 11, 0.1)' : 'rgba(59, 130, 246, 0.1)',
                     color: isUnsubscribed ? '#f59e0b' : 'var(--primary)',
                     margin: '0 auto 32px',
                     display: 'flex',
@@ -161,17 +141,17 @@ const Unsubscribe = () => {
                         <button
                             onClick={() => handleAction(true)}
                             disabled={processing}
-                            style={{ 
-                                backgroundColor: '#ef4444', 
-                                color: '#white', 
-                                fontWeight: 700, 
-                                padding: '16px 40px', 
-                                borderRadius: '16px', 
-                                border: 'none', 
-                                fontSize: '16px', 
+                            style={{
+                                backgroundColor: '#ef4444',
+                                color: '#white',
+                                fontWeight: 700,
+                                padding: '16px 40px',
+                                borderRadius: '16px',
+                                border: 'none',
+                                fontSize: '16px',
                                 cursor: 'pointer',
-                                display: 'inline-flex', 
-                                alignItems: 'center', 
+                                display: 'inline-flex',
+                                alignItems: 'center',
                                 gap: '12px',
                                 transition: 'all 0.2s',
                                 opacity: processing ? 0.7 : 1
@@ -189,17 +169,17 @@ const Unsubscribe = () => {
                         <button
                             onClick={() => handleAction(false)}
                             disabled={processing}
-                            style={{ 
-                                backgroundColor: 'var(--primary)', 
-                                color: 'white', 
-                                fontWeight: 700, 
-                                padding: '16px 40px', 
-                                borderRadius: '16px', 
-                                border: 'none', 
-                                fontSize: '16px', 
+                            style={{
+                                backgroundColor: 'var(--primary)',
+                                color: 'white',
+                                fontWeight: 700,
+                                padding: '16px 40px',
+                                borderRadius: '16px',
+                                border: 'none',
+                                fontSize: '16px',
                                 cursor: 'pointer',
-                                display: 'inline-flex', 
-                                alignItems: 'center', 
+                                display: 'inline-flex',
+                                alignItems: 'center',
                                 gap: '12px',
                                 transition: 'all 0.2s',
                                 opacity: processing ? 0.7 : 1
@@ -216,7 +196,7 @@ const Unsubscribe = () => {
                 <span style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', fontWeight: '600', color: 'var(--text-muted)' }}><ShieldCheck size={14} /> Privacy First</span>
                 <span style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', fontWeight: '600', color: 'var(--text-muted)' }}><Zap size={14} /> Instant Sync</span>
             </div>
-            
+
             <style>{`
                 .animate-spin { animation: spin 1s linear infinite; }
                 @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
