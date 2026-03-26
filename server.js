@@ -50,53 +50,100 @@ const fetchRelay = async (url, body, apiKey) => {
 };
 
 // Enterprise Email Template
-const getEmailTemplate = ({ title, message, ctaText, ctaUrl, inviterName }) => {
+const getEmailTemplate = ({ title, message, ctaText, ctaUrl, inviterName, inviterPhoto }) => {
   const logoUrl = "https://utkristi-colabs.onrender.com/utkristi-colabs.png";
+  const inviterInitials = (inviterName || "U").charAt(0).toUpperCase();
+  
   return `
 <!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8">
   <style>
-    body { font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f1f5f9; margin: 0; padding: 0; -webkit-font-smoothing: antialiased; }
-    .wrapper { width: 100%; table-layout: fixed; background-color: #f1f5f9; padding: 40px 0; }
-    .main { background-color: #ffffff; margin: 0 auto; width: 100%; max-width: 600px; border-radius: 16px; overflow: hidden; box-shadow: 0 20px 50px rgba(0,0,0,0.05); }
-    .header { padding: 40px; text-align: center; border-bottom: 1px solid #f1f5f9; }
-    .logo { height: 32px; width: auto; display: block; margin: 0 auto; }
-    .content { padding: 40px; color: #334155; line-height: 1.6; }
-    .title { font-size: 24px; font-weight: 800; color: #0f172a; margin: 0 0 16px; letter-spacing: -0.02em; }
-    .message { font-size: 16px; color: #475569; margin: 0 0 32px; }
-    .cta-container { text-align: center; margin: 40px 0 20px; }
-    .btn { display: inline-block; background-color: #2563eb; color: #ffffff !important; padding: 14px 32px; border-radius: 12px; text-decoration: none; font-weight: 700; font-size: 15px; box-shadow: 0 10px 15px -3px rgba(37, 99, 235, 0.3); }
-    .divider { height: 1px; background-color: #f1f5f9; margin: 40px 0; }
-    .footer { padding: 0 40px 40px; text-align: center; font-size: 12px; color: #94a3b8; }
-    .footer p { margin: 8px 0; }
-    .legal-links { color: #cbd5e1; margin-top: 24px; border-top: 1px solid #f1f5f9; padding-top: 24px; }
-    .unsubscribe { color: #2563eb; text-decoration: none; font-weight: 600; }
+    body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #f1f5f9; margin: 0; padding: 0; -webkit-font-smoothing: antialiased; }
+    .wrapper { width: 100%; table-layout: fixed; background-color: #f1f5f9; padding: 48px 0; }
+    .main { background-color: #ffffff; margin: 0 auto; width: 100%; max-width: 600px; border-radius: 24px; overflow: hidden; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.08); border: 1px solid rgba(226, 232, 240, 0.8); }
+    
+    .hero-banner { background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); padding: 60px 40px; text-align: center; position: relative; }
+    .logo { height: 32px; width: auto; margin-bottom: 40px; filter: drop-shadow(0 4px 6px rgba(0,0,0,0.2)); }
+    
+    .inviter-badge { display: inline-flex; align-items: center; background: rgba(255,255,255,0.1); backdrop-filter: blur(8px); padding: 8px 16px; border-radius: 100px; border: 1px solid rgba(255,255,255,0.1); margin: 0 auto; }
+    .avatar-mini { width: 32px; height: 32px; border-radius: 50%; background: #3b82f6; color: white; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 800; margin-right: 12px; overflow: hidden; }
+    .avatar-mini img { width: 100%; height: 100%; object-fit: cover; }
+    .inviter-text { color: rgba(255,255,255,0.9); font-size: 13px; font-weight: 600; }
+    
+    .hero-title { color: #ffffff; font-size: 32px; font-weight: 900; margin: 24px 0 12px; letter-spacing: -0.04em; }
+    .hero-subtitle { color: rgba(255,255,255,0.6); font-size: 16px; margin: 0; }
+    
+    .content { padding: 48px; color: #334155; }
+    .message-body { font-size: 17px; line-height: 1.7; color: #475569; margin-bottom: 40px; text-align: center; }
+    
+    .cta-area { text-align: center; margin-bottom: 48px; }
+    .btn { display: inline-block; background: #2563eb; color: #ffffff !important; padding: 18px 44px; border-radius: 16px; text-decoration: none; font-weight: 800; font-size: 16px; box-shadow: 0 15px 30px -5px rgba(37, 99, 235, 0.4); transform: perspective(1px) translateZ(0); }
+    
+    .feature-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 40px; padding-top: 40px; border-top: 1px solid #f1f5f9; }
+    .feature-item { text-align: left; }
+    .feature-icon { font-size: 20px; margin-bottom: 8px; }
+    .feature-title { font-size: 14px; font-weight: 700; color: #0f172a; margin-bottom: 4px; }
+    .feature-desc { font-size: 12px; color: #94a3b8; line-height: 1.5; }
+    
+    .footer { padding: 48px; text-align: center; background-color: #f8fafc; border-top: 1px solid #f1f5f9; }
+    .footer-links { margin-top: 24px; padding-top: 24px; border-top: 1px solid #e2e8f0; font-size: 11px; color: #cbd5e1; line-height: 1.8; }
+    .unsubscribe { color: #2563eb; text-decoration: none; font-weight: 700; }
   </style>
 </head>
 <body>
   <div class="wrapper">
     <div class="main">
-      <div class="header">
+      <div class="hero-banner">
         <img src="${logoUrl}" alt="Utkristi Colabs" class="logo">
+        <div class="inviter-badge">
+          <div class="avatar-mini">
+            ${inviterPhoto ? `<img src="${inviterPhoto}" alt="${inviterName}">` : inviterInitials}
+          </div>
+          <span class="inviter-text">${inviterName || 'A teammate'} is inviting you</span>
+        </div>
+        <h1 class="hero-title">${title}</h1>
+        <p class="hero-subtitle">Experience the future of collaborative engineering.</p>
       </div>
+      
       <div class="content">
-        <h1 class="title">${title}</h1>
-        <p class="message">${message}</p>
-        <div class="cta-container">
+        <div class="message-body">
+          ${message}
+        </div>
+        
+        <div class="cta-area">
           <a href="${ctaUrl}" class="btn">${ctaText}</a>
         </div>
-        <div class="divider"></div>
-        <p style="font-size: 13px; margin: 0;">Sent via <strong>Utkristi Colabs</strong> by ${inviterName || 'a teammate'}.</p>
+        
+        <div class="feature-grid">
+          <div class="feature-item">
+            <div class="feature-title">⚡ Real-time Collaboration</div>
+            <div class="feature-desc">Code, debug, and ship together with zero latency sync.</div>
+          </div>
+          <div class="feature-item">
+            <div class="feature-title">🎥 Professional Video</div>
+            <div class="feature-desc">Integrated 4K conferencing with cinematic grid layouts.</div>
+          </div>
+          <div class="feature-item">
+            <div class="feature-title">🤖 AI-Powered Engine</div>
+            <div class="feature-desc">Intelligent code suggestions and automated workflows.</div>
+          </div>
+          <div class="feature-item">
+            <div class="feature-title">🔒 Enterprise Security</div>
+            <div class="feature-desc">Bank-grade encryption and granular access control.</div>
+          </div>
+        </div>
       </div>
+      
       <div class="footer">
-        <p>&copy; 2026 Utkristi Colabs. All rights reserved.</p>
-        <p>Enterprise Plaza, Digital District, Bangalore</p>
-        <div class="legal-links">
-          This is a mandatory system notification regarding your project workspace.
-          <br><br>
-          <a href="#" class="unsubscribe">Unsubscribe</a> from these alerts &middot; <a href="#" style="color: inherit; text-decoration: none;">Privacy Policy</a>
+        <p style="font-weight: 800; color: #64748b; margin-bottom: 4px;">Utkristi Colabs</p>
+        <p style="font-size: 11px; margin-bottom: 12px;">The World's Most Advanced Collaborative IDE</p>
+        <p>Innovation Plaza, Digital District, Bangalore, KA 560103</p>
+        <div class="footer-links">
+          This invitation was generated by a member of your technical organization. 
+          <br>
+          <a href="#" class="unsubscribe">Manage Notifications</a> &middot; <a href="#" style="color: inherit; text-decoration: none;">Security Center</a> &middot; <a href="#" style="color: inherit; text-decoration: none;">Privacy Policy</a>
         </div>
       </div>
     </div>
@@ -120,9 +167,9 @@ app.get("/api/test-email", async (req, res) => {
     if (!BREVO_KEY) return res.status(500).json({ error: "BREVO_API_KEY not configured" });
 
     const html = getEmailTemplate({
-      title: "Connection Verified",
-      message: "Your Brevo mailing relay is now successfully configured with the enterprise template. You can now invite collaborators to your projects.",
-      ctaText: "Go to Dashboard",
+      title: "Connection Perfected",
+      message: "The RTM Studio mailing relay is now optimized for the enterprise. You can now invite collaborators with a premium, branded experience.",
+      ctaText: "Open Dashboard",
       ctaUrl: process.env.APP_URL || "http://localhost:5000",
       inviterName: "System Diagnostics"
     });
@@ -130,7 +177,7 @@ app.get("/api/test-email", async (req, res) => {
     const result = await fetchRelay("https://api.brevo.com/v3/smtp/email", {
       sender: { name: "Utkristi Colabs", email: process.env.BREVO_FROM_EMAIL || "noreply@rtm-edit.com" },
       to: [{ email }],
-      subject: "RTM Studio - Email Relay Active",
+      subject: "RTM Studio - Relay verified successfully",
       htmlContent: html
     }, BREVO_KEY);
 
@@ -440,11 +487,12 @@ app.post("/api/projects/:id/invite", async (req, res) => {
     const acceptUrl = `${appUrl}/project/${req.params.id}?invite=1&email=${encodeURIComponent(email)}&role=${role || "member"}`;
     
     const html = getEmailTemplate({
-      title: `Join ${projectName}`,
-      message: `${inviterName || 'A teammate'} has invited you to collaborate on the project <strong>${projectName}</strong> as a <strong>${role || 'collaborator'}</strong>. Click below to accept the invitation.`,
-      ctaText: "Accept Invitation",
+      title: "Confirm Your Invitation",
+      message: `<strong>${inviterName || 'A teammate'}</strong> has invited you to join the project workspace <strong>${projectName}</strong> as a <strong>${role || 'collaborator'}</strong>. Get started by clicking the button below.`,
+      ctaText: "Access Project",
       ctaUrl: acceptUrl,
-      inviterName: inviterName
+      inviterName: inviterName,
+      inviterPhoto: req.body.inviterPhoto
     });
 
     const BREVO_KEY = process.env.BREVO_API_KEY;
