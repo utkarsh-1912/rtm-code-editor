@@ -1,18 +1,18 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import {
     Video, VideoOff, Mic, MicOff, Maximize2, Minimize2,
-    ChevronDown, User, ScreenShare, ScreenShareOff, LogOut, Radio, StopCircle
+    ChevronDown, ScreenShare, ScreenShareOff, LogOut, Radio, StopCircle
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import ACTIONS from '../Action';
 
-const VideoChat = ({ 
-    socketRef, 
-    projectId, 
-    user, 
-    isMinimized, 
-    onMinimizeToggle, 
-    externalInCall, 
+const VideoChat = ({
+    socketRef,
+    projectId,
+    user,
+    isMinimized,
+    onMinimizeToggle,
+    externalInCall,
     onCallStateChange,
     clients = [],
     mediaStates = {},
@@ -73,7 +73,7 @@ const VideoChat = ({
                     video: { width: 1280, height: 720, frameRate: 30 }
                 });
                 const camTrack = newStream.getVideoTracks()[0];
-                
+
                 Object.values(peersRef.current).forEach(peer => {
                     const sender = peer.getSenders().find(s => s.track && s.track.kind === 'video');
                     if (sender) sender.replaceTrack(camTrack);
@@ -121,7 +121,7 @@ const VideoChat = ({
             await stopScreenShare();
         }
     }, [isScreenSharing, localStream, stopScreenShare]);
-    
+
     // --- Core Media Logic (Defined first for hoisting) ---
     const setupAudioAnalysis = useCallback((stream, id) => {
         try {
@@ -195,9 +195,9 @@ const VideoChat = ({
 
     const handleToggleVideo = useCallback(async (e) => {
         if (e) e.stopPropagation();
-        
+
         const videoTrack = localStream?.getVideoTracks()[0];
-        
+
         if (!isVideoOff) {
             // Turning OFF
             if (videoTrack) {
@@ -227,7 +227,7 @@ const VideoChat = ({
                     updatedStream.removeTrack(videoTrack);
                 }
                 updatedStream.addTrack(newTrack);
-                
+
                 setLocalStream(new MediaStream(updatedStream.getTracks()));
 
                 Object.values(peersRef.current).forEach(peer => {
@@ -251,9 +251,9 @@ const VideoChat = ({
 
     const handleToggleAudio = useCallback(async (e) => {
         if (e) e.stopPropagation();
-        
+
         let audioTrack = localStream?.getAudioTracks()[0];
-        
+
         if (!isMuted) {
             // Muting
             if (audioTrack) {
@@ -272,14 +272,14 @@ const VideoChat = ({
                 try {
                     const newAudioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
                     audioTrack = newAudioStream.getAudioTracks()[0];
-                    
+
                     let updatedStream = localStream;
                     if (!updatedStream) {
                         updatedStream = new MediaStream();
                     }
                     updatedStream.addTrack(audioTrack);
                     setLocalStream(new MediaStream(updatedStream.getTracks()));
-                    
+
                     Object.values(peersRef.current).forEach(peer => {
                         const sender = peer.getSenders().find(s => s.track && s.track.kind === 'audio');
                         if (sender) {
@@ -288,7 +288,7 @@ const VideoChat = ({
                             peer.addTrack(audioTrack, updatedStream);
                         }
                     });
-                    
+
                     setupAudioAnalysis(updatedStream, 'local');
                 } catch (err) {
                     console.error("Failed to get microphone", err);
@@ -298,7 +298,7 @@ const VideoChat = ({
             } else {
                 audioTrack.enabled = true;
             }
-            
+
             setIsMuted(false);
             broadcastMediaState({ isMuted: false });
         }
@@ -307,7 +307,7 @@ const VideoChat = ({
     // --- WebRTC Core Functions ---
     const startStreaming = useCallback(() => {
         if (!localStream || !rtmpKey) return;
-        
+
         try {
             const options = { mimeType: 'video/webm; codecs=vp8,opus' };
             const recorder = new MediaRecorder(localStream, options);
@@ -475,7 +475,7 @@ const VideoChat = ({
                     const offer = await peer.createOffer();
                     await peer.setLocalDescription(offer);
                     socket.emit('video-offer', { to: userId, offer });
-                    
+
                     // Broadcast our current media state so the new user knows our status
                     socket.emit(ACTIONS.MEDIA_STATE_CHANGE, {
                         roomId: `project-${projectId}`,
@@ -685,10 +685,10 @@ const VideoChat = ({
         return (
             <div style={{ ...containerStyle(isExpanded), display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#0d1117' }}>
                 <div style={{ textAlign: 'center', padding: '40px' }}>
-                    <div style={{ 
-                        width: '80px', height: '80px', borderRadius: '50%', 
-                        background: 'linear-gradient(135deg, var(--primary), #a855f7)', 
-                        display: 'flex', alignItems: 'center', justifyContent: 'center', 
+                    <div style={{
+                        width: '80px', height: '80px', borderRadius: '50%',
+                        background: 'linear-gradient(135deg, var(--primary), #a855f7)',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
                         margin: '0 auto 24px',
                         boxShadow: '0 8px 32px rgba(99, 102, 241, 0.3)'
                     }}>
@@ -825,7 +825,7 @@ const VideoChat = ({
                                         const media = mediaStates[client.socketId] || {};
                                         const isMainUser = client.name === (user?.name || socketRef.current?.userName);
                                         const currentMedia = isMainUser ? { isMuted, isVideoOff } : media;
-                                        
+
                                         return (
                                             <div key={i} style={participantItemStyle}>
                                                 <div style={avatarCircle(32)}>
@@ -868,9 +868,9 @@ const VideoChat = ({
                             <button style={controlCircle(false)} onClick={() => setIsExpanded(!isExpanded)} title={isExpanded ? "Collapse" : "Expand"}>
                                 {isExpanded ? <Minimize2 size={20} color="white" /> : <Maximize2 size={20} color="white" />}
                             </button>
-                            <button 
-                                style={controlCircle(isStreaming, '#3b82f6')} 
-                                onClick={isStreaming ? stopStreaming : () => setShowStreamModal(true)} 
+                            <button
+                                style={controlCircle(isStreaming, '#3b82f6')}
+                                onClick={isStreaming ? stopStreaming : () => setShowStreamModal(true)}
                                 title={isStreaming ? "Stop Streaming" : "Go Live"}
                             >
                                 {isStreaming ? <StopCircle size={20} color="white" /> : <Radio size={20} color="white" />}
@@ -888,10 +888,10 @@ const VideoChat = ({
                                 <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.6)', marginBottom: '16px' }}>
                                     Enter your RTMP URL + Stream Key (e.g. rtmp://a.rtmp.youtube.com/live2/XXXX)
                                 </p>
-                                <input 
+                                <input
                                     style={inputStyle}
-                                    type="text" 
-                                    placeholder="RTMP Endpoint / Key" 
+                                    type="text"
+                                    placeholder="RTMP Endpoint / Key"
                                     value={rtmpKey}
                                     onChange={(e) => setRtmpKey(e.target.value)}
                                 />
@@ -976,23 +976,21 @@ const miniBtn = { width: '28px', height: '28px', borderRadius: '8px', border: 'n
 const callWorkspaceStyle = { flex: 1, display: "flex", flexDirection: "column", position: 'relative' };
 
 const gridStyle = (count) => {
-    let cols = 1;
-    if (count === 2) cols = 2;
-    else if (count <= 4) cols = 2;
-    else cols = 3;
-
     return {
         display: 'grid',
-        gridTemplateColumns: `repeat(${cols}, 1fr)`,
-        gridAutoRows: count > 2 ? '1fr' : 'auto',
-        gap: '20px',
-        padding: '30px',
+        gridTemplateColumns: `repeat(auto-fit, minmax(clamp(240px, 20vw, 600px), 1fr))`,
+        gridAutoRows: 'max-content',
+        gap: 'clamp(12px, 2vw, 24px)',
+        padding: 'clamp(16px, 3vw, 40px)',
         flex: 1,
         width: '100%',
         height: '100%',
+        maxWidth: '1800px',
         margin: '0 auto',
-        overflow: 'hidden',
-        alignContent: 'center'
+        overflowY: 'auto',
+        alignContent: 'center',
+        scrollbarWidth: 'none',
+        msOverflowStyle: 'none'
     };
 };
 
@@ -1047,7 +1045,7 @@ const avatarCircle = (size) => ({
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    fontSize: `${size/2.5}px`,
+    fontSize: `${size / 2.5}px`,
     fontWeight: '800',
     color: 'white',
     boxShadow: '0 4px 12px rgba(59, 130, 246, 0.3)'
@@ -1073,12 +1071,16 @@ const participantStatusStyle = {
 const videoTileStyle = (active) => ({
     borderRadius: "24px",
     overflow: "hidden",
-    backgroundColor: "#1e293b",
-    aspectRatio: "16/9",
+    backgroundColor: "#161b22",
+    aspectRatio: "16 / 9",
     border: active ? "3px solid var(--primary)" : "1px solid rgba(255,255,255,0.08)",
-    boxShadow: active ? "0 0 30px rgba(59, 130, 246, 0.5)" : "0 12px 24px rgba(0,0,0,0.3)",
+    boxShadow: active ? "0 0 40px rgba(59, 130, 246, 0.4)" : "0 15px 35px rgba(0,0,0,0.4)",
     transition: "all 0.4s cubic-bezier(0.16, 1, 0.3, 1)",
-    position: 'relative'
+    position: 'relative',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    transform: active ? 'scale(1.02)' : 'scale(1)'
 });
 
 const videoElementStyle = { width: "100%", height: "100%", objectFit: "cover" };

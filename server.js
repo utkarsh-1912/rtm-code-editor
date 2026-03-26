@@ -7,6 +7,7 @@ const { spawn } = require("child_process");
 const ACTIONS = require("./src/Action");
 const db = require("./src/db");
 const cors = require("cors");
+const https = require("https");
 
 const server = http.createServer(app);
 const io = new Server(server, {
@@ -18,6 +19,36 @@ const io = new Server(server, {
 
 app.use(cors());
 app.use(express.json());
+
+// Request Logger
+app.use((req, res, next) => {
+  console.log(`[SVR] ${req.method} ${req.url}`);
+  next();
+});
+
+// Catch JSON parsing errors
+app.use((err, req, res, next) => {
+  if (err instanceof SyntaxError && err.status === 400 && 'body' in err) {
+    console.error("[JSON Error] Malformed request body caught.");
+    return res.status(400).json({ error: "Malformed JSON", detail: err.message });
+  }
+  next();
+});
+
+// Robust Fetch Relay using built-in https
+const fetchRelay = async (url, body, apiKey) => {
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'api-key': apiKey,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(body)
+  });
+  const resBody = await res.text();
+  return { status: res.status, body: resBody };
+};
+
 app.use(express.static("build"));
 
 // API Routes
@@ -143,19 +174,17 @@ app.post("/api/organizations/:id/members", async (req, res) => {
       const actionUrl = isNewUser ? `${appUrl}/signup` : `${appUrl}/snippets`;
       const actionText = isNewUser ? "Create Account & Join Team" : "View Team Vault";
       const html = `<!DOCTYPE html><html><head><style>body{background:#0d1117;font-family:sans-serif;color:#e2e8f0;margin:0;padding:40px 0}.wrap{max-width:560px;margin:0 auto;background:#161b22;border-radius:16px;overflow:hidden;border:1px solid #30363d}.header{background:linear-gradient(135deg,#1e293b 0%,#0f172a 100%);padding:36px;text-align:center;border-bottom:1px solid #30363d}.logo-text{font-size:26px;font-weight:900;color:#fff}.body{padding:36px}h1{font-size:22px;color:#f1f5f9;margin:0 0 10px;line-height:1.3}p{font-size:15px;color:#94a3b8;line-height:1.6;margin:0 0 16px}.cta{display:inline-block;padding:14px 24px;background:linear-gradient(135deg,#3b82f6,#2563eb);color:#fff;text-decoration:none;border-radius:10px;font-weight:700;margin:16px 0}</style></head><body><div class="wrap"><div class="header"><div class="logo-text">RTM<span style="color:#3b82f6">.</span>Edit</div></div><div class="body"><h1>${inviterName || 'A teammate'} invited you to join "${orgName || 'a Team Vault'}"</h1><p>You've been invited as a <strong>${role || 'member'}</strong> to collaborate on code snippets and components.</p>${isNewUser ? '<p>You don\'t have an account yet. Create one using this email, then let your team know you are ready to be added!</p>' : '<p>You have been successfully added. You can now access the team vault.</p>'}<a href="${actionUrl}" class="cta">${actionText}</a></div></div></body></html>`;
-      await fetch("https://api.brevo.com/v3/smtp/email", {
-        method: "POST",
-        headers: { "api-key": BREVO_KEY, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          sender: { name: "RTM.Edit", email: process.env.BREVO_FROM_EMAIL || "noreply@rtm-edit.com" },
-          to: [{ email }],
-          subject: `${inviterName || 'A teammate'} invited you to "${orgName || 'a Team Vault'}"`,
-          htmlContent: html
-        })
-      }).catch(console.error);
+      
+      fetchRelay("https://api.brevo.com/v3/smtp/email", {
+        sender: { name: "RTM.Edit", email: process.env.BREVO_FROM_EMAIL || "noreply@rtm-edit.com" },
+        to: [{ email }],
+        subject: `${inviterName || 'A teammate'} invited you to "${orgName || 'a Team Vault'}"`,
+        htmlContent: html
+      }, BREVO_KEY).catch(err => console.error("[Brevo Org Invite Error]", err));
     }
     res.json(isNewUser ? { success: true, pendingSignup: true } : member);
   } catch (err) {
+    console.error("[OrgMemberAPI] Error:", err);
     res.status(500).json({ error: err.message || "Failed to add member" });
   }
 });
@@ -320,26 +349,35 @@ app.delete("/api/projects/:id", async (req, res) => {
 app.post("/api/projects/:id/invite", async (req, res) => {
   try {
     const { email, inviterName, projectName, role } = req.body;
-    const acceptUrl = `${process.env.APP_URL || "http://localhost:3000"}/project/${req.params.id}?invite=1&email=${encodeURIComponent(email)}&role=${role || "member"}`;
-    const html = `<!DOCTYPE html><html><body style="background:#0d1117;color:#fff;padding:40px;font-family:sans-serif"><h1>Invite to ${projectName}</h1><p>${inviterName} invited you as ${role}</p><a href="${acceptUrl}" style="padding:12px 24px;background:#3b82f6;color:#fff;text-decoration:none;border-radius:8px">Join Project</a></body></html>`;
+    if (!email || !projectName) return res.status(400).json({ error: "Missing required invite data" });
+
+    const appUrl = process.env.APP_URL || "http://localhost:3000";
+    const acceptUrl = `${appUrl}/project/${req.params.id}?invite=1&email=${encodeURIComponent(email)}&role=${role || "member"}`;
+    const html = `<!DOCTYPE html><html><body style="background:#0d1117;color:#fff;padding:40px;font-family:sans-serif"><h1>Invite to ${projectName}</h1><p>${inviterName || 'A teammate'} invited you to join the project as ${role || 'collaborator'}</p><a href="${acceptUrl}" style="display:inline-block;padding:12px 24px;background:#3b82f6;color:#fff;text-decoration:none;border-radius:8px;font-weight:700">Join Project</a></body></html>`;
+    
     const BREVO_KEY = process.env.BREVO_API_KEY;
     if (BREVO_KEY) {
-      await fetch("https://api.brevo.com/v3/smtp/email", {
-        method: "POST",
-        headers: { "api-key": BREVO_KEY, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          sender: { name: "RTM.Edit", email: process.env.BREVO_FROM_EMAIL || "noreply@rtm-edit.com" },
-          to: [{ email }],
-          subject: `Invite to ${projectName}`,
-          htmlContent: html
-        })
-      });
+      fetchRelay("https://api.brevo.com/v3/smtp/email", {
+        sender: { name: "RTM Studio", email: process.env.BREVO_FROM_EMAIL || "noreply@rtm-edit.com" },
+        to: [{ email }],
+        subject: `${inviterName || 'A teammate'} invited you to ${projectName}`,
+        htmlContent: html
+      }, BREVO_KEY).catch(err => console.error("[Brevo Project Invite Error]", err));
     }
     res.json({ success: true });
-  } catch (err) { res.status(500).json({ error: "Failed to invite" }); }
+  } catch (err) {
+    console.error("[InviteAPI] FATAL Error:", err);
+    res.status(500).json({ error: "Internal Server Error", message: err.message });
+  }
 });
 
 app.use((req, res) => { res.sendFile(path.join(__dirname, "build", "index.html")); });
+
+// Global Error Handler
+app.use((err, req, res, next) => {
+  console.error("[Uncaught Server Error]", err.stack);
+  res.status(500).json({ error: "Internal Server Error", message: err.message });
+});
 
 const userSocketMap = {};
 const roomChatHistory = {};
