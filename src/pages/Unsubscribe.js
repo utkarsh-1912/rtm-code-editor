@@ -7,7 +7,6 @@ import {
     ShieldCheck, 
     Zap, 
     BellOff, 
-    CheckCircle2,
     Shield
 } from 'lucide-react';
 import toast from 'react-hot-toast';
