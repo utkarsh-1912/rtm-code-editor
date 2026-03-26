@@ -50,7 +50,7 @@ const fetchRelay = async (url, body, apiKey) => {
 };
 
 // Enterprise Email Template
-const getEmailTemplate = ({ title, message, ctaText, ctaUrl, inviterName, inviterPhoto, recipientEmail }) => {
+const getEmailTemplate = ({ title, message, ctaText, ctaUrl, inviterName, inviterPhoto, recipientEmail, isWelcome = false }) => {
   const logoUrl = "https://utkristi-colabs.onrender.com/utkristi-colabs.png";
   const inviterInitials = (inviterName || "U").charAt(0).toUpperCase();
   
@@ -59,36 +59,50 @@ const getEmailTemplate = ({ title, message, ctaText, ctaUrl, inviterName, invite
 <html>
 <head>
   <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <style>
     body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #f8fafc; margin: 0; padding: 0; -webkit-font-smoothing: antialiased; }
     .wrapper { width: 100%; table-layout: fixed; background-color: #f8fafc; padding: 60px 0; }
     .main { background-color: #ffffff; margin: 0 auto; width: 100%; max-width: 600px; border-radius: 32px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05), 0 20px 25px -5px rgba(0,0,0,0.05); border: 1px solid #e2e8f0; }
     
-    .header { padding: 48px 40px 32px; text-align: center; }
-    .logo { height: 28px; width: auto; margin-bottom: 32px; }
+    .header { padding: 56px 40px 40px; text-align: center; }
+    .logo { height: 26px; width: auto; margin: 0 auto 40px; display: block; }
     
-    .inviter-pill { display: inline-flex; align-items: center; background: #f1f5f9; padding: 6px 14px; border-radius: 100px; border: 1px solid #e2e8f0; margin-bottom: 24px; }
-    .avatar-mini { width: 24px; height: 24px; border-radius: 50%; background: #2563eb; color: white; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 800; margin-right: 10px; overflow: hidden; }
-    .avatar-mini img { width: 100%; height: 100%; object-fit: cover; }
-    .inviter-text { color: #475569; font-size: 12px; font-weight: 600; }
+    .inviter-pill { display: inline-block; background: #f1f5f9; padding: 8px 16px; border-radius: 100px; border: 1px solid #e2e8f0; margin: 0 auto 32px; text-align: center; }
+    .avatar-mini { width: 24px; height: 24px; border-radius: 50%; background: #2563eb; color: #ffffff; display: inline-block; vertical-align: middle; font-size: 11px; font-weight: 800; line-height: 24px; margin-right: 10px; overflow: hidden; text-align: center; }
+    .avatar-mini img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .inviter-text { color: #475569; font-size: 12px; font-weight: 600; display: inline-block; vertical-align: middle; line-height: 24px; }
     
-    .hero-title { color: #0f172a; font-size: 30px; font-weight: 800; margin: 0 0 16px; letter-spacing: -0.02em; line-height: 1.2; }
-    .hero-subtitle { color: #64748b; font-size: 16px; margin: 0; line-height: 1.5; }
+    .hero-title { color: #0f172a; font-size: 32px; font-weight: 800; margin: 0 0 16px; letter-spacing: -0.02em; line-height: 1.25; }
+    .hero-subtitle { color: #64748b; font-size: 16px; margin: 0; line-height: 1.6; }
     
-    .content { padding: 0 48px 48px; color: #334155; }
-    .message-body { font-size: 16px; line-height: 1.8; color: #475569; margin-bottom: 40px; text-align: center; background: #f8fafc; padding: 32px; border-radius: 20px; border: 1px dashed #e2e8f0; }
+    .content { padding: 0 48px 56px; color: #334155; }
+    .message-body { font-size: 17px; line-height: 1.85; color: #475569; margin-bottom: 48px; text-align: center; background: #f8fafc; padding: 40px; border-radius: 24px; border: 1px dashed #e2e8f0; }
     
-    .cta-area { text-align: center; margin-bottom: 48px; }
-    .btn { display: inline-block; background: #2563eb; color: #ffffff !important; padding: 20px 48px; border-radius: 18px; text-decoration: none; font-weight: 700; font-size: 16px; transition: all 0.2s; }
+    .cta-area { text-align: center; margin-bottom: 56px; }
+    .btn { display: inline-block; background: #2563eb; color: #ffffff !important; padding: 22px 56px; border-radius: 20px; text-decoration: none; font-weight: 700; font-size: 16px; box-shadow: 0 10px 15px -3px rgba(37, 99, 235, 0.2); }
     
-    .feature-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-top: 48px; padding-top: 48px; border-top: 1px solid #f1f5f9; }
-    .feature-item { text-align: left; }
-    .feature-title { font-size: 14px; font-weight: 700; color: #0f172a; margin-bottom: 6px; display: flex; align-items: center; gap: 8px; }
-    .feature-desc { font-size: 12px; color: #64748b; line-height: 1.6; }
+    .feature-grid { width: 100%; border-top: 1px solid #f1f5f9; padding-top: 56px; }
+    .feature-item { width: 48%; display: inline-block; vertical-align: top; margin-bottom: 32px; box-sizing: border-box; }
+    .feature-item-inner { padding-right: 16px; }
+    .feature-title { font-size: 14px; font-weight: 700; color: #0f172a; margin-bottom: 8px; line-height: 1.4; }
+    .feature-icon { font-size: 18px; margin-bottom: 8px; display: block; }
+    .feature-desc { font-size: 12px; color: #64748b; line-height: 1.65; }
     
-    .footer { padding: 48px; text-align: center; background-color: #ffffff; border-top: 1px solid #f1f5f9; }
-    .footer-links { margin-top: 24px; padding-top: 24px; border-top: 1px solid #f1f5f9; font-size: 11px; color: #94a3b8; line-height: 2; }
+    .footer { padding: 56px 48px; text-align: center; background-color: #ffffff; border-top: 1px solid #f1f5f9; }
+    .footer-links { margin-top: 32px; padding-top: 32px; border-top: 1px solid #f1f5f9; font-size: 11px; color: #94a3b8; line-height: 2.2; }
     .unsubscribe { color: #2563eb; text-decoration: none; font-weight: 600; }
+
+    @media only screen and (max-width: 600px) {
+      .wrapper { padding: 20px 0; }
+      .main { border-radius: 0; border-left: none; border-right: none; }
+      .header { padding: 40px 24px 32px; }
+      .hero-title { font-size: 26px; }
+      .content { padding: 0 24px 40px; }
+      .message-body { padding: 24px; font-size: 16px; }
+      .feature-item { width: 100%; display: block; margin-bottom: 24px; }
+      .footer { padding: 40px 24px; }
+    }
   </style>
 </head>
 <body>
@@ -96,14 +110,20 @@ const getEmailTemplate = ({ title, message, ctaText, ctaUrl, inviterName, invite
     <div class="main">
       <div class="header">
         <img src="${logoUrl}" alt="Utkristi Colabs" class="logo">
+        ${!isWelcome ? `
         <div class="inviter-pill">
           <div class="avatar-mini">
             ${inviterPhoto ? `<img src="${inviterPhoto}" alt="${inviterName}">` : inviterInitials}
           </div>
           <span class="inviter-text">${inviterName || 'A teammate'} is inviting you</span>
         </div>
+        ` : `
+        <div class="inviter-pill" style="background: #ecfdf5; border-color: #d1fae5;">
+          <span class="inviter-text" style="color: #065f46; margin: 0;">🚀 System Onboarding Active</span>
+        </div>
+        `}
         <h1 class="hero-title">${title}</h1>
-        <p class="hero-subtitle">The workspace where high-performance engineering happens.</p>
+        <p class="hero-subtitle">The secure workspace where high-performance teams build together.</p>
       </div>
       
       <div class="content">
@@ -117,32 +137,44 @@ const getEmailTemplate = ({ title, message, ctaText, ctaUrl, inviterName, invite
         
         <div class="feature-grid">
           <div class="feature-item">
-            <div class="feature-title">⚡ High-Speed Sync</div>
-            <div class="feature-desc">Zero-latency collaborative engine optimized for speed.</div>
+            <div class="feature-item-inner">
+              <span class="feature-icon">⚡</span>
+              <div class="feature-title">High-Speed Sync</div>
+              <div class="feature-desc">Zero-latency collaborative engine optimized for rapid delivery.</div>
+            </div>
           </div>
           <div class="feature-item">
-            <div class="feature-title">🎥 Cinematic Video</div>
-            <div class="feature-desc">Integrated HD conferencing with professional grids.</div>
+            <div class="feature-item-inner">
+              <span class="feature-icon">🎥</span>
+              <div class="feature-title">Cinematic Video</div>
+              <div class="feature-desc">Integrated HD conferencing with professional layout controls.</div>
+            </div>
           </div>
           <div class="feature-item">
-            <div class="feature-title">🤖 AI-Ready Environment</div>
-            <div class="feature-desc">Engineered for the modern, AI-augmented developer.</div>
+            <div class="feature-item-inner">
+              <span class="feature-icon">🤖</span>
+              <div class="feature-title">AI-Ready Flow</div>
+              <div class="feature-desc">Engineered for the modern, AI-augmented software engineer.</div>
+            </div>
           </div>
           <div class="feature-item">
-            <div class="feature-title">🔒 Bank-Grade Trust</div>
-            <div class="feature-desc">Persistent, encrypted workspaces with SOC2-ready logic.</div>
+            <div class="feature-item-inner">
+              <span class="feature-icon">🔒</span>
+              <div class="feature-title">Security First</div>
+              <div class="feature-desc">Encrypted workspaces with granular, enterprise-grade logic.</div>
+            </div>
           </div>
         </div>
       </div>
       
       <div class="footer">
-        <p style="font-weight: 700; color: #475569; margin-bottom: 4px; font-size: 14px;">Utkristi Colabs</p>
-        <p style="font-size: 11px; color: #94a3b8; margin-bottom: 12px;">The World's Most Advanced Collaborative IDE</p>
+        <p style="font-weight: 700; color: #475569; margin-bottom: 6px; font-size: 14px;">Utkristi Colabs</p>
+        <p style="font-size: 11px; color: #94a3b8; margin-bottom: 16px;">The World's Most Advanced Collaborative IDE</p>
         <p style="font-size: 11px; color: #cbd5e1;">Innovation Plaza, Digital District, Bangalore, KA 560103</p>
         <div class="footer-links">
           This secure communication was intended for <strong>${recipientEmail}</strong>. 
           <br>
-          <a href="${process.env.APP_URL || 'http://localhost:5000'}/unsubscribe?email=${encodeURIComponent(recipientEmail)}" class="unsubscribe">Manage Preferences</a> &middot; <a href="#" style="color: inherit; text-decoration: none;">Security Hub</a> &middot; <a href="#" style="color: inherit; text-decoration: none;">Privacy Policy</a>
+          <a href="${process.env.APP_URL || 'http://localhost:5000'}/unsubscribe?email=${encodeURIComponent(recipientEmail)}" class="unsubscribe">Manage Notifications</a> &middot; <a href="#" style="color: inherit; text-decoration: none;">Security Center</a> &middot; <a href="#" style="color: inherit; text-decoration: none;">Privacy Statement</a>
         </div>
       </div>
     </div>
@@ -171,7 +203,8 @@ app.get("/api/welcome-new-user", async (req, res) => {
       ctaText: "Launch Workspace",
       ctaUrl: process.env.APP_URL || "http://localhost:5000",
       inviterName: "RTM Onboarding",
-      recipientEmail: email
+      recipientEmail: email,
+      isWelcome: true
     });
 
     const result = await fetchRelay("https://api.brevo.com/v3/smtp/email", {
