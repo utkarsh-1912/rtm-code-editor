@@ -29,6 +29,14 @@ const Dashboard = () => {
     const [stats, setStats] = useState({ totalRooms: 0, sessions: 0, hours: 0 });
     const [searchTerm, setSearchTerm] = useState('');
 
+    // Carousel Items
+    const activityItems = React.useMemo(() => {
+        return [
+            ...projects.slice(0, 10).map(p => ({ ...p, type: 'project' })),
+            ...recentRooms.slice(0, 10).map(r => ({ ...r, type: 'room' }))
+        ].sort((a, b) => new Date(b.updatedAt || Date.now()) - new Date(a.updatedAt || Date.now()));
+    }, [projects, recentRooms]);
+
     // UI States
     const [showActionMenu, setShowActionMenu] = useState(null);
     const [showRenameModal, setShowRenameModal] = useState(null);
@@ -43,12 +51,29 @@ const Dashboard = () => {
 
     // Refs for Carousel
     const carouselRef = React.useRef(null);
+    const [scrollIndex, setScrollIndex] = useState(0);
+
+    const handleCarouselScroll = () => {
+        if (!carouselRef.current) return;
+        const scrollLeft = carouselRef.current.scrollLeft;
+        const cardWidth = 344; // card + gap
+        const index = Math.round(scrollLeft / cardWidth);
+        if (index !== scrollIndex) setScrollIndex(index);
+    };
 
     const scrollCarousel = (direction) => {
         if (!carouselRef.current) return;
-        const scrollAmount = 340; // card width + gap
+        const scrollAmount = 344;
         carouselRef.current.scrollBy({
             left: direction === 'right' ? scrollAmount : -scrollAmount,
+            behavior: 'smooth'
+        });
+    };
+
+    const scrollToItem = (index) => {
+        if (!carouselRef.current) return;
+        carouselRef.current.scrollTo({
+            left: index * 344,
             behavior: 'smooth'
         });
     };
@@ -339,128 +364,135 @@ const Dashboard = () => {
                             <div style={{ display: 'flex', gap: '8px' }}>
                                 <button 
                                     onClick={() => scrollCarousel('left')}
-                                    style={{
-                                        border: '1px solid var(--border-color)',
-                                        background: 'var(--bg-card)',
-                                        color: 'var(--text-main)',
-                                        padding: '8px',
-                                        borderRadius: '8px',
-                                        cursor: 'pointer',
-                                        transition: 'all 0.2s'
-                                    }}
-                                    onMouseOver={(e) => e.currentTarget.style.borderColor = 'var(--primary)'}
-                                    onMouseOut={(e) => e.currentTarget.style.borderColor = 'var(--border-color)'}
+                                    style={carouselBtnStyle}
                                 >
                                     <ChevronLeft size={20} />
                                 </button>
                                 <button 
                                     onClick={() => scrollCarousel('right')}
-                                    style={{
-                                        border: '1px solid var(--border-color)',
-                                        background: 'var(--bg-card)',
-                                        color: 'var(--text-main)',
-                                        padding: '8px',
-                                        borderRadius: '8px',
-                                        cursor: 'pointer',
-                                        transition: 'all 0.2s'
-                                    }}
-                                    onMouseOver={(e) => e.currentTarget.style.borderColor = 'var(--primary)'}
-                                    onMouseOut={(e) => e.currentTarget.style.borderColor = 'var(--border-color)'}
+                                    style={carouselBtnStyle}
                                 >
                                     <ChevronRight size={20} />
                                 </button>
                             </div>
                         </div>
 
-                        <div 
-                            ref={carouselRef}
-                            style={{
-                                display: 'flex',
-                                gap: '24px',
-                                overflowX: 'auto',
-                                paddingBottom: '20px',
-                                paddingRight: '20px',
-                                scrollSnapType: 'x mandatory',
-                                scrollbarWidth: 'none',
-                                msOverflowStyle: 'none'
-                            }}
-                            className="activity-carousel"
-                        >
-                            <style>{`
-                                .activity-carousel::-webkit-scrollbar { display: none; }
-                            `}</style>
+                        <div style={{ position: 'relative', minWidth: 0, overflow: 'visible' }}>
+                            <div 
+                                ref={carouselRef}
+                                onScroll={handleCarouselScroll}
+                                style={{
+                                    display: 'flex',
+                                    gap: '24px',
+                                    overflowX: 'auto',
+                                    paddingBottom: '24px',
+                                    scrollSnapType: 'x mandatory',
+                                    scrollbarWidth: 'none',
+                                    msOverflowStyle: 'none',
+                                    WebkitOverflowScrolling: 'touch'
+                                }}
+                                className="activity-carousel"
+                            >
+                                <style>{`
+                                    .activity-carousel::-webkit-scrollbar { display: none; }
+                                `}</style>
 
-                            {[
-                                ...projects.slice(0, 10).map(p => ({ ...p, type: 'project' })),
-                                ...recentRooms.slice(0, 10).map(r => ({ ...r, type: 'room' }))
-                            ].sort((a, b) => new Date(b.updatedAt || Date.now()) - new Date(a.updatedAt || Date.now()))
-                            .map(item => (
-                                <div
-                                    key={`recent-${item.type}-${item.id}`}
-                                    onClick={() => navigate(item.type === 'project' ? `/project/${item.id}` : `/editor/${item.id}`)}
-                                    className="activity-card"
-                                    style={{
-                                        flex: '0 0 320px',
-                                        padding: '20px',
-                                        backgroundColor: 'var(--bg-card)',
-                                        border: '1px solid var(--border-color)',
-                                        borderRadius: '12px',
-                                        cursor: 'pointer',
-                                        transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
-                                        display: 'flex',
-                                        flexDirection: 'column',
-                                        gap: '16px',
-                                        position: 'relative',
-                                        overflow: 'hidden',
-                                        scrollSnapAlign: 'start'
-                                    }}
-                                >
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                                        <div style={{
-                                            width: '40px',
-                                            height: '40px',
-                                            borderRadius: '10px',
-                                            backgroundColor: item.type === 'project' ? 'rgba(59, 130, 246, 0.1)' : 'rgba(139, 92, 246, 0.1)',
-                                            color: item.type === 'project' ? '#3b82f6' : '#8b5cf6',
+                                {activityItems.map((item, idx) => (
+                                    <div
+                                        key={`recent-${item.type}-${item.id}`}
+                                        onClick={() => navigate(item.type === 'project' ? `/project/${item.id}` : `/editor/${item.id}`)}
+                                        className="activity-card"
+                                        style={{
+                                            flex: '0 0 320px',
+                                            padding: '20px',
+                                            backgroundColor: 'var(--bg-card)',
+                                            border: '1px solid var(--border-color)',
+                                            borderRadius: '16px',
+                                            cursor: 'pointer',
+                                            transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
                                             display: 'flex',
-                                            alignItems: 'center',
-                                            justifyContent: 'center'
-                                        }}>
-                                            {item.type === 'project' ? <Folder size={20} /> : <Terminal size={20} />}
+                                            flexDirection: 'column',
+                                            gap: '16px',
+                                            position: 'relative',
+                                            overflow: 'hidden',
+                                            scrollSnapAlign: 'start'
+                                        }}
+                                    >
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                                            <div style={{
+                                                width: '40px',
+                                                height: '40px',
+                                                borderRadius: '10px',
+                                                backgroundColor: item.type === 'project' ? 'rgba(59, 130, 246, 0.1)' : 'rgba(139, 92, 246, 0.1)',
+                                                color: item.type === 'project' ? '#3b82f6' : '#8b5cf6',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center'
+                                            }}>
+                                                {item.type === 'project' ? <Folder size={20} /> : <Terminal size={20} />}
+                                            </div>
+                                            <div style={{
+                                                padding: '4px 10px',
+                                                borderRadius: '6px',
+                                                backgroundColor: 'rgba(255,255,255,0.05)',
+                                                fontSize: '10px',
+                                                fontWeight: '800',
+                                                textTransform: 'uppercase',
+                                                letterSpacing: '0.05em',
+                                                color: 'var(--text-muted)'
+                                            }}>
+                                                {item.type === 'project' ? 'Project' : 'Room'}
+                                            </div>
                                         </div>
-                                        <div style={{
-                                            padding: '4px 10px',
-                                            borderRadius: '6px',
-                                            backgroundColor: 'rgba(255,255,255,0.05)',
-                                            fontSize: '10px',
-                                            fontWeight: '800',
-                                            textTransform: 'uppercase',
-                                            letterSpacing: '0.05em',
-                                            color: 'var(--text-muted)'
-                                        }}>
-                                            {item.type === 'project' ? 'Project' : 'Room'}
+                                        <div>
+                                            <h3 style={{ fontSize: '18px', fontWeight: '700', margin: '0 0 4px 0', color: 'var(--text-main)' }}>{item.name}</h3>
+                                            <p style={{ fontSize: '14px', color: 'var(--text-muted)', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                                {item.type === 'project' 
+                                                    ? (item.description || `${item.type === 'web' ? 'Fullstack web' : 'Technical'} development project`)
+                                                    : `Collaborative coding session • ID: ${item.id.substring(0, 8)}`
+                                                }
+                                            </p>
+                                        </div>
+                                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 'auto', paddingTop: '16px', borderTop: '1px solid var(--border-color)' }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                <Calendar size={14} color="var(--text-muted)" />
+                                                <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                                                    {item.type === 'project' ? 'Updated recently' : 'Opened recently'}
+                                                </span>
+                                            </div>
+                                            <ChevronRight size={16} color="var(--primary)" />
                                         </div>
                                     </div>
-                                    <div>
-                                        <h3 style={{ fontSize: '18px', fontWeight: '700', margin: '0 0 4px 0', color: 'var(--text-main)' }}>{item.name}</h3>
-                                        <p style={{ fontSize: '14px', color: 'var(--text-muted)', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                            {item.type === 'project' 
-                                                ? (item.description || `${item.type === 'web' ? 'Fullstack web' : 'Technical'} development project`)
-                                                : `Collaborative coding session • ID: ${item.id.substring(0, 8)}`
-                                            }
-                                        </p>
-                                    </div>
-                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 'auto', paddingTop: '16px', borderTop: '1px solid var(--border-color)' }}>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                            <Calendar size={14} color="var(--text-muted)" />
-                                            <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
-                                                {item.type === 'project' ? 'Updated recently' : 'Opened recently'}
-                                            </span>
-                                        </div>
-                                        <ChevronRight size={16} color="var(--primary)" />
-                                    </div>
+                                ))}
+                            </div>
+
+                            {/* Pagination Dots */}
+                            {activityItems.length > 1 && (
+                                <div style={{
+                                    display: 'flex',
+                                    justifyContent: 'center',
+                                    gap: '8px',
+                                    marginTop: '8px'
+                                }}>
+                                    {activityItems.map((_, i) => (
+                                        <button
+                                            key={`dot-${i}`}
+                                            onClick={() => scrollToItem(i)}
+                                            style={{
+                                                width: scrollIndex === i ? '24px' : '6px',
+                                                height: '6px',
+                                                borderRadius: '3px',
+                                                backgroundColor: scrollIndex === i ? 'var(--primary)' : 'var(--border-color)',
+                                                border: 'none',
+                                                cursor: 'pointer',
+                                                padding: 0,
+                                                transition: 'all 0.3s ease'
+                                            }}
+                                            aria-label={`Go to item ${i + 1}`}
+                                        />
+                                    ))}
                                 </div>
-                            ))}
+                            )}
                         </div>
                     </div>
                 )}
@@ -894,6 +926,19 @@ const confirmButtonStyle = {
     fontSize: '14px',
     fontWeight: '700',
     cursor: 'pointer'
+};
+
+const carouselBtnStyle = {
+    border: '1px solid var(--border-color)',
+    background: 'var(--bg-card)',
+    color: 'var(--text-main)',
+    padding: '8px',
+    borderRadius: '8px',
+    cursor: 'pointer',
+    transition: 'all 0.2s',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center'
 };
 
 export default Dashboard;
