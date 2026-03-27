@@ -1302,39 +1302,39 @@ const ProjectPage = () => {
                                                                     ) : (
                                                                         <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
                                                                             <div style={{ display: 'flex', backgroundColor: 'rgba(255,255,255,0.02)', borderBottom: '1px solid var(--border-color)', height: '28px' }}>
-                                                                                <button
-                                                                                    onClick={() => setTerminalTab('output')}
-                                                                                    style={{
-                                                                                        padding: '0 16px',
-                                                                                        height: '100%',
-                                                                                        backgroundColor: terminalTab === 'output' ? 'rgba(255,255,255,0.05)' : 'transparent',
-                                                                                        border: 'none',
-                                                                                        borderBottom: terminalTab === 'output' ? '2px solid var(--primary)' : 'none',
-                                                                                        color: terminalTab === 'output' ? 'var(--primary)' : 'var(--text-muted)',
-                                                                                        fontSize: '9px',
-                                                                                        fontWeight: '800',
-                                                                                        cursor: 'pointer',
-                                                                                        textTransform: 'uppercase',
-                                                                                        letterSpacing: '0.05em'
-                                                                                    }}
-                                                                                >
-                                                                                    OUTPUT
-                                                                                </button>
+                                                                                    <button
+                                                                                        onClick={() => setTerminalTab('output')}
+                                                                                        style={{
+                                                                                            padding: '0 16px',
+                                                                                            height: '100%',
+                                                                                            backgroundColor: terminalTab === 'output' ? (isLightMode ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.05)') : 'transparent',
+                                                                                            border: 'none',
+                                                                                            borderBottom: terminalTab === 'output' ? '2px solid var(--primary)' : 'none',
+                                                                                            color: terminalTab === 'output' ? 'var(--primary)' : 'var(--text-muted)',
+                                                                                            fontSize: '10px',
+                                                                                            fontWeight: '900',
+                                                                                            cursor: 'pointer',
+                                                                                            textTransform: 'uppercase',
+                                                                                            letterSpacing: '0.08em'
+                                                                                        }}
+                                                                                    >
+                                                                                        OUTPUT
+                                                                                    </button>
                                                                                 {project?.type !== 'web' && (
                                                                                     <button
                                                                                         onClick={() => setTerminalTab('input')}
                                                                                         style={{
                                                                                             padding: '0 16px',
                                                                                             height: '100%',
-                                                                                            backgroundColor: terminalTab === 'input' ? 'rgba(255,255,255,0.05)' : 'transparent',
+                                                                                            backgroundColor: terminalTab === 'input' ? (isLightMode ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.05)') : 'transparent',
                                                                                             border: 'none',
                                                                                             borderBottom: terminalTab === 'input' ? '2px solid var(--primary)' : 'none',
                                                                                             color: terminalTab === 'input' ? 'var(--primary)' : 'var(--text-muted)',
-                                                                                            fontSize: '9px',
-                                                                                            fontWeight: '800',
+                                                                                            fontSize: '10px',
+                                                                                            fontWeight: '900',
                                                                                             cursor: 'pointer',
                                                                                             textTransform: 'uppercase',
-                                                                                            letterSpacing: '0.05em'
+                                                                                            letterSpacing: '0.08em'
                                                                                         }}
                                                                                     >
                                                                                         INPUT (STDIN)
@@ -1354,9 +1354,10 @@ const ProjectPage = () => {
                                                                                             height: '100%',
                                                                                             backgroundColor: 'transparent',
                                                                                             border: 'none',
-                                                                                            color: '#d1d5db',
-                                                                                            padding: '12px',
-                                                                                            fontSize: '12px',
+                                                                                            color: 'var(--text-main)',
+                                                                                            padding: '16px',
+                                                                                            fontSize: '13px',
+                                                                                            lineHeight: '1.6',
                                                                                             fontFamily: 'monospace',
                                                                                             outline: 'none',
                                                                                             resize: 'none',
@@ -1841,7 +1842,7 @@ const outputPaneStyle = {
 
 const outputHeaderStyle = {
     padding: '8px 16px',
-    backgroundColor: 'rgba(255,255,255,0.02)',
+    backgroundColor: 'var(--bg-card)',
     borderBottom: '1px solid var(--border-color)',
     display: 'flex',
     justifyContent: 'space-between',
@@ -1856,12 +1857,14 @@ const outputHeaderStyle = {
 const outputTextStyle = {
     padding: '16px',
     margin: 0,
-    color: '#d1d5db',
+    color: 'var(--text-main)',
     fontSize: '13px',
+    lineHeight: '1.6',
     fontFamily: 'monospace',
     whiteSpace: 'pre-wrap',
     overflowY: 'auto',
-    height: '100%'
+    height: '100%',
+    opacity: 0.95
 };
 
 const closeTabStyle = {

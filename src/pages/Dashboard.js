@@ -358,38 +358,41 @@ const Dashboard = () => {
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                                 <div style={{ width: '8px', height: '24px', backgroundColor: 'var(--primary)', borderRadius: '4px' }} />
-                                <h2 style={{ fontSize: '22px', fontWeight: '900', margin: 0, letterSpacing: '-0.02em' }}>Recent Activity</h2>
+                                <h2 style={{ fontSize: '20px', fontWeight: '800', margin: 0, letterSpacing: '-0.02em', color: 'var(--text-main)' }}>Recent Activity</h2>
                             </div>
                             
-                            <div style={{ display: 'flex', gap: '8px' }}>
+                            <div style={{ display: 'flex', gap: '10px' }}>
                                 <button 
                                     onClick={() => scrollCarousel('left')}
                                     style={carouselBtnStyle}
+                                    title="Scroll Left"
                                 >
-                                    <ChevronLeft size={20} />
+                                    <ChevronLeft size={18} />
                                 </button>
                                 <button 
                                     onClick={() => scrollCarousel('right')}
                                     style={carouselBtnStyle}
+                                    title="Scroll Right"
                                 >
-                                    <ChevronRight size={20} />
+                                    <ChevronRight size={18} />
                                 </button>
                             </div>
                         </div>
 
-                        <div style={{ position: 'relative', minWidth: 0, overflow: 'visible' }}>
+                        <div style={{ position: 'relative', width: '100%', minWidth: 0 }}>
                             <div 
                                 ref={carouselRef}
                                 onScroll={handleCarouselScroll}
                                 style={{
                                     display: 'flex',
-                                    gap: '24px',
+                                    gap: '20px',
                                     overflowX: 'auto',
-                                    paddingBottom: '24px',
+                                    padding: '4px 4px 24px 4px',
                                     scrollSnapType: 'x mandatory',
                                     scrollbarWidth: 'none',
                                     msOverflowStyle: 'none',
-                                    WebkitOverflowScrolling: 'touch'
+                                    WebkitOverflowScrolling: 'touch',
+                                    minHeight: '180px'
                                 }}
                                 className="activity-carousel"
                             >
@@ -403,25 +406,36 @@ const Dashboard = () => {
                                         onClick={() => navigate(item.type === 'project' ? `/project/${item.id}` : `/editor/${item.id}`)}
                                         className="activity-card"
                                         style={{
-                                            flex: '0 0 320px',
+                                            flex: '0 0 300px',
+                                            height: '160px',
                                             padding: '20px',
                                             backgroundColor: 'var(--bg-card)',
                                             border: '1px solid var(--border-color)',
                                             borderRadius: '16px',
                                             cursor: 'pointer',
-                                            transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
+                                            transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
                                             display: 'flex',
                                             flexDirection: 'column',
-                                            gap: '16px',
+                                            justifyContent: 'space-between',
                                             position: 'relative',
-                                            overflow: 'hidden',
-                                            scrollSnapAlign: 'start'
+                                            scrollSnapAlign: 'start',
+                                            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+                                        }}
+                                        onMouseOver={(e) => {
+                                            e.currentTarget.style.transform = 'translateY(-4px)';
+                                            e.currentTarget.style.borderColor = 'var(--primary)';
+                                            e.currentTarget.style.boxShadow = '0 10px 15px -3px rgba(37, 99, 235, 0.15)';
+                                        }}
+                                        onMouseOut={(e) => {
+                                            e.currentTarget.style.transform = 'translateY(0)';
+                                            e.currentTarget.style.borderColor = 'var(--border-color)';
+                                            e.currentTarget.style.boxShadow = '0 4px 6px -1px rgba(0, 0, 0, 0.1)';
                                         }}
                                     >
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                             <div style={{
-                                                width: '40px',
-                                                height: '40px',
+                                                width: '36px',
+                                                height: '36px',
                                                 borderRadius: '10px',
                                                 backgroundColor: item.type === 'project' ? 'rgba(59, 130, 246, 0.1)' : 'rgba(139, 92, 246, 0.1)',
                                                 color: item.type === 'project' ? '#3b82f6' : '#8b5cf6',
@@ -429,38 +443,29 @@ const Dashboard = () => {
                                                 alignItems: 'center',
                                                 justifyContent: 'center'
                                             }}>
-                                                {item.type === 'project' ? <Folder size={20} /> : <Terminal size={20} />}
+                                                {item.type === 'project' ? <Folder size={18} /> : <Terminal size={18} />}
                                             </div>
-                                            <div style={{
-                                                padding: '4px 10px',
-                                                borderRadius: '6px',
-                                                backgroundColor: 'rgba(255,255,255,0.05)',
+                                            <span style={{
                                                 fontSize: '10px',
-                                                fontWeight: '800',
+                                                fontWeight: '700',
                                                 textTransform: 'uppercase',
-                                                letterSpacing: '0.05em',
-                                                color: 'var(--text-muted)'
-                                            }}>
-                                                {item.type === 'project' ? 'Project' : 'Room'}
-                                            </div>
+                                                color: 'var(--text-muted)',
+                                                letterSpacing: '0.05em'
+                                            }}>{item.type}</span>
                                         </div>
+                                        
                                         <div>
-                                            <h3 style={{ fontSize: '18px', fontWeight: '700', margin: '0 0 4px 0', color: 'var(--text-main)' }}>{item.name}</h3>
-                                            <p style={{ fontSize: '14px', color: 'var(--text-muted)', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                                {item.type === 'project' 
-                                                    ? (item.description || `${item.type === 'web' ? 'Fullstack web' : 'Technical'} development project`)
-                                                    : `Collaborative coding session • ID: ${item.id.substring(0, 8)}`
-                                                }
+                                            <h3 style={{ fontSize: '16px', fontWeight: '700', margin: '0 0 4px 0', color: 'var(--text-main)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                                {item.name}
+                                            </h3>
+                                            <p style={{ fontSize: '13px', color: 'var(--text-muted)', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                                {item.type === 'project' ? (item.description || 'Active development') : `ID: ${item.id.substring(0, 8)}`}
                                             </p>
                                         </div>
-                                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 'auto', paddingTop: '16px', borderTop: '1px solid var(--border-color)' }}>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                                <Calendar size={14} color="var(--text-muted)" />
-                                                <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
-                                                    {item.type === 'project' ? 'Updated recently' : 'Opened recently'}
-                                                </span>
-                                            </div>
-                                            <ChevronRight size={16} color="var(--primary)" />
+
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', color: 'var(--text-muted)' }}>
+                                            <Calendar size={12} /> 
+                                            <span>Recently {item.type === 'project' ? 'built' : 'opened'}</span>
                                         </div>
                                     </div>
                                 ))}
@@ -469,26 +474,30 @@ const Dashboard = () => {
                             {/* Pagination Dots */}
                             {activityItems.length > 1 && (
                                 <div style={{
+                                    position: 'absolute',
+                                    bottom: '-2px',
+                                    left: '50%',
+                                    transform: 'translateX(-50%)',
                                     display: 'flex',
-                                    justifyContent: 'center',
-                                    gap: '8px',
-                                    marginTop: '8px'
+                                    gap: '6px',
+                                    padding: '8px',
+                                    zIndex: 5
                                 }}>
                                     {activityItems.map((_, i) => (
                                         <button
                                             key={`dot-${i}`}
                                             onClick={() => scrollToItem(i)}
                                             style={{
-                                                width: scrollIndex === i ? '24px' : '6px',
+                                                width: scrollIndex === i ? '20px' : '6px',
                                                 height: '6px',
                                                 borderRadius: '3px',
                                                 backgroundColor: scrollIndex === i ? 'var(--primary)' : 'var(--border-color)',
                                                 border: 'none',
                                                 cursor: 'pointer',
                                                 padding: 0,
-                                                transition: 'all 0.3s ease'
+                                                transition: 'all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)'
                                             }}
-                                            aria-label={`Go to item ${i + 1}`}
+                                            aria-label={`Show slide ${i + 1}`}
                                         />
                                     ))}
                                 </div>

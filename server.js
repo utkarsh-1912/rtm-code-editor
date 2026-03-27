@@ -223,6 +223,37 @@ app.get("/api/welcome-new-user", async (req, res) => {
   }
 });
 
+app.get("/api/test-email", async (req, res) => {
+  try {
+    const { email } = req.query;
+    if (!email) return res.status(400).json({ error: "Email query param required" });
+
+    const html = getEmailTemplate({
+      title: "System Performance Test",
+      message: "This is a diagnostic notification from <strong>Utkristi Colabs</strong> to verify your SMTP relay configuration. If you're reading this, your communication pipeline is mission-ready.",
+      ctaText: "Return to Dashboard",
+      ctaUrl: process.env.APP_URL || "http://localhost:5000",
+      inviterName: "Utkristi Colabs Admin",
+      recipientEmail: email
+    });
+
+    const BREVO_KEY = process.env.BREVO_API_KEY;
+    if (!BREVO_KEY) return res.status(500).json({ error: "SMTP relay key not configured (BREVO_API_KEY missing)" });
+
+    const result = await fetchRelay("https://api.brevo.com/v3/smtp/email", {
+      sender: { name: "Utkristi Colabs Diagnostics", email: process.env.BREVO_FROM_EMAIL || "noreply@rtm-edit.com" },
+      to: [{ email }],
+      subject: "Communication Pipeline Verified - Utkristi Colabs",
+      htmlContent: html
+    }, BREVO_KEY);
+
+    res.json({ success: true, message: "Diagnostic email dispatched", brevoStatus: result.status });
+  } catch (err) {
+    console.error("[TestEmail] Error:", err);
+    res.status(500).json({ error: "SMTP Relay Failure", message: err.message });
+  }
+});
+
 app.get("/api/user-dashboard", async (req, res) => {
   try {
     const { userId } = req.query;
