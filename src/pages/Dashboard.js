@@ -24,6 +24,7 @@ const Dashboard = () => {
     const { user, loading } = useAuth();
     const navigate = useNavigate();
     const location = useLocation();
+    const [projects, setProjects] = useState([]);
     const [recentRooms, setRecentRooms] = useState([]);
     const [loadingRooms, setLoadingRooms] = useState(true);
     const [stats, setStats] = useState({ totalRooms: 0, sessions: 0, hours: 0 });
@@ -35,7 +36,6 @@ const Dashboard = () => {
     const [showDeleteModal, setShowDeleteModal] = useState(null);
     const [newName, setNewName] = useState('');
     const [activeTab, setActiveTab] = useState('rooms'); // rooms, projects
-    const [projects, setProjects] = useState([]);
     const [showCreateProjectModal, setShowCreateProjectModal] = useState(false);
     const [newProjectName, setNewProjectName] = useState('');
     const [newProjectDesc, setNewProjectDesc] = useState('');

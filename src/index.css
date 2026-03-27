@@ -13,6 +13,13 @@
   --border-color: rgba(255, 255, 255, 0.1);
   --glass-border: rgba(255, 255, 255, 0.08);
   --accent-glow: rgba(59, 130, 246, 0.3);
+  
+  /* Glassmorphism 2.0 Tokens */
+  --glass-bg: rgba(15, 23, 42, 0.7);
+  --glass-border: rgba(255, 255, 255, 0.08);
+  --glass-blur: 16px;
+  --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.4);
+  
   --bg-image: radial-gradient(circle at 15% 50%, rgba(59, 130, 246, 0.15), transparent 25%),
     radial-gradient(circle at 85% 30%, rgba(139, 92, 246, 0.15), transparent 25%);
 }
@@ -30,6 +37,13 @@
   --border-color: #cbd5e1;
   --glass-border: rgba(0, 0, 0, 0.1);
   --accent-glow: rgba(37, 99, 235, 0.1);
+  
+  /* Glassmorphism 2.0 Tokens - Light Mode */
+  --glass-bg: rgba(255, 255, 255, 0.85);
+  --glass-border: rgba(0, 0, 0, 0.08);
+  --glass-blur: 12px;
+  --glass-shadow: 0 8px 32px 0 rgba(148, 163, 184, 0.15);
+  
   --bg-image: radial-gradient(circle at 15% 50%, rgba(59, 130, 246, 0.08), transparent 25%),
     radial-gradient(circle at 85% 30%, rgba(139, 92, 246, 0.08), transparent 25%);
 }

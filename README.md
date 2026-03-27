@@ -1,26 +1,32 @@
-# Utkristi Colabs 🚀
+# Utkristi Colabs: Enterprise-Grade Collaborative IDE 🚀
 
 Utkristi Colabs is a **world-class real-time collaborative IDE** engineered for high-performance engineering teams. It merges professional-grade code synchronization with cinematic video conferencing and a premium developer experience.
 
 ![Utkristi Colabs Banner](https://utkristi-colabs.onrender.com/utkristi-colabs.png)
 
-## ✨ Enterprise-Grade Features
+## 💎 Premium Features
 
-- **🎥 Cinematic Video Conferencing**: Low-latency 4K video with an intelligent 16:9 grid that auto-scales across all devices without clipping.
-- **🚀 Pro Project Workspaces**: Persistent multi-file directory structures built on Neon PostgreSQL with sub-millisecond Keystroke Sync.
-- **🎨 Advanced Architectural Whiteboard**: Real-time sketching with dual-canvas synchronization and user-tagged cursors.
-- **🛡️ Enterprise Communication**: A localized email engine using Brevo, featuring high-fidelity invitations and self-service compliance management.
-- **📱 Universal Mobile Focus**: Fully optimized mobile IDE with a specialized navigation tray and zero-clutter headers.
-- **💾 Global State Persistence**: Automatically saved room states, chat histories, and snippet vaults ensuring zero data loss.
-- **🛠️ Multi-Runtime Support**: Instant code execution via Judge0 for Python, C++, Java, and JavaScript.
+### 🎨 State-of-the-Art UI/UX
+- **Glassmorphism 2.0**: A sophisticated, theme-aware aesthetic with layered blurs, glowing borders, and dynamic saturation.
+- **Zen Mode (`Alt + Z`)**: A one-click distraction-free interface that hides sidebars and terminals for deep-focus coding sessions.
+- **Command Palette (`Ctrl + K`)**: A powerful fuzzy-search interface to access all IDE actions, file navigation, and settings instantly.
+
+### 🚀 Advanced Workspace
+- **Multi-File Persistence**: Full project directory support with hierarchical structures built on Neon PostgreSQL.
+- **Real-time Synchronization**: Sub-millisecond multi-cursor precision powered by advanced Operational Transformation (OT).
+- **Cinematic Video Chat**: Integrated 4K-ready video conferencing with an intelligent 16:9 grid that auto-scales without clipping.
+
+### 📊 Enterprise Dashboard
+- **Activity Timeline**: A horizontal, scrollable carousel tracking your recent project interactions and team contributions.
+- **Project Health Hub**: Visualized project cards with language breakdowns, collaborator counts, and metadata.
+- **SMTP Relay Diagnostics**: Built-in verification tools for ensuring enterprise email delivery and SMTP health.
 
 ## 🛠️ Tech Stack
 
-- **Frontend**: React.js, CodeMirror 6, Lucide Icons, React-Router-Dom v6.
-- **Backend**: Node.js 22+, Express.js, Socket.io (Real-time).
-- **Communication**: Brevo API (Transactional Emails), WebRTC (Video/Audio).
+- **Frontend**: React 18, CodeMirror 6, Lucide Icons, Vanilla CSS (Premium Design System).
+- **Backend**: Node.js 22+, Express.js, Socket.io (Real-time Topology).
+- **Communication**: Brevo API (Transactional Emails), WebRTC (Direct Media Relay).
 - **Database**: PostgreSQL (Neon Serverless).
-- **Security**: Firebase Identity Management with session tracking.
 
 ## 🚀 Quick Start
 
@@ -31,14 +37,15 @@ Utkristi Colabs is a **world-class real-time collaborative IDE** engineered for 
 - Brevo API Key
 
 ### Installation
-1. Clone & Install:
+
+1. **Clone & Install**:
    ```bash
    git clone https://github.com/utkarsh-1912/rtm-code-editor.git
    cd rtm-code-editor
    npm install
    ```
 
-2. Configuration (`.env`):
+2. **Configuration (`.env`)**:
    ```env
    DATABASE_URL=your_postgresql_url
    BREVO_API_KEY=your_brevo_key
@@ -46,16 +53,18 @@ Utkristi Colabs is a **world-class real-time collaborative IDE** engineered for 
    APP_URL=https://your-deployment.com
    ```
 
-3. Run Environment:
+3. **Run Development**:
    ```bash
-   # Production-ready Server
+   # Start Production-ready Server
    node server.js
+   # In another terminal
+   npm start
    ```
 
 ## 📐 Enterprise Architecture
 
 Utkristi Colabs uses a **Tri-Sync Topology**:
-1. **Keystroke Layer**: WebSockets handle OT-like synchronization for immediate feedback.
+1. **Keystroke Layer**: WebSockets handle OT synchronization for immediate feedback.
 2. **Persistence Layer**: All project artifacts are written to PostgreSQL on every significant change.
 3. **Media Layer**: Peer-to-peer WebRTC handles the heavy lifting of video conferencing, offloading server resources.
 

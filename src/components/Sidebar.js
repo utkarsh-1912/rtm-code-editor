@@ -37,8 +37,11 @@ const Sidebar = ({ isOpen, onClose, isMobile, isCollapsed, onToggleCollapse, isL
             height: '100%',
             display: 'flex',
             flexDirection: 'column',
-            backgroundColor: 'var(--bg-card)',
-            borderRight: '1px solid var(--border-color)',
+            backgroundColor: 'var(--glass-bg)',
+            backdropFilter: 'blur(var(--glass-blur))',
+            WebkitBackdropFilter: 'blur(var(--glass-blur))',
+            borderRight: '1px solid var(--glass-border)',
+            boxShadow: 'var(--glass-shadow)',
             padding: isCollapsed && !isMobile ? '24px 12px' : '24px 16px',
             transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
             overflow: 'hidden'

@@ -12,10 +12,10 @@ import {
 
 export default function About() {
     return (
-        <ContentLayout title="The Utkristi Colabs Vision">
+        <ContentLayout title="Utkristi Colabs Vision">
             <div style={{ marginBottom: '60px' }}>
                 <p style={{ fontSize: '20px', lineHeight: '1.6', color: 'var(--text-main)', fontWeight: '500' }}>
-                    Utkristi Colabs (Utkristi Colabs) is a next-generation collaborative IDE engineered for the highest tier of technical teams.
+                    Utkristi Colabs is a next-generation collaborative IDE engineered for the highest tier of technical teams.
                     We've eliminated the friction of remote engineering by fusing high-performance code synchronization with cinematic video communication and enterprise-grade reliability.
                 </p>
             </div>
@@ -27,37 +27,38 @@ export default function About() {
                     </h2>
                     <p style={{ color: 'var(--text-muted)', lineHeight: '1.7' }}>
                         Experience 4K, low-latency video conferencing integrated directly into your workspace.
-                        Our cinematic 16:9 grid intelligently scales to provide an immersive pair-programming experience without ever clipping or cluttered layouts.
+                        Our cinematic 16:9 grid intelligently scales to provide an immersive pair-programming experience.
                     </p>
                 </section>
 
                 <section>
                     <h2 style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: '22px', fontWeight: '800', marginBottom: '16px', color: '#10b981' }}>
-                        <Layers size={24} /> Multi-File Projects
+                        <Layers size={24} /> Focus-Driven Workspace
                     </h2>
                     <p style={{ color: 'var(--text-muted)', lineHeight: '1.7' }}>
-                        Move beyond simple one-off snippets. Utkristi Colabs supports persistent, hierarchical project directories
-                        synced across all participants with sub-millisecond precision using our advanced Operational Transformation engine.
+                        Utkristi Colabs features <strong>Glassmorphism 2.0</strong> aesthetics and a dedicated <strong>Zen Mode</strong> (`Alt+Z`) 
+                        to eliminate distractions. Our <strong>Command Palette</strong> (`Ctrl+K`) ensures every IDE action is just a keystroke away.
                     </p>
                 </section>
 
                 <section>
                     <h2 style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: '22px', fontWeight: '800', marginBottom: '16px', color: '#8b5cf6' }}>
-                        <Lock size={24} /> Enterprise Communication
+                        <Zap size={24} /> Enterprise Hub
                     </h2>
                     <p style={{ color: 'var(--text-muted)', lineHeight: '1.7' }}>
-                        Collaborate with confidence. Our enterprise-grade notification system handles project invitations with
-                        professional branding, reliable delivery, and full self-service subscription management to respect user privacy and compliance.
+                        Manage your engineering lifecycle with our high-fidelity <strong>Dashboard</strong>. 
+                        Includes horizontal activity carousels, real-time project health, and <strong>SMTP Relay Diagnostics</strong> 
+                        to ensure your team communication never fails.
                     </p>
                 </section>
 
                 <section>
                     <h2 style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: '22px', fontWeight: '800', marginBottom: '16px', color: '#f59e0b' }}>
-                        <Cpu size={24} /> High-Performance Stack
+                        <Cpu size={24} /> Next-Gen Execution
                     </h2>
                     <p style={{ color: 'var(--text-muted)', lineHeight: '1.7' }}>
-                        Built on an uncompromising infrastructure of Node.js, WebSockets (Socket.io), and Neon PostgreSQL.
-                        We ensure that every keystroke, cursor movement, and whiteboard stroke is persistent and real-time.
+                        Powered by Node 22 and PostgreSQL, Utkristi Colabs offers persistent multi-file environments with 
+                        sub-millisecond Operational Transformation (OT) for conflict-free global collaboration.
                     </p>
                 </section>
             </div>
