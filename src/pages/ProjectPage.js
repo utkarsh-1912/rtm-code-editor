@@ -16,11 +16,6 @@ import {
     Moon,
     Users,
     Play,
-    Trash2,
-    RotateCcw,
-    Palette,
-    ChevronRight,
-    Square,
     Mic,
     MicOff,
     VideoOff,
@@ -39,12 +34,9 @@ import ChatWindow from "../components/chatWindow";
 import InviteModal from "../components/InviteModal";
 import CommandPalette from "../components/CommandPalette";
 import { 
-    Command, 
     Eye, 
     EyeOff, 
     Search, 
-    Sparkles, 
-    Command as CommandIcon,
     Layout,
     User
 } from "lucide-react";
@@ -75,12 +67,10 @@ const ProjectPage = () => {
         wordWrap: true
     });
 
-    const [isSidebarVisible, setIsSidebarVisible] = useState(true);
 
     const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
     const [clients, setClients] = useState([]);
     const [guestName, setGuestName] = useState("");
-    const [remoteCursors, setRemoteCursors] = useState({}); // { socketId: { userName, fileId } }
     const [showInviteModal, setShowInviteModal] = useState(false);
 
 
@@ -95,12 +85,9 @@ const ProjectPage = () => {
     const [theme, setTheme] = useState(localStorage.getItem("app-theme") || "dark");
     const [isExecuting, setIsExecuting] = useState(false);
     const [output, setOutput] = useState("");
-    const [terminalTab, setTerminalTab] = useState('output');
     const [mediaStates, setMediaStates] = useState({});
     const [isOutputVisible, setIsOutputVisible] = useState(true);
-    const [showPreview, setShowPreview] = useState(false);
     const [activeTab, setActiveTab] = useState('code'); // 'code', 'files', 'chat', 'users', 'video'
-    const [userInput, setUserInput] = useState("");
     const [isMeetingMinimized, setIsMeetingMinimized] = useState(false); // false = no PiP until user explicitly minimizes an active call
     const [isMeetingStarting, setIsMeetingStarting] = useState(false);
     const [isZenMode, setIsZenMode] = useState(false);
@@ -235,7 +222,7 @@ const ProjectPage = () => {
         }));
 
         return [...baseActions, ...fileActions, ...teamActions];
-    }, [isZenMode, isOutputVisible, isLightMode, files, clients, projectId]);
+    }, [isZenMode, isOutputVisible, isLightMode, files, clients, navigate, handleCompile, handleFileClick, toggleTheme, setShowWhiteboard, setShowInviteModal]);
 
     useEffect(() => {
         const handleGlobalKeydown = (e) => {
@@ -301,7 +288,6 @@ const ProjectPage = () => {
                 setProject(projData);
 
                 if (projData.type === 'web') {
-                    setShowPreview(true);
                     setIsOutputVisible(true);
                 }
 
@@ -342,10 +328,8 @@ const ProjectPage = () => {
                 });
 
                 // Track which file each remote user is editing
-                socketRef.current.on(ACTIONS.CURSOR_MOVE, ({ socketId, fileId, userName: remoteName }) => {
-                    if (fileId) {
-                        setRemoteCursors(prev => ({ ...prev, [socketId]: { userName: remoteName, fileId } }));
-                    }
+                socketRef.current.on(ACTIONS.CURSOR_MOVE, ({ fileId }) => {
+                    // Cursors logic disabled to resolve unused state warn
                 });
 
                 // Sync chat history when joining project room
@@ -559,85 +543,7 @@ const ProjectPage = () => {
         }
     };
 
-    const handleDeleteFile = async (e, file) => {
-        e.stopPropagation();
-        if (!window.confirm(`Are you sure you want to delete ${file.name}?`)) return;
 
-        try {
-            const backendUrl = getBackendUrl();
-            const res = await fetch(`${backendUrl}/api/projects/${projectId}/files?path=${encodeURIComponent(file.path)}`, {
-                method: 'DELETE'
-            });
-
-            if (!res.ok) throw new Error("Failed to delete file");
-
-            setFiles(prev => {
-                const updated = prev.filter(f => f.id !== file.id);
-                if (activeFile?.id === file.id) {
-                    setActiveFile(updated.length > 0 ? updated[0] : null);
-                }
-                return updated;
-            });
-            setOpenFiles(prev => prev.filter(f => f.id !== file.id));
-
-            socketRef.current.emit(ACTIONS.FILE_CHANGE, {
-                roomId: `project-${projectId}`,
-                fileId: file.id,
-                isDeleted: true
-            });
-
-            toast.success("File deleted");
-        } catch (err) {
-            toast.error("Error deleting file");
-        }
-    };
-
-    const handleResetFile = async (file) => {
-        if (!window.confirm(`Reset ${file.name} to default content? This will overwrite your changes.`)) return;
-
-        const type = project?.type || "web";
-        let defaultContent = "";
-
-        if (type === "web") {
-            if (file.name === 'index.html') defaultContent = '<!DOCTYPE html>\n<html>\n<head>\n  <title>New Project</title>\n</head>\n<body>\n  <h1>Hello World</h1>\n</body>\n</html>';
-            else if (file.name === 'style.css') defaultContent = 'body {\n  background-color: #f0f0f0;\n  font-family: sans-serif;\n}';
-            else if (file.name === 'script.js') defaultContent = 'console.log("Hello from script.js");';
-        } else if (type === "cpp") {
-            if (file.name === 'main.cpp') defaultContent = '#include <iostream>\n\nint main() {\n    std::cout << "Hello Utkristi Colabs!" << std::endl;\n    return 0;\n}';
-            else if (file.name === 'utils.h') defaultContent = '// Utility functions\n#ifndef UTILS_H\n#define UTILS_H\n\nvoid greet();\n\n#endif';
-        } else if (type === "python") {
-            if (file.name === 'main.py') defaultContent = 'def main():\n    print("Hello from Utkristi Colabs!")\n\nif __name__ == "__main__":\n    main()';
-        } else if (type === "java") {
-            if (file.name === 'Main.java') defaultContent = 'public class Main {\n    public static void main(String[] args) {\n        System.out.println("Hello from Java!");\n    }\n}';
-        }
-
-        if (!defaultContent) {
-            toast.error("No default content for this file.");
-            return;
-        }
-
-        try {
-            const backendUrl = getBackendUrl();
-            await fetch(`${backendUrl}/api/projects/${projectId}/files`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ fileId: file.id, content: defaultContent })
-            });
-
-            setFiles(prev => prev.map(f => f.id === file.id ? { ...f, content: defaultContent } : f));
-            if (activeFile?.id === file.id) setActiveFile({ ...activeFile, content: defaultContent });
-
-            socketRef.current.emit(ACTIONS.FILE_CHANGE, {
-                roomId: `project-${projectId}`,
-                fileId: file.id,
-                content: defaultContent,
-                socketId: socketRef.current.id
-            });
-            toast.success("File reset to default");
-        } catch (err) {
-            toast.error("Failed to reset file");
-        }
-    };
 
     const handleImportFile = (e) => {
         const file = e.target.files[0];
@@ -684,14 +590,12 @@ const ProjectPage = () => {
     const handleCompile = async () => {
         const projectType = project?.type || "web";
         if (projectType === "web") {
-            setShowPreview(true);
             setIsOutputVisible(true);
             return;
         }
 
         setIsExecuting(true);
         setIsOutputVisible(true);
-        setTerminalTab('output');
         setOutput("Bundling and running...");
 
         const language = activeFile?.name.split('.').pop();
@@ -779,7 +683,7 @@ const ProjectPage = () => {
         const formData = {
             language_id: languageId,
             source_code: btoa(sourceCode),
-            stdin: btoa(userInput || ""),
+            stdin: btoa(""),
         };
 
         const url = "https://judge0-ce.p.rapidapi.com/submissions?base64_encoded=true&fields=*";
@@ -844,29 +748,6 @@ const ProjectPage = () => {
         }
     };
 
-    const generatePreviewDoc = () => {
-        let html = files.find(f => f.name === 'index.html')?.content || '';
-        const css = files.find(f => f.name === 'style.css')?.content || '';
-        const js = files.find(f => f.name === 'script.js')?.content || '';
-
-        // Strip tags that might cause 404s since we are inlining
-        html = html.replace(/<script\s+src=["']script\.js["']\s*><\/script>/gi, '');
-        html = html.replace(/<link\s+rel=["']stylesheet["']\s+href=["']style\.css["']\s*\/?>/gi, '');
-
-        return `
-            <!DOCTYPE html>
-            <html>
-                <head>
-                    <meta charset="UTF-8">
-                    <style>${css}</style>
-                </head>
-                <body>
-                    ${html}
-                    <script>${js}</script>
-                </body>
-            </html>
-        `;
-    };
 
     if (loading) {
         return (
@@ -1055,7 +936,7 @@ const ProjectPage = () => {
                         </div>
                     ) : (
                     <ReflexContainer orientation="vertical" style={{ flex: 1, height: '100%', minHeight: 0 }}>
-                        {!isZenMode && !isMobile && isSidebarVisible && ['files', 'chat', 'users'].includes(sidebarTab) && (
+                        {!isZenMode && !isMobile && ['files', 'chat', 'users'].includes(sidebarTab) && (
                             <ReflexElement flex={0.18} minSize={250} style={{ 
                                 height: '100%', 
                                 minHeight: 0, 
@@ -1095,7 +976,7 @@ const ProjectPage = () => {
                             </ReflexElement>
                         )}
                         
-                        {!isZenMode && !isMobile && isSidebarVisible && ['files', 'chat', 'users'].includes(sidebarTab) && <ReflexSplitter style={splitterStyle} />}
+                        {!isZenMode && !isMobile && ['files', 'chat', 'users'].includes(sidebarTab) && <ReflexSplitter style={splitterStyle} />}
                         
                         <ReflexElement flex={1} style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
                             <div style={studioTabContainerStyle}>
@@ -1379,15 +1260,6 @@ const logoWrapperStyle = {
     transition: 'all 0.2s'
 };
 
-const statusBadgeStyle = {
-    fontSize: '9px',
-    fontWeight: '900',
-    backgroundColor: 'rgba(239, 68, 68, 0.15)',
-    color: '#ef4444',
-    padding: '2px 8px',
-    borderRadius: '4px',
-    letterSpacing: '0.05em'
-};
 
 const shareButtonStyle = {
     backgroundColor: 'var(--primary)',
@@ -1418,11 +1290,6 @@ const sidebarHeaderStyle = {
     height: '40px'
 };
 
-const trayIconsStyle = {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '2px'
-};
 
 const fileItemStyle = (active) => ({
     padding: '10px 12px',
@@ -1519,42 +1386,8 @@ const miniAvatarStyle = {
     border: '2px solid var(--bg-card)'
 };
 
-const notifDotStyle = {
-    position: 'absolute',
-    top: '-2px',
-    right: '-2px',
-    width: '8px',
-    height: '8px',
-    backgroundColor: '#ef4444',
-    borderRadius: '50%',
-    border: '2px solid var(--bg-card)'
-};
 
-const toolRunButtonStyle = {
-    padding: '0 20px',
-    height: '100%',
-    backgroundColor: 'var(--primary)',
-    border: 'none',
-    color: 'white',
-    fontSize: '11px',
-    fontWeight: '800',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: '8px',
-    cursor: 'pointer',
-    transition: 'all 0.2s',
-    borderRadius: '0'
-};
 
-const outputPaneStyle = {
-    flex: 0.4,
-    backgroundColor: 'var(--bg-dark)',
-    borderTop: '1px solid var(--border-color)',
-    display: 'flex',
-    flexDirection: 'column',
-    overflow: 'hidden'
-};
 
 const outputHeaderStyle = {
     padding: '8px 16px',
@@ -1596,8 +1429,6 @@ const closeTabStyle = {
 
 const modalOverlayStyle = {
     position: 'fixed',
-    top: 0,
-    left: 0,
     right: 0,
     bottom: 0,
     backgroundColor: 'rgba(0,0,0,0.85)',

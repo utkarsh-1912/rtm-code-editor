@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { Search, Command, FileText, Play, Eye, EyeOff, Sun, Moon, Link, Settings, X, Zap, Hash, Globe, User, Layout, MessageSquare, Terminal, Folder, FileCode, Users, Video } from 'lucide-react';
+import { Search, Command } from 'lucide-react';
 
 const CommandPalette = ({ isOpen, onClose, actions = [], isLightMode }) => {
     const [search, setSearch] = useState('');

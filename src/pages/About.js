@@ -6,7 +6,6 @@ import {
     Shield,
     Cpu,
     Globe,
-    Lock,
     Layers
 } from "lucide-react";
 
