@@ -24,6 +24,7 @@ import {
     Mic,
     MicOff,
     VideoOff,
+    Zap,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import ProjectEditor from "../components/ProjectEditor";
