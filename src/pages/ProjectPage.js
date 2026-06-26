@@ -194,7 +194,7 @@ const ProjectPage = () => {
             setOutput("Error retrieving execution output.");
             setIsExecuting(false);
         }
-    }, [pollExecutionResult]);
+    }, []);
 
     const handleCompile = React.useCallback(async () => {
         const projectType = project?.type || "web";
