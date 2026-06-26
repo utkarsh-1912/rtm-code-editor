@@ -17,7 +17,8 @@ const VideoChat = ({
     clients = [],
     mediaStates = {},
     initialAudioState = true,
-    initialVideoState = true
+    initialVideoState = true,
+    isMobile = false
 }) => {
     // --- State Management ---
     const [localStream, setLocalStream] = useState(null);
@@ -443,13 +444,23 @@ const VideoChat = ({
 
     // Cleanup camera tracks faithfully on hard unmounts (e.g Sidebar routing to Dashboard)
     useEffect(() => {
-        const currentStream = localStream;
         return () => {
-            if (currentStream) {
-                currentStream.getTracks().forEach(t => t.stop());
+            if (localStream) {
+                localStream.getTracks().forEach(t => t.stop());
             }
+            if (screenStreamRef.current) {
+                screenStreamRef.current.getTracks().forEach(t => t.stop());
+            }
+            if (audioContextRef.current) {
+                audioContextRef.current.close().catch(() => {});
+            }
+            if (socketRef.current) {
+                socketRef.current.emit('leave-video-chat', { projectId });
+            }
+            Object.values(peersRef.current).forEach(peer => peer.close());
+            peersRef.current = {};
         };
-    }, [localStream]);
+    }, [localStream, projectId, socketRef]);
 
 
     // --- Socket Signaling Handlers ---
@@ -675,238 +686,207 @@ const VideoChat = ({
     const totalPages = Math.ceil(totalPeople / pageSize);
 
     if (!inCall) {
-        if (isMinimized) {
-            return (
-                <div style={{ ...minimizedOverlayStyle, left: `${pipPosition.x}px`, top: `${pipPosition.y}px`, bottom: 'auto', right: 'auto', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#0d1117', border: '1px solid var(--primary)', borderRadius: '12px' }}>
-                    <div style={{ color: 'var(--primary)', fontSize: '10px', fontWeight: 'bold' }}>JOINING...</div>
-                </div>
-            );
-        }
-        return (
-            <div style={{ ...containerStyle(isExpanded), display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#0d1117' }}>
-                <div style={{ textAlign: 'center', padding: '40px' }}>
-                    <div style={{
-                        width: '80px', height: '80px', borderRadius: '50%',
-                        background: 'linear-gradient(135deg, var(--primary), #a855f7)',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        margin: '0 auto 24px',
-                        boxShadow: '0 8px 32px rgba(99, 102, 241, 0.3)'
-                    }}>
-                        <Video size={40} color="white" />
-                    </div>
-                    <h2 style={{ color: 'white', marginBottom: '12px', fontSize: '24px', fontWeight: '800', letterSpacing: '-0.02em' }}>
-                        Joining Video Conference...
-                    </h2>
-                    <p style={{ color: 'var(--text-muted)', marginBottom: '32px', maxWidth: '300px', lineHeight: '1.6', margin: '0 auto' }}>
-                        Connecting you to the room and requesting media access.
-                    </p>
-                </div>
-            </div>
-        );
-    }
-
-    if (isMinimized) {
         return (
             <div
                 className="glass-panel"
-                style={{
+                style={isMobile ? {
+                    width: '100%',
+                    height: '100%',
+                    position: 'relative',
+                    left: 0,
+                    top: 0,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    backgroundColor: 'var(--bg-card)',
+                    border: 'none',
+                    borderRadius: 0
+                } : {
                     ...minimizedOverlayStyle,
                     left: `${pipPosition.x}px`,
                     top: `${pipPosition.y}px`,
                     bottom: 'auto',
                     right: 'auto',
-                    border: isDragging ? '2px solid var(--primary)' : '1px solid rgba(255,255,255,0.1)',
-                    scale: isDragging ? '1.02' : '1',
-                    transition: isDragging ? 'none' : 'scale 0.2s, border 0.2s'
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    backgroundColor: 'var(--bg-card)',
+                    border: '1px solid var(--primary)',
+                    borderRadius: '12px',
+                    width: '240px',
+                    height: '140px'
                 }}
-                onMouseDown={startDragging}
-                onMouseEnter={() => setIsHoveringMini(true)}
-                onMouseLeave={() => setIsHoveringMini(false)}
             >
-                <div style={minifiedGridStyle}>
-                    {activeSpeaker === 'local' || !activeSpeaker ? (
-                        <video ref={(el) => { if (el) el.srcObject = localStream }} autoPlay muted playsInline style={miniVideoElement} />
-                    ) : (
-                        <RemoteVideo user={remoteUsers[activeSpeaker]} isMini />
-                    )}
+                <div style={{ color: 'var(--primary)', fontSize: '11px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <div style={{
+                        width: '12px', height: '12px',
+                        border: '2px solid var(--primary)',
+                        borderTopColor: 'transparent',
+                        borderRadius: '50%',
+                        animation: 'spin 1s linear infinite'
+                    }} />
+                    Connecting Call...
                 </div>
-
-                {/* Internal Hover Controls */}
-                <div style={{
-                    ...miniControls,
-                    opacity: isHoveringMini || isDragging ? 1 : 0,
-                    transform: isHoveringMini || isDragging ? 'translate(calc(-50%)) scale(1)' : 'translate(calc(-50%)) translateY(10px) scale(0.9)',
-                    transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
-                    pointerEvents: isHoveringMini ? 'auto' : 'none'
-                }}>
-                    <button style={miniBtn} onClick={(e) => { e.stopPropagation(); onMinimizeToggle(false); }} title="Expand">
-                        <Maximize2 size={12} color="white" />
-                    </button>
-                    <button
-                        style={{ ...miniBtn, color: isVideoOff ? '#ef4444' : 'white' }}
-                        onClick={handleToggleVideo}
-                        title={isVideoOff ? "Turn Camera On" : "Turn Camera Off"}
-                    >
-                        {isVideoOff ? <VideoOff size={12} /> : <Video size={12} />}
-                    </button>
-                    <button
-                        style={{ ...miniBtn, color: isMuted ? '#ef4444' : 'white' }}
-                        onClick={handleToggleAudio}
-                        title={isMuted ? "Unmute" : "Mute"}
-                    >
-                        {isMuted ? <MicOff size={12} /> : <Mic size={12} />}
-                    </button>
-                    <button
-                        style={{ ...miniBtn }}
-                        onClick={(e) => { e.stopPropagation(); onMinimizeToggle(false); }}
-                        title="Expand"
-                    >
-                        <Maximize2 size={12} color="white" />
-                    </button>
-                </div>
+                <style>{`
+                    @keyframes spin {
+                        0% { transform: rotate(0deg); }
+                        100% { transform: rotate(360deg); }
+                    }
+                `}</style>
             </div>
         );
     }
 
+    const width = isMinimized ? 240 : 480;
+    const height = isMinimized ? 160 : 320;
 
     return (
-        <div style={containerStyle(isExpanded)}>
-            {!inCall ? null : (
-                <div style={callWorkspaceStyle}>
-                    <div style={{ flex: 1, display: 'flex', overflow: 'hidden', position: 'relative' }}>
-                        <div style={gridStyle(paginatedParticipants.length)}>
-                            {paginatedParticipants.map((p) => (
-                                <div key={p.id} style={{ ...videoTileStyle(activeSpeaker === p.id), position: 'relative' }}>
-                                    {p.isLocal ? (
-                                        <>
-                                            {isVideoOff ? (
-                                                <div style={avatarCenterStyle}>
-                                                    <div style={avatarCircle(64)}>
-                                                        {(user?.name || socketRef.current?.userName || 'U')[0].toUpperCase()}
-                                                    </div>
-                                                </div>
-                                            ) : (
-                                                <video ref={(el) => { if (el) el.srcObject = localStream }} autoPlay muted playsInline style={videoElementStyle} />
-                                            )}
-                                            <div style={tileOverlayStyle}>
-                                                <div style={nameTagStyle(isMuted)}>
-                                                    {isMuted ? <MicOff size={14} color="#ef4444" /> : <Mic size={14} color="#10b981" />}
-                                                    <span>You</span>
-                                                </div>
-                                            </div>
-                                        </>
-                                    ) : (
-                                        <RemoteVideo user={p} />
-                                    )}
-                                </div>
-                            ))}
-                        </div>
-
-                        {totalPages > 1 && (
-                            <div style={paginationWrapper}>
-                                {[...Array(totalPages)].map((_, i) => (
-                                    <div
-                                        key={i}
-                                        onClick={() => setPage(i)}
-                                        style={paginationDot(page === i)}
-                                    />
-                                ))}
-                            </div>
-                        )}
-
-                        {/* Integrated Participants Sidebar (Desktop Expanded Mode) */}
-                        {isExpanded && (
-                            <div style={participantsSidebarStyle}>
-                                <div style={sidebarHeaderStyle}>
-                                    <h3 style={sidebarTitleStyle}>PARTICIPANTS ({clients.length})</h3>
-                                </div>
-                                <div style={participantsListStyle}>
-                                    {clients.map((client, i) => {
-                                        const media = mediaStates[client.socketId] || {};
-                                        const isMainUser = client.name === (user?.name || socketRef.current?.userName);
-                                        const currentMedia = isMainUser ? { isMuted, isVideoOff } : media;
-
-                                        return (
-                                            <div key={i} style={participantItemStyle}>
-                                                <div style={avatarCircle(32)}>
-                                                    {(client.userName || client.name || 'U')[0].toUpperCase()}
-                                                </div>
-                                                <span style={participantNameStyle}>
-                                                    {client.userName || client.name} {isMainUser && "(You)"}
-                                                </span>
-                                                <div style={participantStatusStyle}>
-                                                    {currentMedia.isMuted ? <MicOff size={14} color="#ef4444" /> : <Mic size={14} color="#10b981" />}
-                                                    {currentMedia.isVideoOff ? <VideoOff size={14} color="#ef4444" /> : <Video size={14} color="#10b981" />}
-                                                </div>
-                                            </div>
-                                        );
-                                    })}
+        <div
+            className="glass-panel"
+            style={isMobile ? {
+                width: '100%',
+                height: '100%',
+                position: 'relative',
+                left: 0,
+                top: 0,
+                display: 'flex',
+                flexDirection: 'column',
+                backgroundColor: '#000',
+                border: 'none',
+                borderRadius: 0,
+                overflow: 'hidden'
+            } : {
+                ...minimizedOverlayStyle,
+                width: `${width}px`,
+                height: `${height}px`,
+                left: `${pipPosition.x}px`,
+                top: `${pipPosition.y}px`,
+                bottom: 'auto',
+                right: 'auto',
+                border: isDragging ? '2px solid var(--primary)' : '1px solid rgba(255,255,255,0.1)',
+                scale: isDragging ? '1.02' : '1',
+                transition: isDragging ? 'none' : 'scale 0.2s, border 0.2s, width 0.3s, height 0.3s'
+            }}
+            onMouseDown={isMobile ? undefined : startDragging}
+            onMouseEnter={isMobile ? undefined : () => setIsHoveringMini(true)}
+            onMouseLeave={isMobile ? undefined : () => setIsHoveringMini(false)}
+        >
+            {isMinimized ? (
+                // Minimized: Show active speaker
+                <div style={minifiedGridStyle}>
+                    {activeSpeaker === 'local' || !activeSpeaker ? (
+                        isVideoOff ? (
+                            <div style={avatarCenterStyle}>
+                                <div style={avatarCircle(48)}>
+                                    {(user?.name || socketRef.current?.userName || 'U')[0].toUpperCase()}
                                 </div>
                             </div>
-                        )}
-                    </div>
-
-                    <div style={controlDockWrapper}>
-                        <div style={controlDock}>
-                            {!user?.isGuest && (
-                                <>
-                                    <button style={controlCircle(isMuted, '#ef4444')} onClick={handleToggleAudio} title={isMuted ? "Unmute" : "Mute"}>
-                                        {isMuted ? <MicOff size={20} color="white" /> : <Mic size={20} color="white" />}
-                                    </button>
-                                    <button style={controlCircle(isVideoOff, '#ef4444')} onClick={handleToggleVideo} title={isVideoOff ? "Turn Camera On" : "Turn Camera Off"}>
-                                        {isVideoOff ? <VideoOff size={20} color="white" /> : <Video size={20} color="white" />}
-                                    </button>
-                                    <button style={controlCircle(isScreenSharing, 'var(--primary)')} onClick={toggleScreenShare} title={isScreenSharing ? "Stop Sharing" : "Share Screen"}>
-                                        {isScreenSharing ? <ScreenShareOff size={20} color="white" /> : <ScreenShare size={20} color="white" />}
-                                    </button>
-                                </>
-                            )}
-                            <div style={dividerStyle} />
-                            <button style={controlCircle(false)} onClick={() => onMinimizeToggle(true)} title="Minimize">
-                                <ChevronDown size={20} color="white" />
-                            </button>
-                            <button style={controlCircle(false)} onClick={() => setIsExpanded(!isExpanded)} title={isExpanded ? "Collapse" : "Expand"}>
-                                {isExpanded ? <Minimize2 size={20} color="white" /> : <Maximize2 size={20} color="white" />}
-                            </button>
-                            <button
-                                style={controlCircle(isStreaming, '#3b82f6')}
-                                onClick={isStreaming ? stopStreaming : () => setShowStreamModal(true)}
-                                title={isStreaming ? "Stop Streaming" : "Go Live"}
-                            >
-                                {isStreaming ? <StopCircle size={20} color="white" /> : <Radio size={20} color="white" />}
-                            </button>
-                            <button style={controlCircle(true, '#ef4444')} onClick={handleLeaveCall} title="Leave Meeting">
-                                <LogOut size={20} color="white" />
-                            </button>
-                        </div>
-                    </div>
-
-                    {showStreamModal && (
-                        <div style={modalOverlay}>
-                            <div className="glass-panel" style={modalContent}>
-                                <h3 style={{ margin: '0 0 16px', color: 'white' }}>Stream Setup</h3>
-                                <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.6)', marginBottom: '16px' }}>
-                                    Enter your RTMP URL + Stream Key (e.g. rtmp://a.rtmp.youtube.com/live2/XXXX)
-                                </p>
-                                <input
-                                    style={inputStyle}
-                                    type="text"
-                                    placeholder="RTMP Endpoint / Key"
-                                    value={rtmpKey}
-                                    onChange={(e) => setRtmpKey(e.target.value)}
-                                />
-                                <div style={{ display: 'flex', gap: '12px', marginTop: '20px' }}>
-                                    <button style={cancelBtn} onClick={() => setShowStreamModal(false)}>Cancel</button>
-                                    <button style={startBtn} onClick={startStreaming}>Go Live</button>
-                                </div>
-                            </div>
-                        </div>
+                        ) : (
+                            <video ref={(el) => { if (el) el.srcObject = localStream }} autoPlay muted playsInline style={miniVideoElement} />
+                        )
+                    ) : (
+                        <RemoteVideo user={remoteUsers[activeSpeaker]} isMini />
                     )}
                 </div>
+            ) : (
+                // Expanded Grid View: Show all participants in a neat layout
+                <div style={{
+                    flex: 1,
+                    display: 'grid',
+                    gridTemplateColumns: paginatedParticipants.length <= 1 ? '1fr' : '1fr 1fr',
+                    gridTemplateRows: paginatedParticipants.length <= 2 ? '1fr' : '1fr 1fr',
+                    gap: '6px',
+                    padding: '6px',
+                    backgroundColor: '#000',
+                    overflow: 'hidden',
+                    height: '100%'
+                }}>
+                    {paginatedParticipants.map((p) => (
+                        <div key={p.id} style={{ position: 'relative', borderRadius: '8px', overflow: 'hidden', backgroundColor: '#1f2937' }}>
+                            {p.isLocal ? (
+                                isVideoOff ? (
+                                    <div style={avatarCenterStyle}>
+                                        <div style={avatarCircle(32)}>
+                                            {(user?.name || socketRef.current?.userName || 'U')[0].toUpperCase()}
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <video ref={(el) => { if (el) el.srcObject = localStream }} autoPlay muted playsInline style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                )
+                            ) : (
+                                <RemoteVideo user={p} isMini />
+                            )}
+                            <div style={{
+                                position: 'absolute', bottom: '6px', left: '6px',
+                                display: 'flex', alignItems: 'center', gap: '4px',
+                                backgroundColor: 'rgba(0,0,0,0.65)', padding: '4px 8px',
+                                borderRadius: '6px', fontSize: '10px', color: 'white',
+                                border: '1px solid rgba(255,255,255,0.08)', zIndex: 10
+                            }}>
+                                {p.isLocal ? (
+                                    isMuted ? <MicOff size={10} color="#ef4444" /> : <Mic size={10} color="#10b981" />
+                                ) : (
+                                    p.isMuted ? <MicOff size={10} color="#ef4444" /> : <Mic size={10} color="#10b981" />
+                                )}
+                                <span style={{ fontWeight: '600' }}>{p.isLocal ? 'You' : p.name || 'Participant'}</span>
+                            </div>
+                        </div>
+                    ))}
+                </div>
             )}
-        </div>
-    );
-};
+
+            {/* Hover Controls Overlay */}
+            <div
+                onMouseDown={(e) => e.stopPropagation()} // Prevent dragging when clicking controls!
+                style={{
+                    ...miniControls,
+                    opacity: isHoveringMini || isDragging ? 1 : 0,
+                    transform: isHoveringMini || isDragging ? 'translate(-50%, 0) scale(1)' : 'translate(-50%, 12px) scale(0.92)',
+                    transition: 'all 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
+                    pointerEvents: isHoveringMini ? 'auto' : 'none'
+                }}
+            >
+                <button
+                    style={{ ...miniBtn, color: isMuted ? '#ef4444' : 'white' }}
+                    onClick={handleToggleAudio}
+                    title={isMuted ? "Unmute Mic" : "Mute Mic"}
+                >
+                    {isMuted ? <MicOff size={13} /> : <Mic size={13} />}
+                </button>
+                <button
+                    style={{ ...miniBtn, color: isVideoOff ? '#ef4444' : 'white' }}
+                    onClick={handleToggleVideo}
+                    title={isVideoOff ? "Turn Camera On" : "Turn Camera Off"}
+                >
+                    {isVideoOff ? <VideoOff size={13} /> : <Video size={13} />}
+                </button>
+                {!user?.isGuest && (
+                    <button
+                        style={{ ...miniBtn, color: isScreenSharing ? '#10b981' : 'white' }}
+                        onClick={toggleScreenShare}
+                        title={isScreenSharing ? "Stop Sharing" : "Share Screen"}
+                    >
+                        {isScreenSharing ? <ScreenShareOff size={13} /> : <ScreenShare size={13} />}
+                    </button>
+                )}
+                <button
+                    style={miniBtn}
+                    onClick={(e) => { e.stopPropagation(); onMinimizeToggle(!isMinimized); }}
+                    title={isMinimized ? "Grid View" : "Minimize View"}
+                >
+                    {isMinimized ? <Maximize2 size={13} /> : <Minimize2 size={13} />}
+                </button>
+                <button
+                    style={{ ...miniBtn, backgroundColor: '#ef4444', color: 'white' }}
+                    onClick={(e) => { e.stopPropagation(); handleLeaveCall(); }}
+                    title="Leave Call"
+                >
+                    <LogOut size={13} />
+                </button>
+            </div>
+        </div>);
+}
 
 const RemoteVideo = ({ user, isMini }) => {
     const videoRef = useRef();

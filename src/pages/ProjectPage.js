@@ -16,10 +16,7 @@ import {
     Moon,
     Users,
     Play,
-    Mic,
-    MicOff,
-    VideoOff,
-    Zap,
+    Pause,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import ProjectEditor from "../components/ProjectEditor";
@@ -70,25 +67,28 @@ const ProjectPage = () => {
 
     const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
     const [clients, setClients] = useState([]);
-    const [guestName, setGuestName] = useState("");
+    const [guestName, setGuestName] = useState(localStorage.getItem("guest-name") || "");
     const [showInviteModal, setShowInviteModal] = useState(false);
 
 
     // New Lobby States
     const [showLobby, setShowLobby] = useState(false);
+    const [showGuestModal, setShowGuestModal] = useState(!user && !localStorage.getItem("guest-name"));
     const [initialAudio, setInitialAudio] = useState(true);
     const [initialVideo, setInitialVideo] = useState(true);
     const lobbyVideoRef = useRef(null);
     const lobbyStreamRef = useRef(null);
 
     const [sidebarTab, setSidebarTab] = useState('files');
+    const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+    const [isMeetingActive, setIsMeetingActive] = useState(false);
     const [theme, setTheme] = useState(localStorage.getItem("app-theme") || "dark");
     const [isExecuting, setIsExecuting] = useState(false);
     const [output, setOutput] = useState("");
     const [mediaStates, setMediaStates] = useState({});
     const [isOutputVisible, setIsOutputVisible] = useState(true);
     const [activeTab, setActiveTab] = useState('code'); // 'code', 'files', 'chat', 'users', 'video'
-    const [isMeetingMinimized, setIsMeetingMinimized] = useState(false); // false = no PiP until user explicitly minimizes an active call
+    const [isMeetingMinimized, setIsMeetingMinimized] = useState(true); // default true for floating overlay
     const [isMeetingStarting, setIsMeetingStarting] = useState(false);
     const [isZenMode, setIsZenMode] = useState(false);
     const [showCommandPalette, setShowCommandPalette] = useState(false);
@@ -139,6 +139,187 @@ const ProjectPage = () => {
             }
         };
     }, [showLobby]);
+
+    // --- Core Handlers (callback-stabilized for palette) ---
+    const toggleTheme = React.useCallback(() => {
+        const newTheme = theme === "dark" ? "light" : "dark";
+        setTheme(newTheme);
+        localStorage.setItem("app-theme", newTheme);
+        if (newTheme === "light") {
+            document.documentElement.classList.add("light-theme");
+        } else {
+            document.documentElement.classList.remove("light-theme");
+        }
+    }, [theme]);
+
+    const handleFileClick = React.useCallback((file) => {
+        setActiveFile(file);
+        if (!openFiles.find(f => f.id === file.id)) {
+            setOpenFiles(prev => [...prev, file]);
+        }
+        if (isMobile) setActiveTab('code');
+    }, [openFiles, isMobile]);
+
+    const pollExecutionResult = React.useCallback(async (token) => {
+        const url = `https://judge0-ce.p.rapidapi.com/submissions/${token}?base64_encoded=true&fields=*`;
+        const options = {
+            method: "GET",
+            headers: {
+                "X-RapidAPI-Key": process.env.REACT_APP_RAPIDAPI_KEY || 'd08f949d60mshc3405a91834ca1fp1a2502jsn34e3da2dd121',
+                "X-RapidAPI-Host": "judge0-ce.p.rapidapi.com",
+            },
+        };
+
+        try {
+            const response = await fetch(url, options);
+            const data = await response.json();
+
+            if (data.status?.id === 1 || data.status?.id === 2) {
+                setTimeout(() => pollExecutionResult(token), 2000);
+                return;
+            } else {
+                setIsExecuting(false);
+                const decodedOutput = data.stdout ? atob(data.stdout) : null;
+                const decodedError = data.stderr ? atob(data.stderr) : null;
+                const decodedCompileOutput = data.compile_output ? atob(data.compile_output) : null;
+
+                if (data.status?.id === 3) {
+                    setOutput(decodedOutput !== null ? decodedOutput : "Code Executed Successfully. No Output.");
+                } else {
+                    setOutput(decodedError || decodedCompileOutput || data.status?.description || "Unknown Error");
+                }
+            }
+        } catch (err) {
+            console.error(err);
+            setOutput("Error retrieving execution output.");
+            setIsExecuting(false);
+        }
+    }, [pollExecutionResult]);
+
+    const handleCompile = React.useCallback(async () => {
+        const projectType = project?.type || "web";
+        if (projectType === "web") {
+            setIsOutputVisible(true);
+            return;
+        }
+
+        setIsExecuting(true);
+        setIsOutputVisible(true);
+        setOutput("Bundling and running...");
+
+        const language = activeFile?.name.split('.').pop();
+        let languageId = 63;
+        if (language === 'cpp' || language === 'h') languageId = 54;
+        else if (language === 'py') languageId = 71;
+        else if (language === 'java') languageId = 62;
+
+        let sourceCode = activeFile.content;
+
+        if (language === 'cpp' || language === 'h') {
+            const visited = new Set([activeFile.name]);
+            const resolveIncludes = (content) => {
+                return content.replace(/#include\s*"(.*?)"/g, (match, fileName) => {
+                    if (visited.has(fileName)) return `// Already included: ${fileName}`;
+                    const includedFile = files.find(f => f.name === fileName);
+                    if (includedFile) {
+                        visited.add(fileName);
+                        return `// Included from ${fileName}\n${resolveIncludes(includedFile.content)}`;
+                    }
+                    return match;
+                });
+            };
+            sourceCode = resolveIncludes(sourceCode);
+        } else if (language === 'java') {
+            const visited = new Set([activeFile.name]);
+            const resolveJavaImports = (code) => {
+                // Remove package declaration
+                let resolved = code.replace(/^package\s+.*?;/gm, '');
+                // Resolve imports for project classes
+                resolved = resolved.replace(/^import\s+([a-zA-Z0-9_.]+);/gm, (match, fullClassName) => {
+                    const className = fullClassName.split('.').pop();
+                    const fileName = `${className}.java`;
+                    if (visited.has(fileName)) return `// File ${fileName} already bundled`;
+                    const importedFile = files.find(f => f.name === fileName);
+                    if (importedFile) {
+                        visited.add(fileName);
+                        const content = importedFile.content.replace(/public\s+class/g, 'class');
+                        return `// Bundled from ${fileName}\n${resolveJavaImports(content)}`;
+                    }
+                    return match;
+                });
+                return resolved;
+            };
+
+            sourceCode = resolveJavaImports(activeFile.content);
+            // Append any other java files not explicitly imported
+            files.filter(f => f.name.endsWith('.java') && !visited.has(f.name)).forEach(f => {
+                visited.add(f.name);
+                const cleanContent = f.content.replace(/public\s+class/g, 'class').replace(/^package\s+.*?;/gm, '');
+                sourceCode += `\n\n// From ${f.name}\n${resolveJavaImports(cleanContent)}`;
+            });
+        } else if (language === 'py') {
+            const visited = new Set([activeFile.name]);
+            const resolvePythonImports = (content) => {
+                // Handle: from module import ...
+                let resolved = content.replace(/^from\s+([a-zA-Z0-9_.]+)\s+import\s+/gm, (match, moduleName) => {
+                    const fileName = `${moduleName}.py`;
+                    if (visited.has(fileName)) return `# Already imported: ${moduleName}\n`;
+                    const importedFile = files.find(f => f.name === fileName);
+                    if (importedFile) {
+                        visited.add(fileName);
+                        return `# Imported from ${fileName}\n${resolvePythonImports(importedFile.content)}\n`;
+                    }
+                    return match;
+                });
+
+                // Handle: import module
+                resolved = resolved.replace(/^import\s+([a-zA-Z0-9_.]+)/gm, (match, moduleName) => {
+                    const fileName = `${moduleName}.py`;
+                    if (visited.has(fileName)) return `# Already imported: ${moduleName}\n`;
+                    const importedFile = files.find(f => f.name === fileName);
+                    if (importedFile) {
+                        visited.add(fileName);
+                        return `# Imported from ${fileName}\n${resolvePythonImports(importedFile.content)}\n`;
+                    }
+                    return match;
+                });
+
+                return resolved;
+            };
+            sourceCode = resolvePythonImports(sourceCode);
+        }
+
+        const formData = {
+            language_id: languageId,
+            source_code: btoa(sourceCode),
+            stdin: btoa(""),
+        };
+
+        const url = "https://judge0-ce.p.rapidapi.com/submissions?base64_encoded=true&fields=*";
+        const options = {
+            method: 'POST',
+            headers: {
+                'content-type': 'application/json',
+                'X-RapidAPI-Key': process.env.REACT_APP_RAPIDAPI_KEY || 'd08f949d60mshc3405a91834ca1fp1a2502jsn34e3da2dd121',
+                'X-RapidAPI-Host': 'judge0-ce.p.rapidapi.com'
+            },
+            body: JSON.stringify(formData)
+        };
+
+        try {
+            const response = await fetch(url, options);
+            const data = await response.json();
+            if (data.token) {
+                await pollExecutionResult(data.token);
+            } else {
+                throw new Error("Failed to get execution token.");
+            }
+        } catch (error) {
+            console.error("Compilation error:", error);
+            setOutput("Something went wrong while attempting to run your code.");
+            setIsExecuting(false);
+        }
+    }, [project, activeFile, files, pollExecutionResult]);
 
     // --- Keyboard Shortcuts & Palette Actions ---
     const commandActions = useMemo(() => {
@@ -383,8 +564,15 @@ const ProjectPage = () => {
                     navigate('/dashboard');
                 }
 
-                // Show Lobby instead of directly joining
-                setShowLobby(true);
+                // Bypass lobby and connect directly
+                const savedGuestName = localStorage.getItem("guest-name");
+                if (user) {
+                    joinProject(user.name);
+                } else if (savedGuestName) {
+                    joinProject(savedGuestName);
+                } else {
+                    setShowGuestModal(true);
+                }
 
                 // Load chat history from localstorage
                 const savedChat = localStorage.getItem(`project-chat-${projectId}`);
@@ -410,16 +598,6 @@ const ProjectPage = () => {
         };
     }, [projectId, user, navigate, joinProject]);
 
-    const toggleTheme = () => {
-        const newTheme = theme === "dark" ? "light" : "dark";
-        setTheme(newTheme);
-        localStorage.setItem("app-theme", newTheme);
-        if (newTheme === "light") {
-            document.documentElement.classList.add("light-theme");
-        } else {
-            document.documentElement.classList.remove("light-theme");
-        }
-    };
 
     const handleLobbyJoin = (e) => {
         if (e) e.preventDefault();
@@ -431,13 +609,6 @@ const ProjectPage = () => {
         joinProject(user ? user.name : guestName.trim());
     };
 
-    const handleFileClick = (file) => {
-        setActiveFile(file);
-        if (!openFiles.find(f => f.id === file.id)) {
-            setOpenFiles([...openFiles, file]);
-        }
-        if (isMobile) setActiveTab('code');
-    };
 
     const handleSaveFile = (content, isRemote = false) => {
         if (!activeFile) return;
@@ -587,166 +758,6 @@ const ProjectPage = () => {
         reader.readAsText(file);
     };
 
-    const handleCompile = async () => {
-        const projectType = project?.type || "web";
-        if (projectType === "web") {
-            setIsOutputVisible(true);
-            return;
-        }
-
-        setIsExecuting(true);
-        setIsOutputVisible(true);
-        setOutput("Bundling and running...");
-
-        const language = activeFile?.name.split('.').pop();
-        let languageId = 63;
-        if (language === 'cpp' || language === 'h') languageId = 54;
-        else if (language === 'py') languageId = 71;
-        else if (language === 'java') languageId = 62;
-
-        let sourceCode = activeFile.content;
-
-        if (language === 'cpp' || language === 'h') {
-            const visited = new Set([activeFile.name]);
-            const resolveIncludes = (content) => {
-                return content.replace(/#include\s*"(.*?)"/g, (match, fileName) => {
-                    if (visited.has(fileName)) return `// Already included: ${fileName}`;
-                    const includedFile = files.find(f => f.name === fileName);
-                    if (includedFile) {
-                        visited.add(fileName);
-                        return `// Included from ${fileName}\n${resolveIncludes(includedFile.content)}`;
-                    }
-                    return match;
-                });
-            };
-            sourceCode = resolveIncludes(sourceCode);
-        } else if (language === 'java') {
-            const visited = new Set([activeFile.name]);
-            const resolveJavaImports = (code) => {
-                // Remove package declaration
-                let resolved = code.replace(/^package\s+.*?;/gm, '');
-                // Resolve imports for project classes
-                resolved = resolved.replace(/^import\s+([a-zA-Z0-9_.]+);/gm, (match, fullClassName) => {
-                    const className = fullClassName.split('.').pop();
-                    const fileName = `${className}.java`;
-                    if (visited.has(fileName)) return `// File ${fileName} already bundled`;
-                    const importedFile = files.find(f => f.name === fileName);
-                    if (importedFile) {
-                        visited.add(fileName);
-                        const content = importedFile.content.replace(/public\s+class/g, 'class');
-                        return `// Bundled from ${fileName}\n${resolveJavaImports(content)}`;
-                    }
-                    return match;
-                });
-                return resolved;
-            };
-
-            sourceCode = resolveJavaImports(activeFile.content);
-            // Append any other java files not explicitly imported
-            files.filter(f => f.name.endsWith('.java') && !visited.has(f.name)).forEach(f => {
-                visited.add(f.name);
-                const cleanContent = f.content.replace(/public\s+class/g, 'class').replace(/^package\s+.*?;/gm, '');
-                sourceCode += `\n\n// From ${f.name}\n${resolveJavaImports(cleanContent)}`;
-            });
-        } else if (language === 'py') {
-            const visited = new Set([activeFile.name]);
-            const resolvePythonImports = (content) => {
-                // Handle: from module import ...
-                let resolved = content.replace(/^from\s+([a-zA-Z0-9_.]+)\s+import\s+/gm, (match, moduleName) => {
-                    const fileName = `${moduleName}.py`;
-                    if (visited.has(fileName)) return `# Already imported: ${moduleName}\n`;
-                    const importedFile = files.find(f => f.name === fileName);
-                    if (importedFile) {
-                        visited.add(fileName);
-                        return `# Imported from ${fileName}\n${resolvePythonImports(importedFile.content)}\n`;
-                    }
-                    return match;
-                });
-
-                // Handle: import module
-                resolved = resolved.replace(/^import\s+([a-zA-Z0-9_.]+)/gm, (match, moduleName) => {
-                    const fileName = `${moduleName}.py`;
-                    if (visited.has(fileName)) return `# Already imported: ${moduleName}\n`;
-                    const importedFile = files.find(f => f.name === fileName);
-                    if (importedFile) {
-                        visited.add(fileName);
-                        return `# Imported from ${fileName}\n${resolvePythonImports(importedFile.content)}\n`;
-                    }
-                    return match;
-                });
-
-                return resolved;
-            };
-            sourceCode = resolvePythonImports(sourceCode);
-        }
-
-        const formData = {
-            language_id: languageId,
-            source_code: btoa(sourceCode),
-            stdin: btoa(""),
-        };
-
-        const url = "https://judge0-ce.p.rapidapi.com/submissions?base64_encoded=true&fields=*";
-        const options = {
-            method: 'POST',
-            headers: {
-                'content-type': 'application/json',
-                'X-RapidAPI-Key': process.env.REACT_APP_RAPIDAPI_KEY || 'd08f949d60mshc3405a91834ca1fp1a2502jsn34e3da2dd121',
-                'X-RapidAPI-Host': 'judge0-ce.p.rapidapi.com'
-            },
-            body: JSON.stringify(formData)
-        };
-
-        try {
-            const response = await fetch(url, options);
-            const data = await response.json();
-            if (data.token) {
-                await pollExecutionResult(data.token);
-            } else {
-                throw new Error("Failed to get execution token.");
-            }
-        } catch (error) {
-            console.error("Compilation error:", error);
-            setOutput("Something went wrong while attempting to run your code.");
-            setIsExecuting(false);
-        }
-    };
-
-    const pollExecutionResult = async (token) => {
-        const url = `https://judge0-ce.p.rapidapi.com/submissions/${token}?base64_encoded=true&fields=*`;
-        const options = {
-            method: "GET",
-            headers: {
-                "X-RapidAPI-Key": process.env.REACT_APP_RAPIDAPI_KEY || 'd08f949d60mshc3405a91834ca1fp1a2502jsn34e3da2dd121',
-                "X-RapidAPI-Host": "judge0-ce.p.rapidapi.com",
-            },
-        };
-
-        try {
-            const response = await fetch(url, options);
-            const data = await response.json();
-
-            if (data.status?.id === 1 || data.status?.id === 2) {
-                setTimeout(() => pollExecutionResult(token), 2000);
-                return;
-            } else {
-                setIsExecuting(false);
-                const decodedOutput = data.stdout ? atob(data.stdout) : null;
-                const decodedError = data.stderr ? atob(data.stderr) : null;
-                const decodedCompileOutput = data.compile_output ? atob(data.compile_output) : null;
-
-                if (data.status?.id === 3) {
-                    setOutput(decodedOutput !== null ? decodedOutput : "Code Executed Successfully. No Output.");
-                } else {
-                    setOutput(decodedError || decodedCompileOutput || data.status?.description || "Unknown Error");
-                }
-            }
-        } catch (err) {
-            console.error(err);
-            setOutput("Error retrieving execution output.");
-            setIsExecuting(false);
-        }
-    };
 
 
     if (loading) {
@@ -757,209 +768,336 @@ const ProjectPage = () => {
         );
     }
 
+    const toggleSidebarTab = (tab) => {
+        if (sidebarTab === tab) {
+            setIsSidebarOpen(prev => !prev);
+        } else {
+            setSidebarTab(tab);
+            setIsSidebarOpen(true);
+        }
+    };
+
     return (
         <div className="project-workspace" style={{ height: '100vh', display: 'flex', flexDirection: 'column', backgroundColor: 'var(--bg-dark)', color: 'var(--text-main)', overflow: 'hidden' }}>
-            {/* Workspace Core */}
-
-                {/* Header */}
-                {!isZenMode && (
-                    <header style={{
-                        height: '50px',
-                        backgroundColor: 'var(--glass-bg)',
-                        backdropFilter: 'blur(var(--glass-blur))',
-                        borderBottom: '1px solid var(--glass-border)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        padding: '0 16px',
-                        zIndex: 10
-                    }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                            <div style={logoWrapperStyle} onClick={() => navigate('/dashboard')}>
-                                <img src={isLightMode ? "/utkristi-labs.png" : "/utkristi-labs-dark.png"} alt="Logo" style={{ height: '24px' }} />
-                            </div>
-                            <div style={{ width: '1px', height: '16px', backgroundColor: 'var(--border-color)' }} />
-                            <h2 style={{ fontSize: '14px', fontWeight: '800', color: 'var(--text-main)', margin: 0, letterSpacing: '-0.01em' }}>
-                                {project?.name || "Loading..."}
-                            </h2>
+            {/* Workspace Core Header */}
+            {!isZenMode && (
+                <div style={{
+                    height: isMobile ? "50px" : "56px",
+                    backgroundColor: "var(--bg-card)",
+                    borderBottom: "1px solid var(--border-color)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    padding: isMobile ? "0 12px" : "0 20px",
+                    flexShrink: 0,
+                    zIndex: 100
+                }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: isMobile ? "8px" : "14px" }}>
+                        <div style={logoWrapperStyle} onClick={() => navigate('/dashboard')}>
+                            <img src={isLightMode ? "/utkristi-labs.png" : "/utkristi-labs-dark.png"} alt="Logo" style={{ height: isMobile ? '20px' : '26px' }} />
                         </div>
-
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <div 
-                                onClick={() => setShowCommandPalette(true)}
-                                style={{
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '8px',
-                                    padding: '6px 12px',
-                                    backgroundColor: 'rgba(255,255,255,0.05)',
-                                    borderRadius: '8px',
-                                    cursor: 'pointer',
-                                    border: '1px solid var(--border-color)',
-                                    marginRight: '12px'
-                                }}
-                            >
-                                <Search size={14} color="var(--text-muted)" />
-                                <span style={{ fontSize: '12px', color: 'var(--text-muted)', fontWeight: '600' }}>Search Actions...</span>
-                                <div style={{ 
-                                    padding: '2px 4px', 
-                                    backgroundColor: 'rgba(0,0,0,0.2)', 
-                                    borderRadius: '4px', 
-                                    fontSize: '9px',
-                                    color: 'var(--text-muted)',
-                                    border: '1px solid var(--border-color)'
-                                }}>CTRL K</div>
+                        {!isMobile && <div style={{ height: "20px", width: "1px", backgroundColor: "var(--border-color)" }} />}
+                        {!isMobile && (
+                            <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                                <span style={{ fontSize: "12px", fontWeight: "700", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.05em" }}>Project</span>
+                                <span style={{ fontSize: "12px", fontFamily: "monospace", color: "var(--text-main)", backgroundColor: "var(--secondary)", padding: "2px 8px", borderRadius: "4px", border: "1px solid var(--border-color)", fontWeight: "600" }}>
+                                    {project?.name || "Loading..."}
+                                </span>
                             </div>
+                        )}
+                    </div>
 
+                    <div style={{ display: "flex", alignItems: "center", gap: isMobile ? "8px" : "12px" }}>
+                        {/* Redesigned Icon Tray (Clean IDE Style, matching editor.js) */}
+                        <div style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "4px",
+                            backgroundColor: "var(--secondary)",
+                            padding: "4px",
+                            borderRadius: "10px",
+                            border: "1px solid var(--border-color)"
+                        }}>
+                            {!isMobile && (
+                                <>
+                                    <button
+                                        onClick={() => toggleSidebarTab('files')}
+                                        style={{
+                                            display: "flex", alignItems: "center", justifyContent: "center", width: "32px", height: "32px",
+                                            color: (isSidebarOpen && sidebarTab === 'files') ? "var(--primary)" : "var(--text-muted)",
+                                            backgroundColor: (isSidebarOpen && sidebarTab === 'files') ? "rgba(59, 130, 246, 0.1)" : "transparent",
+                                            borderRadius: "6px", border: "none", cursor: "pointer", transition: "all 0.2s"
+                                        }}
+                                        onMouseOver={(e) => !(isSidebarOpen && sidebarTab === 'files') && (e.currentTarget.style.backgroundColor = "var(--bg-card)")}
+                                        onMouseOut={(e) => !(isSidebarOpen && sidebarTab === 'files') && (e.currentTarget.style.backgroundColor = "transparent")}
+                                        title="Files Explorer"
+                                    >
+                                        <Folder size={18} />
+                                    </button>
+                                    <button
+                                        onClick={() => toggleSidebarTab('chat')}
+                                        style={{
+                                            display: "flex", alignItems: "center", justifyContent: "center", width: "32px", height: "32px",
+                                            color: (isSidebarOpen && sidebarTab === 'chat') ? "var(--primary)" : "var(--text-muted)",
+                                            backgroundColor: (isSidebarOpen && sidebarTab === 'chat') ? "rgba(59, 130, 246, 0.1)" : "transparent",
+                                            borderRadius: "6px", border: "none", cursor: "pointer", transition: "all 0.2s",
+                                            position: "relative"
+                                        }}
+                                        onMouseOver={(e) => !(isSidebarOpen && sidebarTab === 'chat') && (e.currentTarget.style.backgroundColor = "var(--bg-card)")}
+                                        onMouseOut={(e) => !(isSidebarOpen && sidebarTab === 'chat') && (e.currentTarget.style.backgroundColor = "transparent")}
+                                        title="Project Chat"
+                                    >
+                                        <MessageSquare size={18} />
+                                        {messages.length > 0 && <div style={{ position: 'absolute', top: '4px', right: '4px', width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#ef4444' }} />}
+                                    </button>
+                                    <button
+                                        onClick={() => toggleSidebarTab('users')}
+                                        style={{
+                                            display: "flex", alignItems: "center", justifyContent: "center", width: "32px", height: "32px",
+                                            color: (isSidebarOpen && sidebarTab === 'users') ? "var(--primary)" : "var(--text-muted)",
+                                            backgroundColor: (isSidebarOpen && sidebarTab === 'users') ? "rgba(59, 130, 246, 0.1)" : "transparent",
+                                            borderRadius: "6px", border: "none", cursor: "pointer", transition: "all 0.2s"
+                                        }}
+                                        onMouseOver={(e) => !(isSidebarOpen && sidebarTab === 'users') && (e.currentTarget.style.backgroundColor = "var(--bg-card)")}
+                                        onMouseOut={(e) => !(isSidebarOpen && sidebarTab === 'users') && (e.currentTarget.style.backgroundColor = "transparent")}
+                                        title="Team Collaborators"
+                                    >
+                                        <Users size={18} />
+                                    </button>
+                                    <button
+                                        onClick={() => setShowWhiteboard(true)}
+                                        style={{
+                                            display: "flex", alignItems: "center", justifyContent: "center", width: "32px", height: "32px",
+                                            color: "var(--text-muted)", backgroundColor: "transparent",
+                                            borderRadius: "6px", border: "none", cursor: "pointer", transition: "all 0.2s"
+                                        }}
+                                        onMouseOver={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-card)")}
+                                        onMouseOut={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
+                                        title="Infinite Board"
+                                    >
+                                        <Layout size={18} />
+                                    </button>
+                                    <button
+                                        onClick={() => setIsMeetingActive(!isMeetingActive)}
+                                        style={{
+                                            display: "flex", alignItems: "center", justifyContent: "center", width: "32px", height: "32px",
+                                            color: isMeetingActive ? "#22c55e" : "var(--text-muted)",
+                                            backgroundColor: isMeetingActive ? "rgba(34, 197, 94, 0.1)" : "transparent",
+                                            borderRadius: "6px", border: "none", cursor: "pointer", transition: "all 0.2s"
+                                        }}
+                                        onMouseOver={(e) => !isMeetingActive && (e.currentTarget.style.backgroundColor = "var(--bg-card)")}
+                                        onMouseOut={(e) => !isMeetingActive && (e.currentTarget.style.backgroundColor = "transparent")}
+                                        title={isMeetingActive ? "Leave Video Call" : "Join Video Call"}
+                                    >
+                                        <Video size={18} />
+                                    </button>
+                                    <div style={{ width: "1px", height: "18px", backgroundColor: "var(--border-color)", margin: "0 2px" }} />
+                                </>
+                            )}
                             <button
-                                onClick={() => setShowInviteModal(true)}
-                                style={shareButtonStyle}
+                                onClick={handleCompile}
+                                disabled={isExecuting}
+                                style={{
+                                    display: "flex", alignItems: "center", justifyContent: "center", width: "32px", height: "32px",
+                                    color: isExecuting ? "#4ade80" : "#22c55e", backgroundColor: "transparent",
+                                    borderRadius: "6px", border: "none", cursor: isExecuting ? "default" : "pointer", transition: "all 0.2s"
+                                }}
+                                onMouseOver={(e) => !isExecuting && (e.currentTarget.style.backgroundColor = "rgba(34, 197, 94, 0.1)")}
+                                onMouseOut={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
+                                title="Run Code"
                             >
-                                <Plus size={16} /> Invite
+                                {isExecuting ? <Pause size={18} fill="#4ade80" /> : <Play size={18} fill="#22c55e" />}
                             </button>
-
-                            <div style={{ width: '1px', height: '16px', backgroundColor: 'var(--border-color)', margin: '0 8px' }} />
-
-                                    <div style={{ ...collaboratorAvatarsStyle, display: 'flex', alignItems: 'center' }}>
-                                        <div style={{
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            gap: '4px',
-                                            padding: '2px 8px',
-                                            backgroundColor: 'rgba(59, 130, 246, 0.1)',
-                                            borderRadius: '4px',
-                                            border: '1px solid rgba(59, 130, 246, 0.2)',
-                                            fontSize: '9px',
-                                            fontWeight: '900',
-                                            color: 'var(--primary)',
-                                            marginRight: '12px',
-                                            letterSpacing: '0.05em'
-                                        }}>
-                                            <Zap size={10} fill="var(--primary)" /> SPATIAL
-                                        </div>
-                                        {clients.slice(0, 3).map((client, i) => (
-                                            <div key={i} style={{ ...miniAvatarStyle, marginLeft: i === 0 ? 0 : '-8px', zIndex: 10 - i }}>
-                                                {client.userName?.[0]?.toUpperCase() || '?'}
-                                            </div>
-                                        ))}
-                                {clients.length > 3 && (
-                                    <div style={{ ...miniAvatarStyle, marginLeft: '-8px', backgroundColor: '#374151', fontSize: '9px' }}>
-                                        +{clients.length - 3}
-                                    </div>
-                                )}
-                            </div>
+                            <button
+                                onClick={toggleTheme}
+                                style={{
+                                    display: "flex", alignItems: "center", justifyContent: "center", width: "32px", height: "32px",
+                                    color: isLightMode ? "#fbbf24" : "var(--text-muted)", backgroundColor: "transparent",
+                                    borderRadius: "6px", border: "none", cursor: "pointer", transition: "all 0.2s"
+                                }}
+                                onMouseOver={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-card)")}
+                                onMouseOut={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
+                                title="Toggle Theme"
+                            >
+                                {isLightMode ? <Sun size={18} /> : <Moon size={18} />}
+                            </button>
+                            {!isMobile && (
+                                <>
+                                    <div style={{ width: "1px", height: "18px", backgroundColor: "var(--border-color)", margin: "0 2px" }} />
+                                    <button
+                                        onClick={() => setShowCommandPalette(true)}
+                                        style={{
+                                            display: "flex", alignItems: "center", justifyContent: "center", width: "32px", height: "32px",
+                                            color: "var(--text-muted)", backgroundColor: "transparent",
+                                            borderRadius: "6px", border: "none", cursor: "pointer", transition: "all 0.2s"
+                                        }}
+                                        onMouseOver={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-card)")}
+                                        onMouseOut={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
+                                        title="Command Palette (Ctrl+K)"
+                                    >
+                                        <Search size={18} />
+                                    </button>
+                                    <button
+                                        onClick={() => setShowInviteModal(true)}
+                                        style={{
+                                            display: "flex", alignItems: "center", justifyContent: "center", width: "32px", height: "32px",
+                                            color: "#a855f7", backgroundColor: "transparent",
+                                            borderRadius: "6px", border: "none", cursor: "pointer", transition: "all 0.2s"
+                                        }}
+                                        onMouseOver={(e) => (e.currentTarget.style.backgroundColor = "rgba(168, 85, 247, 0.1)")}
+                                        onMouseOut={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
+                                        title="Invite Team"
+                                    >
+                                        <Plus size={18} />
+                                    </button>
+                                </>
+                            )}
                         </div>
-                    </header>
-                )}
+                    </div>
+                </div>
+            )}
 
-                {/* Main Content Area */}
-                <div style={{ flex: 1, display: 'flex', overflow: 'hidden', position: 'relative' }}>
-                    {showLobby ? (
-                        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#0d1117' }}>
-                            <div style={{ ...modalContentStyle, maxWidth: '600px', padding: '30px' }}>
-                                <h2 style={{ fontSize: '24px', fontWeight: '800', marginBottom: '8px', color: 'white' }}>Join Studio</h2>
-                                <p style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: '24px' }}>Configure your media before entering.</p>
-
-                                <div style={{ display: 'flex', gap: '24px', flexDirection: isMobile ? 'column' : 'row' }}>
-                                    {/* Media Preview Column */}
-                                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                                        <div style={{
-                                            width: '100%', aspectRatio: '16/9', backgroundColor: '#000',
-                                            borderRadius: '12px', overflow: 'hidden', position: 'relative',
-                                            border: '1px solid rgba(255,255,255,0.1)'
-                                        }}>
-                                            <video
-                                                autoPlay
-                                                muted
-                                                playsInline
-                                                ref={lobbyVideoRef}
-                                                style={{ width: '100%', height: '100%', objectFit: 'cover', transform: 'scaleX(-1)', opacity: initialVideo ? 1 : 0 }}
-                                            />
-                                            {!initialVideo && (
-                                                <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#1f2937' }}>
-                                                    <VideoOff size={48} color="#4b5563" />
-                                                </div>
-                                            )}
-
-                                            <div style={{ position: 'absolute', bottom: '12px', left: 0, right: 0, display: 'flex', justifyContent: 'center', gap: '12px' }}>
-                                                <button
-                                                    onClick={toggleLobbyAudio}
-                                                    style={{
-                                                        width: '40px', height: '40px', borderRadius: '50%', border: 'none',
-                                                        backgroundColor: initialAudio ? 'rgba(0,0,0,0.6)' : '#ef4444',
-                                                        color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
-                                                        backdropFilter: 'blur(4px)', transition: 'all 0.2s'
-                                                    }}
-                                                >
-                                                    {initialAudio ? <Mic size={18} /> : <MicOff size={18} />}
-                                                </button>
-                                                <button
-                                                    onClick={toggleLobbyVideo}
-                                                    style={{
-                                                        width: '40px', height: '40px', borderRadius: '50%', border: 'none',
-                                                        backgroundColor: initialVideo ? 'rgba(0,0,0,0.6)' : '#ef4444',
-                                                        color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
-                                                        backdropFilter: 'blur(4px)', transition: 'all 0.2s'
-                                                    }}
-                                                >
-                                                    {initialVideo ? <Video size={18} /> : <VideoOff size={18} />}
-                                                </button>
-                                            </div>
+            {/* Main Content Area */}
+            <div style={{ flex: 1, display: 'flex', overflow: 'hidden', position: 'relative' }}>
+                {isMobile ? (
+                    // MOBILE VIEW: Render view dynamically based on bottom tab
+                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', paddingBottom: '56px' }}>
+                        {activeTab === 'code' && (
+                            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+                                <div style={studioTabContainerStyle}>
+                                    {openFiles.map(file => (
+                                        <div key={file.id} onClick={() => handleFileClick(file)} style={studioTabStyle(activeFile?.id === file.id, isLightMode)}>
+                                            <FileText size={12} />
+                                            <span>{file.name}</span>
+                                            <button style={closeTabStyle} onClick={(e) => handleCloseTab(e, file.id)}><X size={10} /></button>
                                         </div>
-                                    </div>
-
-                                    {/* Auth/Guest Form Column */}
-                                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                                        {user ? (
-                                            <div style={{ textAlign: 'center', padding: '20px', backgroundColor: 'rgba(255,255,255,0.02)', borderRadius: '12px', border: '1px solid var(--border-color)', marginBottom: '20px' }}>
-                                                <img src={user.photoURL || `https://ui-avatars.com/api/?name=${user.name}&background=0D8ABC&color=fff`} alt="Avatar" style={{ width: '64px', height: '64px', borderRadius: '50%', marginBottom: '12px', border: '3px solid var(--primary)' }} />
-                                                <h3 style={{ margin: 0, fontSize: '18px', color: 'white' }}>{user.name}</h3>
-                                                <p style={{ margin: '4px 0 0 0', fontSize: '13px', color: 'var(--text-muted)' }}>{user.email}</p>
-                                            </div>
-                                        ) : (
-                                            <form onSubmit={handleLobbyJoin} style={{ marginBottom: '20px', textAlign: 'left' }}>
-                                                <label style={{ display: 'block', textAlign: 'left', marginBottom: '8px', fontSize: '12px', color: 'var(--text-muted)', fontWeight: '600', textTransform: 'uppercase' }}>Join as Guest</label>
-                                                <input
-                                                    autoFocus
-                                                    value={guestName}
-                                                    onChange={(e) => setGuestName(e.target.value)}
-                                                    style={modalInputStyle}
-                                                    placeholder="Enter Display Name"
-                                                    required
+                                    ))}
+                                </div>
+                                <div style={{ flex: 1, position: 'relative' }}>
+                                    <ReflexContainer orientation="horizontal">
+                                        <ReflexElement flex={isOutputVisible ? 0.65 : 1}>
+                                            {activeFile ? (
+                                                <ProjectEditor
+                                                    key={activeFile.id}
+                                                    socketRef={socketRef}
+                                                    roomId={`project-${projectId}`}
+                                                    fileId={activeFile.id}
+                                                    onCodeChange={handleSaveFile}
+                                                    code={activeFile.content}
+                                                    filename={activeFile.name}
+                                                    language={activeFile.name.split('.').pop()}
+                                                    settings={settings}
+                                                    userName={user?.name || guestName}
+                                                    isLightMode={isLightMode}
                                                 />
-                                            </form>
+                                            ) : (
+                                                <div style={emptyEditorStyle}><Terminal size={48} style={{ opacity: 0.1 }} /></div>
+                                            )}
+                                        </ReflexElement>
+                                        {isOutputVisible && <ReflexSplitter style={splitterStyle} />}
+                                        {isOutputVisible && (
+                                            <ReflexElement flex={0.35} style={{ backgroundColor: 'var(--bg-dark)' }}>
+                                                <div style={outputHeaderStyle}>
+                                                    <span>Terminal</span>
+                                                    <X size={14} onClick={() => setIsOutputVisible(false)} />
+                                                </div>
+                                                <pre style={outputTextStyle}>{output}</pre>
+                                            </ReflexElement>
                                         )}
-                                        <button onClick={handleLobbyJoin} style={modalButtonStyle}>Join Studio</button>
-                                    </div>
+                                    </ReflexContainer>
                                 </div>
                             </div>
-                        </div>
-                    ) : (
+                        )}
+                        {activeTab === 'files' && (
+                            <div style={{ flex: 1, backgroundColor: 'var(--bg-dark)', padding: '16px', overflowY: 'auto' }}>
+                                <h3 style={{ fontSize: '14px', fontWeight: '800', color: 'var(--primary)', textTransform: 'uppercase', marginBottom: '16px', letterSpacing: '0.1em' }}>Files Explorer</h3>
+                                <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '16px' }}>
+                                    <label style={{ cursor: 'pointer', opacity: 0.8, color: 'var(--text-main)', display: 'flex', gap: '6px', alignItems: 'center', fontSize: '12px', border: '1px solid var(--border-color)', padding: '6px 12px', borderRadius: '6px', backgroundColor: 'var(--bg-card)' }} title="Import File">
+                                        <Plus size={14} /> Import File
+                                        <input type="file" style={{ display: 'none' }} onChange={handleImportFile} />
+                                    </label>
+                                    <button style={{ color: 'var(--text-main)', display: 'flex', gap: '6px', alignItems: 'center', fontSize: '12px', border: '1px solid var(--border-color)', padding: '6px 12px', borderRadius: '6px', backgroundColor: 'var(--bg-card)', cursor: 'pointer' }} onClick={handleAddFile} title="New File">
+                                        <Plus size={14} /> New File
+                                    </button>
+                                </div>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                                    {files.map(file => (
+                                        <div key={file.id} onClick={() => handleFileClick(file)} style={fileItemStyle(activeFile?.id === file.id)}>
+                                            <FileCode size={14} />
+                                            <span>{file.name}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                        {activeTab === 'chat' && (
+                            <div style={{ flex: 1, overflow: 'hidden' }}>
+                                <ChatWindow socketRef={socketRef} roomId={`project-${projectId}`} userName={user?.name || guestName} isLightMode={isLightMode} isMobile={isMobile} messages={messages} setMessages={setMessages} />
+                            </div>
+                        )}
+                        {activeTab === 'users' && (
+                            <div style={{ flex: 1, backgroundColor: 'var(--bg-dark)', padding: '16px', overflowY: 'auto' }}>
+                                <h3 style={{ fontSize: '14px', fontWeight: '800', color: 'var(--primary)', textTransform: 'uppercase', marginBottom: '16px', letterSpacing: '0.1em' }}>Team Members ({clients.length})</h3>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                    {clients.map((client, i) => (
+                                        <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px', backgroundColor: 'var(--bg-card)', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                                            <div style={miniAvatarStyle}>
+                                                {(client.userName || client.name || 'U')[0].toUpperCase()}
+                                            </div>
+                                            <span style={{ fontSize: '13px', fontWeight: '600' }}>
+                                                {client.userName || client.name} {client.name === (user?.name || guestName) && "(You)"}
+                                            </span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                        {activeTab === 'video' && (
+                            <div style={{ flex: 1, backgroundColor: 'var(--bg-dark)', display: 'flex', flexDirection: 'column', position: 'relative' }}>
+                                <VideoChat
+                                    socketRef={socketRef}
+                                    projectId={projectId}
+                                    user={user || { name: guestName || 'Guest', isGuest: true }}
+                                    isMinimized={false}
+                                    onMinimizeToggle={() => {}}
+                                    externalInCall={isMeetingStarting}
+                                    onCallStateChange={setIsMeetingStarting}
+                                    clients={clients}
+                                    mediaStates={mediaStates}
+                                    initialAudioState={initialAudio}
+                                    initialVideoState={initialVideo}
+                                    isMobile={isMobile}
+                                />
+                            </div>
+                        )}
+                    </div>
+                ) : (
+                    // DESKTOP WORKSPACE LAYOUT
                     <ReflexContainer orientation="vertical" style={{ flex: 1, height: '100%', minHeight: 0 }}>
-                        {!isZenMode && !isMobile && ['files', 'chat', 'users'].includes(sidebarTab) && (
+                        {!isZenMode && isSidebarOpen && ['files', 'chat', 'users'].includes(sidebarTab) && (
                             <ReflexElement flex={0.18} minSize={250} style={{ 
                                 height: '100%', 
                                 minHeight: 0, 
-                                backgroundColor: 'var(--glass-bg)', 
-                                backdropFilter: 'blur(var(--glass-blur))', 
-                                borderRight: '1px solid var(--glass-border)' 
+                                backgroundColor: 'var(--bg-card)', 
+                                borderRight: '1px solid var(--border-color)',
+                                display: 'flex',
+                                flexDirection: 'column'
                             }}>
-                                <div style={{ height: '100%', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
-                                    <div style={sidebarHeaderStyle}>
-                                        <span style={{ fontSize: '10px', fontWeight: '900', letterSpacing: '0.12em', color: 'var(--primary)', textTransform: 'uppercase' }}>
-                                            {sidebarTab === 'chat' ? 'Messages' : sidebarTab === 'users' ? 'Team' : sidebarTab}
-                                        </span>
-                                        {sidebarTab === 'files' && (
-                                            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                                                <label style={{ cursor: 'pointer', opacity: 0.6 }} title="Import File">
-                                                    <FileText size={14} />
-                                                    <input type="file" style={{ display: 'none' }} onChange={handleImportFile} />
-                                                </label>
-                                                <Plus size={14} style={{ cursor: 'pointer', opacity: 0.6 }} onClick={handleAddFile} title="New File" />
-                                            </div>
-                                        )}
-                                    </div>
-                                    <div style={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
+                                <div style={sidebarHeaderStyle}>
+                                    <span style={{ fontSize: '10px', fontWeight: '900', letterSpacing: '0.12em', color: 'var(--primary)', textTransform: 'uppercase' }}>
+                                        {sidebarTab === 'chat' ? 'Messages' : sidebarTab === 'users' ? 'Team' : sidebarTab}
+                                    </span>
+                                    {sidebarTab === 'files' && (
+                                        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                            <label style={{ cursor: 'pointer', opacity: 0.6 }} title="Import File">
+                                                <FileText size={14} />
+                                                <input type="file" style={{ display: 'none' }} onChange={handleImportFile} />
+                                            </label>
+                                            <Plus size={14} style={{ cursor: 'pointer', opacity: 0.6 }} onClick={handleAddFile} title="New File" />
+                                        </div>
+                                    )}
+                                </div>
+                                <div style={{ flex: 1, overflowY: 'auto', minHeight: 0, backgroundColor: 'var(--bg-card)' }}>
                                     {sidebarTab === 'files' && (
                                         <div style={{ padding: '8px' }}>
                                             {files.map(file => (
@@ -970,13 +1108,26 @@ const ProjectPage = () => {
                                             ))}
                                         </div>
                                     )}
-                                    {sidebarTab === 'chat' && <ChatWindow socketRef={socketRef} roomId={`project-${projectId}`} userName={user?.name} isLightMode={isLightMode} isMobile={isMobile} messages={messages} setMessages={setMessages} />}
-                                    </div>
+                                    {sidebarTab === 'chat' && <ChatWindow socketRef={socketRef} roomId={`project-${projectId}`} userName={user?.name || guestName} isLightMode={isLightMode} isMobile={isMobile} messages={messages} setMessages={setMessages} />}
+                                    {sidebarTab === 'users' && (
+                                        <div style={{ padding: '12px' }}>
+                                            {clients.map((client, i) => (
+                                                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px', borderRadius: '6px', marginBottom: '4px', backgroundColor: 'rgba(255,255,255,0.01)' }}>
+                                                    <div style={miniAvatarStyle}>
+                                                        {(client.userName || client.name || 'U')[0].toUpperCase()}
+                                                    </div>
+                                                    <span style={{ fontSize: '12px', fontWeight: '500' }}>
+                                                        {client.userName || client.name} {client.name === (user?.name || guestName) && "(You)"}
+                                                    </span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
                                 </div>
                             </ReflexElement>
                         )}
                         
-                        {!isZenMode && !isMobile && ['files', 'chat', 'users'].includes(sidebarTab) && <ReflexSplitter style={splitterStyle} />}
+                        {!isZenMode && isSidebarOpen && ['files', 'chat', 'users'].includes(sidebarTab) && <ReflexSplitter style={splitterStyle} />}
                         
                         <ReflexElement flex={1} style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
                             <div style={studioTabContainerStyle}>
@@ -1002,7 +1153,7 @@ const ProjectPage = () => {
                                             filename={activeFile.name}
                                             language={activeFile.name.split('.').pop()}
                                             settings={settings}
-                                            userName={user?.name}
+                                            userName={user?.name || guestName}
                                             isLightMode={isLightMode}
                                         />
                                     ) : (
@@ -1023,21 +1174,31 @@ const ProjectPage = () => {
                             </div>
                         </ReflexElement>
                     </ReflexContainer>
-                    )}
-                </div>
+                )}
+            </div>
 
-                <ChatWindow socketRef={socketRef} roomId={`project-${projectId}`} userName={user?.name} isLightMode={isLightMode} isMobile={isMobile} messages={messages} setMessages={setMessages} />
-
-                <WhiteboardModal
-                    isOpen={showWhiteboard}
-                    onClose={() => setShowWhiteboard(false)}
+            {/* Draggable Mini Video Floating Box (Mounted on call activate) */}
+            {isMeetingActive && !isMobile && (
+                <VideoChat
                     socketRef={socketRef}
-                    roomId={projectId}
-                    user={user || { name: socketRef.current?.userName || "Guest" }}
+                    projectId={projectId}
+                    user={user || { name: guestName || 'Guest', isGuest: true }}
+                    isMinimized={isMeetingMinimized}
+                    onMinimizeToggle={(val) => setIsMeetingMinimized(val)}
+                    externalInCall={isMeetingStarting}
+                    onCallStateChange={(active) => {
+                        setIsMeetingStarting(active);
+                        if (!active) setIsMeetingActive(false);
+                    }}
+                    clients={clients}
+                    mediaStates={mediaStates}
+                    initialAudioState={initialAudio}
+                    initialVideoState={initialVideo}
+                    isMobile={isMobile}
                 />
+            )}
 
-
-            {/* Minimal Studio Footer */}
+            {/* Studio Footer */}
             <footer style={studioFooterStyle}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                     <div style={{
@@ -1047,16 +1208,12 @@ const ProjectPage = () => {
                         backgroundColor: '#10b981',
                         boxShadow: '0 0 6px rgba(16, 185, 129, 0.4)'
                     }} />
-                    <span style={{ fontSize: '9px', fontWeight: '700', color: 'var(--text-muted)' }}>
+                    <span style={{ fontSize: '9px', fontWeight: '750', color: 'var(--text-muted)' }}>
                         {project?.type?.toUpperCase()} ENGINE
                     </span>
                 </div>
 
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px', height: '100%' }}>
-                    {/* Always-on conferencing (no leave button) */}
-
-                    <div style={{ width: '1px', height: '12px', backgroundColor: 'var(--border-color)', margin: '0 4px' }} />
-
                     <button
                         onClick={() => setIsOutputVisible(!isOutputVisible)}
                         title="Toggle Terminal"
@@ -1083,7 +1240,7 @@ const ProjectPage = () => {
                             display: 'flex',
                             alignItems: 'center',
                             gap: '6px',
-                            padding: '0 10px',
+                            padding: '0 12px',
                             borderRadius: '4px',
                             border: 'none',
                             backgroundColor: 'var(--primary)',
@@ -1102,27 +1259,71 @@ const ProjectPage = () => {
                 </div>
             </footer>
 
-            {/* Video PiP Overlay — shown when minimized and user has joined */}
-            {!showLobby && hasJoinedRef.current && isMeetingMinimized && (
-                <VideoChat
-                    socketRef={socketRef}
-                    projectId={projectId}
-                    user={user || { name: socketRef.current?.userName, isGuest: true }}
-                    isMinimized={true}
-                    onMinimizeToggle={(val) => {
-                        setIsMeetingMinimized(val);
-                        if (!val) {
-                            if (isMobile) setActiveTab('video');
-                            else setSidebarTab('video');
-                        }
-                    }}
-                    externalInCall={isMeetingStarting}
-                    onCallStateChange={setIsMeetingStarting}
-                    clients={clients}
-                    mediaStates={mediaStates}
-                    initialAudioState={initialAudio}
-                    initialVideoState={initialVideo}
-                />
+            {/* Guest Entry Name Overlay Modal */}
+            {showGuestModal && (
+                <div style={{
+                    position: 'fixed',
+                    inset: 0,
+                    backgroundColor: 'rgba(0,0,0,0.7)',
+                    backdropFilter: 'blur(8px)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    zIndex: 99999
+                }}>
+                    <div style={{
+                        backgroundColor: 'var(--bg-card)',
+                        padding: '32px',
+                        borderRadius: '16px',
+                        border: '1px solid var(--border-color)',
+                        width: '360px',
+                        boxShadow: '0 20px 45px rgba(0,0,0,0.5)',
+                        textAlign: 'center'
+                    }}>
+                        <h2 style={{ fontSize: '20px', fontWeight: '800', marginBottom: '8px', color: 'white' }}>Join Studio</h2>
+                        <p style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: '24px' }}>Please enter a display name to enter the workspace.</p>
+                        <form onSubmit={(e) => {
+                            e.preventDefault();
+                            if (guestName.trim()) {
+                                localStorage.setItem('guest-name', guestName.trim());
+                                joinProject(guestName.trim());
+                                setShowGuestModal(false);
+                            }
+                        }}>
+                            <input
+                                autoFocus
+                                value={guestName}
+                                onChange={(e) => setGuestName(e.target.value)}
+                                style={{
+                                    width: '100%',
+                                    padding: '12px 16px',
+                                    borderRadius: '8px',
+                                    backgroundColor: 'var(--bg-dark)',
+                                    border: '1px solid var(--border-color)',
+                                    color: 'white',
+                                    fontSize: '14px',
+                                    marginBottom: '20px',
+                                    outline: 'none',
+                                    textAlign: 'center'
+                                }}
+                                placeholder="Enter Display Name"
+                                required
+                            />
+                            <button type="submit" style={{
+                                width: '100%',
+                                padding: '12px',
+                                borderRadius: '8px',
+                                border: 'none',
+                                backgroundColor: 'var(--primary)',
+                                color: 'white',
+                                fontWeight: '700',
+                                cursor: 'pointer',
+                                fontSize: '14px',
+                                boxShadow: '0 4px 12px rgba(59, 130, 246, 0.3)'
+                            }}>Join Workspace</button>
+                        </form>
+                    </div>
+                </div>
             )}
 
             {/* Mobile Bottom Navigation Bar */}
@@ -1137,30 +1338,21 @@ const ProjectPage = () => {
                     WebkitBackdropFilter: 'blur(16px)',
                 }}>
                     <button
-                        onClick={() => {
-                            if (activeTab === 'video' && isMeetingStarting) setIsMeetingMinimized(true);
-                            setActiveTab('code');
-                        }}
+                        onClick={() => setActiveTab('code')}
                         style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px', background: 'none', border: 'none', color: activeTab === 'code' ? 'var(--primary)' : 'var(--text-muted)', cursor: 'pointer', padding: '8px', fontSize: '9px', fontWeight: '700', transition: 'all 0.2s' }}
                     >
                         <FileCode size={18} />
                         <span>Code</span>
                     </button>
                     <button
-                        onClick={() => {
-                            if (activeTab === 'video' && isMeetingStarting) setIsMeetingMinimized(true);
-                            setActiveTab('files');
-                        }}
+                        onClick={() => setActiveTab('files')}
                         style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px', background: 'none', border: 'none', color: activeTab === 'files' ? 'var(--primary)' : 'var(--text-muted)', cursor: 'pointer', padding: '8px', fontSize: '9px', fontWeight: '700', transition: 'all 0.2s' }}
                     >
                         <Folder size={18} />
                         <span>Files</span>
                     </button>
                     <button
-                        onClick={() => {
-                            if (activeTab === 'video' && isMeetingStarting) setIsMeetingMinimized(true);
-                            setActiveTab('chat');
-                        }}
+                        onClick={() => setActiveTab('chat')}
                         style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px', background: 'none', border: 'none', color: activeTab === 'chat' ? 'var(--primary)' : 'var(--text-muted)', cursor: 'pointer', padding: '8px', fontSize: '9px', fontWeight: '700', transition: 'all 0.2s', position: 'relative' }}
                     >
                         <MessageSquare size={18} />
@@ -1175,39 +1367,22 @@ const ProjectPage = () => {
                         <span>People</span>
                     </button>
                     <button
-                        onClick={() => {
-                            setIsMeetingMinimized(false);
-                            setActiveTab('video');
-                        }}
+                        onClick={() => setActiveTab('video')}
                         style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px', background: 'none', border: 'none', color: activeTab === 'video' ? 'var(--primary)' : 'var(--text-muted)', cursor: 'pointer', padding: '8px', fontSize: '9px', fontWeight: '700', transition: 'all 0.2s' }}
                     >
                         <Video size={18} />
                         <span>Meet</span>
                     </button>
-                    <button
-                        onClick={() => setShowInviteModal(true)}
-                        style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px', background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '8px', fontSize: '9px', fontWeight: '700', transition: 'all 0.2s' }}
-                    >
-                        <Plus size={18} />
-                        <span>Invite</span>
-                    </button>
-                    <button
-                        onClick={handleCompile}
-                        disabled={isExecuting}
-                        style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px', background: 'none', border: 'none', color: isExecuting ? 'var(--primary)' : 'var(--text-muted)', cursor: 'pointer', padding: '8px', fontSize: '9px', fontWeight: '700', transition: 'all 0.2s', opacity: isExecuting ? 0.5 : 1 }}
-                    >
-                        <Play size={18} />
-                        <span>Run</span>
-                    </button>
                 </nav>
             )}
+
             {/* Team Invite Modal */}
             <InviteModal
                 isOpen={showInviteModal}
                 onClose={() => setShowInviteModal(false)}
                 projectId={projectId}
                 projectName={project?.name || "this project"}
-                inviterName={user?.name || socketRef.current?.userName}
+                inviterName={user?.name || guestName}
             />
 
             <CommandPalette 
@@ -1261,32 +1436,13 @@ const logoWrapperStyle = {
 };
 
 
-const shareButtonStyle = {
-    backgroundColor: 'var(--primary)',
-    color: 'white',
-    border: 'none',
-    borderRadius: '8px',
-    padding: '8px 16px',
-    fontSize: '12px',
-    fontWeight: '700',
-    display: 'flex',
-    alignItems: 'center',
-    gap: '8px',
-    cursor: 'pointer',
-    boxShadow: '0 4px 10px rgba(59, 130, 246, 0.3)'
-};
-
-
-
-
-
 const sidebarHeaderStyle = {
     padding: '12px 16px',
     borderBottom: '1px solid var(--border-color)',
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: 'var(--bg-dark)',
+    backgroundColor: 'var(--bg-card)',
     height: '40px'
 };
 
@@ -1367,11 +1523,6 @@ const splitterStyle = {
     opacity: 0.5
 };
 
-const collaboratorAvatarsStyle = {
-    display: 'flex',
-    alignItems: 'center'
-};
-
 const miniAvatarStyle = {
     width: '24px',
     height: '24px',
@@ -1385,8 +1536,6 @@ const miniAvatarStyle = {
     fontWeight: '800',
     border: '2px solid var(--bg-card)'
 };
-
-
 
 
 const outputHeaderStyle = {
@@ -1427,17 +1576,6 @@ const closeTabStyle = {
     alignItems: 'center'
 };
 
-const modalOverlayStyle = {
-    position: 'fixed',
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0,0,0,0.85)',
-    backdropFilter: 'blur(10px)',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: 9999
-};
 
 const modalContentStyle = {
     backgroundColor: 'var(--bg-card)',
