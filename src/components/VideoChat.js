@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import {
     Video, VideoOff, Mic, MicOff, Maximize2, Minimize2,
-    ChevronDown, ScreenShare, ScreenShareOff, LogOut, Radio, StopCircle
+    ScreenShare, ScreenShareOff, LogOut
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import ACTIONS from '../Action';
@@ -28,16 +28,12 @@ const VideoChat = ({
     const [isScreenSharing, setIsScreenSharing] = useState(false);
     const [inCall, setInCall] = useState(false);
     const [activeSpeaker, setActiveSpeaker] = useState(null);
-    const [isExpanded, setIsExpanded] = useState(false);
-    const [isStreaming, setIsStreaming] = useState(false);
-    const [rtmpKey, setRtmpKey] = useState('');
-    const [showStreamModal, setShowStreamModal] = useState(false);
-    const mediaRecorderRef = useRef(null);
+
     const [pipPosition, setPipPosition] = useState({ x: window.innerWidth - 240, y: window.innerHeight - 200 });
     const [isDragging, setIsDragging] = useState(false);
     const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
     const [isHoveringMini, setIsHoveringMini] = useState(false);
-    const [page, setPage] = useState(0);
+    const page = 0;
     const pageSize = 6;
 
     // --- Refs for WebRTC & Audio ---
@@ -306,48 +302,7 @@ const VideoChat = ({
     }, [isMuted, localStream, broadcastMediaState, setupAudioAnalysis, inCall, handleJoinCall]);
 
     // --- WebRTC Core Functions ---
-    const startStreaming = useCallback(() => {
-        if (!localStream || !rtmpKey) return;
 
-        try {
-            const options = { mimeType: 'video/webm; codecs=vp8,opus' };
-            const recorder = new MediaRecorder(localStream, options);
-            mediaRecorderRef.current = recorder;
-
-            socketRef.current.emit(ACTIONS.START_STREAMING, {
-                projectId,
-                rtmpKey,
-                platform: rtmpKey.startsWith('rtmp://a.rtmp.youtube.com') ? 'youtube' : 'twitch'
-            });
-
-            recorder.ondataavailable = (event) => {
-                if (event.data && event.data.size > 0) {
-                    socketRef.current.emit(ACTIONS.STREAM_DATA, {
-                        projectId,
-                        chunk: event.data
-                    });
-                }
-            };
-
-            recorder.start(1000); // 1-second chunks
-            setIsStreaming(true);
-            setShowStreamModal(false);
-            toast.success("Streaming started!");
-        } catch (err) {
-            console.error("Streaming error:", err);
-            toast.error("Failed to start streaming. Browser might not support this format.");
-        }
-    }, [localStream, rtmpKey, projectId, socketRef]);
-
-    const stopStreaming = useCallback(() => {
-        if (mediaRecorderRef.current) {
-            mediaRecorderRef.current.stop();
-            mediaRecorderRef.current = null;
-        }
-        socketRef.current.emit(ACTIONS.STOP_STREAMING, { projectId });
-        setIsStreaming(false);
-        toast("Streaming stopped.");
-    }, [projectId, socketRef]);
 
     const createPeer = useCallback((targetSocketId, name, stream) => {
         const peer = new RTCPeerConnection({
@@ -444,6 +399,7 @@ const VideoChat = ({
 
     // Cleanup camera tracks faithfully on hard unmounts (e.g Sidebar routing to Dashboard)
     useEffect(() => {
+        const currentSocket = socketRef.current;
         return () => {
             if (localStream) {
                 localStream.getTracks().forEach(t => t.stop());
@@ -454,8 +410,8 @@ const VideoChat = ({
             if (audioContextRef.current) {
                 audioContextRef.current.close().catch(() => {});
             }
-            if (socketRef.current) {
-                socketRef.current.emit('leave-video-chat', { projectId });
+            if (currentSocket) {
+                currentSocket.emit('leave-video-chat', { projectId });
             }
             Object.values(peersRef.current).forEach(peer => peer.close());
             peersRef.current = {};
@@ -681,9 +637,9 @@ const VideoChat = ({
         ...(!user?.isGuest ? [{ id: 'local', isLocal: true }] : []),
         ...Object.entries(remoteUsers).map(([id, data]) => ({ id, ...data }))
     ];
-    const totalPeople = allParticipants.length;
+
     const paginatedParticipants = allParticipants.slice(page * pageSize, (page + 1) * pageSize);
-    const totalPages = Math.ceil(totalPeople / pageSize);
+
 
     if (!inCall) {
         return (
@@ -928,14 +884,7 @@ const RemoteVideo = ({ user, isMini }) => {
 };
 
 // --- Styles ---
-const containerStyle = (isExpanded) => ({
-    backgroundColor: "#0d1117",
-    height: "100%",
-    width: "100%",
-    display: "flex", flexDirection: "column",
-    transition: "height 0.4s cubic-bezier(0.16, 1, 0.3, 1)",
-    position: "relative", overflow: "hidden",
-});
+
 
 const minimizedOverlayStyle = {
     position: 'fixed', bottom: '80px', right: '24px', width: '240px', height: '160px',
@@ -954,69 +903,7 @@ const miniControls = {
 };
 const miniBtn = { width: '28px', height: '28px', borderRadius: '8px', border: 'none', backgroundColor: 'rgba(255,255,255,0.1)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: 'background 0.2s' };
 
-const callWorkspaceStyle = { flex: 1, display: "flex", flexDirection: "column", position: 'relative' };
 
-const gridStyle = (count) => {
-    return {
-        display: 'grid',
-        gridTemplateColumns: `repeat(auto-fit, minmax(clamp(240px, 20vw, 600px), 1fr))`,
-        gridAutoRows: 'max-content',
-        gap: 'clamp(12px, 2vw, 24px)',
-        padding: 'clamp(16px, 3vw, 40px)',
-        flex: 1,
-        width: '100%',
-        height: '100%',
-        maxWidth: '1800px',
-        margin: '0 auto',
-        overflowY: 'auto',
-        alignContent: 'start', // Changed to start to prevent top-clipping on overflow
-        scrollbarWidth: 'none',
-        msOverflowStyle: 'none'
-    };
-};
-
-const participantsSidebarStyle = {
-    width: '300px',
-    backgroundColor: 'rgba(13, 17, 23, 0.8)',
-    backdropFilter: 'blur(20px)',
-    borderLeft: '1px solid rgba(255,255,255,0.08)',
-    display: 'flex',
-    flexDirection: 'column',
-    height: '100%',
-    zIndex: 10
-};
-
-const sidebarHeaderStyle = {
-    padding: '28px 24px',
-    borderBottom: '1px solid rgba(255,255,255,0.08)'
-};
-
-const sidebarTitleStyle = {
-    margin: 0,
-    fontSize: '12px',
-    fontWeight: '800',
-    color: 'var(--primary)',
-    letterSpacing: '0.12em',
-    textTransform: 'uppercase'
-};
-
-const participantsListStyle = {
-    flex: 1,
-    overflowY: 'auto',
-    padding: '16px'
-};
-
-const participantItemStyle = {
-    display: 'flex',
-    alignItems: 'center',
-    padding: '14px',
-    borderRadius: '16px',
-    backgroundColor: 'rgba(255,255,255,0.03)',
-    marginBottom: '10px',
-    gap: '14px',
-    border: '1px solid rgba(255,255,255,0.05)',
-    transition: 'transform 0.2s ease'
-};
 
 const avatarCircle = (size) => ({
     width: `${size}px`,
@@ -1032,38 +919,7 @@ const avatarCircle = (size) => ({
     boxShadow: '0 4px 12px rgba(59, 130, 246, 0.3)'
 });
 
-const participantNameStyle = {
-    flex: 1,
-    fontSize: '14px',
-    fontWeight: '600',
-    color: '#f1f5f9',
-    whiteSpace: 'nowrap',
-    overflow: 'hidden',
-    textOverflow: 'ellipsis'
-};
 
-const participantStatusStyle = {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '10px',
-    opacity: 0.9
-};
-
-const videoTileStyle = (active) => ({
-    borderRadius: "24px",
-    overflow: "hidden",
-    backgroundColor: "#161b22",
-    aspectRatio: "16 / 9",
-    maxHeight: 'min(450px, 50vh)', // Senseful max height for tiles
-    border: active ? "3px solid var(--primary)" : "1px solid rgba(255,255,255,0.08)",
-    boxShadow: active ? "0 0 40px rgba(59, 130, 246, 0.4)" : "0 15px 35px rgba(0,0,0,0.4)",
-    transition: "all 0.4s cubic-bezier(0.16, 1, 0.3, 1)",
-    position: 'relative',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    transform: active ? 'scale(1.02)' : 'scale(1)'
-});
 
 const videoElementStyle = { width: "100%", height: "100%", objectFit: "cover" };
 const avatarCenterStyle = { width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#0f172a' };
@@ -1075,36 +931,8 @@ const nameTagStyle = (muted) => ({
     borderRadius: "12px", border: muted ? "1px solid rgba(239, 68, 68, 0.4)" : "1px solid rgba(255,255,255,0.12)"
 });
 
-const controlDockWrapper = { position: "absolute", bottom: "40px", width: "100%", display: "flex", justifyContent: "center", pointerEvents: "none", zIndex: 100 };
-const controlDock = {
-    display: "flex", alignItems: "center", gap: "10px", padding: "10px",
-    borderRadius: "24px", backgroundColor: "rgba(15, 23, 42, 0.8)", backdropFilter: "blur(16px)",
-    border: '1px solid rgba(255,255,255,0.15)', pointerEvents: "auto",
-    boxShadow: '0 20px 40px rgba(0,0,0,0.4)'
-};
 
-const controlCircle = (active, color) => ({
-    width: "44px", height: "44px", borderRadius: "14px",
-    backgroundColor: active ? (color || "rgba(255,255,255,0.1)") : "rgba(255,255,255,0.08)",
-    color: "#fff", border: "none", cursor: "pointer", display: "flex",
-    alignItems: "center", justifyContent: "center", transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
-    transform: active ? 'scale(1.05)' : 'scale(1)'
-});
-
-const dividerStyle = { width: '1px', height: '24px', backgroundColor: 'rgba(255,255,255,0.15)', margin: '0 4px' };
 const miniMuteIcon = { position: 'absolute', top: '10px', right: '10px', backgroundColor: 'rgba(239, 68, 68, 0.9)', padding: '5px', borderRadius: '50%', zIndex: 10, boxShadow: '0 4px 8px rgba(0,0,0,0.3)' };
-const paginationWrapper = { position: 'absolute', right: '24px', top: '50%', transform: 'translateY(-50%)', display: 'flex', flexDirection: 'column', gap: '10px', zIndex: 10 };
-const paginationDot = (active) => ({
-    width: '10px', height: '10px', borderRadius: '50%',
-    backgroundColor: active ? 'var(--primary)' : 'rgba(255,255,255,0.25)',
-    cursor: 'pointer', transition: 'all 0.3s',
-    transform: active ? 'scale(1.3)' : 'scale(1)'
-});
 
-const modalOverlay = { position: 'absolute', inset: 0, backgroundColor: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 };
-const modalContent = { width: '400px', padding: '30px', borderRadius: '24px', backgroundColor: 'rgba(15, 23, 42, 0.9)', border: '1px solid rgba(255,255,255,0.1)' };
-const inputStyle = { width: '100%', padding: '12px 16px', borderRadius: '12px', backgroundColor: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'white', fontSize: '14px' };
-const cancelBtn = { flex: 1, padding: '12px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.1)', backgroundColor: 'transparent', color: 'white', cursor: 'pointer' };
-const startBtn = { flex: 1, padding: '12px', borderRadius: '12px', border: 'none', backgroundColor: 'var(--primary)', color: 'white', fontWeight: '700', cursor: 'pointer' };
 
 export default VideoChat;

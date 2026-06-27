@@ -30,6 +30,7 @@ import WhiteboardModal from "../components/WhiteboardModal";
 import ChatWindow from "../components/chatWindow";
 import InviteModal from "../components/InviteModal";
 import CommandPalette from "../components/CommandPalette";
+import Client from "../components/clients";
 import { 
     Eye, 
     EyeOff, 
@@ -72,12 +73,9 @@ const ProjectPage = () => {
 
 
     // New Lobby States
-    const [showLobby, setShowLobby] = useState(false);
     const [showGuestModal, setShowGuestModal] = useState(!user && !localStorage.getItem("guest-name"));
-    const [initialAudio, setInitialAudio] = useState(true);
-    const [initialVideo, setInitialVideo] = useState(true);
-    const lobbyVideoRef = useRef(null);
-    const lobbyStreamRef = useRef(null);
+    const initialAudio = true;
+    const initialVideo = true;
 
     const [sidebarTab, setSidebarTab] = useState('files');
     const [isSidebarOpen, setIsSidebarOpen] = useState(true);
@@ -109,36 +107,7 @@ const ProjectPage = () => {
         openFilesRef.current = openFiles;
     }, [openFiles]);
 
-    // --- Lobby Media Preview ---
-    useEffect(() => {
-        if (showLobby) {
-            navigator.mediaDevices.getUserMedia({ video: true, audio: true })
-                .then(stream => {
-                    lobbyStreamRef.current = stream;
-                    if (lobbyVideoRef.current) {
-                        lobbyVideoRef.current.srcObject = stream;
-                    }
-                    setInitialAudio(true);
-                    setInitialVideo(true);
-                })
-                .catch(err => {
-                    console.error("Lobby camera error:", err);
-                    setInitialAudio(false);
-                    setInitialVideo(false);
-                });
-        } else {
-            if (lobbyStreamRef.current) {
-                lobbyStreamRef.current.getTracks().forEach(t => t.stop());
-                lobbyStreamRef.current = null;
-            }
-        }
-        return () => {
-            if (lobbyStreamRef.current) {
-                lobbyStreamRef.current.getTracks().forEach(t => t.stop());
-                lobbyStreamRef.current = null;
-            }
-        };
-    }, [showLobby]);
+
 
     // --- Core Handlers (callback-stabilized for palette) ---
     const toggleTheme = React.useCallback(() => {
@@ -217,7 +186,7 @@ const ProjectPage = () => {
 
         if (language === 'cpp' || language === 'h') {
             const visited = new Set([activeFile.name]);
-            const resolveIncludes = (content) => {
+            function resolveIncludes(content) {
                 return content.replace(/#include\s*"(.*?)"/g, (match, fileName) => {
                     if (visited.has(fileName)) return `// Already included: ${fileName}`;
                     const includedFile = files.find(f => f.name === fileName);
@@ -227,11 +196,11 @@ const ProjectPage = () => {
                     }
                     return match;
                 });
-            };
+            }
             sourceCode = resolveIncludes(sourceCode);
         } else if (language === 'java') {
             const visited = new Set([activeFile.name]);
-            const resolveJavaImports = (code) => {
+            function resolveJavaImports(code) {
                 // Remove package declaration
                 let resolved = code.replace(/^package\s+.*?;/gm, '');
                 // Resolve imports for project classes
@@ -248,7 +217,7 @@ const ProjectPage = () => {
                     return match;
                 });
                 return resolved;
-            };
+            }
 
             sourceCode = resolveJavaImports(activeFile.content);
             // Append any other java files not explicitly imported
@@ -259,7 +228,7 @@ const ProjectPage = () => {
             });
         } else if (language === 'py') {
             const visited = new Set([activeFile.name]);
-            const resolvePythonImports = (content) => {
+            function resolvePythonImports(content) {
                 // Handle: from module import ...
                 let resolved = content.replace(/^from\s+([a-zA-Z0-9_.]+)\s+import\s+/gm, (match, moduleName) => {
                     const fileName = `${moduleName}.py`;
@@ -285,7 +254,7 @@ const ProjectPage = () => {
                 });
 
                 return resolved;
-            };
+            }
             sourceCode = resolvePythonImports(sourceCode);
         }
 
@@ -424,23 +393,7 @@ const ProjectPage = () => {
         return () => window.removeEventListener('keydown', handleGlobalKeydown);
     }, [isZenMode]);
 
-    const toggleLobbyAudio = () => {
-        setInitialAudio(prev => {
-            if (lobbyStreamRef.current) {
-                lobbyStreamRef.current.getAudioTracks().forEach(t => t.enabled = !prev);
-            }
-            return !prev;
-        });
-    };
 
-    const toggleLobbyVideo = () => {
-        setInitialVideo(prev => {
-            if (lobbyStreamRef.current) {
-                lobbyStreamRef.current.getVideoTracks().forEach(t => t.enabled = !prev);
-            }
-            return !prev;
-        });
-    };
 
     const joinProject = React.useCallback((name) => {
         if (!socketRef.current || hasJoinedRef.current) return;
@@ -599,15 +552,7 @@ const ProjectPage = () => {
     }, [projectId, user, navigate, joinProject]);
 
 
-    const handleLobbyJoin = (e) => {
-        if (e) e.preventDefault();
-        if (!user && !guestName.trim()) {
-            toast.error("Please enter a display name to join.");
-            return;
-        }
-        setShowLobby(false);
-        joinProject(user ? user.name : guestName.trim());
-    };
+
 
 
     const handleSaveFile = (content, isRemote = false) => {
@@ -808,6 +753,37 @@ const ProjectPage = () => {
                     </div>
 
                     <div style={{ display: "flex", alignItems: "center", gap: isMobile ? "8px" : "12px" }}>
+                        {!isMobile && (
+                            <div style={{ display: "flex", alignItems: "center" }}>
+                                {clients.slice(0, 5).map((client, idx) => (
+                                    <div key={client.socketId || idx} style={{ marginLeft: idx === 0 ? 0 : "-8px", zIndex: 5 - idx }}>
+                                        <Client 
+                                            userName={client.userName || client.name} 
+                                            isCompact={true} 
+                                            isCurrentUser={(client.userName || client.name) === (user?.name || guestName)} 
+                                        />
+                                    </div>
+                                ))}
+                                {clients.length > 5 && (
+                                    <div style={{ 
+                                        marginLeft: "-8px", 
+                                        width: "32px", 
+                                        height: "32px", 
+                                        borderRadius: "50%", 
+                                        backgroundColor: "var(--secondary)", 
+                                        display: "flex", 
+                                        alignItems: "center", 
+                                        justifyContent: "center", 
+                                        fontSize: "11px", 
+                                        fontWeight: "700", 
+                                        color: "var(--text-muted)", 
+                                        border: "2px solid var(--bg-card)" 
+                                    }}>
+                                        +{clients.length - 5}
+                                    </div>
+                                )}
+                            </div>
+                        )}
                         {/* Redesigned Icon Tray (Clean IDE Style, matching editor.js) */}
                         <div style={{
                             display: "flex",
@@ -1385,6 +1361,15 @@ const ProjectPage = () => {
                 inviterName={user?.name || guestName}
             />
 
+            {/* Whiteboard Modal */}
+            <WhiteboardModal
+                isOpen={showWhiteboard}
+                onClose={() => setShowWhiteboard(false)}
+                socketRef={socketRef}
+                roomId={`project-${projectId}`}
+                user={user || { name: guestName || 'Guest' }}
+            />
+
             <CommandPalette 
                 isOpen={showCommandPalette}
                 onClose={() => setShowCommandPalette(false)}
@@ -1577,41 +1562,6 @@ const closeTabStyle = {
 };
 
 
-const modalContentStyle = {
-    backgroundColor: 'var(--bg-card)',
-    padding: '40px',
-    borderRadius: '8px',
-    border: '1px solid var(--border-color)',
-    width: '100%',
-    maxWidth: '400px',
-    textAlign: 'center',
-    boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)'
-};
 
-const modalInputStyle = {
-    width: '100%',
-    padding: '14px 20px',
-    backgroundColor: 'var(--bg-dark)',
-    border: '1px solid var(--border-color)',
-    borderRadius: '6px',
-    color: 'white',
-    fontSize: '15px',
-    outline: 'none',
-    marginBottom: '20px',
-    textAlign: 'center'
-};
-
-const modalButtonStyle = {
-    width: '100%',
-    padding: '14px',
-    backgroundColor: 'var(--primary)',
-    color: 'white',
-    border: 'none',
-    borderRadius: '6px',
-    fontSize: '15px',
-    fontWeight: '700',
-    cursor: 'pointer',
-    boxShadow: '0 10px 15px -3px rgba(59, 130, 246, 0.3)'
-};
 
 export default ProjectPage;
