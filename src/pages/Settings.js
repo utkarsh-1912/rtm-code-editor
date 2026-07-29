@@ -448,23 +448,125 @@ const ToggleItem = ({ label, description, enabled }) => {
         </div>
     );
 };
-
 // Styles
 const gridStyle = { display: 'grid', gridTemplateColumns: '260px 1fr', gap: '32px', alignItems: 'start' };
-const sidebarNavStyle = { display: 'flex', flexDirection: 'column', gap: '4px', backgroundColor: 'var(--bg-card)', padding: '12px', borderRadius: '8px', border: '1px solid var(--border-color)' };
-const sidebarButtonStyle = { display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 16px', border: 'none', borderRadius: '6px', fontSize: '14px', textAlign: 'left', cursor: 'pointer', transition: 'all 0.2s' };
-const contentAreaStyle = { backgroundColor: 'var(--bg-card)', padding: '32px', borderRadius: '8px', border: '1px solid var(--border-color)', minHeight: '500px' };
-const headerIconWrapperStyle = { width: '40px', height: '40px', borderRadius: '6px', backgroundColor: 'rgba(59, 130, 246, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--primary)', border: '1px solid var(--border-color)' };
+
+const sidebarNavStyle = {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '4px',
+    backgroundColor: 'var(--glass-bg)',
+    padding: '12px',
+    borderRadius: 'var(--radius-card)',
+    border: '1px solid var(--border-color)',
+    boxShadow: 'var(--glass-shadow)',
+    backdropFilter: 'blur(var(--glass-blur))'
+};
+
+const sidebarButtonStyle = {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '12px',
+    padding: '10px 16px',
+    border: 'none',
+    borderRadius: 'var(--radius-btn)',
+    fontSize: '14px',
+    textAlign: 'left',
+    cursor: 'pointer',
+    transition: 'all var(--transition-normal)',
+    fontFamily: "'Outfit', sans-serif"
+};
+
+const contentAreaStyle = {
+    backgroundColor: 'var(--glass-bg)',
+    padding: '32px',
+    borderRadius: 'var(--radius-card)',
+    border: '1px solid var(--border-color)',
+    minHeight: '500px',
+    boxShadow: 'var(--glass-shadow)',
+    backdropFilter: 'blur(var(--glass-blur))'
+};
+
+const headerIconWrapperStyle = {
+    width: '40px',
+    height: '40px',
+    borderRadius: 'var(--radius-btn)',
+    backgroundColor: 'rgba(59, 130, 246, 0.1)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    color: 'var(--primary)',
+    border: '1px solid var(--border-color)'
+};
+
 const sectionHeaderStyle = { marginBottom: '32px', borderBottom: '1px solid var(--border-color)', paddingBottom: '20px' };
-const sectionTitleStyle = { fontSize: '18px', fontWeight: '700', margin: '0 0 8px' };
+const sectionTitleStyle = { fontSize: '18px', fontWeight: '800', margin: '0 0 8px', fontFamily: "'Outfit', sans-serif" };
 const sectionSubtitleStyle = { color: 'var(--text-muted)', fontSize: '14px', margin: 0 };
 const formGroupStyle = { marginBottom: '24px' };
-const labelStyle = { display: 'block', fontSize: '13px', fontWeight: '600', color: 'var(--text-muted)', marginBottom: '8px' };
-const inputStyle = { width: '100%', padding: '12px 16px', backgroundColor: 'var(--bg-dark)', border: '1px solid var(--border-color)', borderRadius: '6px', color: 'var(--text-main)', fontSize: '14px', outline: 'none' };
-const saveButtonStyle = { display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 24px', backgroundColor: 'var(--primary)', color: 'white', border: 'none', borderRadius: '6px', fontSize: '14px', fontWeight: '600', cursor: 'pointer', transition: 'opacity 0.2s' };
-const themeOptionStyle = { padding: '24px 16px', borderRadius: '8px', display: 'flex', flexDirection: 'column', alignItems: 'center', cursor: 'pointer', position: 'relative', transition: 'all 0.2s' };
-const dangerZoneItemStyle = { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px', borderRadius: '8px', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-dark)' };
-const ghostButtonStyle = { padding: '8px 16px', backgroundColor: 'transparent', border: '1px solid var(--border-color)', borderRadius: '6px', color: 'var(--text-main)', fontSize: '13px', fontWeight: '600', cursor: 'pointer' };
+const labelStyle = { display: 'block', fontSize: '13px', fontWeight: '700', color: 'var(--text-muted)', marginBottom: '8px', textTransform: 'uppercase', fontFamily: "'Outfit', sans-serif" };
+
+const inputStyle = {
+    width: '100%',
+    padding: '12px 16px',
+    backgroundColor: 'var(--bg-dark)',
+    border: '1px solid var(--border-color)',
+    borderRadius: 'var(--radius-btn)',
+    color: 'var(--text-main)',
+    fontSize: '14px',
+    outline: 'none',
+    transition: 'border-color var(--transition-normal)'
+};
+
+const saveButtonStyle = {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '10px',
+    padding: '12px 24px',
+    backgroundColor: 'var(--primary)',
+    color: 'white',
+    border: 'none',
+    borderRadius: 'var(--radius-btn)',
+    fontSize: '14px',
+    fontWeight: '700',
+    cursor: 'pointer',
+    transition: 'all var(--transition-spring)',
+    fontFamily: "'Outfit', sans-serif",
+    boxShadow: '0 4px 12px var(--accent-glow)'
+};
+
+const themeOptionStyle = {
+    padding: '24px 16px',
+    borderRadius: 'var(--radius-card)',
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    cursor: 'pointer',
+    position: 'relative',
+    transition: 'all var(--transition-normal)'
+};
+
+const dangerZoneItemStyle = {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: '16px',
+    borderRadius: 'var(--radius-card)',
+    border: '1px solid var(--border-color)',
+    backgroundColor: 'var(--bg-dark)'
+};
+
+const ghostButtonStyle = {
+    padding: '8px 16px',
+    backgroundColor: 'transparent',
+    border: '1px solid var(--border-color)',
+    borderRadius: 'var(--radius-btn)',
+    color: 'var(--text-main)',
+    fontSize: '13px',
+    fontWeight: '700',
+    cursor: 'pointer',
+    transition: 'all var(--transition-normal)',
+    fontFamily: "'Outfit', sans-serif"
+};
 
 const modalOverlayStyle = {
     position: 'fixed',
@@ -472,22 +574,23 @@ const modalOverlayStyle = {
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 2000,
-    backdropFilter: 'blur(4px)'
+    backdropFilter: 'blur(8px)'
 };
 
 const modalContentStyle = {
-    backgroundColor: 'var(--bg-card)',
+    backgroundColor: 'var(--bg-floating)',
     padding: '32px',
-    borderRadius: '12px',
+    borderRadius: 'var(--radius-card)',
     border: '1px solid var(--border-color)',
     width: '90%',
     maxWidth: '450px',
-    boxShadow: '0 20px 40px rgba(0,0,0,0.5)'
+    boxShadow: 'var(--glass-shadow)',
+    backdropFilter: 'blur(16px)'
 };
 
 export default Settings;

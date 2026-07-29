@@ -44,16 +44,11 @@ export default function ContentLayout({ title, children }) {
             }}>
                 <button
                     onClick={() => navigate("/")}
+                    className="secondary-action-btn hover-bounce"
                     style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "8px",
-                        backgroundColor: "transparent",
-                        border: "none",
-                        color: "var(--text-muted)",
-                        cursor: "pointer",
-                        fontSize: "14px",
-                        fontWeight: "600"
+                        padding: "8px 16px",
+                        fontSize: "13px",
+                        fontWeight: "700"
                     }}
                 >
                     <ArrowLeft size={16} /> Back
@@ -61,21 +56,19 @@ export default function ContentLayout({ title, children }) {
 
                 <button
                     onClick={toggleTheme}
+                    className="secondary-action-btn hover-bounce"
                     style={{
+                        width: "36px",
+                        height: "36px",
+                        padding: 0,
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "center",
-                        width: "32px",
-                        height: "32px",
-                        backgroundColor: "var(--bg-card)",
-                        border: "1px solid var(--border-color)",
-                        borderRadius: "6px",
-                        cursor: "pointer",
                         color: isLightMode ? "#fbbf24" : "var(--text-muted)",
-                        transition: "all 0.2s"
+                        borderRadius: "8px"
                     }}
                 >
-                    {isLightMode ? <Sun size={14} /> : <Moon size={14} />}
+                    {isLightMode ? <Sun size={18} /> : <Moon size={18} />}
                 </button>
             </header>
 
@@ -83,15 +76,17 @@ export default function ContentLayout({ title, children }) {
             <main style={{
                 flex: 1,
                 width: "100%",
-                maxWidth: "760px",
-                margin: "0 auto",
-                padding: "48px 24px",
+                maxWidth: "800px",
+                margin: "40px auto 80px",
+                padding: "0 24px",
                 position: "relative",
                 zIndex: 1
             }}>
-                <h1 style={{ fontSize: "2.5rem", fontWeight: "700", marginBottom: "32px" }}>{title}</h1>
-                <div style={{ fontSize: "15px", lineHeight: "1.6", color: "var(--text-muted)" }}>
-                    {children}
+                <div className="glassmorphic-card" style={{ padding: "40px", border: "1px solid var(--border-color)" }}>
+                    <h1 style={{ fontSize: "2.2rem", fontWeight: "800", marginBottom: "32px", color: "var(--text-main)", fontFamily: "'Outfit', sans-serif" }}>{title}</h1>
+                    <div style={{ fontSize: "15px", lineHeight: "1.7", color: "var(--text-muted)" }}>
+                        {children}
+                    </div>
                 </div>
             </main>
 

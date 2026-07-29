@@ -206,65 +206,15 @@ function HomePage() {
                 <div style={{ display: "flex", flexWrap: "wrap", gap: "16px", marginBottom: "24px" }} className="hero-buttons">
                   <button
                     onClick={() => navigate("/dashboard")}
-                    style={{
-                      flex: 1,
-                      minWidth: "200px",
-                      padding: "16px 32px",
-                      background: "linear-gradient(135deg, var(--primary) 0%, #2563eb 100%)",
-                      color: "white",
-                      borderRadius: "16px",
-                      fontWeight: "800",
-                      border: "none",
-                      cursor: "pointer",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      gap: "12px",
-                      boxShadow: "0 10px 25px -5px rgba(59, 130, 246, 0.5)",
-                      transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
-                      fontSize: "15px"
-                    }}
-                    onMouseOver={e => {
-                      e.currentTarget.style.transform = "translateY(-3px)";
-                      e.currentTarget.style.boxShadow = "0 15px 30px -5px rgba(59, 130, 246, 0.6)";
-                    }}
-                    onMouseOut={e => {
-                      e.currentTarget.style.transform = "translateY(0)";
-                      e.currentTarget.style.boxShadow = "0 10px 25px -5px rgba(59, 130, 246, 0.5)";
-                    }}
+                    className="primary-action-btn hover-bounce glow-effect"
+                    style={{ flex: 1, minWidth: "200px", padding: "16px 32px", fontSize: "15px" }}
                   >
                     <LayoutDashboard size={20} strokeWidth={2.5} /> Dashboard
                   </button>
                   <button
                     onClick={() => navigate("/dashboard", { state: { openCreateProject: true } })}
-                    style={{
-                      flex: 1,
-                      minWidth: "200px",
-                      padding: "16px 32px",
-                      backgroundColor: "var(--bg-card-transparent)",
-                      color: "var(--text-main)",
-                      borderRadius: "16px",
-                      fontWeight: "800",
-                      border: "1px solid var(--border-color-glass)",
-                      cursor: "pointer",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      gap: "12px",
-                      transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
-                      fontSize: "15px",
-                      backdropFilter: "blur(10px)"
-                    }}
-                    onMouseOver={e => {
-                      e.currentTarget.style.transform = "translateY(-3px)";
-                      e.currentTarget.style.borderColor = "var(--primary)";
-                      e.currentTarget.style.backgroundColor = "var(--bg-card)";
-                    }}
-                    onMouseOut={e => {
-                      e.currentTarget.style.transform = "translateY(0)";
-                      e.currentTarget.style.borderColor = "var(--border-color-glass)";
-                      e.currentTarget.style.backgroundColor = "var(--bg-card-transparent)";
-                    }}
+                    className="secondary-action-btn hover-bounce"
+                    style={{ flex: 1, minWidth: "200px", padding: "16px 32px", fontSize: "15px", border: "1px solid var(--border-color)" }}
                   >
                     <Plus size={20} strokeWidth={2.5} /> New Project
                   </button>
@@ -272,30 +222,19 @@ function HomePage() {
 
                 {recentProjects.length > 0 && (
                   <div className="staggered-entry" style={{ animationDelay: "0.5s", width: "100%", marginBottom: "48px" }}>
-                    <div style={{ fontSize: "11px", color: "var(--primary)", fontWeight: "800", marginBottom: "16px", textTransform: "uppercase", letterSpacing: "0.1em" }}>Recent Projects</div>
+                    <div style={{ fontSize: "11px", color: "var(--primary)", fontWeight: "800", marginBottom: "16px", textTransform: "uppercase", letterSpacing: "0.1em", fontFamily: "'Outfit', sans-serif" }}>Recent Projects</div>
                     <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
                       {recentProjects.map(proj => (
                         <div
                           key={proj.id}
                           onClick={() => navigate(`/project/${proj.id}`)}
+                          className="glassmorphic-card hover-bounce"
                           style={{
                             padding: "16px 20px",
-                            backgroundColor: "var(--bg-card-transparent)",
-                            borderRadius: "16px",
-                            border: "1px solid var(--border-color-glass)",
                             display: "flex",
                             alignItems: "center",
                             gap: "14px",
-                            cursor: "pointer",
-                            transition: "all 0.2s"
-                          }}
-                          onMouseOver={e => {
-                            e.currentTarget.style.borderColor = "var(--primary)";
-                            e.currentTarget.style.transform = "translateX(5px)";
-                          }}
-                          onMouseOut={e => {
-                            e.currentTarget.style.borderColor = "var(--border-color-glass)";
-                            e.currentTarget.style.transform = "translateX(0)";
+                            cursor: "pointer"
                           }}
                         >
                           <div style={{ color: "var(--primary)" }}><Folder size={18} /></div>

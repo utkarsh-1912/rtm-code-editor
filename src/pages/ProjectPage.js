@@ -739,7 +739,14 @@ const ProjectPage = () => {
                 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: isMobile ? "8px" : "14px" }}>
                         <div style={logoWrapperStyle} onClick={() => navigate('/dashboard')}>
-                            <img src={isLightMode ? "/utkristi-labs.png" : "/utkristi-labs-dark.png"} alt="Logo" style={{ height: isMobile ? '20px' : '26px' }} />
+                            <img
+                                src={isMobile
+                                    ? (isLightMode ? "/utkristi-labs.png" : "/utkristi-labs-dark.png")
+                                    : (isLightMode ? "/utkristi-colabs.png" : "/utkristi-colabs-dark.png")
+                                }
+                                alt="Logo"
+                                style={{ height: isMobile ? '24px' : '32px', objectFit: 'contain' }}
+                            />
                         </div>
                         {!isMobile && <div style={{ height: "20px", width: "1px", backgroundColor: "var(--border-color)" }} />}
                         {!isMobile && (

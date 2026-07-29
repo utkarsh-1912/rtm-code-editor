@@ -2,7 +2,6 @@ import React, { useState, useRef, useEffect } from "react";
 import {
   useNavigate,
   useLocation,
-  Navigate,
   useParams,
 } from "react-router-dom";
 import toast from "react-hot-toast";
@@ -48,7 +47,10 @@ function Editor() {
   const location = useLocation();
   const reactNavigator = useNavigate();
   const { roomId } = useParams();
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
+  const [userName, setUserName] = useState(location.state?.userName || localStorage.getItem("guest-name") || "");
+  const [showGuestModal, setShowGuestModal] = useState(false);
+  const [guestInput, setGuestInput] = useState("");
 
   const codeRef = useRef(localStorage.getItem(`code-${roomId}`) || "");
 
@@ -113,6 +115,20 @@ function Editor() {
   useEffect(() => {
     localStorage.setItem(`chat-${roomId}`, JSON.stringify(messages));
   }, [messages, roomId]);
+
+  useEffect(() => {
+    if (authLoading) return;
+    if (user && user.name) {
+      setUserName(user.name);
+    } else {
+      const savedGuestName = localStorage.getItem("guest-name");
+      if (savedGuestName) {
+        setUserName(savedGuestName);
+      } else if (!location.state?.userName) {
+        setShowGuestModal(true);
+      }
+    }
+  }, [authLoading, user, location.state]);
 
   useEffect(() => {
     const handleResize = () => {
@@ -193,6 +209,7 @@ function Editor() {
   }, [activeTab, isMobile, isChatCollapsed]);
 
   useEffect(() => {
+    if (authLoading || !userName) return;
     const init = async () => {
       // Helper to get sanitized backend URL
       const getBackendUrl = () => {
@@ -257,18 +274,18 @@ function Editor() {
         reactNavigator("/");
       }
 
-      socketRef.current.userName = location.state?.userName || "Guest";
+      socketRef.current.userName = userName;
       socketRef.current.emit(ACTIONS.JOIN, {
         roomId,
-        userName: location.state?.userName,
+        userName: userName,
         userProfile: user,
       });
 
       socketRef.current.on(
         ACTIONS.JOINED,
-        ({ clients, userName, socketId }) => {
-          if (userName !== location.state?.userName) {
-            toast.success(`${userName} joined !`);
+        ({ clients, userName: joinedUser, socketId }) => {
+          if (joinedUser !== userName) {
+            toast.success(`${joinedUser} joined !`);
           }
           setClients(clients);
 
@@ -346,7 +363,7 @@ function Editor() {
         socket.off(ACTIONS.DELETE_MESSAGE);
       }
     };
-  }, [roomId, location.state?.userName, reactNavigator, user]);
+  }, [roomId, userName, reactNavigator, user, authLoading]);
 
   // Reset unread count when chat is viewed
   useEffect(() => {
@@ -355,8 +372,12 @@ function Editor() {
     }
   }, [activeTab, isChatCollapsed, isMobile]);
 
-  if (!location.state) {
-    return <Navigate to={`/?room=${roomId}`} />;
+  if (authLoading) {
+    return (
+      <div style={{ height: "100vh", display: "flex", alignItems: "center", justifyContent: "center", backgroundColor: "var(--bg-dark)", color: "white" }}>
+        <LoadingScreen isLightMode={isLightMode} />
+      </div>
+    );
   }
 
   const copyRoomId = async () => {
@@ -550,7 +571,7 @@ function Editor() {
             <div style={{ display: "flex", alignItems: "center" }}>
               {clients.slice(0, 5).map((client, idx) => (
                 <div key={client.socketId} style={{ marginLeft: idx === 0 ? 0 : "-8px", zIndex: 5 - idx }}>
-                  <Client userName={client.userName} isCompact={true} isCurrentUser={client.userName === location.state?.userName} />
+                  <Client userName={client.userName} isCompact={true} isCurrentUser={client.userName === userName} />
                 </div>
               ))}
               {clients.length > 5 && (
@@ -723,7 +744,7 @@ function Editor() {
                       onDownload={downloadCode}
                       settings={settings}
                       isReadOnly={isReadOnly}
-                      userName={location.state?.userName}
+                      userName={userName}
                     />
                   )}
                   {activeTab === "output" && (
@@ -733,7 +754,7 @@ function Editor() {
                     <ChatWindow
                       socketRef={socketRef}
                       roomId={roomId}
-                      userName={location.state?.userName}
+                      userName={userName}
                       isLightMode={isLightMode}
                       isMobile={isMobile}
                       messages={messages}
@@ -757,7 +778,7 @@ function Editor() {
                             <Client
                               userName={client.userName}
                               isCompact={false}
-                              isCurrentUser={client.userName === location.state?.userName}
+                              isCurrentUser={client.userName === userName}
                             />
                           </div>
                         ))}
@@ -890,7 +911,7 @@ function Editor() {
                         <ChatWindow
                           socketRef={socketRef}
                           roomId={roomId}
-                          userName={location.state?.userName}
+                          userName={userName}
                           isLightMode={isLightMode}
                           messages={messages}
                           setMessages={setMessages}
@@ -926,7 +947,7 @@ function Editor() {
                             isLightMode={isLightMode}
                             settings={settings}
                             isReadOnly={isReadOnly}
-                            userName={location.state?.userName}
+                            userName={userName}
                           />
                         </div>
                       </ReflexElement>
@@ -992,6 +1013,65 @@ function Editor() {
           code={currentCode}
           language={language}
         />
+      )}
+
+      {showGuestModal && (
+        <div style={{
+          position: "fixed",
+          inset: 0,
+          backgroundColor: "rgba(0, 0, 0, 0.6)",
+          backdropFilter: "blur(8px)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          zIndex: 99999
+        }}>
+          <div style={{
+            backgroundColor: "var(--bg-floating)",
+            padding: "32px",
+            borderRadius: "var(--radius-card)",
+            border: "1px solid var(--border-color)",
+            width: "360px",
+            boxShadow: "var(--glass-shadow)",
+            textAlign: "center"
+          }}>
+            <h2 style={{ fontSize: "20px", fontWeight: "800", marginBottom: "8px", color: "white", fontFamily: "'Outfit', sans-serif" }}>Join Workspace</h2>
+            <p style={{ fontSize: "13px", color: "var(--text-muted)", marginBottom: "24px" }}>Please enter a display name to join the room.</p>
+            <form onSubmit={(e) => {
+              e.preventDefault();
+              if (guestInput.trim()) {
+                localStorage.setItem("guest-name", guestInput.trim());
+                setUserName(guestInput.trim());
+                setShowGuestModal(false);
+              }
+            }}>
+              <input
+                autoFocus
+                placeholder="Your name..."
+                value={guestInput}
+                onChange={(e) => setGuestInput(e.target.value)}
+                style={{
+                  width: "100%",
+                  padding: "12px 16px",
+                  borderRadius: "var(--radius-btn)",
+                  backgroundColor: "var(--bg-dark)",
+                  border: "1px solid var(--border-color)",
+                  color: "white",
+                  fontSize: "14px",
+                  outline: "none",
+                  marginBottom: "20px"
+                }}
+              />
+              <button
+                type="submit"
+                className="primary-action-btn hover-bounce"
+                style={{ width: "100%", padding: "12px", borderRadius: "var(--radius-btn)", fontWeight: "700" }}
+              >
+                Join Room
+              </button>
+            </form>
+          </div>
+        </div>
       )}
     </div>
   );

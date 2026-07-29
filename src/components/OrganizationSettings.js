@@ -259,13 +259,14 @@ const OrganizationSettings = ({ isOpen, onClose, userId, userName }) => {
 
 const overlayStyle = {
     position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.8)', backdropFilter: 'blur(8px)',
+    backgroundColor: 'rgba(0, 0, 0, 0.6)', backdropFilter: 'blur(8px)',
     display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 3000
 };
 
 const modalStyle = {
-    backgroundColor: 'var(--bg-card)', width: '90%', maxWidth: '800px', height: '80vh',
-    borderRadius: '24px', border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', overflow: 'hidden'
+    backgroundColor: 'var(--bg-floating)', width: '90%', maxWidth: '800px', height: '80vh',
+    borderRadius: 'var(--radius-card)', border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', overflow: 'hidden',
+    boxShadow: 'var(--glass-shadow)', backdropFilter: 'blur(16px)'
 };
 
 const headerStyle = {
@@ -276,55 +277,62 @@ const sidebarStyle = {
     width: '240px', borderRight: '1px solid var(--border-color)', backgroundColor: 'var(--bg-dark)', display: 'flex', flexDirection: 'column'
 };
 
-const contentStyle = { flex: 1, backgroundColor: 'var(--bg-card)', overflowY: 'auto' };
+const contentStyle = { flex: 1, backgroundColor: 'transparent', overflowY: 'auto' };
 
 const closeButtonStyle = { background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' };
 
 const plusButtonStyle = {
-    padding: '4px', borderRadius: '6px', border: '1px solid var(--border-color)', backgroundColor: 'transparent', color: 'var(--primary)', cursor: 'pointer'
+    padding: '4px', borderRadius: 'var(--radius-badge)', border: '1px solid var(--border-color)', backgroundColor: 'transparent', color: 'var(--primary)', cursor: 'pointer',
+    transition: 'all var(--transition-normal)'
 };
 
 const orgItemStyle = (active) => ({
-    padding: '12px 16px', borderRadius: '12px', display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer',
+    padding: '12px 16px', borderRadius: 'var(--radius-btn)', display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer',
     backgroundColor: active ? 'rgba(59, 130, 246, 0.1)' : 'transparent', color: active ? 'var(--primary)' : 'var(--text-main)',
-    marginBottom: '4px', transition: 'all 0.2s'
+    marginBottom: '4px', transition: 'all var(--transition-normal)',
+    fontFamily: "'Outfit', sans-serif"
 });
 
 const inputStyle = {
     width: '100%', padding: '12px 14px', backgroundColor: 'var(--bg-dark)', border: '1px solid var(--border-color)',
-    borderRadius: '10px', color: 'white', fontSize: '14px', outline: 'none'
+    borderRadius: 'var(--radius-btn)', color: 'var(--text-main)', fontSize: '14px', outline: 'none',
+    transition: 'border-color var(--transition-normal)'
 };
 
 const primaryButtonStyle = {
-    padding: '10px 20px', backgroundColor: 'var(--primary)', color: 'white', border: 'none', borderRadius: '8px', fontWeight: '600', cursor: 'pointer'
+    padding: '10px 20px', backgroundColor: 'var(--primary)', color: 'white', border: 'none', borderRadius: 'var(--radius-btn)', fontWeight: '700', cursor: 'pointer',
+    transition: 'all var(--transition-spring)', fontFamily: "'Outfit', sans-serif", boxShadow: '0 4px 12px var(--accent-glow)'
 };
 
 const secondaryButtonStyle = {
-    padding: '10px 20px', backgroundColor: 'transparent', color: 'var(--text-muted)', border: '1px solid var(--border-color)', borderRadius: '8px', fontWeight: '600', cursor: 'pointer'
+    padding: '10px 20px', backgroundColor: 'transparent', color: 'var(--text-muted)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-btn)', fontWeight: '600', cursor: 'pointer',
+    transition: 'all var(--transition-normal)', fontFamily: "'Outfit', sans-serif"
 };
 
-const labelStyle = { fontSize: '11px', fontWeight: '700', color: 'var(--text-muted)', marginBottom: '8px', display: 'block' };
+const labelStyle = { fontSize: '11px', fontWeight: '800', color: 'var(--text-muted)', marginBottom: '8px', display: 'block', textTransform: 'uppercase', fontFamily: "'Outfit', sans-serif" };
 
 const roleBadgeStyle = {
-    fontSize: '10px', fontWeight: '800', textTransform: 'uppercase', padding: '4px 8px', backgroundColor: 'rgba(59, 130, 246, 0.1)', color: 'var(--primary)', borderRadius: '6px'
+    fontSize: '10px', fontWeight: '800', textTransform: 'uppercase', padding: '4px 8px', backgroundColor: 'rgba(59, 130, 246, 0.1)', color: 'var(--primary)', borderRadius: 'var(--radius-badge)',
+    fontFamily: "'Outfit', sans-serif"
 };
 
 const inputIconStyle = { position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', opacity: 0.4 };
 
-const inviteButtonStyle = { padding: '0 20px', backgroundColor: 'var(--primary)', color: 'white', border: 'none', borderRadius: '10px', fontWeight: '600', cursor: 'pointer' };
+const inviteButtonStyle = { padding: '0 20px', backgroundColor: 'var(--primary)', color: 'white', border: 'none', borderRadius: 'var(--radius-btn)', fontWeight: '700', cursor: 'pointer', fontFamily: "'Outfit', sans-serif" };
 
 const memberListStyle = { display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '12px' };
 
 const memberItemStyle = {
-    padding: '12px', backgroundColor: 'var(--bg-dark)', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between'
+    padding: '12px', backgroundColor: 'var(--bg-dark)', borderRadius: 'var(--radius-btn)', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+    border: '1px solid var(--border-color)'
 };
 
-const avatarStyle = { width: '32px', height: '32px', borderRadius: '50%', backgroundColor: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: '700', fontSize: '14px' };
+const avatarStyle = { width: '32px', height: '32px', borderRadius: '50%', backgroundColor: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: '800', fontSize: '14px', fontFamily: "'Outfit', sans-serif" };
 
 const emptyContentStyle = { height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)' };
 
 const formContainerStyle = { padding: '40px', maxWidth: '400px', margin: '0 auto' };
 
-const memberSectionStyle = { padding: '16px', backgroundColor: 'var(--bg-dark)', borderRadius: '16px', border: '1px solid var(--border-color)' };
+const memberSectionStyle = { padding: '16px', backgroundColor: 'var(--bg-dark)', borderRadius: 'var(--radius-card)', border: '1px solid var(--border-color)' };
 
 export default OrganizationSettings;

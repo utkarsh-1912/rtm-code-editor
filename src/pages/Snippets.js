@@ -623,11 +623,13 @@ const primaryButtonStyle = {
     backgroundColor: 'var(--primary)',
     color: 'white',
     border: 'none',
-    borderRadius: '8px',
-    fontWeight: '600',
+    borderRadius: 'var(--radius-btn)',
+    fontWeight: '700',
     fontSize: '14px',
     cursor: 'pointer',
-    transition: 'opacity 0.2s'
+    transition: 'all var(--transition-spring)',
+    fontFamily: "'Outfit', sans-serif",
+    boxShadow: '0 4px 12px var(--accent-glow)'
 };
 
 const secondaryButtonStyle = {
@@ -635,10 +637,12 @@ const secondaryButtonStyle = {
     backgroundColor: 'transparent',
     color: 'var(--text-muted)',
     border: '1px solid var(--border-color)',
-    borderRadius: '8px',
+    borderRadius: 'var(--radius-btn)',
     fontWeight: '600',
     fontSize: '14px',
-    cursor: 'pointer'
+    cursor: 'pointer',
+    transition: 'all var(--transition-normal)',
+    fontFamily: "'Outfit', sans-serif"
 };
 
 const modalOverlayStyle = {
@@ -647,22 +651,23 @@ const modalOverlayStyle = {
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(0,0,0,0.7)',
+    backgroundColor: 'rgba(0,0,0,0.6)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 1000,
     padding: '24px',
-    backdropFilter: 'blur(4px)'
+    backdropFilter: 'blur(8px)'
 };
 
 const modalContentStyle = {
-    backgroundColor: 'var(--bg-card)',
+    backgroundColor: 'var(--bg-floating)',
     padding: '32px',
-    borderRadius: '12px',
+    borderRadius: 'var(--radius-card)',
     border: '1px solid var(--border-color)',
     width: '100%',
-    boxShadow: '0 20px 40px rgba(0,0,0,0.4)'
+    boxShadow: 'var(--glass-shadow)',
+    backdropFilter: 'blur(16px)'
 };
 
 const modalInputStyle = {
@@ -670,19 +675,21 @@ const modalInputStyle = {
     padding: '12px 14px',
     backgroundColor: 'var(--bg-dark)',
     border: '1px solid var(--border-color)',
-    borderRadius: '8px',
+    borderRadius: 'var(--radius-btn)',
     color: 'var(--text-main)',
     fontSize: '14px',
-    outline: 'none'
+    outline: 'none',
+    transition: 'border-color var(--transition-normal)'
 };
 
 const labelStyle = {
     display: 'block',
     fontSize: '11px',
-    fontWeight: '700',
+    fontWeight: '800',
     color: 'var(--text-muted)',
     marginBottom: '8px',
-    textTransform: 'uppercase'
+    textTransform: 'uppercase',
+    fontFamily: "'Outfit', sans-serif"
 };
 
 const iconButtonStyle = {
@@ -694,8 +701,8 @@ const iconButtonStyle = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: '10px',
-    transition: 'all 0.2s'
+    borderRadius: 'var(--radius-btn)',
+    transition: 'all var(--transition-normal)'
 };
 
 const premiumButtonStyle = {
@@ -703,27 +710,29 @@ const premiumButtonStyle = {
     alignItems: 'center',
     gap: '8px',
     padding: '10px 16px',
-    borderRadius: '10px',
+    borderRadius: 'var(--radius-btn)',
     border: 'none',
     backgroundColor: 'var(--primary)',
     color: 'white',
     fontSize: '14px',
     fontWeight: '700',
     cursor: 'pointer',
-    transition: 'all 0.2s'
+    transition: 'all var(--transition-spring)',
+    fontFamily: "'Outfit', sans-serif"
 };
 
 const vaultButtonStyle = (active) => ({
     padding: '8px 16px',
-    borderRadius: '20px',
+    borderRadius: 'var(--radius-btn)',
     backgroundColor: active ? 'var(--primary)' : 'var(--bg-card)',
     color: active ? 'white' : 'var(--text-muted)',
     border: `1px solid ${active ? 'var(--primary)' : 'var(--border-color)'}`,
     fontSize: '13px',
-    fontWeight: '600',
+    fontWeight: '700',
     cursor: 'pointer',
     whiteSpace: 'nowrap',
-    transition: 'all 0.2s'
+    transition: 'all var(--transition-normal)',
+    fontFamily: "'Outfit', sans-serif"
 });
 
 export default Snippets;

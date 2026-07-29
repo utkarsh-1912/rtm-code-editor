@@ -13,7 +13,10 @@ import {
     Zap,
     Folder,
     ChevronRight,
-    ChevronLeft
+    ChevronLeft,
+    Coffee,
+    Globe,
+    FileCode
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import AppLayout from '../components/AppLayout';
@@ -298,42 +301,15 @@ const Dashboard = () => {
                     }}>
                         <button
                             onClick={() => setShowCreateProjectModal(true)}
-                            className="dashboard-primary-btn"
-                            style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '10px',
-                                padding: '10px 20px',
-                                background: 'rgba(255, 255, 255, 0.05)',
-                                color: 'var(--text-main)',
-                                border: '1px solid var(--border-color)',
-                                borderRadius: '8px',
-                                fontWeight: '700',
-                                fontSize: '14px',
-                                cursor: 'pointer',
-                                transition: 'all 0.3s'
-                            }}
+                            className="secondary-action-btn hover-bounce"
+                            style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 20px', fontSize: '14px', borderRadius: 'var(--radius-btn)', fontWeight: '700' }}
                         >
                             <Folder size={18} /> New Project
                         </button>
                         <button
                             onClick={() => navigate('/')}
-                            className="dashboard-primary-btn highlight"
-                            style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '10px',
-                                padding: '10px 20px',
-                                background: 'var(--primary)',
-                                color: 'white',
-                                border: 'none',
-                                borderRadius: '8px',
-                                fontWeight: '700',
-                                fontSize: '14px',
-                                cursor: 'pointer',
-                                transition: 'all 0.3s',
-                                boxShadow: '0 8px 12px -3px rgba(59, 130, 246, 0.3)'
-                            }}
+                            className="primary-action-btn hover-bounce glow-effect"
+                            style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 20px', fontSize: '14px', borderRadius: 'var(--radius-btn)', fontWeight: '700' }}
                         >
                             <Plus size={20} strokeWidth={2.5} /> New Room
                         </button>
@@ -674,17 +650,53 @@ const Dashboard = () => {
                                             />
                                         </div>
                                         <div>
-                                            <label style={{ fontSize: '11px', fontWeight: '800', color: 'var(--text-muted)', marginBottom: '8px', display: 'block' }}>PROJECT TYPE</label>
-                                            <select
-                                                style={modalInputStyle}
-                                                value={newProjectType}
-                                                onChange={(e) => setNewProjectType(e.target.value)}
-                                            >
-                                                <option value="web">Web Project (HTML/CSS/JS)</option>
-                                                <option value="cpp">C++ Project</option>
-                                                <option value="python">Python Project</option>
-                                                <option value="java">Java Project</option>
-                                            </select>
+                                            <label style={{ fontSize: '11px', fontWeight: '800', color: 'var(--text-muted)', marginBottom: '8px', display: 'block' }}>SELECT TEMPLATE</label>
+                                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px', marginTop: '8px' }}>
+                                                {[
+                                                    { id: 'web', name: 'Web Starter', desc: 'HTML5, CSS3 & JS', icon: <Globe size={18} /> },
+                                                    { id: 'cpp', name: 'C++ Console', desc: 'main.cpp structure', icon: <Terminal size={18} /> },
+                                                    { id: 'python', name: 'Python Script', desc: 'main.py script', icon: <FileCode size={18} /> },
+                                                    { id: 'java', name: 'Java Class', desc: 'Main.java boiler', icon: <Coffee size={18} /> }
+                                                ].map(tpl => {
+                                                    const isSelected = newProjectType === tpl.id;
+                                                    return (
+                                                        <div
+                                                            key={tpl.id}
+                                                            onClick={() => setNewProjectType(tpl.id)}
+                                                            style={{
+                                                                padding: '12px 14px',
+                                                                borderRadius: 'var(--radius-card)',
+                                                                border: isSelected ? '1.5px solid var(--primary)' : '1px solid var(--border-color)',
+                                                                backgroundColor: isSelected ? 'rgba(59, 130, 246, 0.05)' : 'var(--bg-dark)',
+                                                                cursor: 'pointer',
+                                                                transition: 'all var(--transition-normal)',
+                                                                display: 'flex',
+                                                                alignItems: 'center',
+                                                                gap: '10px',
+                                                                textAlign: 'left'
+                                                            }}
+                                                        >
+                                                            <div style={{
+                                                                color: isSelected ? 'var(--primary)' : 'var(--text-muted)',
+                                                                backgroundColor: isSelected ? 'rgba(59, 130, 246, 0.1)' : 'rgba(255,255,255,0.02)',
+                                                                width: '32px',
+                                                                height: '32px',
+                                                                borderRadius: 'var(--radius-btn)',
+                                                                display: 'flex',
+                                                                alignItems: 'center',
+                                                                justifyContent: 'center',
+                                                                flexShrink: 0
+                                                            }}>
+                                                                {tpl.icon}
+                                                            </div>
+                                                            <div style={{ flex: 1, minWidth: 0 }}>
+                                                                <div style={{ fontSize: '12px', fontWeight: '700', color: isSelected ? 'var(--primary)' : 'var(--text-main)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{tpl.name}</div>
+                                                                <div style={{ fontSize: '10px', color: 'var(--text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{tpl.desc}</div>
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
                                         </div>
                                     </div>
                                     <div style={{ display: 'flex', gap: '12px', marginTop: '32px', justifyContent: 'flex-end' }}>
@@ -744,11 +756,12 @@ const Dashboard = () => {
 // Styles
 // Modern Sharp Styles
 const workspaceCardStyle = {
-    backgroundColor: 'var(--bg-card)',
+    backgroundColor: 'var(--glass-bg)',
     border: '1px solid var(--border-color)',
-    borderRadius: '8px',
-    boxShadow: '0 10px 30px -10px rgba(0,0,0,0.1)',
-    overflow: 'hidden'
+    borderRadius: 'var(--radius-card)',
+    boxShadow: 'var(--glass-shadow)',
+    overflow: 'hidden',
+    backdropFilter: 'blur(var(--glass-blur))'
 };
 
 const workspaceHeaderStyle = {
@@ -757,7 +770,7 @@ const workspaceHeaderStyle = {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.02)',
+    backgroundColor: 'rgba(255,255,255,0.01)',
     flexWrap: 'wrap',
     gap: '20px'
 };
@@ -765,22 +778,23 @@ const workspaceHeaderStyle = {
 const pillTabContainerStyle = {
     display: 'flex',
     backgroundColor: 'var(--bg-dark)',
-    padding: '3px',
-    borderRadius: '4px',
+    padding: '4px',
+    borderRadius: 'var(--radius-btn)',
     border: '1px solid var(--border-color)'
 };
 
 const pillTabButtonStyle = (active) => ({
     padding: '8px 24px',
-    borderRadius: '4px',
+    borderRadius: '8px',
     backgroundColor: active ? 'var(--bg-card)' : 'transparent',
     color: active ? 'var(--primary)' : 'var(--text-muted)',
     border: 'none',
     fontSize: '13px',
     fontWeight: '700',
     cursor: 'pointer',
-    transition: 'all 0.2s',
-    boxShadow: active ? '0 2px 8px rgba(0,0,0,0.2)' : 'none'
+    transition: 'all var(--transition-fast)',
+    boxShadow: active ? '0 2px 8px rgba(0,0,0,0.15)' : 'none',
+    fontFamily: "'Outfit', sans-serif"
 });
 
 const searchContainerStyle = {
@@ -789,16 +803,16 @@ const searchContainerStyle = {
     gap: '12px',
     padding: '10px 16px',
     backgroundColor: 'var(--bg-dark)',
-    borderRadius: '4px',
+    borderRadius: 'var(--radius-btn)',
     border: '1px solid var(--border-color)',
     minWidth: window.innerWidth < 768 ? '180px' : '280px',
-    transition: 'border-color 0.2s'
+    transition: 'border-color var(--transition-normal)'
 };
 
 const searchInputStyle = {
     background: 'transparent',
     border: 'none',
-    color: 'white',
+    color: 'var(--text-main)',
     fontSize: '14px',
     width: '100%',
     outline: 'none'
@@ -806,48 +820,53 @@ const searchInputStyle = {
 
 const sharpItemCardStyle = {
     padding: '24px',
-    backgroundColor: 'transparent',
-    borderRadius: '6px',
-    border: '1px solid var(--border-color)',
+    backgroundColor: 'var(--glass-bg)',
+    borderRadius: 'var(--radius-card)',
+    border: '1px solid var(--glass-border)',
+    boxShadow: 'var(--glass-shadow)',
     display: 'flex',
     flexDirection: 'column',
-    transition: 'all 0.2s ease',
-    minHeight: '180px'
+    transition: 'all var(--transition-spring)',
+    minHeight: '180px',
+    cursor: 'pointer'
 };
 
 const sharpCardButtonStyle = {
     padding: '8px 16px',
-    borderRadius: '4px',
+    borderRadius: 'var(--radius-badge)',
     backgroundColor: 'var(--bg-dark)',
     border: '1px solid var(--border-color)',
     color: 'var(--text-main)',
-    fontWeight: '600',
+    fontWeight: '700',
     fontSize: '12px',
     cursor: 'pointer',
-    transition: 'all 0.2s'
+    transition: 'all var(--transition-normal)',
+    fontFamily: "'Outfit', sans-serif"
 };
 
 const sharpLangBadgeStyle = (lang) => ({
     fontSize: '10px',
-    fontWeight: '700',
+    fontWeight: '800',
     padding: '4px 8px',
     backgroundColor: 'rgba(59, 130, 246, 0.08)',
     color: 'var(--primary)',
-    borderRadius: '2px',
-    textTransform: 'uppercase'
+    borderRadius: 'var(--radius-badge)',
+    textTransform: 'uppercase',
+    fontFamily: "'Outfit', sans-serif"
 });
 
 const sharpMenuStyle = {
     position: 'absolute',
     right: 0,
     top: '28px',
-    backgroundColor: 'var(--bg-card)',
+    backgroundColor: 'var(--bg-floating)',
     border: '1px solid var(--border-color)',
-    borderRadius: '4px',
-    padding: '4px',
+    borderRadius: 'var(--radius-btn)',
+    padding: '6px',
     zIndex: 100,
     minWidth: '140px',
-    boxShadow: '0 8px 16px rgba(0,0,0,0.4)'
+    boxShadow: '0 8px 24px rgba(0,0,0,0.3)',
+    backdropFilter: 'blur(12px)'
 };
 
 const emptyStateStyle = {
@@ -869,11 +888,11 @@ const menuButtonStyle = {
     backgroundColor: 'transparent',
     color: 'var(--text-main)',
     fontSize: '13px',
-    fontWeight: '500',
+    fontWeight: '600',
     cursor: 'pointer',
     textAlign: 'left',
-    borderRadius: '4px',
-    transition: 'background 0.2s'
+    borderRadius: '6px',
+    transition: 'background var(--transition-fast)'
 };
 
 const modalOverlayStyle = {
@@ -882,24 +901,25 @@ const modalOverlayStyle = {
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(0,0,0,0.7)',
+    backgroundColor: 'rgba(0,0,0,0.6)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 1000,
     padding: '24px',
-    backdropFilter: 'blur(4px)'
+    backdropFilter: 'blur(8px)'
 };
 
 const modalContentStyle = {
-    backgroundColor: 'var(--bg-card)',
-    padding: '24px',
-    borderRadius: '8px',
+    backgroundColor: 'var(--bg-floating)',
+    padding: '32px',
+    borderRadius: 'var(--radius-card)',
     border: '1px solid var(--border-color)',
     width: '100%',
     maxWidth: '480px',
-    boxShadow: '0 20px 40px rgba(0,0,0,0.4)',
-    position: 'relative'
+    boxShadow: 'var(--glass-shadow)',
+    position: 'relative',
+    backdropFilter: 'blur(16px)'
 };
 
 const modalInputStyle = {
@@ -907,11 +927,11 @@ const modalInputStyle = {
     padding: '14px 16px',
     backgroundColor: 'var(--bg-dark)',
     border: '1px solid var(--border-color)',
-    borderRadius: '6px',
+    borderRadius: 'var(--radius-btn)',
     color: 'var(--text-main)',
     fontSize: '15px',
     outline: 'none',
-    transition: 'border-color 0.2s',
+    transition: 'border-color var(--transition-normal)',
     boxSizing: 'border-box'
 };
 
@@ -919,22 +939,25 @@ const cancelButtonStyle = {
     padding: '12px 20px',
     backgroundColor: 'transparent',
     border: '1px solid var(--border-color)',
-    borderRadius: '6px',
+    borderRadius: 'var(--radius-btn)',
     color: 'var(--text-muted)',
     fontSize: '14px',
     fontWeight: '600',
-    cursor: 'pointer'
+    cursor: 'pointer',
+    transition: 'all var(--transition-normal)'
 };
 
 const confirmButtonStyle = {
     padding: '12px 24px',
     backgroundColor: 'var(--primary)',
     border: 'none',
-    borderRadius: '6px',
+    borderRadius: 'var(--radius-btn)',
     color: 'white',
     fontSize: '14px',
     fontWeight: '700',
-    cursor: 'pointer'
+    cursor: 'pointer',
+    transition: 'all var(--transition-normal)',
+    boxShadow: '0 4px 12px rgba(59, 130, 246, 0.3)'
 };
 
 const carouselBtnStyle = {
@@ -944,7 +967,7 @@ const carouselBtnStyle = {
     padding: '8px',
     borderRadius: '8px',
     cursor: 'pointer',
-    transition: 'all 0.2s',
+    transition: 'all var(--transition-normal)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center'

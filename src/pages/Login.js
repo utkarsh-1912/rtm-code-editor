@@ -115,7 +115,7 @@ const Login = () => {
 
                 <div style={{ maxWidth: "360px", width: "100%", margin: "0 auto" }}>
                     <div style={{ marginBottom: "32px" }}>
-                        <h2 style={{ fontSize: "28px", fontWeight: "700", marginBottom: "8px" }}>Sign In</h2>
+                        <h2 style={{ fontSize: "28px", fontWeight: "800", marginBottom: "8px", fontFamily: "'Outfit', sans-serif" }}>Sign In</h2>
                         <p style={{ color: "var(--text-muted)", fontSize: "14px" }}>Access your workspace to continue building.</p>
                     </div>
 
@@ -126,10 +126,10 @@ const Login = () => {
                             onMouseLeave={() => setIsHovered(null)}
                             style={{
                                 display: "flex", alignItems: "center", justifyContent: "center", gap: "10px",
-                                width: "100%", padding: "12px", borderRadius: "8px", border: "1px solid var(--border-color)",
+                                width: "100%", padding: "12px", borderRadius: "var(--radius-btn)", border: "1px solid var(--border-color)",
                                 backgroundColor: isHovered === 'google' ? "var(--bg-card)" : "transparent",
-                                color: "var(--text-main)", fontSize: "14px", fontWeight: "600",
-                                cursor: "pointer", transition: "all 0.2s"
+                                color: "var(--text-main)", fontSize: "14px", fontWeight: "700",
+                                cursor: "pointer", transition: "all var(--transition-normal)", fontFamily: "'Outfit', sans-serif"
                             }}
                         >
                             <Mail size={18} color="var(--primary)" /> Continue with Google
@@ -141,10 +141,10 @@ const Login = () => {
                             onMouseLeave={() => setIsHovered(null)}
                             style={{
                                 display: "flex", alignItems: "center", justifyContent: "center", gap: "10px",
-                                width: "100%", padding: "12px", borderRadius: "8px", border: "1px solid var(--border-color)",
+                                width: "100%", padding: "12px", borderRadius: "var(--radius-btn)", border: "1px solid var(--border-color)",
                                 backgroundColor: isHovered === 'github' ? "var(--bg-card)" : "transparent",
-                                color: "var(--text-main)", fontSize: "14px", fontWeight: "600",
-                                cursor: "pointer", transition: "all 0.2s"
+                                color: "var(--text-main)", fontSize: "14px", fontWeight: "700",
+                                cursor: "pointer", transition: "all var(--transition-normal)", fontFamily: "'Outfit', sans-serif"
                             }}
                         >
                             <Github size={18} /> Continue with GitHub
@@ -153,26 +153,27 @@ const Login = () => {
 
                     <div style={{ display: "flex", alignItems: "center", gap: "12px", margin: "24px 0" }}>
                         <div style={{ flex: 1, height: "1px", backgroundColor: "var(--border-color)" }}></div>
-                        <span style={{ fontSize: "11px", fontWeight: "600", textTransform: "uppercase", color: "var(--text-muted)" }}>or guest</span>
+                        <span style={{ fontSize: "11px", fontWeight: "700", textTransform: "uppercase", color: "var(--text-muted)", fontFamily: "'Outfit', sans-serif" }}>or guest</span>
                         <div style={{ flex: 1, height: "1px", backgroundColor: "var(--border-color)" }}></div>
                     </div>
 
                     <div style={{
-                        backgroundColor: "var(--bg-card)",
+                        backgroundColor: "var(--glass-bg)",
+                        backdropFilter: "blur(var(--glass-blur))",
                         border: "1px solid var(--border-color)",
                         padding: "24px",
-                        borderRadius: "12px",
+                        borderRadius: "var(--radius-card)",
                         textAlign: "center"
                     }}>
                         <ShieldCheck size={20} style={{ color: "var(--primary)", marginBottom: "8px" }} />
-                        <h4 style={{ fontSize: "14px", fontWeight: "600", marginBottom: "4px" }}>Quick Access</h4>
+                        <h4 style={{ fontSize: "14px", fontWeight: "700", marginBottom: "4px", fontFamily: "'Outfit', sans-serif" }}>Quick Access</h4>
                         <p style={{ color: "var(--text-muted)", fontSize: "12px", marginBottom: "16px" }}>Join as a guest to use the core editor.</p>
                         <button
                             onClick={() => navigate("/")}
+                            className="primary-action-btn hover-bounce glow-effect"
                             style={{
-                                width: "100%", padding: "10px", borderRadius: "6px", border: "none",
-                                backgroundColor: "var(--primary)", color: "white", fontSize: "13px", fontWeight: "600",
-                                cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: "6px"
+                                width: "100%", padding: "10px", borderRadius: "var(--radius-btn)", border: "none", fontSize: "13px",
+                                display: "flex", alignItems: "center", justifycontent: "center", gap: "6px"
                             }}
                         >
                             Launch Editor <ChevronRight size={14} />
@@ -180,7 +181,7 @@ const Login = () => {
                     </div>
 
                     <p style={{ textAlign: "center", marginTop: "32px", fontSize: "13px", color: "var(--text-muted)" }}>
-                        Don't have an account? <span onClick={() => navigate("/signup")} style={{ color: "var(--primary)", fontWeight: "600", cursor: "pointer" }}>Join Now</span>
+                        Don't have an account? <span onClick={() => navigate("/signup")} style={{ color: "var(--primary)", fontWeight: "700", cursor: "pointer" }}>Join Now</span>
                     </p>
                 </div>
             </div>
