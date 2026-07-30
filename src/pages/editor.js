@@ -41,6 +41,11 @@ import LoadingScreen from "../components/LoadingScreen";
 import SnippetModal from "../components/SnippetModal";
 import { ImportIcon, PencilLine } from "lucide-react";
 import WhiteboardModal from "../components/WhiteboardModal";
+import TabBar from "../components/TabBar";
+import AICopilotModal from "../components/AICopilotModal";
+import DiffViewerModal from "../components/DiffViewerModal";
+import AnalyticsDashboardModal from "../components/AnalyticsDashboardModal";
+import { Bot, History, Activity } from "lucide-react";
 
 function Editor() {
   const socketRef = useRef(null);
@@ -87,8 +92,10 @@ function Editor() {
   const [activeTab, setActiveTab] = useState("code"); // "code" | "output" | "chat"
 
   const [messages, setMessages] = useState(() => {
-    const saved = localStorage.getItem(`chat-${roomId}`);
-    return saved ? JSON.parse(saved) : [];
+    try {
+      const saved = localStorage.getItem(`chat-${roomId}`);
+      return saved ? JSON.parse(saved) : [];
+    } catch { return []; }
   });
   const [unreadChatCount, setUnreadChatCount] = useState(0);
 
@@ -101,12 +108,18 @@ function Editor() {
   const [showSettings, setShowSettings] = useState(false);
   const [showGistModal, setShowGistModal] = useState(false);
   const [settings, setSettings] = useState(() => {
-    const saved = localStorage.getItem("app-editor-settings");
-    return saved ? JSON.parse(saved) : { fontSize: 16, tabSize: 4, wordWrap: false };
+    try {
+      const saved = localStorage.getItem("app-editor-settings");
+      return saved ? JSON.parse(saved) : { fontSize: 16, tabSize: 4, wordWrap: false };
+    } catch { return { fontSize: 16, tabSize: 4, wordWrap: false }; }
   });
 
   const [showSnippetModal, setShowSnippetModal] = useState(false);
   const [showWhiteboard, setShowWhiteboard] = useState(false);
+  const [showAICopilot, setShowAICopilot] = useState(false);
+  const [showDiffViewer, setShowDiffViewer] = useState(false);
+  const [showAnalytics, setShowAnalytics] = useState(false);
+  const [openFiles] = useState([{ name: `main.${language === 'python' ? 'py' : language === 'cpp' ? 'cpp' : 'js'}`, path: 'main', content: currentCode }]);
 
   useEffect(() => {
     localStorage.setItem("app-editor-settings", JSON.stringify(settings));
@@ -264,6 +277,10 @@ function Editor() {
       }
 
       socketRef.current = await initSocket();
+      if (!isMounted) {
+        socketRef.current.disconnect();
+        return;
+      }
       setSocketConnected(true);
       socketRef.current.on("connect_error", (err) => handleErrors(err));
       socketRef.current.on("connect_failed", (err) => handleErrors(err));
@@ -346,9 +363,11 @@ function Editor() {
       });
     };
 
+    let isMounted = true;
     init();
 
     return () => {
+      isMounted = false;
       const socket = socketRef.current;
       if (socket) {
         socket.disconnect();
@@ -419,10 +438,18 @@ function Editor() {
     const langObj = LANGUAGES.find((l) => l.value === language);
     const languageId = langObj ? langObj.id : 63;
 
+    // Safe base64 encoding for Unicode/emoji characters
+    const safeBase64 = (str) => {
+      try {
+        return btoa(unescape(encodeURIComponent(str)));
+      } catch {
+        return btoa(str);
+      }
+    };
     const formData = {
       language_id: languageId,
-      source_code: btoa(codeRef.current),
-      ...(stdin.trim() && { stdin: btoa(stdin) })
+      source_code: safeBase64(codeRef.current),
+      ...(stdin.trim() && { stdin: safeBase64(stdin) })
     };
 
     const url = "https://judge0-ce.p.rapidapi.com/submissions?base64_encoded=true&fields=*";
@@ -470,7 +497,16 @@ function Editor() {
       const data = await response.json();
 
       if (data.status?.id === 1 || data.status?.id === 2) {
-        setTimeout(() => pollExecutionResult(token), 2000);
+        if ((pollExecutionResult._retries || 0) < 20) {
+          pollExecutionResult._retries = (pollExecutionResult._retries || 0) + 1;
+          setTimeout(() => pollExecutionResult(token), 2000);
+        } else {
+          pollExecutionResult._retries = 0;
+          setIsExecuting(false);
+          setOutput("Execution timed out. Please try again.");
+          setIsError(true);
+          socketRef.current?.emit(ACTIONS.SYNC_EXECUTE, { roomId, isExecuting: false });
+        }
         return;
       } else {
         setIsExecuting(false);
@@ -601,6 +637,34 @@ function Editor() {
             >
               {isExecuting ? <Pause size={18} fill="#4ade80" /> : <Play size={18} fill="#22c55e" />}
             </button>
+            <button
+              onClick={() => setShowAICopilot(true)}
+              style={{ display: "flex", alignItems: "center", justifyContent: "center", width: "32px", height: "32px", color: "var(--primary)", backgroundColor: "rgba(59, 130, 246, 0.1)", borderRadius: "6px", border: "1px solid rgba(59, 130, 246, 0.2)", cursor: "pointer", transition: "all 0.2s" }}
+              title="AI Copilot Studio"
+            >
+              <Bot size={18} />
+            </button>
+
+            <button
+              onClick={() => setShowDiffViewer(true)}
+              style={{ display: isMobile ? "none" : "flex", alignItems: "center", justifyContent: "center", width: "32px", height: "32px", color: "var(--text-muted)", backgroundColor: "transparent", borderRadius: "6px", border: "none", cursor: "pointer", transition: "all 0.2s" }}
+              onMouseOver={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-card)")}
+              onMouseOut={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
+              title="Version History & Diff Viewer"
+            >
+              <History size={18} />
+            </button>
+
+            <button
+              onClick={() => setShowAnalytics(true)}
+              style={{ display: isMobile ? "none" : "flex", alignItems: "center", justifyContent: "center", width: "32px", height: "32px", color: "var(--text-muted)", backgroundColor: "transparent", borderRadius: "6px", border: "none", cursor: "pointer", transition: "all 0.2s" }}
+              onMouseOver={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-card)")}
+              onMouseOut={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
+              title="Workspace Telemetry Analytics"
+            >
+              <Activity size={18} />
+            </button>
+
             <button
               onClick={() => setShowSettings(true)}
               style={{ display: isMobile ? "none" : "flex", alignItems: "center", justifyContent: "center", width: "32px", height: "32px", color: "var(--text-muted)", backgroundColor: "transparent", borderRadius: "6px", border: "none", cursor: "pointer", transition: "all 0.2s" }}
@@ -927,8 +991,10 @@ function Editor() {
                   <ReflexElement key="main-pane" className="right-pane" flex={isChatCollapsed ? 1 : 0.75}>
                     <ReflexContainer orientation="horizontal">
                       <ReflexElement className="editor-pane" flex={0.65} minSize={200}>
-                        <div style={{ height: "100%", width: "100%", overflow: "hidden" }}>
-                          <EditorComp
+                        <div style={{ height: "100%", width: "100%", overflow: "hidden", display: "flex", flexDirection: "column" }}>
+                          <TabBar openFiles={openFiles} activeFile={openFiles[0]} isMobile={isMobile} />
+                          <div style={{ flex: 1, overflow: "hidden" }}>
+                            <EditorComp
                             socketRef={socketRef}
                             roomId={roomId}
                             onCodeChange={(code) => {
@@ -949,6 +1015,7 @@ function Editor() {
                             isReadOnly={isReadOnly}
                             userName={userName}
                           />
+                          </div>
                         </div>
                       </ReflexElement>
 
@@ -1073,6 +1140,40 @@ function Editor() {
           </div>
         </div>
       )}
+
+      <AICopilotModal
+        isOpen={showAICopilot}
+        onClose={() => setShowAICopilot(false)}
+        code={currentCode}
+        language={language}
+        roomId={roomId}
+        userId={user?.uid}
+        onApplyCode={(newCode) => {
+          codeRef.current = newCode;
+          setCurrentCode(newCode);
+          socketRef.current?.emit(ACTIONS.CODE_CHANGE, { roomId, code: newCode });
+        }}
+      />
+
+      <DiffViewerModal
+        isOpen={showDiffViewer}
+        onClose={() => setShowDiffViewer(false)}
+        roomId={roomId}
+        currentCode={currentCode}
+        onRestoreSnapshot={(snap) => {
+          if (snap.code) {
+            codeRef.current = snap.code;
+            setCurrentCode(snap.code);
+            socketRef.current?.emit(ACTIONS.CODE_CHANGE, { roomId, code: snap.code });
+          }
+        }}
+      />
+
+      <AnalyticsDashboardModal
+        isOpen={showAnalytics}
+        onClose={() => setShowAnalytics(false)}
+        roomId={roomId}
+      />
     </div>
   );
 }

@@ -15,6 +15,9 @@ const orgRoutes = require("./server/routes/orgRoutes");
 const snippetRoutes = require("./server/routes/snippetRoutes");
 const notificationRoutes = require("./server/routes/notificationRoutes");
 const systemRoutes = require("./server/routes/systemRoutes");
+const aiRoutes = require("./server/routes/aiRoutes");
+const snapshotRoutes = require("./server/routes/snapshotRoutes");
+const analyticsRoutes = require("./server/routes/analyticsRoutes");
 
 const server = http.createServer(app);
 const io = new Server(server, {
@@ -50,6 +53,9 @@ app.use('/api', orgRoutes);
 app.use('/api', snippetRoutes);
 app.use('/api', notificationRoutes);
 app.use('/api', systemRoutes);
+app.use('/api', aiRoutes);
+app.use('/api', snapshotRoutes);
+app.use('/api', analyticsRoutes);
 
 // Serve static React build files in production
 if (process.env.NODE_ENV === 'production') {

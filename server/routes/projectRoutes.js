@@ -79,9 +79,9 @@ router.post('/projects/:id/files', async (req, res) => {
 // Delete project file
 router.delete('/projects/:id/files', async (req, res) => {
     try {
-        const { path } = req.body;
-        if (!path) return res.status(400).json({ error: "Missing path parameter" });
-        await ProjectRepository.deleteProjectFile(req.params.id, path);
+        const filePath = req.query.path || req.body?.path;
+        if (!filePath) return res.status(400).json({ error: "Missing path parameter" });
+        await ProjectRepository.deleteProjectFile(req.params.id, filePath);
         res.json({ success: true });
     } catch (err) {
         console.error(err);

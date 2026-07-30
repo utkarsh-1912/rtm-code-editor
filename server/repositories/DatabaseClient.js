@@ -127,6 +127,43 @@ async function initializeSchema() {
         );
         `;
 
+        await sql`
+        CREATE TABLE IF NOT EXISTS snapshots (
+            id SERIAL PRIMARY KEY,
+            project_id INTEGER REFERENCES projects(id) ON DELETE CASCADE,
+            room_id VARCHAR(255),
+            name VARCHAR(255) NOT NULL,
+            code TEXT,
+            files_snapshot JSONB DEFAULT '[]'::jsonb,
+            created_by VARCHAR(255) DEFAULT 'User',
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+        );
+        `;
+
+        await sql`
+        CREATE TABLE IF NOT EXISTS analytics_logs (
+            id SERIAL PRIMARY KEY,
+            user_id VARCHAR(255),
+            room_id VARCHAR(255),
+            project_id INTEGER,
+            action_type VARCHAR(100) NOT NULL,
+            metadata JSONB DEFAULT '{}'::jsonb,
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+        );
+        `;
+
+        await sql`
+        CREATE TABLE IF NOT EXISTS workspace_permissions (
+            id SERIAL PRIMARY KEY,
+            room_id VARCHAR(255),
+            project_id INTEGER,
+            user_id VARCHAR(255) NOT NULL,
+            can_edit BOOLEAN DEFAULT TRUE,
+            can_share BOOLEAN DEFAULT TRUE,
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+        );
+        `;
+
         console.log("Database schema initialized successfully.");
     } catch (err) {
         console.error("Error initializing schema:", err);

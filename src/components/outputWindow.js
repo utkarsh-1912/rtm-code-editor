@@ -17,7 +17,7 @@ export default function OutputWindow({ output, isError, time, isMobile, stdin, s
             </div>
             <textarea
                 value={stdin || ""}
-                onChange={(e) => setStdin(e.target.value)}
+                onChange={(e) => setStdin && setStdin(e.target.value)}
                 placeholder="Enter input for your program here..."
                 style={{
                     flex: 1,
@@ -43,7 +43,7 @@ export default function OutputWindow({ output, isError, time, isMobile, stdin, s
                     <Terminal size={14} color="var(--text-muted)" />
                     <span style={{ fontWeight: "600", color: "var(--text-muted)", fontSize: "13px" }}>Execution Output</span>
                 </div>
-                {time && (
+                {(time !== null && time !== undefined) && (
                     <span style={{ fontSize: "11px", color: "var(--text-muted)", backgroundColor: "var(--secondary)", padding: "2px 6px", borderRadius: "4px" }}>
                         Time: {time}s
                     </span>

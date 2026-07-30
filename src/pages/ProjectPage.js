@@ -31,12 +31,18 @@ import ChatWindow from "../components/chatWindow";
 import InviteModal from "../components/InviteModal";
 import CommandPalette from "../components/CommandPalette";
 import Client from "../components/clients";
+import AICopilotModal from "../components/AICopilotModal";
+import DiffViewerModal from "../components/DiffViewerModal";
+import AnalyticsDashboardModal from "../components/AnalyticsDashboardModal";
 import { 
     Eye, 
     EyeOff, 
     Search, 
     Layout,
-    User
+    User,
+    Bot,
+    History,
+    Activity
 } from "lucide-react";
 
 const ProjectPage = () => {
@@ -70,6 +76,9 @@ const ProjectPage = () => {
     const [clients, setClients] = useState([]);
     const [guestName, setGuestName] = useState(localStorage.getItem("guest-name") || "");
     const [showInviteModal, setShowInviteModal] = useState(false);
+    const [showAICopilot, setShowAICopilot] = useState(false);
+    const [showDiffViewer, setShowDiffViewer] = useState(false);
+    const [showAnalytics, setShowAnalytics] = useState(false);
 
 
     // New Lobby States
@@ -144,13 +153,22 @@ const ProjectPage = () => {
             const data = await response.json();
 
             if (data.status?.id === 1 || data.status?.id === 2) {
-                setTimeout(() => pollExecutionResult(token), 2000);
+                if ((pollExecutionResult._retries || 0) < 20) {
+                    pollExecutionResult._retries = (pollExecutionResult._retries || 0) + 1;
+                    setTimeout(() => pollExecutionResult(token), 2000);
+                } else {
+                    pollExecutionResult._retries = 0;
+                    setIsExecuting(false);
+                    setOutput("Execution timed out. Please try again.");
+                }
                 return;
             } else {
                 setIsExecuting(false);
-                const decodedOutput = data.stdout ? atob(data.stdout) : null;
-                const decodedError = data.stderr ? atob(data.stderr) : null;
-                const decodedCompileOutput = data.compile_output ? atob(data.compile_output) : null;
+                // Safe UTF-8 atob decoding
+                const safeDecode = (b64) => { try { return decodeURIComponent(escape(atob(b64))); } catch { return atob(b64); } };
+                const decodedOutput = data.stdout ? safeDecode(data.stdout) : null;
+                const decodedError = data.stderr ? safeDecode(data.stderr) : null;
+                const decodedCompileOutput = data.compile_output ? safeDecode(data.compile_output) : null;
 
                 if (data.status?.id === 3) {
                     setOutput(decodedOutput !== null ? decodedOutput : "Code Executed Successfully. No Output.");
@@ -258,11 +276,13 @@ const ProjectPage = () => {
             sourceCode = resolvePythonImports(sourceCode);
         }
 
-        const formData = {
-            language_id: languageId,
-            source_code: btoa(sourceCode),
-            stdin: btoa(""),
-        };
+            // Safe UTF-8 base64 encoding
+            const safeBase64 = (str) => { try { return btoa(unescape(encodeURIComponent(str))); } catch { return btoa(str); } };
+            const formData = {
+                language_id: languageId,
+                source_code: safeBase64(sourceCode),
+                stdin: btoa(""),
+            };
 
         const url = "https://judge0-ce.p.rapidapi.com/submissions?base64_encoded=true&fields=*";
         const options = {
@@ -368,7 +388,7 @@ const ProjectPage = () => {
             icon: <User size={18} />,
             category: 'Collaboration',
             description: 'Connected team member.',
-            run: () => toast.info(`Jump to ${client.userName}'s cursor coming soon!`)
+            run: () => toast(`Jumping to ${client.userName}'s cursor coming soon!`)
         }));
 
         return [...baseActions, ...fileActions, ...teamActions];
@@ -530,7 +550,7 @@ const ProjectPage = () => {
                 // Load chat history from localstorage
                 const savedChat = localStorage.getItem(`project-chat-${projectId}`);
                 if (savedChat) {
-                    setMessages(JSON.parse(savedChat));
+                    try { setMessages(JSON.parse(savedChat)); } catch { /* ignore corrupted cache */ }
                 }
 
                 setLoading(false);
@@ -873,6 +893,43 @@ const ProjectPage = () => {
                                         title={isMeetingActive ? "Leave Video Call" : "Join Video Call"}
                                     >
                                         <Video size={18} />
+                                    </button>
+                                    <button
+                                        onClick={() => setShowAICopilot(true)}
+                                        style={{
+                                            display: "flex", alignItems: "center", justifyContent: "center", width: "32px", height: "32px",
+                                            color: "var(--primary)", backgroundColor: "rgba(59, 130, 246, 0.1)",
+                                            borderRadius: "6px", border: "1px solid rgba(59, 130, 246, 0.2)", cursor: "pointer", transition: "all 0.2s"
+                                        }}
+                                        title="AI Copilot Studio"
+                                    >
+                                        <Bot size={18} />
+                                    </button>
+                                    <button
+                                        onClick={() => setShowDiffViewer(true)}
+                                        style={{
+                                            display: "flex", alignItems: "center", justifyContent: "center", width: "32px", height: "32px",
+                                            color: "var(--text-muted)", backgroundColor: "transparent",
+                                            borderRadius: "6px", border: "none", cursor: "pointer", transition: "all 0.2s"
+                                        }}
+                                        onMouseOver={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-card)")}
+                                        onMouseOut={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
+                                        title="Version History & Diff Viewer"
+                                    >
+                                        <History size={18} />
+                                    </button>
+                                    <button
+                                        onClick={() => setShowAnalytics(true)}
+                                        style={{
+                                            display: "flex", alignItems: "center", justifyContent: "center", width: "32px", height: "32px",
+                                            color: "var(--text-muted)", backgroundColor: "transparent",
+                                            borderRadius: "6px", border: "none", cursor: "pointer", transition: "all 0.2s"
+                                        }}
+                                        onMouseOver={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-card)")}
+                                        onMouseOut={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
+                                        title="Workspace Telemetry Analytics"
+                                    >
+                                        <Activity size={18} />
                                     </button>
                                     <div style={{ width: "1px", height: "18px", backgroundColor: "var(--border-color)", margin: "0 2px" }} />
                                 </>
@@ -1308,6 +1365,35 @@ const ProjectPage = () => {
                     </div>
                 </div>
             )}
+
+            {/* v2.0 Modals */}
+            <AICopilotModal
+                isOpen={showAICopilot}
+                onClose={() => setShowAICopilot(false)}
+                code={activeFile?.content || ""}
+                language={activeFile?.name?.endsWith('.py') ? 'python' : activeFile?.name?.endsWith('.cpp') ? 'cpp' : 'javascript'}
+                projectId={projectId}
+                userId={user?.uid}
+                onApplyCode={(newCode) => {
+                    handleSaveFile(newCode);
+                }}
+            />
+
+            <DiffViewerModal
+                isOpen={showDiffViewer}
+                onClose={() => setShowDiffViewer(false)}
+                projectId={projectId}
+                currentCode={activeFile?.content || ""}
+                onRestoreSnapshot={(snap) => {
+                    if (snap.code) handleSaveFile(snap.code);
+                }}
+            />
+
+            <AnalyticsDashboardModal
+                isOpen={showAnalytics}
+                onClose={() => setShowAnalytics(false)}
+                projectId={projectId}
+            />
 
             {/* Mobile Bottom Navigation Bar */}
             {isMobile && (

@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useMemo } from "react";
 import { Download } from "lucide-react";
 import CodeMirror from "@uiw/react-codemirror";
 import { javascript, esLint } from "@codemirror/lang-javascript";
@@ -175,7 +175,8 @@ function EditorComp({
     if (code !== undefined && code !== editorCode) {
       setEditorCode(code);
     }
-  }, [code, editorCode]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [code]);
 
   const handleEditorChange = (value, viewUpdate) => {
     setEditorCode(value);
@@ -186,11 +187,15 @@ function EditorComp({
     // For standard Rooms (editor.js), we use CODE_CHANGE for real-time sync.
     // For Pro Projects (ProjectPage.js), we skip CODE_CHANGE to avoid echo loops
     // because ProjectPage handles sync via FILE_CHANGE on onCodeChange.
-    if (!fileId && (viewUpdate.transactions[0]?.isUserEvent("input") || viewUpdate.transactions[0]?.isUserEvent("delete"))) {
-      socketRef.current?.emit(ACTIONS.CODE_CHANGE, {
-        roomId,
-        code: value,
-      });
+    if (!fileId && viewUpdate.docChanged) {
+      // Only emit if change was not from incoming socket (avoids echo)
+      const hasUserTransaction = viewUpdate.transactions.some(tr => tr.isUserEvent("input") || tr.isUserEvent("delete") || tr.isUserEvent("undo") || tr.isUserEvent("redo") || tr.annotation);
+      if (hasUserTransaction || viewUpdate.transactions.length > 0) {
+        socketRef.current?.emit(ACTIONS.CODE_CHANGE, {
+          roomId,
+          code: value,
+        });
+      }
     }
 
     // Sync cursor movement
@@ -225,10 +230,37 @@ function EditorComp({
       case "java": return cpp();
       case "html":
       case "htmlmixed": return html();
-      case "css": return html(); // cm-lang-html often handles css well enough or has its own, but sticking to basics
+      case "css": return html();
       default: return javascript();
     }
   };
+
+  // Memoize cursor plugin — only rebuild when cursor positions change
+  const memoizedCursorPlugin = useMemo(() => cursorPlugin(remoteCursors), [remoteCursors]);
+
+  // Memoize ESLint linter so it's not rebuilt on every render
+  const esLintLinter = useMemo(() => {
+    if (settings?.enableLinting && language === "javascript") {
+      try {
+        // eslint-disable-next-line
+        const { Linter } = require("eslint-linter-browserify");
+        return [lintGutter(), linter(esLint(new Linter()))];
+      } catch { return []; }
+    }
+    return [];
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [settings?.enableLinting, language]);
+
+  // Memoize the entire extensions array to prevent CodeMirror reconfiguration on every keystroke
+  const editorExtensions = useMemo(() => [
+    getLanguageExtension(language),
+    ...(settings?.wordWrap ? [EditorView.lineWrapping] : []),
+    ...(settings?.keybinding === "vim" ? [vim()] : []),
+    ...(settings?.keybinding === "emacs" ? [emacs()] : []),
+    ...esLintLinter,
+    memoizedCursorPlugin,
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  ], [language, settings?.wordWrap, settings?.keybinding, esLintLinter, memoizedCursorPlugin]);
 
 
   return (
@@ -315,14 +347,7 @@ function EditorComp({
             tabSize: settings?.tabSize || 4,
           }}
           style={{ height: "100%" }}
-          extensions={[
-            getLanguageExtension(language),
-            ...(settings?.wordWrap ? [EditorView.lineWrapping] : []),
-            ...(settings?.keybinding === "vim" ? [vim()] : []),
-            ...(settings?.keybinding === "emacs" ? [emacs()] : []),
-            ...(settings?.enableLinting && language === "javascript" ? [lintGutter(), linter(esLint(new (require("eslint-linter-browserify").Linter)()))] : []),
-            cursorPlugin(remoteCursors),
-          ]}
+          extensions={editorExtensions}
         />
       </div>
     </div>

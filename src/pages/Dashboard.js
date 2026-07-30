@@ -109,6 +109,7 @@ const Dashboard = () => {
         try {
             const backendUrl = getBackendUrl();
             const response = await fetch(`${backendUrl}/api/user-dashboard?userId=${user.uid}`);
+            if (!response.ok) throw new Error(`Dashboard API error: ${response.status}`);
             const data = await response.json();
 
             setRecentRooms(data.rooms || []);
@@ -116,8 +117,9 @@ const Dashboard = () => {
 
             // Fetch Projects
             const projRes = await fetch(`${backendUrl}/api/projects?userId=${user.uid}`);
+            if (!projRes.ok) throw new Error(`Projects API error: ${projRes.status}`);
             const projData = await projRes.json();
-            setProjects(projData || []);
+            setProjects(Array.isArray(projData) ? projData : []);
         } catch (err) {
             console.error("Dashboard Fetch Error:", err);
             toast.error("Failed to load your workspace data.");
@@ -164,6 +166,8 @@ const Dashboard = () => {
                 fetchDashboardData();
                 setShowRenameModal(null);
                 setNewName('');
+            } else {
+                toast.error("Failed to rename: server error");
             }
         } catch (err) {
             toast.error("Failed to rename room");
@@ -209,6 +213,8 @@ const Dashboard = () => {
                 toast.success("Project deleted");
                 setShowDeleteModal(null);
                 fetchDashboardData();
+            } else {
+                toast.error("Failed to delete project");
             }
         } catch (err) {
             toast.error("Delete failed");
@@ -216,8 +222,8 @@ const Dashboard = () => {
     };
 
     const filteredRooms = recentRooms.filter(room =>
-        room.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        room.id.toLowerCase().includes(searchTerm.toLowerCase())
+        (room.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (room.id || '').toLowerCase().includes(searchTerm.toLowerCase())
     );
 
     if (loading || !user) {
@@ -288,7 +294,7 @@ const Dashboard = () => {
                             color: 'var(--text-main)',
                             letterSpacing: '-0.03em'
                         }}>
-                            Welcome back, <span style={{ color: 'var(--text-main)' }}>{user.name.split(' ')[0]}</span>
+                            Welcome back, <span style={{ color: 'var(--text-main)' }}>{(user?.name || user?.email || 'User').split(' ')[0]}</span>
                         </h1>
                         <p style={{ color: 'var(--text-muted)', fontSize: '14px' }}>Let's build something amazing today.</p>
                     </div>
