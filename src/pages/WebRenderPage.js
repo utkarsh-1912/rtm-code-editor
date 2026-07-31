@@ -1,11 +1,10 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { 
     Monitor, 
     Tablet, 
     Smartphone, 
     RotateCcw, 
-    ExternalLink, 
     ArrowLeft, 
     Terminal, 
     Trash2, 
@@ -13,9 +12,7 @@ import {
     Moon,
     Copy,
     Check,
-    Globe,
-    Code,
-    RefreshCw
+    Globe
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { getBackendUrl } from '../utils/api';
@@ -47,7 +44,7 @@ export default function WebRenderPage() {
     const socketRef = useRef(null);
 
     // 1. Fetch Project & Files
-    const loadProjectData = async () => {
+    const loadProjectData = useCallback(async () => {
         try {
             setLoading(true);
             const backendUrl = getBackendUrl();
@@ -69,11 +66,11 @@ export default function WebRenderPage() {
         } finally {
             setLoading(false);
         }
-    };
+    }, [projectId]);
 
     useEffect(() => {
         loadProjectData();
-    }, [projectId]);
+    }, [loadProjectData]);
 
     // 2. Setup Socket for Live Reload on Code Changes
     useEffect(() => {
