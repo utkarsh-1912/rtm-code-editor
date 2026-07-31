@@ -21,7 +21,8 @@ import {
   Share2,
   Settings,
   Users,
-  LayoutDashboard
+  LayoutDashboard,
+  Zap
 } from "lucide-react";
 import { ReflexContainer, ReflexSplitter, ReflexElement } from "react-reflex";
 import "react-reflex/styles.css";
@@ -45,6 +46,7 @@ import TabBar from "../components/TabBar";
 import AICopilotModal from "../components/AICopilotModal";
 import DiffViewerModal from "../components/DiffViewerModal";
 import AnalyticsDashboardModal from "../components/AnalyticsDashboardModal";
+import FocusModeModal from "../components/FocusModeModal";
 import { Bot, History, Activity } from "lucide-react";
 
 function Editor() {
@@ -119,6 +121,7 @@ function Editor() {
   const [showAICopilot, setShowAICopilot] = useState(false);
   const [showDiffViewer, setShowDiffViewer] = useState(false);
   const [showAnalytics, setShowAnalytics] = useState(false);
+  const [showFocusModal, setShowFocusModal] = useState(false);
   const [openFiles] = useState([{ name: `main.${language === 'python' ? 'py' : language === 'cpp' ? 'cpp' : 'js'}`, path: 'main', content: currentCode }]);
 
   useEffect(() => {
@@ -128,6 +131,17 @@ function Editor() {
   useEffect(() => {
     localStorage.setItem(`chat-${roomId}`, JSON.stringify(messages));
   }, [messages, roomId]);
+
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.altKey && e.key.toLowerCase() === 'f') {
+        e.preventDefault();
+        setShowFocusModal(prev => !prev);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   useEffect(() => {
     if (authLoading) return;
@@ -743,6 +757,15 @@ function Editor() {
                     >
                       <PencilLine size={18} />
                     </button>
+                    <button
+                      onClick={() => setShowFocusModal(true)}
+                      style={{ width: "32px", height: "32px", color: "var(--text-muted)", background: "transparent", border: "none", borderRadius: "6px", cursor: "pointer", transition: "all 0.2s" }}
+                      onMouseOver={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-card)")}
+                      onMouseOut={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
+                      title="Focus Mode (Alt+F)"
+                    >
+                      <Zap size={18} />
+                    </button>
                   </>
                 )}
                 <button
@@ -1173,6 +1196,20 @@ function Editor() {
         isOpen={showAnalytics}
         onClose={() => setShowAnalytics(false)}
         roomId={roomId}
+      />
+
+      <FocusModeModal
+        isOpen={showFocusModal}
+        onClose={() => setShowFocusModal(false)}
+        code={currentCode}
+        onCodeChange={(val) => {
+          codeRef.current = val;
+          setCurrentCode(val);
+          socketRef.current?.emit(ACTIONS.CODE_CHANGE, { roomId, code: val });
+        }}
+        language={language}
+        fileName={`room-${roomId}`}
+        isLightMode={isLightMode}
       />
     </div>
   );

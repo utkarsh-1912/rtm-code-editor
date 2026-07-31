@@ -19,7 +19,8 @@ import {
     Pause,
     Globe,
     RotateCcw,
-    Trash2
+    Trash2,
+    Zap
 } from "lucide-react";
 import toast from "react-hot-toast";
 import ProjectEditor from "../components/ProjectEditor";
@@ -37,6 +38,7 @@ import Client from "../components/clients";
 import AICopilotModal from "../components/AICopilotModal";
 import DiffViewerModal from "../components/DiffViewerModal";
 import AnalyticsDashboardModal from "../components/AnalyticsDashboardModal";
+import FocusModeModal from "../components/FocusModeModal";
 import { 
     Eye, 
     EyeOff, 
@@ -82,6 +84,7 @@ const ProjectPage = () => {
     const [showAICopilot, setShowAICopilot] = useState(false);
     const [showDiffViewer, setShowDiffViewer] = useState(false);
     const [showAnalytics, setShowAnalytics] = useState(false);
+    const [showFocusModal, setShowFocusModal] = useState(false);
 
 
     // New Lobby States
@@ -567,6 +570,10 @@ const ProjectPage = () => {
                     icon: !isZenMode ? '🧘' : '👁️',
                     style: { borderRadius: '10px', background: 'var(--bg-card)', color: 'var(--text-main)', border: '1px solid var(--border-color)' }
                 });
+            }
+            if (e.altKey && e.key.toLowerCase() === 'f') {
+                e.preventDefault();
+                setShowFocusModal(prev => !prev);
             }
             if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
                 e.preventDefault();
@@ -1070,6 +1077,19 @@ const ProjectPage = () => {
                                         <Bot size={18} />
                                     </button>
                                     <button
+                                        onClick={() => setShowFocusModal(true)}
+                                        style={{
+                                            display: "flex", alignItems: "center", justifyContent: "center", width: "32px", height: "32px",
+                                            color: "var(--text-muted)", backgroundColor: "transparent",
+                                            borderRadius: "6px", border: "none", cursor: "pointer", transition: "all 0.2s"
+                                        }}
+                                        onMouseOver={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-card)")}
+                                        onMouseOut={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
+                                        title="Focus Mode (Alt+F)"
+                                    >
+                                        <Zap size={18} />
+                                    </button>
+                                    <button
                                         onClick={() => setShowDiffViewer(true)}
                                         style={{
                                             display: "flex", alignItems: "center", justifyContent: "center", width: "32px", height: "32px",
@@ -1549,6 +1569,16 @@ const ProjectPage = () => {
                 isOpen={showAnalytics}
                 onClose={() => setShowAnalytics(false)}
                 projectId={projectId}
+            />
+
+            <FocusModeModal
+                isOpen={showFocusModal}
+                onClose={() => setShowFocusModal(false)}
+                code={activeFile?.content || ""}
+                onCodeChange={(val) => handleSaveFile(val)}
+                language={activeFile?.name?.split('.').pop() || 'javascript'}
+                fileName={activeFile?.name || 'main.js'}
+                isLightMode={isLightMode}
             />
 
             {/* Mobile Bottom Navigation Bar */}
