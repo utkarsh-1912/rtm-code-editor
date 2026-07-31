@@ -20,7 +20,8 @@ import {
     Globe,
     RotateCcw,
     Trash2,
-    Zap
+    Zap,
+    ExternalLink
 } from "lucide-react";
 import toast from "react-hot-toast";
 import ProjectEditor from "../components/ProjectEditor";
@@ -437,13 +438,22 @@ const ProjectPage = () => {
                         </button>
                     )}
                     {outputTab === 'preview' && (
-                        <button
-                            onClick={handleCompile}
-                            title="Refresh Web App"
-                            style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
-                        >
-                            <RotateCcw size={13} />
-                        </button>
+                        <>
+                            <button
+                                onClick={handleCompile}
+                                title="Refresh Web App"
+                                style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+                            >
+                                <RotateCcw size={13} />
+                            </button>
+                            <button
+                                onClick={() => window.open(`/render/${projectId}`, '_blank')}
+                                title="Open Full Standalone Render Page in New Tab"
+                                style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+                            >
+                                <ExternalLink size={13} />
+                            </button>
+                        </>
                     )}
                     <X size={14} style={{ cursor: 'pointer', color: 'var(--text-muted)' }} onClick={() => setIsOutputVisible(false)} />
                 </div>

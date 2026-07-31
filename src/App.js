@@ -15,6 +15,7 @@ import Dashboard from "./pages/Dashboard";
 import Snippets from "./pages/Snippets";
 import Settings from "./pages/Settings";
 import ProjectPage from "./pages/ProjectPage";
+import WebRenderPage from "./pages/WebRenderPage";
 import Unsubscribe from "./pages/Unsubscribe";
 import NotFound from "./pages/NotFound";
 import OfflineBanner from "./components/OfflineBanner";
@@ -63,6 +64,7 @@ function App() {
             <Route path="/snippets" element={<Snippets />} />
             <Route path="/settings" element={<Settings />} />
             <Route path="/project/:projectId" element={<ProjectPage />} />
+            <Route path="/render/:projectId" element={<WebRenderPage />} />
             <Route path="/unsubscribe" element={<Unsubscribe />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
