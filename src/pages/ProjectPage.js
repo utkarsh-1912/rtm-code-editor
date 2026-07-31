@@ -1584,6 +1584,9 @@ const ProjectPage = () => {
             <FocusModeModal
                 isOpen={showFocusModal}
                 onClose={() => setShowFocusModal(false)}
+                files={files}
+                activeFile={activeFile}
+                onFileSelect={(file) => handleFileClick(file)}
                 code={activeFile?.content || ""}
                 onCodeChange={(val) => handleSaveFile(val)}
                 language={activeFile?.name?.split('.').pop() || 'javascript'}

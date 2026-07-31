@@ -9,7 +9,9 @@ import {
     Target,
     Clock,
     Zap,
-    Music
+    Music,
+    FileCode,
+    ChevronDown
 } from 'lucide-react';
 import CodeMirror from '@uiw/react-codemirror';
 import { javascript } from '@codemirror/lang-javascript';
@@ -27,8 +29,12 @@ export default function FocusModeModal({
     onCodeChange,
     language = "javascript",
     fileName = "main.js",
+    files = [],
+    activeFile = null,
+    onFileSelect,
     isLightMode = false
 }) {
+    const [showFileDropdown, setShowFileDropdown] = useState(false);
     // Focus Timer State
     const [timerMode, setTimerMode] = useState(25); // 25, 50, or custom
     const [timeLeft, setTimeLeft] = useState(25 * 60);
@@ -237,6 +243,16 @@ export default function FocusModeModal({
         localStorage.setItem('rtm_focus_tasks', JSON.stringify(updated));
     };
 
+    const currentFileName = activeFile?.name || fileName;
+    const currentLanguage = activeFile ? (activeFile.name.endsWith('.py') ? 'python' : activeFile.name.endsWith('.cpp') ? 'cpp' : activeFile.name.endsWith('.html') ? 'html' : 'javascript') : language;
+
+    const handleSwitchFile = (file) => {
+        setShowFileDropdown(false);
+        setFocusCode(file.content || "");
+        if (onFileSelect) onFileSelect(file);
+        toast.success(`Focusing on ${file.name}`);
+    };
+
     const handleEditorChange = (val) => {
         setFocusCode(val);
         if (onCodeChange) onCodeChange(val);
@@ -303,9 +319,74 @@ export default function FocusModeModal({
                             <span style={{ fontSize: '14px', fontWeight: '800', letterSpacing: '-0.02em', color: '#ffffff' }}>
                                 FOCUS MODE
                             </span>
-                            <span style={{ fontSize: '10px', color: 'var(--text-muted)', display: 'block' }}>
-                                {fileName}
-                            </span>
+                        <div style={{ position: 'relative' }}>
+                            <button
+                                onClick={() => setShowFileDropdown(!showFileDropdown)}
+                                style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '6px',
+                                    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+                                    border: '1px solid rgba(255, 255, 255, 0.15)',
+                                    color: '#ffffff',
+                                    padding: '4px 10px',
+                                    borderRadius: '6px',
+                                    fontSize: '12px',
+                                    fontWeight: '600',
+                                    cursor: 'pointer'
+                                }}
+                            >
+                                <FileCode size={14} color="#3b82f6" />
+                                <span>{currentFileName}</span>
+                                <ChevronDown size={12} color="var(--text-muted)" />
+                            </button>
+
+                            {showFileDropdown && (
+                                <div style={{
+                                    position: 'absolute',
+                                    top: '36px',
+                                    left: 0,
+                                    width: '220px',
+                                    backgroundColor: '#0f172a',
+                                    border: '1px solid rgba(255,255,255,0.15)',
+                                    borderRadius: '8px',
+                                    boxShadow: '0 10px 25px rgba(0,0,0,0.5)',
+                                    zIndex: 1000,
+                                    padding: '6px',
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    gap: '2px'
+                                }}>
+                                    <div style={{ fontSize: '10px', fontWeight: '800', color: 'var(--text-muted)', padding: '4px 8px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                                        Switch Focus File
+                                    </div>
+                                    {files.length > 0 ? (
+                                        files.map(f => (
+                                            <div
+                                                key={f.id || f.name}
+                                                onClick={() => handleSwitchFile(f)}
+                                                style={{
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    gap: '8px',
+                                                    padding: '6px 8px',
+                                                    borderRadius: '6px',
+                                                    fontSize: '12px',
+                                                    cursor: 'pointer',
+                                                    backgroundColor: (f.name === currentFileName || f.id === activeFile?.id) ? 'rgba(59, 130, 246, 0.2)' : 'transparent',
+                                                    color: (f.name === currentFileName || f.id === activeFile?.id) ? '#3b82f6' : '#f8fafc'
+                                                }}
+                                            >
+                                                <FileCode size={13} />
+                                                <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.name}</span>
+                                            </div>
+                                        ))
+                                    ) : (
+                                        <div style={{ padding: '6px 8px', fontSize: '11px', color: 'var(--text-muted)' }}>{currentFileName}</div>
+                                    )}
+                                </div>
+                            )}
+                        </div>
                         </div>
                     </div>
 
@@ -473,7 +554,7 @@ export default function FocusModeModal({
 
             {/* Main Focus Canvas */}
             <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
-                {/* Left Sidebar: Sprint Tasks */}
+                {/* Left Sidebar: Sprint Tasks & Files */}
                 <div style={{
                     width: '260px',
                     backgroundColor: 'rgba(0, 0, 0, 0.4)',
@@ -483,6 +564,37 @@ export default function FocusModeModal({
                     flexDirection: 'column',
                     gap: '16px'
                 }}>
+                    {files.length > 1 && (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '12px' }}>
+                            <span style={{ fontSize: '11px', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--text-muted)' }}>
+                                Project Files
+                            </span>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', maxHeight: '140px', overflowY: 'auto' }}>
+                                {files.map(f => (
+                                    <div
+                                        key={f.id || f.name}
+                                        onClick={() => handleSwitchFile(f)}
+                                        style={{
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '8px',
+                                            padding: '6px 8px',
+                                            borderRadius: '6px',
+                                            fontSize: '12px',
+                                            cursor: 'pointer',
+                                            backgroundColor: (f.name === currentFileName || f.id === activeFile?.id) ? 'rgba(59, 130, 246, 0.2)' : 'rgba(255,255,255,0.03)',
+                                            border: `1px solid ${(f.name === currentFileName || f.id === activeFile?.id) ? 'rgba(59, 130, 246, 0.4)' : 'rgba(255,255,255,0.06)'}`,
+                                            color: (f.name === currentFileName || f.id === activeFile?.id) ? '#3b82f6' : 'white'
+                                        }}
+                                    >
+                                        <FileCode size={13} color={(f.name === currentFileName || f.id === activeFile?.id) ? '#3b82f6' : 'var(--text-muted)'} />
+                                        <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.name}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                         <span style={{ fontSize: '11px', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--text-muted)' }}>
                             Sprint Checklist
@@ -553,7 +665,7 @@ export default function FocusModeModal({
                             tabSize: 4
                         }}
                         style={{ height: '100%', fontSize: '16px' }}
-                        extensions={[getLanguageExtension(language), EditorView.lineWrapping]}
+                        extensions={[getLanguageExtension(currentLanguage), EditorView.lineWrapping]}
                     />
                 </div>
             </div>
