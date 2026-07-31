@@ -17,6 +17,9 @@ import {
     Users,
     Play,
     Pause,
+    Globe,
+    RotateCcw,
+    Trash2
 } from "lucide-react";
 import toast from "react-hot-toast";
 import ProjectEditor from "../components/ProjectEditor";
@@ -94,6 +97,8 @@ const ProjectPage = () => {
     const [output, setOutput] = useState("");
     const [mediaStates, setMediaStates] = useState({});
     const [isOutputVisible, setIsOutputVisible] = useState(true);
+    const [webSrcDoc, setWebSrcDoc] = useState("");
+    const [outputTab, setOutputTab] = useState("preview"); // "preview" | "terminal"
     const [activeTab, setActiveTab] = useState('code'); // 'code', 'files', 'chat', 'users', 'video'
     const [isMeetingMinimized, setIsMeetingMinimized] = useState(true); // default true for floating overlay
     const [isMeetingStarting, setIsMeetingStarting] = useState(false);
@@ -129,6 +134,20 @@ const ProjectPage = () => {
             document.documentElement.classList.remove("light-theme");
         }
     }, [theme]);
+
+    useEffect(() => {
+        const handleIframeMessage = (event) => {
+            if (event.data?.type === 'CONSOLE_LOG') {
+                setOutput((prev) => (prev ? `${prev}\n[LOG] ${event.data.log}` : `[LOG] ${event.data.log}`));
+            } else if (event.data?.type === 'CONSOLE_WARN') {
+                setOutput((prev) => (prev ? `${prev}\n[WARN] ${event.data.log}` : `[WARN] ${event.data.log}`));
+            } else if (event.data?.type === 'CONSOLE_ERROR') {
+                setOutput((prev) => (prev ? `${prev}\n[ERROR] ${event.data.log}` : `[ERROR] ${event.data.log}`));
+            }
+        };
+        window.addEventListener('message', handleIframeMessage);
+        return () => window.removeEventListener('message', handleIframeMessage);
+    }, []);
 
     const handleFileClick = React.useCallback((file) => {
         setActiveFile(file);
@@ -185,8 +204,56 @@ const ProjectPage = () => {
 
     const handleCompile = React.useCallback(async () => {
         const projectType = project?.type || "web";
-        if (projectType === "web") {
+        const fileExt = activeFile?.name?.split('.').pop()?.toLowerCase();
+
+        if (projectType === "web" || fileExt === "html" || fileExt === "css" || fileExt === "js") {
             setIsOutputVisible(true);
+            setOutputTab("preview");
+
+            const htmlFile = files.find(f => f.name === 'index.html' || f.name.endsWith('.html'))?.content 
+                || (fileExt === 'html' ? activeFile.content : '<!DOCTYPE html><html><head><meta charset="utf-8"/><title>Web App</title></head><body><h1>Web App Preview</h1></body></html>');
+            const cssFile = files.find(f => f.name === 'style.css' || f.name.endsWith('.css'))?.content || '';
+            const jsFile = files.find(f => f.name === 'script.js' || f.name.endsWith('.js'))?.content || '';
+
+            const consoleInterceptor = `
+            <script>
+              (function() {
+                const _log = console.log, _error = console.error, _warn = console.warn;
+                console.log = function(...args) {
+                  _log.apply(console, args);
+                  window.parent.postMessage({ type: 'CONSOLE_LOG', log: args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(' ') }, '*');
+                };
+                console.error = function(...args) {
+                  _error.apply(console, args);
+                  window.parent.postMessage({ type: 'CONSOLE_ERROR', log: args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(' ') }, '*');
+                };
+                console.warn = function(...args) {
+                  _warn.apply(console, args);
+                  window.parent.postMessage({ type: 'CONSOLE_WARN', log: args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(' ') }, '*');
+                };
+                window.onerror = function(msg, url, line) {
+                  window.parent.postMessage({ type: 'CONSOLE_ERROR', log: 'Uncaught Error: ' + msg + ' (Line ' + line + ')' }, '*');
+                };
+              })();
+            </script>
+            `;
+
+            let src = htmlFile;
+            if (src.includes('</head>')) {
+                src = src.replace('</head>', `${consoleInterceptor}<style>\n${cssFile}\n</style></head>`);
+            } else {
+                src = `${consoleInterceptor}<style>\n${cssFile}\n</style>${src}`;
+            }
+
+            if (src.includes('</body>')) {
+                src = src.replace('</body>', `<script>\n${jsFile}\n</script></body>`);
+            } else {
+                src = `${src}\n<script>\n${jsFile}\n</script>`;
+            }
+
+            setWebSrcDoc(src);
+            const timeStr = new Date().toLocaleTimeString();
+            setOutput(prev => prev ? `${prev}\n--- Web App Reloaded [${timeStr}] ---` : `--- Web App Reloaded [${timeStr}] ---`);
             return;
         }
 
@@ -309,6 +376,103 @@ const ProjectPage = () => {
             setIsExecuting(false);
         }
     }, [project, activeFile, files, pollExecutionResult]);
+
+    const renderOutputPanel = () => (
+        <div style={{ backgroundColor: 'var(--bg-dark)', display: 'flex', flexDirection: 'column', height: '100%', width: '100%' }}>
+            <div style={outputHeaderStyle}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <div style={{ display: 'flex', gap: '2px', backgroundColor: 'rgba(0,0,0,0.3)', padding: '2px', borderRadius: '6px', border: '1px solid var(--border-color)' }}>
+                        <button
+                            onClick={() => setOutputTab('preview')}
+                            style={{
+                                padding: '3px 10px',
+                                fontSize: '10px',
+                                fontWeight: '750',
+                                borderRadius: '4px',
+                                border: 'none',
+                                cursor: 'pointer',
+                                backgroundColor: outputTab === 'preview' ? 'var(--primary)' : 'transparent',
+                                color: outputTab === 'preview' ? '#ffffff' : 'var(--text-muted)',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '5px',
+                                transition: 'all 0.2s'
+                            }}
+                        >
+                            <Globe size={12} /> Live Preview
+                        </button>
+                        <button
+                            onClick={() => setOutputTab('terminal')}
+                            style={{
+                                padding: '3px 10px',
+                                fontSize: '10px',
+                                fontWeight: '750',
+                                borderRadius: '4px',
+                                border: 'none',
+                                cursor: 'pointer',
+                                backgroundColor: outputTab === 'terminal' ? 'var(--primary)' : 'transparent',
+                                color: outputTab === 'terminal' ? '#ffffff' : 'var(--text-muted)',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '5px',
+                                transition: 'all 0.2s'
+                            }}
+                        >
+                            <Terminal size={12} /> Terminal Console
+                        </button>
+                    </div>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    {outputTab === 'terminal' && (
+                        <button
+                            onClick={() => setOutput("")}
+                            title="Clear Terminal Logs"
+                            style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+                        >
+                            <Trash2 size={13} />
+                        </button>
+                    )}
+                    {outputTab === 'preview' && (
+                        <button
+                            onClick={handleCompile}
+                            title="Refresh Web App"
+                            style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+                        >
+                            <RotateCcw size={13} />
+                        </button>
+                    )}
+                    <X size={14} style={{ cursor: 'pointer', color: 'var(--text-muted)' }} onClick={() => setIsOutputVisible(false)} />
+                </div>
+            </div>
+
+            <div style={{ flex: 1, width: '100%', height: 'calc(100% - 36px)', position: 'relative', overflow: 'hidden' }}>
+                {outputTab === 'preview' ? (
+                    <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', backgroundColor: '#ffffff' }}>
+                        <div style={{ height: '26px', backgroundColor: '#f1f5f9', borderBottom: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', padding: '0 10px', gap: '8px' }}>
+                            <div style={{ display: 'flex', gap: '4px' }}>
+                                <div style={{ width: '7px', height: '7px', borderRadius: '50%', backgroundColor: '#ef4444' }} />
+                                <div style={{ width: '7px', height: '7px', borderRadius: '50%', backgroundColor: '#f59e0b' }} />
+                                <div style={{ width: '7px', height: '7px', borderRadius: '50%', backgroundColor: '#10b981' }} />
+                            </div>
+                            <div style={{ flex: 1, backgroundColor: '#ffffff', height: '18px', borderRadius: '4px', border: '1px solid #cbd5e1', fontSize: '10px', color: '#64748b', display: 'flex', alignItems: 'center', padding: '0 8px', fontFamily: 'monospace' }}>
+                                http://localhost:3000/app
+                            </div>
+                        </div>
+                        <iframe
+                            key={webSrcDoc}
+                            srcDoc={webSrcDoc || '<!DOCTYPE html><html><body style="font-family:sans-serif;padding:20px;color:#333">Click <b>RUN</b> to build & preview your web app.</body></html>'}
+                            title="Web Preview"
+                            style={{ width: '100%', flex: 1, border: 'none', backgroundColor: '#ffffff' }}
+                            sandbox="allow-scripts allow-modals allow-forms allow-same-origin"
+                        />
+                    </div>
+                ) : (
+                    <pre style={outputTextStyle}>{output || "No console output yet. Click RUN to execute your web app or code."}</pre>
+                )}
+            </div>
+        </div>
+    );
 
     // --- Keyboard Shortcuts & Palette Actions ---
     const commandActions = useMemo(() => {
@@ -1036,12 +1200,8 @@ const ProjectPage = () => {
                                         </ReflexElement>
                                         {isOutputVisible && <ReflexSplitter style={splitterStyle} />}
                                         {isOutputVisible && (
-                                            <ReflexElement flex={0.35} style={{ backgroundColor: 'var(--bg-dark)' }}>
-                                                <div style={outputHeaderStyle}>
-                                                    <span>Terminal</span>
-                                                    <X size={14} onClick={() => setIsOutputVisible(false)} />
-                                                </div>
-                                                <pre style={outputTextStyle}>{output}</pre>
+                                            <ReflexElement flex={0.4} style={{ backgroundColor: 'var(--bg-dark)' }}>
+                                                {renderOutputPanel()}
                                             </ReflexElement>
                                         )}
                                     </ReflexContainer>
@@ -1202,12 +1362,8 @@ const ProjectPage = () => {
                                     </ReflexElement>
                                     {isOutputVisible && <ReflexSplitter style={splitterStyle} />}
                                     {isOutputVisible && (
-                                        <ReflexElement flex={0.3} style={{ backgroundColor: 'var(--bg-dark)' }}>
-                                            <div style={outputHeaderStyle}>
-                                                <span>Terminal</span>
-                                                <X size={14} onClick={() => setIsOutputVisible(false)} />
-                                            </div>
-                                            <pre style={outputTextStyle}>{output}</pre>
+                                        <ReflexElement flex={0.4} style={{ backgroundColor: 'var(--bg-dark)' }}>
+                                            {renderOutputPanel()}
                                         </ReflexElement>
                                     )}
                                 </ReflexContainer>
