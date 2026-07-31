@@ -63,10 +63,12 @@ async function updateLastRoom(userId, roomId) {
 async function linkRoomToUser(userId, roomId) {
     const user = await sql`SELECT id FROM users WHERE auth_provider_id = ${userId}`;
     if (!user.length) return null;
+    const room = await sql`SELECT id FROM rooms WHERE room_id = ${roomId}`;
+    if (!room.length) return null;
 
     return await sql`
         INSERT INTO user_rooms (user_id, room_id)
-        VALUES (${user[0].id}, ${roomId})
+        VALUES (${user[0].id}, ${room[0].id})
         ON CONFLICT (user_id, room_id) DO NOTHING
         RETURNING *
     `;
@@ -75,11 +77,15 @@ async function linkRoomToUser(userId, roomId) {
 async function unlinkRoomFromUser(userId, roomId) {
     const user = await sql`SELECT id FROM users WHERE auth_provider_id = ${userId}`;
     if (!user.length) return null;
+    const room = await sql`SELECT id FROM rooms WHERE room_id = ${roomId}`;
+    const roomInternalId = room.length ? room[0].id : null;
 
-    await sql`
-        DELETE FROM user_rooms 
-        WHERE user_id = ${user[0].id} AND room_id = ${roomId}
-    `;
+    if (roomInternalId) {
+        await sql`
+            DELETE FROM user_rooms 
+            WHERE user_id = ${user[0].id} AND room_id = ${roomInternalId}
+        `;
+    }
 
     await sql`
         UPDATE users 

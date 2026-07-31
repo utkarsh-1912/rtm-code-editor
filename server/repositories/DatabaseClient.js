@@ -164,6 +164,10 @@ async function initializeSchema() {
         );
         `;
 
+        // Ensure missing columns exist for backward compatibility with existing databases
+        await sql`ALTER TABLE sessions ADD COLUMN IF NOT EXISTS session_id VARCHAR(255);`;
+        await sql`ALTER TABLE rooms ADD COLUMN IF NOT EXISTS name VARCHAR(255);`;
+
         console.log("Database schema initialized successfully.");
     } catch (err) {
         console.error("Error initializing schema:", err);

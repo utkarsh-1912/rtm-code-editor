@@ -60,36 +60,66 @@ async function updateProfile(userId, { name, bio, social_links }) {
  * Active session tracking
  */
 async function getSessions(userId) {
+    const user = await sql`SELECT id FROM users WHERE auth_provider_id = ${userId}`;
+    if (!user.length) return [];
     return await sql`
         SELECT * FROM sessions 
-        WHERE user_id = ${userId} 
+        WHERE user_id = ${user[0].id}
         ORDER BY last_active DESC
     `;
 }
 
 async function createSession(userId, { device, ip, userAgent, sessionId }) {
+    let user = await sql`SELECT id FROM users WHERE auth_provider_id = ${userId}`;
+    let internalUserId;
+    if (!user.length) {
+        // Auto-provision user record if not present
+        const newUser = await sql`
+            INSERT INTO users (email, name, auth_provider_id)
+            VALUES (${userId + '@user.local'}, 'Developer', ${userId})
+            ON CONFLICT (auth_provider_id) DO NOTHING
+            RETURNING id
+        `;
+        if (newUser.length) {
+            internalUserId = newUser[0].id;
+        } else {
+            const fetched = await sql`SELECT id FROM users WHERE auth_provider_id = ${userId}`;
+            internalUserId = fetched[0]?.id;
+        }
+    } else {
+        internalUserId = user[0].id;
+    }
+
+    if (!internalUserId) throw new Error("User record unavailable");
+
     if (sessionId) {
         const existing = await sql`
             UPDATE sessions 
             SET last_active = CURRENT_TIMESTAMP, ip = ${ip}, device = ${device}, user_agent = ${userAgent}
-            WHERE session_id = ${sessionId} AND user_id = ${userId}
+            WHERE session_id = ${sessionId}
             RETURNING *
         `;
         if (existing.length > 0) return existing;
     }
 
+    const newSessionId = (sessionId && typeof sessionId === 'string' && sessionId.length > 5) 
+        ? sessionId 
+        : Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+
     return await sql`
         INSERT INTO sessions (user_id, device, ip, user_agent, session_id)
-        VALUES (${userId}, ${device}, ${ip}, ${userAgent}, ${sessionId || Math.random().toString(36).substring(2, 15)})
+        VALUES (${internalUserId}, ${device}, ${ip}, ${userAgent}, ${newSessionId})
         RETURNING *
     `;
 }
 
 async function deleteOtherSessions(userId, currentSessionId) {
     if (!currentSessionId) return [];
+    const user = await sql`SELECT id FROM users WHERE auth_provider_id = ${userId}`;
+    if (!user.length) return [];
     return await sql`
         DELETE FROM sessions 
-        WHERE user_id = ${userId} AND session_id != ${currentSessionId}
+        WHERE user_id = ${user[0].id} AND session_id != ${currentSessionId}
         RETURNING *
     `;
 }

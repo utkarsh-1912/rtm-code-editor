@@ -2,14 +2,14 @@ const { sql } = require('./DatabaseClient');
 
 async function getUserDashboard(userId) {
     const user = await sql`SELECT id FROM users WHERE auth_provider_id = ${userId}`;
-    if (!user.length) return { recentRooms: [], stats: { totalRooms: 0, totalSnippets: 0, totalOrgs: 0 } };
+    if (!user.length) return { recentRooms: [], rooms: [], stats: { totalRooms: 0, totalSnippets: 0, totalOrgs: 0 } };
 
     const internalId = user[0].id;
 
     const recentRooms = await sql`
-        SELECT r.room_id, r.language, r.updated_at, r.code 
+        SELECT r.id as internal_id, r.room_id, r.language, r.updated_at, r.code 
         FROM rooms r
-        JOIN user_rooms ur ON r.room_id = ur.room_id
+        JOIN user_rooms ur ON r.id = ur.room_id
         WHERE ur.user_id = ${internalId}
         ORDER BY r.updated_at DESC
         LIMIT 10
@@ -19,12 +19,19 @@ async function getUserDashboard(userId) {
     const totalSnippets = await sql`SELECT COUNT(*) FROM snippets WHERE user_id = ${internalId}`;
     const totalOrgs = await sql`SELECT COUNT(*) FROM organization_members WHERE user_id = ${internalId}`;
 
+    const formattedRooms = recentRooms.map(r => ({
+        ...r,
+        id: r.room_id,
+        name: r.room_id
+    }));
+
     return {
-        recentRooms,
+        recentRooms: formattedRooms,
+        rooms: formattedRooms,
         stats: {
-            totalRooms: parseInt(totalRooms[0].count, 10),
-            totalSnippets: parseInt(totalSnippets[0].count, 10),
-            totalOrgs: parseInt(totalOrgs[0].count, 10)
+            totalRooms: parseInt(totalRooms[0]?.count || 0, 10),
+            totalSnippets: parseInt(totalSnippets[0]?.count || 0, 10),
+            totalOrgs: parseInt(totalOrgs[0]?.count || 0, 10)
         }
     };
 }
