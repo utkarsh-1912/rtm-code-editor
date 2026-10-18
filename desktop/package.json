@@ -3,6 +3,7 @@
   "productName": "Utkristi CoLabs",
   "version": "1.0.0",
   "description": "Desktop app for Utkristi CoLabs: real-time pair programming with local Judge0 and a local AI model.",
+  "homepage": "https://github.com/utkarsh-1912/rtm-code-editor",
   "main": "main.js",
   "author": "Utkristi.io",
   "license": "UNLICENSED",
