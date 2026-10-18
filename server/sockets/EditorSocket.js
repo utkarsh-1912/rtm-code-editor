@@ -4,13 +4,15 @@ const UserRepository = require('../repositories/UserRepository');
 const ProjectRepository = require('../repositories/ProjectRepository');
 
 function setupEditorSocket(io, socket, safeSocket, context) {
-    const { userSocketMap, userPhotoMap, roomChatHistory, getAllClients } = context;
+    const { userSocketMap, userPhotoMap, roomChatHistory, getAllClients, claimSeat } = context;
     const safePhoto = (url) => (typeof url === 'string' && /^https:\/\//.test(url) ? url.slice(0, 500) : null);
 
-    socket.on(ACTIONS.JOIN, safeSocket(async ({ roomId, userName, userProfile }) => {
+    socket.on(ACTIONS.JOIN, safeSocket(async ({ roomId, userName, userProfile, clientId }) => {
+        if (!roomId) return;
         const finalUserName = userName || "Guest";
         userSocketMap[socket.id] = finalUserName;
         userPhotoMap[socket.id] = safePhoto(userProfile?.photoURL);
+        claimSeat(socket, roomId, { clientId, uid: userProfile?.uid });
         socket.join(roomId);
 
         // Announce the join before touching the database so a slow or cold DB
@@ -41,11 +43,13 @@ function setupEditorSocket(io, socket, safeSocket, context) {
         }
     }));
 
-    socket.on(ACTIONS.PROJECT_JOIN, safeSocket(async ({ projectId, userName, photoURL }) => {
+    socket.on(ACTIONS.PROJECT_JOIN, safeSocket(async ({ projectId, userName, photoURL, clientId, uid }) => {
+        if (!projectId) return;
         const finalUserName = userName || "Guest";
         const roomId = `project-${projectId}`;
         userSocketMap[socket.id] = finalUserName;
         userPhotoMap[socket.id] = safePhoto(photoURL);
+        claimSeat(socket, roomId, { clientId, uid });
         socket.join(roomId);
 
         const files = await ProjectRepository.getProjectFiles(projectId);

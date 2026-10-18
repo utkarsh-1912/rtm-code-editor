@@ -37,9 +37,15 @@ export const AuthProvider = ({ children }) => {
 
 
     // Profile + session bookkeeping; never blocks the UI.
-    const syncWithBackend = async (uid) => {
+    const syncWithBackend = async (identity) => {
+        const uid = identity.uid;
         try {
             const { getBackendUrl } = await import('../utils/api');
+            await fetch(`${getBackendUrl()}/api/user/sync`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ uid, email: identity.email, name: identity.name, photoURL: identity.photoURL }),
+            }).catch(() => { });
             const profileRes = await fetch(`${getBackendUrl()}/api/user/profile?userId=${uid}`);
             if (profileRes.ok) {
                 const profileData = await profileRes.json();
@@ -92,7 +98,7 @@ export const AuthProvider = ({ children }) => {
             };
             setUser(userData);
             setLoading(false);
-            syncWithBackend(firebaseUser.uid);
+            syncWithBackend(userData);
         });
 
         return () => unsubscribe();

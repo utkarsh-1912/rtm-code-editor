@@ -1,13 +1,10 @@
 import React, { useEffect, useRef, useState } from "react";
 import CodeMirror from "@uiw/react-codemirror";
-import { javascript } from "@codemirror/lang-javascript";
-import { python } from "@codemirror/lang-python";
-import { cpp } from "@codemirror/lang-cpp";
-import { html } from "@codemirror/lang-html";
 import { dracula } from "@uiw/codemirror-theme-dracula";
 import { EditorView, Decoration, ViewPlugin, WidgetType } from "@codemirror/view";
 import { vim } from "@replit/codemirror-vim";
 import { emacs } from "@replit/codemirror-emacs";
+import { editorLanguage } from "../utils/languages";
 import ACTIONS from "../Action";
 
 // --- Remote Cursor Branding ---
@@ -81,14 +78,15 @@ function ProjectEditor({
 
         socket.on(ACTIONS.FILE_CHANGE, handleCodeChange);
         socket.on(ACTIONS.CURSOR_MOVE, handleCursorMove);
-        socket.on(ACTIONS.DISCONNECTED, ({ socketId }) => {
+        const handleLeft = ({ socketId }) => {
             setRemoteCursors(prev => { const next = { ...prev }; delete next[socketId]; return next; });
-        });
+        };
+        socket.on(ACTIONS.DISCONNECTED, handleLeft);
 
         return () => {
             socket.off(ACTIONS.FILE_CHANGE, handleCodeChange);
             socket.off(ACTIONS.CURSOR_MOVE, handleCursorMove);
-            socket.off(ACTIONS.DISCONNECTED);
+            socket.off(ACTIONS.DISCONNECTED, handleLeft); // only ours; never strip the page's listeners
         };
     }, [socketRef, fileId, onCodeChange]);
 
@@ -131,17 +129,7 @@ function ProjectEditor({
     };
 
     // `lang` may be a language name or a file extension.
-    const getLanguageExtension = (lang) => {
-        switch ((lang || "").toLowerCase()) {
-            case "python": case "py": return python();
-            case "cpp": case "c": case "h": case "hpp": case "cc": return cpp();
-            case "html": case "htm": case "css": return html();
-            case "jsx": case "tsx": return javascript({ jsx: true });
-            case "ts": return javascript({ typescript: true });
-            case "javascript": case "js": return javascript({ jsx: true });
-            default: return javascript();
-        }
-    };
+    const getLanguageExtension = (lang) => editorLanguage(String(lang || "").toLowerCase());
 
     return (
         <div style={{ height: "100%", backgroundColor: "var(--u-bg, #282a36)", overflow: "hidden", position: 'relative' }}>

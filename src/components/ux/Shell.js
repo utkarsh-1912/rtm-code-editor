@@ -58,6 +58,34 @@ export function useThemeToggle() {
     return [isLight, toggle];
 }
 
+// One line of display type scaled to exactly fill its container width.
+function FitLine({ className, children }) {
+    const boxRef = useRef(null);
+    const textRef = useRef(null);
+    useEffect(() => {
+        const box = boxRef.current;
+        const text = textRef.current;
+        if (!box || !text) return undefined;
+        const fit = () => {
+            text.style.fontSize = "100px";
+            const ratio = box.clientWidth / text.scrollWidth;
+            text.style.fontSize = `${Math.max(24, Math.floor(100 * ratio * 0.995))}px`;
+        };
+        let frame = 0;
+        const schedule = () => { cancelAnimationFrame(frame); frame = requestAnimationFrame(fit); };
+        fit();
+        const ro = new ResizeObserver(schedule);
+        ro.observe(box);
+        document.fonts?.ready.then(schedule);
+        return () => { ro.disconnect(); cancelAnimationFrame(frame); };
+    }, []);
+    return (
+        <div className={className} ref={boxRef} aria-hidden="true">
+            <span ref={textRef} className="f-word-line">{children}</span>
+        </div>
+    );
+}
+
 // Dark / light / system segmented switch for footers and settings.
 export function ThemeSwitch() {
     const [pref, setPref] = useState(getThemePref);
@@ -199,9 +227,7 @@ export default function Shell({
                         </div>
                     </div>
 
-                    <div className="f-word" aria-hidden="true">
-                        <span>Utkristi</span><span className="u-faint">CoLabs</span>
-                    </div>
+                    <FitLine className="f-word"><span>Utkristi</span> <span className="u-faint">CoLabs</span></FitLine>
 
                     <div className="u-foot-bottom">
                         <span>&copy; {now.getFullYear()} Utkristi CoLabs · Built by Utkristi.io</span>

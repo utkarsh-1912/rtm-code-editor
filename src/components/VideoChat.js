@@ -7,6 +7,23 @@ import CallAnnotations from './CallAnnotations';
 import toast from 'react-hot-toast';
 import ACTIONS from '../Action';
 
+// Camera sized for a mesh call: plenty for a tile, a fraction of 720p30's bandwidth.
+const CAM = { width: { ideal: 640 }, height: { ideal: 360 }, frameRate: { ideal: 24, max: 30 } };
+const MIC = { echoCancellation: true, noiseSuppression: true, autoGainControl: true };
+const SCREEN = { video: { frameRate: { ideal: 15, max: 30 } }, audio: true };
+
+// STUN plus TURN. Set REACT_APP_TURN_URL / _USERNAME / _CREDENTIAL for your own relay;
+// the public Open Relay is only a fallback.
+const ICE_SERVERS = [
+    { urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302'] },
+    ...(process.env.REACT_APP_TURN_URL
+        ? [{ urls: process.env.REACT_APP_TURN_URL.split(','), username: process.env.REACT_APP_TURN_USERNAME, credential: process.env.REACT_APP_TURN_CREDENTIAL }]
+        : [{ urls: ['turn:openrelay.metered.ca:80', 'turn:openrelay.metered.ca:443'], username: 'openrelayproject', credential: 'openrelayproject' }]),
+];
+
+// Per-peer video budget: every extra person in the mesh means another upload of our video.
+const videoBitrate = (peerCount, screen) => (screen ? 1500000 : peerCount <= 1 ? 1200000 : peerCount <= 3 ? 700000 : 350000);
+
 const VideoChat = ({
     socketRef,
     projectId,
@@ -45,8 +62,29 @@ const VideoChat = ({
     const audioContextRef = useRef(null);
     const analysersRef = useRef({}); // { socketId: AnalyserNode }
     const pendingCandidatesRef = useRef({}); // Bug 2: ICE candidate queue per peer
+    const localStreamRef = useRef(null);
+    useEffect(() => { localStreamRef.current = localStream; }, [localStream]);
+
+    // Cap each video sender's bitrate for the current call size and content.
+    const tuneSenders = useCallback((screen = mediaStateRef.current.isScreenSharing) => {
+        const peers = Object.values(peersRef.current);
+        const max = videoBitrate(peers.length, screen);
+        peers.forEach((peer) => {
+            peer.getSenders().forEach((sender) => {
+                if (!sender.track || sender.track.kind !== 'video' || !sender.getParameters) return;
+                const params = sender.getParameters();
+                if (!params.encodings || !params.encodings.length) params.encodings = [{}];
+                params.encodings[0].maxBitrate = max;
+                params.encodings[0].maxFramerate = screen ? 15 : 24;
+                params.degradationPreference = screen ? 'maintain-resolution' : 'balanced';
+                sender.setParameters(params).catch(() => { });
+            });
+        });
+    }, []);
 
     const mediaStateRef = useRef({ isMuted, isVideoOff, isScreenSharing });
+    const remoteUsersRef = useRef({});
+    useEffect(() => { remoteUsersRef.current = remoteUsers; }, [remoteUsers]);
     useEffect(() => {
         mediaStateRef.current = { isMuted, isVideoOff, isScreenSharing };
     }, [isMuted, isVideoOff, isScreenSharing]);
@@ -55,7 +93,7 @@ const VideoChat = ({
     const broadcastMediaState = useCallback((state) => {
         if (!socketRef.current) return;
         socketRef.current.emit(ACTIONS.MEDIA_STATE_CHANGE, {
-            roomId: `project-${projectId}`,
+            roomId: `call:${projectId}`,
             state
         });
     }, [projectId, socketRef]);
@@ -70,9 +108,10 @@ const VideoChat = ({
         try {
             if (!isVideoOff) {
                 const newStream = await navigator.mediaDevices.getUserMedia({
-                    video: { width: 1280, height: 720, frameRate: 30 }
+                    video: CAM
                 });
                 const camTrack = newStream.getVideoTracks()[0];
+                if ('contentHint' in camTrack) camTrack.contentHint = 'motion';
 
                 Object.values(peersRef.current).forEach(peer => {
                     const sender = peer.getSenders().find(s => s.track && s.track.kind === 'video');
@@ -85,6 +124,7 @@ const VideoChat = ({
                 setLocalStream(displayStream);
             }
             setIsScreenSharing(false);
+            tuneSenders(false);
             broadcastMediaState({ ...mediaStateRef.current, isScreenSharing: false });
         } catch (err) {
             console.error("Return to camera failed", err);
@@ -92,13 +132,14 @@ const VideoChat = ({
             setIsScreenSharing(false);
             broadcastMediaState({ ...mediaStateRef.current, isScreenSharing: false });
         }
-    }, [isVideoOff, localStream, broadcastMediaState]);
+    }, [isVideoOff, localStream, broadcastMediaState, tuneSenders]);
 
     const toggleScreenShare = useCallback(async () => {
         if (!isScreenSharing) {
             try {
-                const screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
+                const screenStream = await navigator.mediaDevices.getDisplayMedia(SCREEN);
                 const screenTrack = screenStream.getVideoTracks()[0];
+                if ('contentHint' in screenTrack) screenTrack.contentHint = 'detail';
                 screenStreamRef.current = screenStream;
 
                 screenTrack.onended = () => {
@@ -115,6 +156,7 @@ const VideoChat = ({
                 if (currentAudio) displayStream.addTrack(currentAudio);
                 setLocalStream(displayStream);
                 setIsScreenSharing(true);
+                tuneSenders(true);
                 broadcastMediaState({ ...mediaStateRef.current, isScreenSharing: true });
 
             } catch (err) {
@@ -123,7 +165,7 @@ const VideoChat = ({
         } else {
             await stopScreenShare();
         }
-    }, [isScreenSharing, localStream, stopScreenShare, broadcastMediaState]);
+    }, [isScreenSharing, localStream, stopScreenShare, broadcastMediaState, tuneSenders]);
 
     // --- Core Media Logic (Defined first for hoisting) ---
     const setupAudioAnalysis = useCallback((stream, id) => {
@@ -167,8 +209,8 @@ const VideoChat = ({
                 stream = new MediaStream();
             } else {
                 stream = await navigator.mediaDevices.getUserMedia({
-                    video: initialVideoState ? { width: 1280, height: 720, frameRate: 30 } : false,
-                    audio: initialAudioState
+                    video: initialVideoState ? CAM : false,
+                    audio: initialAudioState ? MIC : false
                 });
             }
 
@@ -217,7 +259,7 @@ const VideoChat = ({
             }
             try {
                 const newStream = await navigator.mediaDevices.getUserMedia({
-                    video: { width: 1280, height: 720, frameRate: 30 }
+                    video: CAM
                 });
                 const newTrack = newStream.getVideoTracks()[0];
 
@@ -273,7 +315,7 @@ const VideoChat = ({
             if (!audioTrack) {
                 // Track doesn't exist (joined muted natively), need to get it
                 try {
-                    const newAudioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    const newAudioStream = await navigator.mediaDevices.getUserMedia({ audio: MIC });
                     audioTrack = newAudioStream.getAudioTracks()[0];
 
                     let updatedStream = localStream;
@@ -311,24 +353,18 @@ const VideoChat = ({
 
 
     const createPeer = useCallback((targetSocketId, name, stream) => {
-        const peer = new RTCPeerConnection({
-            // Bug 3: Added STUN + Open TURN relay for NAT traversal reliability
-            iceServers: [
-                { urls: 'stun:stun.l.google.com:19302' },
-                { urls: 'stun:stun1.l.google.com:19302' },
-                {
-                    urls: 'turn:openrelay.metered.ca:80',
-                    username: 'openrelayproject',
-                    credential: 'openrelayproject'
-                },
-                {
-                    urls: 'turn:openrelay.metered.ca:443',
-                    username: 'openrelayproject',
-                    credential: 'openrelayproject'
-                },
-            ],
-            iceTransportPolicy: 'all',
-        });
+        const peer = new RTCPeerConnection({ iceServers: ICE_SERVERS, iceCandidatePoolSize: 2 });
+
+        // Recover from dropped networks (Wi-Fi to mobile, VPN changes) with an ICE restart.
+        peer.onconnectionstatechange = async () => {
+            if (peer.connectionState !== 'failed' || !socketRef.current) return;
+            try {
+                peer.restartIce?.();
+                const offer = await peer.createOffer({ iceRestart: true });
+                await peer.setLocalDescription(offer);
+                socketRef.current.emit('video-offer', { to: targetSocketId, offer });
+            } catch (e) { /* the peer will be re-created when they rejoin */ }
+        };
 
         // Bug 2: Initialize candidate queue for this peer
         if (!pendingCandidatesRef.current[targetSocketId]) {
@@ -338,6 +374,7 @@ const VideoChat = ({
         if (stream) {
             stream.getTracks().forEach(track => peer.addTrack(track, stream));
         }
+        setTimeout(() => tuneSenders(), 0);
 
         peer.onicecandidate = (event) => {
             if (event.candidate && socketRef.current) {
@@ -358,7 +395,7 @@ const VideoChat = ({
         };
 
         return peer;
-    }, [socketRef, setupAudioAnalysis]);
+    }, [socketRef, setupAudioAnalysis, tuneSenders]);
 
 
     const handleLeaveCall = useCallback(() => {
@@ -403,26 +440,19 @@ const VideoChat = ({
         }
     }, [externalInCall, inCall, handleLeaveCall]);
 
-    // Cleanup camera tracks faithfully on hard unmounts (e.g Sidebar routing to Dashboard)
+    // Release camera, mic and connections when the call UI unmounts. Uses refs so that
+    // changing tracks (camera on/off, screen share) never tears down the call.
     useEffect(() => {
         const currentSocket = socketRef.current;
         return () => {
-            if (localStream) {
-                localStream.getTracks().forEach(t => t.stop());
-            }
-            if (screenStreamRef.current) {
-                screenStreamRef.current.getTracks().forEach(t => t.stop());
-            }
-            if (audioContextRef.current) {
-                audioContextRef.current.close().catch(() => {});
-            }
-            if (currentSocket) {
-                currentSocket.emit('leave-video-chat', { projectId });
-            }
+            localStreamRef.current?.getTracks().forEach(t => t.stop());
+            screenStreamRef.current?.getTracks().forEach(t => t.stop());
+            audioContextRef.current?.close().catch(() => { });
+            currentSocket?.emit('leave-video-chat', { projectId });
             Object.values(peersRef.current).forEach(peer => peer.close());
             peersRef.current = {};
         };
-    }, [localStream, projectId, socketRef]);
+    }, [projectId, socketRef]);
 
 
     // --- Socket Signaling Handlers ---
@@ -451,7 +481,7 @@ const VideoChat = ({
 
                     // Broadcast our current media state so the new user knows our status
                     socket.emit(ACTIONS.MEDIA_STATE_CHANGE, {
-                        roomId: `project-${projectId}`,
+                        roomId: `call:${projectId}`,
                         state: mediaStateRef.current
                     });
                 } catch (err) { console.error("Offer error", err); }
@@ -461,8 +491,11 @@ const VideoChat = ({
         };
 
         const onVideoOffer = async ({ from, offer }) => {
-            const peer = createPeer(from, "User", localStream);
-            peersRef.current[from] = peer;
+            let peer = peersRef.current[from];
+            if (!peer || peer.signalingState === 'closed') {
+                peer = createPeer(from, remoteUsersRef.current[from]?.name || "User", localStream);
+                peersRef.current[from] = peer;
+            }
 
             try {
                 await peer.setRemoteDescription(new RTCSessionDescription(offer));
@@ -479,7 +512,7 @@ const VideoChat = ({
 
                 // Also broadcast our media state back so they have ours
                 socket.emit(ACTIONS.MEDIA_STATE_CHANGE, {
-                    roomId: `project-${projectId}`,
+                    roomId: `call:${projectId}`,
                     state: mediaStateRef.current
                 });
             } catch (err) { console.error("Answer error", err); }
@@ -518,6 +551,7 @@ const VideoChat = ({
 
         const onUserLeft = ({ userId }) => {
             if (peersRef.current[userId]) {
+                setTimeout(() => tuneSenders(), 0);
                 peersRef.current[userId].close();
                 delete peersRef.current[userId];
                 delete analysersRef.current[userId];
@@ -562,7 +596,7 @@ const VideoChat = ({
             socket.off('user-left-video', onUserLeft);
             socket.off(ACTIONS.MEDIA_STATE_CHANGE, onMediaStateChange);
         };
-    }, [localStream, socketRef, createPeer, projectId]);
+    }, [localStream, socketRef, createPeer, projectId, tuneSenders]);
 
     // --- Active Speaker Detection ---
     useEffect(() => {

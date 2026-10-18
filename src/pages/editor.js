@@ -35,6 +35,8 @@ import Client from "../components/clients";
 import { LANGUAGES, THEMES } from "../config";
 import { useAuth } from "../context/AuthContext";
 import { runCode, formatRun } from "../utils/runner";
+import { isTemplate, templateFor } from "../utils/languages";
+import { CLIENT_ID } from "../utils/clientId";
 import { resolveTheme, setThemePref } from "../utils/theme";
 import "../styles/app.css";
 import LoadingScreen from "../components/LoadingScreen";
@@ -49,6 +51,7 @@ import { Bot, History, Activity, Video as VideoIcon } from "lucide-react";
 import VideoChat from "../components/VideoChat";
 import WorkspaceHeader from "../components/WorkspaceHeader";
 import CommandPalette from "../components/CommandPalette";
+import ShareModal from "../components/ShareModal";
 
 function Editor() {
   const socketRef = useRef(null);
@@ -56,6 +59,8 @@ function Editor() {
   const reactNavigator = useNavigate();
   const { roomId } = useParams();
   const { user, loading: authLoading } = useAuth();
+  const userRef = useRef(user);
+  userRef.current = user;
   const [userName, setUserName] = useState(location.state?.userName || localStorage.getItem("guest-name") || "");
   const [showGuestModal, setShowGuestModal] = useState(false);
   const [guestInput, setGuestInput] = useState("");
@@ -94,7 +99,8 @@ function Editor() {
 
   const [stdin, setStdin] = useState("");
 
-  const [role] = useState(location.state?.role || "editor");
+  // Role comes from in-app navigation or a shared link (?role=viewer).
+  const [role] = useState(location.state?.role || new URLSearchParams(location.search).get("role") || "editor");
   const isReadOnly = role === "viewer";
 
   // Editor Settings State
@@ -114,6 +120,7 @@ function Editor() {
   const [showAnalytics, setShowAnalytics] = useState(false);
   const [showFocusModal, setShowFocusModal] = useState(false);
   const [showCommandPalette, setShowCommandPalette] = useState(false);
+  const [showShare, setShowShare] = useState(false);
   const runShortcutRef = useRef(null);
   const [isMeetingActive, setIsMeetingActive] = useState(false);
   const [isMeetingMinimized, setIsMeetingMinimized] = useState(false);
@@ -171,6 +178,19 @@ function Editor() {
 
   const toggleTheme = () => {
     setIsLightMode(setThemePref(isLightMode ? "dark" : "light"));
+  };
+
+  // Switch language; drop in that language's starter code if the editor is empty or
+  // still holds another language's starter (never overwrites real work).
+  const changeLanguage = (newLang) => {
+    setLanguage(newLang);
+    socketRef.current?.emit(ACTIONS.SYNC_LANGUAGE, { roomId, language: newLang });
+    if (!isReadOnly && isTemplate(codeRef.current)) {
+      const starter = templateFor(newLang);
+      codeRef.current = starter;
+      setCurrentCode(starter);
+      socketRef.current?.emit(ACTIONS.CODE_CHANGE, { roomId, code: starter });
+    }
   };
 
   const downloadCode = () => {
@@ -255,8 +275,9 @@ function Editor() {
           // Fallback to retry loop if immediate ping fails
         }
 
+        // Free hosting can take up to a minute to wake; keep trying for ~90s.
         let retries = 0;
-        const maxRetries = 15;
+        const maxRetries = 110;
         while (retries < maxRetries) {
           try {
             const resp = await fetch(`${backendUrl}/api/ping`);
@@ -280,11 +301,15 @@ function Editor() {
         return;
       }
 
-      socketRef.current = await initSocket();
+      // Only the live run may own the socket; a stale run (effect re-ran while we were
+      // waiting for the server) must not overwrite the ref with a socket it then closes.
+      const fresh = await initSocket();
       if (!isMounted) {
-        socketRef.current.disconnect();
+        fresh.disconnect();
         return;
       }
+      ownSocket = fresh;
+      socketRef.current = fresh;
       setSocketConnected(true);
       socketRef.current.on("connect_error", (err) => handleErrors(err));
       socketRef.current.on("connect_failed", (err) => handleErrors(err));
@@ -299,7 +324,8 @@ function Editor() {
       socketRef.current.emit(ACTIONS.JOIN, {
         roomId,
         userName: userName,
-        userProfile: user,
+        userProfile: userRef.current,
+        clientId: CLIENT_ID,
       });
 
       socketRef.current.on(
@@ -328,8 +354,9 @@ function Editor() {
         setMediaStates((prev) => ({ ...prev, [userId]: { ...prev[userId], ...state } }));
       });
 
-      socketRef.current.on(ACTIONS.DISCONNECTED, ({ socketId, userName }) => {
-        toast.error(`${userName} left the room !`);
+      socketRef.current.on(ACTIONS.DISCONNECTED, ({ socketId, userName, replaced }) => {
+        // "replaced" = an older connection from the same page; not a real departure.
+        if (!replaced) toast(`${userName} left the room`);
         setClients((prev) => prev.filter((client) => client.socketId !== socketId));
       });
 
@@ -372,11 +399,12 @@ function Editor() {
     };
 
     let isMounted = true;
+    let ownSocket = null;
     init();
 
     return () => {
       isMounted = false;
-      const socket = socketRef.current;
+      const socket = ownSocket;
       if (socket) {
         socket.disconnect();
         socket.off(ACTIONS.JOINED);
@@ -390,7 +418,9 @@ function Editor() {
         socket.off(ACTIONS.DELETE_MESSAGE);
       }
     };
-  }, [roomId, userName, reactNavigator, user, authLoading]);
+    // Reconnect only when the identity changes, not on every profile refresh.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [roomId, userName, reactNavigator, user?.uid, authLoading]);
 
   // Reset unread count when chat is viewed
   useEffect(() => {
@@ -425,8 +455,7 @@ function Editor() {
   };
 
   const handleShare = async (shareRole = "editor") => {
-    const roleParam = shareRole === "viewer" ? "&role=viewer" : "";
-    const shareUrl = `${window.location.origin}/?room=${roomId}${roleParam}`;
+    const shareUrl = `${window.location.origin}/editor/${encodeURIComponent(roomId)}${shareRole === "viewer" ? "?role=viewer" : ""}`;
     try {
       await navigator.clipboard.writeText(shareUrl);
       toast.success(shareRole === "viewer" ? "Spectator link copied!" : "Editor link copied!");
@@ -486,8 +515,7 @@ function Editor() {
           { id: "call", label: isMeetingActive ? "Leave call" : "Start voice & video call", icon: <VideoIcon size={18} />, onClick: () => setIsMeetingActive((v) => !v), active: isMeetingActive, tone: "green" },
           { id: "board", label: "Whiteboard", icon: <PencilLine size={18} />, onClick: () => setShowWhiteboard(true) },
           { id: "ai", label: "AI Copilot", icon: <Bot size={18} />, onClick: () => setShowAICopilot(true) },
-          { id: "share", label: "Copy editor link", icon: <Share2 size={18} />, onClick: () => handleShare("editor") },
-          { id: "viewer", label: "Copy spectator link", icon: <Users size={18} />, onClick: () => handleShare("viewer"), section: "more" },
+          { id: "share", label: "Invite people", icon: <Share2 size={18} />, onClick: () => setShowShare(true) },
           { id: "history", label: "Version history", icon: <History size={18} />, onClick: () => setShowDiffViewer(true), section: "more" },
           { id: "analytics", label: "Analytics", icon: <Activity size={18} />, onClick: () => setShowAnalytics(true), section: "more" },
           ...(user ? [
@@ -497,6 +525,7 @@ function Editor() {
           { id: "gist", label: "Export to GitHub Gist", icon: <Github size={18} />, onClick: () => setShowGistModal(true), section: "more" },
           { id: "download", label: "Download code", icon: <Download size={18} />, onClick: downloadCode, section: "more" },
           { id: "copy", label: "Copy room ID", icon: <Copy size={18} />, onClick: copyRoomId, section: "more" },
+          { id: "viewer", label: "Copy spectator link", icon: <Users size={18} />, onClick: () => handleShare("viewer"), section: "more" },
           { id: "palette", label: "Command palette (Ctrl+K)", icon: <Zap size={18} />, onClick: () => setShowCommandPalette(true), section: "more", desktopOnly: true },
           { id: "settings", label: "Editor settings", icon: <Settings size={18} />, onClick: () => setShowSettings(true), section: "more" },
           ...(user ? [{ id: "dash", label: "Back to dashboard", icon: <LayoutDashboard size={18} />, onClick: () => reactNavigator("/dashboard"), section: "more" }] : []),
@@ -519,10 +548,7 @@ function Editor() {
                         setCurrentCode(code);
                       }}
                       language={language}
-                      onLanguageChange={(newLang) => {
-                        setLanguage(newLang);
-                        socketRef.current?.emit(ACTIONS.SYNC_LANGUAGE, { roomId, language: newLang });
-                      }}
+                      onLanguageChange={changeLanguage}
                       theme={theme}
                       code={currentCode}
                       onRunCode={handleCompile}
@@ -623,10 +649,7 @@ function Editor() {
                               setCurrentCode(code);
                             }}
                             language={language}
-                            onLanguageChange={(newLang) => {
-                              setLanguage(newLang);
-                              socketRef.current?.emit(ACTIONS.SYNC_LANGUAGE, { roomId, language: newLang });
-                            }}
+                            onLanguageChange={changeLanguage}
                             theme={theme}
                             code={currentCode}
                             onRunCode={handleCompile}
@@ -681,7 +704,7 @@ function Editor() {
             <button className={!isChatCollapsed ? "on" : ""} onClick={() => setIsChatCollapsed(!isChatCollapsed)}>
               <MessageSquare size={12} /> chat{isChatCollapsed && unreadChatCount > 0 ? ` (${unreadChatCount})` : ""}
             </button>
-            <button onClick={() => handleShare("editor")}><Share2 size={12} /> invite</button>
+            <button onClick={() => setShowShare(true)}><Share2 size={12} /> invite</button>
           </div>
         </footer>
       )}
@@ -771,13 +794,15 @@ function Editor() {
         </div>
       )}
 
+      <ShareModal open={showShare} onClose={() => setShowShare(false)} roomId={roomId} peopleOnline={clients.length} />
+
       <CommandPalette
         isOpen={showCommandPalette}
         onClose={() => setShowCommandPalette(false)}
         isLightMode={isLightMode}
         actions={[
           { id: "run", label: "Run code", category: "Actions", shortcut: "Ctrl Enter", icon: <Terminal size={16} />, run: handleCompile },
-          { id: "share", label: "Copy editor link", category: "Collaboration", icon: <Share2 size={16} />, run: () => handleShare("editor") },
+          { id: "share", label: "Invite people", category: "Collaboration", icon: <Share2 size={16} />, run: () => setShowShare(true) },
           { id: "viewer", label: "Copy spectator link", category: "Collaboration", icon: <Users size={16} />, run: () => handleShare("viewer") },
           { id: "call", label: isMeetingActive ? "Leave call" : "Start voice & video call", category: "Collaboration", icon: <VideoIcon size={16} />, run: () => setIsMeetingActive((v) => !v) },
           { id: "board", label: "Open whiteboard", category: "Collaboration", icon: <PencilLine size={16} />, run: () => setShowWhiteboard(true) },

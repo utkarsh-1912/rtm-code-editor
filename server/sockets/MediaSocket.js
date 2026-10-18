@@ -4,9 +4,13 @@ const StreamingService = require('../services/StreamingService');
 function setupMediaSocket(io, socket, safeSocket, context) {
     const { userSocketMap } = context;
 
+    // Calls get their own room, so only people actually in the call exchange media
+    // (the project/room channel can have many more people who are just editing).
+    const callRoom = (id) => `call:${id}`;
+
     // WebRTC Signaling
     socket.on('join-video-chat', safeSocket(({ projectId, name, isSpectator }) => {
-        const roomId = `project-${projectId}`;
+        const roomId = callRoom(projectId);
         socket.join(roomId);
         const clients = Array.from(io.sockets.adapter.rooms.get(roomId) || []).filter(id => id !== socket.id).map(id => ({
             userId: id, name: userSocketMap[id] || "Guest", isSpectator: false
@@ -32,11 +36,11 @@ function setupMediaSocket(io, socket, safeSocket, context) {
     // Drawing + pointers over a shared screen
     socket.on('call-annotate', safeSocket(({ projectId, event }) => {
         if (!projectId || !event) return;
-        socket.to(`project-${projectId}`).emit('call-annotate', { userId: socket.id, name: userSocketMap[socket.id], event });
+        socket.to(callRoom(projectId)).emit('call-annotate', { userId: socket.id, name: userSocketMap[socket.id], event });
     }));
 
     socket.on('leave-video-chat', safeSocket(({ projectId }) => {
-        const roomId = `project-${projectId}`;
+        const roomId = callRoom(projectId);
         socket.leave(roomId);
         socket.to(roomId).emit('user-left-video', { userId: socket.id });
     }));

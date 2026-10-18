@@ -1,8 +1,6 @@
-export const LANGUAGES = [
-    { id: 63, name: "JavaScript (Node.js 12.14.0)", value: "javascript" },
-    { id: 71, name: "Python (3.8.1)", value: "python" },
-    { id: 54, name: "C++ (GCC 9.2.0)", value: "cpp" },
-    { id: 62, name: "Java (OpenJDK 13.0.1)", value: "java" },
-];
+import { LANGS } from "./utils/languages";
+
+// Room language picker: { id: Judge0 id, name, value } for every runnable language.
+export const LANGUAGES = LANGS.map((l) => ({ id: l.judge0Id, name: `${l.label} (${l.runtime})`, value: l.id }));
 
 export const THEMES = ["dracula", "monokai", "material", "nord", "blackboard"];

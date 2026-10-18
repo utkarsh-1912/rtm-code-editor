@@ -19,9 +19,9 @@ router.get('/projects', async (req, res) => {
 // Create project
 router.post('/projects', async (req, res) => {
     try {
-        const { userId, name, description, type } = req.body;
+        const { userId, name, description, type, empty } = req.body;
         if (!userId || !name) return res.status(400).json({ error: "Missing required parameters" });
-        const project = await ProjectRepository.createProject(userId, name, description, type);
+        const project = await ProjectRepository.createProject(userId, name, description, type, { empty: !!empty });
         res.json(project);
     } catch (err) {
         console.error(err);
@@ -70,6 +70,30 @@ router.post('/projects/:id/files', async (req, res) => {
         if (!name || !path) return res.status(400).json({ error: "Missing file details" });
         const file = await ProjectRepository.upsertProjectFile(req.params.id, name, path, content || "", isDirectory || false);
         res.json(file);
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// Bulk import (opened folder / several files). Has its own body limit; see server.js.
+const MAX_FILES = 300;
+const MAX_FILE_BYTES = 1024 * 1024;
+router.post('/projects/:id/files/bulk', express.json({ limit: '10mb' }), async (req, res) => {
+    try {
+        const files = Array.isArray(req.body?.files) ? req.body.files : null;
+        if (!files || !files.length) return res.status(400).json({ error: "No files" });
+        if (files.length > MAX_FILES) return res.status(413).json({ error: `At most ${MAX_FILES} files per request` });
+        const clean = [];
+        for (const f of files) {
+            const path = String(f.path || '').replace(/\/g, '/').replace(/^\/+/, '');
+            if (!path || path.includes('..') || path.length > 400) return res.status(400).json({ error: `Bad path: ${f.path}` });
+            const content = String(f.content ?? '');
+            if (Buffer.byteLength(content) > MAX_FILE_BYTES) return res.status(413).json({ error: `${path} is larger than 1 MB` });
+            clean.push({ name: path, path, content });
+        }
+        const saved = await ProjectRepository.upsertProjectFiles(req.params.id, clean);
+        res.json({ success: true, count: saved.length, files: saved });
     } catch (err) {
         console.error(err);
         res.status(500).json({ error: err.message });

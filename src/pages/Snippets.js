@@ -6,15 +6,9 @@ import OrganizationSettings from '../components/OrganizationSettings';
 import { useAuth } from '../context/AuthContext';
 import { getBackendUrl } from '../utils/api';
 import { Modal, timeAgo, pad2 } from '../components/ux/primitives';
+import { SNIPPET_LANGS } from '../utils/languages';
 
-const LANGS = [
-    ['javascript', 'JavaScript', 'js'],
-    ['python', 'Python', 'py'],
-    ['cpp', 'C++', 'c++'],
-    ['java', 'Java', 'jv'],
-    ['html', 'HTML', 'htm'],
-    ['css', 'CSS', 'css'],
-];
+const LANGS = SNIPPET_LANGS;
 const langShort = (l) => (LANGS.find(([v]) => v === l)?.[2]) || (l || '?').slice(0, 3);
 const langName = (l) => (LANGS.find(([v]) => v === l)?.[1]) || l;
 const EMPTY = { title: '', code: '', language: 'javascript', tags: [], organizationId: null };

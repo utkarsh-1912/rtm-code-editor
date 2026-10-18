@@ -7,6 +7,8 @@ const setupMediaSocket = require('./MediaSocket');
 const userSocketMap = {};
 // socketId -> avatar URL for signed-in people (names stay in userSocketMap)
 const userPhotoMap = {};
+// socketId -> { clientId, uid } so one page never appears twice in a room
+const socketMeta = {};
 const roomChatHistory = {};
 const roomWhiteboardState = {};
 
@@ -23,11 +25,26 @@ function initializeSockets(io) {
                 socketId,
                 userName: userSocketMap[socketId] || "Guest",
                 photoURL: userPhotoMap[socketId] || null,
+                uid: socketMeta[socketId]?.uid || null,
             };
         });
     }
 
+    // Register this socket's page id and drop older sockets from the same page in this room.
+    function claimSeat(socket, roomId, { clientId, uid } = {}) {
+        const cid = typeof clientId === 'string' ? clientId.slice(0, 64) : null;
+        socketMeta[socket.id] = { clientId: cid, uid: typeof uid === 'string' ? uid.slice(0, 128) : null };
+        if (!cid) return;
+        for (const id of io.sockets.adapter.rooms.get(roomId) || []) {
+            if (id !== socket.id && socketMeta[id]?.clientId === cid) {
+                socketMeta[id].replaced = true;
+                io.sockets.sockets.get(id)?.disconnect(true);
+            }
+        }
+    }
+
     const context = {
+        claimSeat,
         userSocketMap,
         userPhotoMap,
         roomChatHistory,
@@ -43,8 +60,11 @@ function initializeSockets(io) {
         socket.on("disconnecting", safeSocket(() => {
             [...socket.rooms].forEach(roomId => {
                 if (roomId === socket.id) return;
-                socket.in(roomId).emit(ACTIONS.DISCONNECTED, { socketId: socket.id, userName: userSocketMap[socket.id] || "Guest" });
-                if (roomId.startsWith('project-')) socket.in(roomId).emit('user-left-video', { userId: socket.id });
+                socket.in(roomId).emit(ACTIONS.DISCONNECTED, { socketId: socket.id, userName: userSocketMap[socket.id] || "Guest", replaced: !!socketMeta[socket.id]?.replaced });
+                if (roomId.startsWith('call:')) {
+                    socket.in(roomId).emit('user-left-video', { userId: socket.id });
+                    return;
+                }
 
                 const remaining = getAllClients(roomId);
                 if (remaining.length <= 1) {
@@ -56,6 +76,7 @@ function initializeSockets(io) {
             });
             delete userSocketMap[socket.id];
             delete userPhotoMap[socket.id];
+            delete socketMeta[socket.id];
         }));
     });
 }

@@ -1,20 +1,17 @@
 import React, { useEffect, useMemo } from "react";
 import { Download, FileCode2 } from "lucide-react";
 import CodeMirror from "@uiw/react-codemirror";
-import { javascript, esLint } from "@codemirror/lang-javascript";
-import { python } from "@codemirror/lang-python";
-import { cpp } from "@codemirror/lang-cpp";
-import { html } from "@codemirror/lang-html";
+import { esLint } from "@codemirror/lang-javascript";
 import { dracula } from "@uiw/codemirror-theme-dracula";
 import { EditorView, Decoration, ViewPlugin, WidgetType } from "@codemirror/view";
 import { vim } from "@replit/codemirror-vim";
 import { emacs } from "@replit/codemirror-emacs";
 import { linter, lintGutter } from "@codemirror/lint";
+import { editorLanguage, fileNameFor } from "../utils/languages";
 import ACTIONS from "../Action";
 import { LANGUAGES } from "../config";
 
-const FILE_NAMES = { javascript: "main.js", python: "main.py", cpp: "main.cpp", java: "Main.java" };
-export const roomFileName = (language) => FILE_NAMES[language] || `main.${language || "txt"}`;
+export const roomFileName = (language) => fileNameFor(language);
 
 // Remote cursor widget
 class CursorWidget extends WidgetType {
@@ -104,75 +101,58 @@ function EditorComp({
   const [editorCode, setEditorCode] = React.useState(code || "");
   const [remoteCursors, setRemoteCursors] = React.useState({});
 
+  // Latest callback without re-subscribing on every render (the parent passes an inline fn).
+  const onCodeChangeRef = React.useRef(onCodeChange);
+  onCodeChangeRef.current = onCodeChange;
+  const keybindingRef = React.useRef(settings?.keybinding);
+  keybindingRef.current = settings?.keybinding;
+
   useEffect(() => {
     const socket = socketRef.current;
-    if (socket) {
-      // Note: FILE_CHANGE is now handled by the parent ProjectPage component
-      // to maintain a single source of truth for the file list and content.
+    if (!socket) return undefined;
 
-      socket.on(ACTIONS.CODE_CHANGE, ({ code: incomingCode, fileId: incomingFileId }) => {
-        // Compatibility: !incomingFileId means it's a standard room
-        // incomingFileId === fileId means it's the correct file in a multi-file project
-        if (incomingCode !== null && (!incomingFileId || incomingFileId === fileId)) {
-          setEditorCode(incomingCode);
-          onCodeChange(incomingCode);
-        }
-      });
-
-      socket.on(ACTIONS.CURSOR_MOVE, ({ cursor, userName: remoteUser, socketId, color, fileId: incomingFileId }) => {
-        if (incomingFileId === fileId) {
-          setRemoteCursors((prev) => ({
-            ...prev,
-            [socketId]: { pos: cursor, userName: remoteUser, color: color || "#3b82f6" }
-          }));
-        } else {
-          // If they moved to another file, remove their cursor from this view
-          setRemoteCursors((prev) => {
-            const next = { ...prev };
-            delete next[socketId];
-            return next;
-          });
-        }
-      });
-
-      socket.on(ACTIONS.JOINED, ({ clients }) => {
-        // Cleanup cursors for anyone NOT in the clients list
-        setRemoteCursors((prev) => {
-          const next = { ...prev };
-          const socketIds = clients.map(c => c.socketId);
-          Object.keys(next).forEach(sid => {
-            if (!socketIds.includes(sid)) delete next[sid];
-          });
-          return next;
-        });
-      });
-
-      socket.on(ACTIONS.DISCONNECTED, ({ socketId }) => {
-        setRemoteCursors((prev) => {
-          const next = { ...prev };
-          delete next[socketId];
-          return next;
-        });
-      });
-      socket.on(ACTIONS.SYNC_SCROLL, ({ scrollPos, userName: remoteUser, fileId: incomingFileId }) => {
-        if (incomingFileId === fileId && settings?.keybinding !== "vim" && settings?.keybinding !== "emacs") {
-          // Find the editor view and scroll it
-          const editor = document.querySelector('.cm-content');
-          if (editor) {
-            const wrap = editor.closest('.cm-scroller');
-            if (wrap) wrap.scrollTop = scrollPos;
-          }
-        }
-      });
-    }
-    return () => {
-      socket?.off(ACTIONS.CODE_CHANGE);
-      socket?.off(ACTIONS.CURSOR_MOVE);
-      socket?.off(ACTIONS.JOINED);
-      socket?.off(ACTIONS.DISCONNECTED);
-      socket?.off(ACTIONS.SYNC_SCROLL);
+    // Named handlers: cleanup must remove only ours. A bare socket.off(EVENT) would also
+    // remove the page's listeners (joins, leaves), which broke presence and avatars.
+    const onRemoteCode = ({ code: incomingCode, fileId: incomingFileId }) => {
+      // !incomingFileId = standard room; matching fileId = this file in a project
+      if (incomingCode !== null && (!incomingFileId || incomingFileId === fileId)) {
+        setEditorCode(incomingCode);
+        onCodeChangeRef.current?.(incomingCode);
+      }
     };
-  }, [socketRef, onCodeChange, settings?.keybinding, fileId]);
+    const onCursor = ({ cursor, userName: remoteUser, socketId, color, fileId: incomingFileId }) => {
+      if (incomingFileId === fileId) {
+        setRemoteCursors((prev) => ({ ...prev, [socketId]: { pos: cursor, userName: remoteUser, color: color || "#3b82f6" } }));
+      } else {
+        setRemoteCursors((prev) => { const next = { ...prev }; delete next[socketId]; return next; });
+      }
+    };
+    const onJoined = ({ clients }) => {
+      const ids = new Set(clients.map((c) => c.socketId));
+      setRemoteCursors((prev) => Object.fromEntries(Object.entries(prev).filter(([sid]) => ids.has(sid))));
+    };
+    const onLeft = ({ socketId }) => {
+      setRemoteCursors((prev) => { const next = { ...prev }; delete next[socketId]; return next; });
+    };
+    const onScroll = ({ scrollPos, fileId: incomingFileId }) => {
+      if (incomingFileId !== fileId || keybindingRef.current === "vim" || keybindingRef.current === "emacs") return;
+      const wrap = document.querySelector('.cm-content')?.closest('.cm-scroller');
+      if (wrap) wrap.scrollTop = scrollPos;
+    };
+
+    socket.on(ACTIONS.CODE_CHANGE, onRemoteCode);
+    socket.on(ACTIONS.CURSOR_MOVE, onCursor);
+    socket.on(ACTIONS.JOINED, onJoined);
+    socket.on(ACTIONS.DISCONNECTED, onLeft);
+    socket.on(ACTIONS.SYNC_SCROLL, onScroll);
+    return () => {
+      socket.off(ACTIONS.CODE_CHANGE, onRemoteCode);
+      socket.off(ACTIONS.CURSOR_MOVE, onCursor);
+      socket.off(ACTIONS.JOINED, onJoined);
+      socket.off(ACTIONS.DISCONNECTED, onLeft);
+      socket.off(ACTIONS.SYNC_SCROLL, onScroll);
+    };
+  }, [socketRef, fileId]);
 
   useEffect(() => {
     if (code !== undefined && code !== editorCode) {
@@ -225,18 +205,7 @@ function EditorComp({
     }
   };
 
-  const getLanguageExtension = (lang) => {
-    switch (lang) {
-      case "javascript": return javascript({ jsx: true });
-      case "python": return python();
-      case "cpp": return cpp();
-      case "java": return cpp();
-      case "html":
-      case "htmlmixed": return html();
-      case "css": return html();
-      default: return javascript();
-    }
-  };
+  const getLanguageExtension = (lang) => editorLanguage(String(lang || "").toLowerCase());
 
   // Memoize cursor plugin — only rebuild when cursor positions change
   const memoizedCursorPlugin = useMemo(() => cursorPlugin(remoteCursors), [remoteCursors]);

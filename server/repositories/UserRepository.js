@@ -9,19 +9,24 @@ async function getUser(userId) {
 }
 
 /**
- * Find or Create User from Firebase profile
+ * Create the user or refresh their identity. Fixes rows auto-created by a session
+ * call (placeholder email, name "Developer") once the real profile arrives.
  */
 async function findOrCreateUser(firebaseUser) {
-    const { uid, email, name } = firebaseUser;
-    const users = await sql`SELECT * FROM users WHERE auth_provider_id = ${uid}`;
-    if (users.length > 0) return users[0];
-
-    const newUser = await sql`
-        INSERT INTO users (email, name, auth_provider_id)
-        VALUES (${email}, ${name}, ${uid})
+    const { uid } = firebaseUser;
+    const email = firebaseUser.email || `${uid}@user.local`;
+    const name = firebaseUser.name || firebaseUser.displayName || email.split('@')[0];
+    const photo = typeof firebaseUser.photoURL === 'string' && /^https:\/\//.test(firebaseUser.photoURL) ? firebaseUser.photoURL.slice(0, 500) : null;
+    const rows = await sql`
+        INSERT INTO users (email, name, auth_provider_id, photo_url)
+        VALUES (${email}, ${name}, ${uid}, ${photo})
+        ON CONFLICT (auth_provider_id) DO UPDATE SET
+            email = CASE WHEN users.email LIKE '%@user.local' THEN EXCLUDED.email ELSE users.email END,
+            name = CASE WHEN users.name IS NULL OR users.name = '' OR users.name = 'Developer' THEN EXCLUDED.name ELSE users.name END,
+            photo_url = COALESCE(EXCLUDED.photo_url, users.photo_url)
         RETURNING *
     `;
-    return newUser[0];
+    return rows[0];
 }
 
 /**
@@ -44,6 +49,12 @@ async function isUserUnsubscribed(email) {
  * Profile updates
  */
 async function updateProfile(userId, { name, bio, social_links }) {
+    // Make sure the row exists (a profile can be saved before any room was joined).
+    await sql`
+        INSERT INTO users (email, name, auth_provider_id)
+        VALUES (${`${userId}@user.local`}, ${name || 'Developer'}, ${userId})
+        ON CONFLICT (auth_provider_id) DO NOTHING
+    `;
     const updated = await sql`
         UPDATE users
         SET 

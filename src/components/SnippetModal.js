@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Search, X, Save } from 'lucide-react';
 import { Modal } from './ux/primitives';
+import { SNIPPET_LANGS } from '../utils/languages';
 import { getBackendUrl } from '../utils/api';
 import toast from 'react-hot-toast';
 
@@ -167,7 +168,7 @@ const SnippetModal = ({ isOpen, onClose, onImport, userId, code: currentCode, la
                         <div className="u-field">
                             <label htmlFor="sm-lang">Language</label>
                             <select id="sm-lang" className="u-select" value={saveData.language} onChange={(e) => setSaveData({ ...saveData, language: e.target.value })}>
-                                {[['javascript', 'JavaScript'], ['python', 'Python'], ['cpp', 'C++'], ['java', 'Java'], ['html', 'HTML'], ['css', 'CSS']].map(([v, n]) => <option key={v} value={v}>{n}</option>)}
+                                {SNIPPET_LANGS.map(([v, n]) => <option key={v} value={v}>{n}</option>)}
                             </select>
                         </div>
                     </div>

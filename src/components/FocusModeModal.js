@@ -13,11 +13,8 @@ import {
     FileCode,
     ChevronDown
 } from 'lucide-react';
+import { editorLanguage } from '../utils/languages';
 import CodeMirror from '@uiw/react-codemirror';
-import { javascript } from '@codemirror/lang-javascript';
-import { python } from '@codemirror/lang-python';
-import { cpp } from '@codemirror/lang-cpp';
-import { html } from '@codemirror/lang-html';
 import { dracula } from '@uiw/codemirror-theme-dracula';
 import { EditorView } from '@codemirror/view';
 import toast from 'react-hot-toast';
@@ -266,15 +263,7 @@ export default function FocusModeModal({
         return { lines, words, chars };
     }, [focusCode]);
 
-    const getLanguageExtension = (lang) => {
-        switch (lang) {
-            case "javascript": return javascript({ jsx: true });
-            case "python": return python();
-            case "cpp": return cpp();
-            case "html": return html();
-            default: return javascript();
-        }
-    };
+    const getLanguageExtension = (lang) => editorLanguage(String(lang || "").toLowerCase());
 
     if (!isOpen) return null;
 

@@ -7,7 +7,8 @@ const JUDGE0_URL = (process.env.COLABS_JUDGE0_URL || "http://localhost:2358").re
 const LLM_URL = (process.env.COLABS_LLM_URL || "http://localhost:11434/v1").replace(/\/$/, "");
 const LLM_MODEL = process.env.COLABS_LLM_MODEL || "qwen2.5-coder:1.5b";
 
-const JUDGE0_IDS = { javascript: 63, python: 71, cpp: 54, java: 62 };
+// Mirrors src/shared/languages.json (the desktop bundle cannot import from src/).
+const JUDGE0_IDS = { javascript: 63, typescript: 74, python: 71, java: 62, c: 50, cpp: 54, csharp: 51, go: 60, rust: 73, kotlin: 78, php: 68, ruby: 72, swift: 83, bash: 46, lua: 64, r: 80, sql: 82 };
 const b64 = (s) => Buffer.from(String(s || ""), "utf8").toString("base64");
 const unb64 = (s) => (s ? Buffer.from(s, "base64").toString("utf8") : "");
 

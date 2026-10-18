@@ -133,3 +133,35 @@ export const extractRoomId = (value) => {
     const m = v.match(/\/editor\/([^/?#\s]+)/) || v.match(/[?&]room=([^&#\s]+)/);
     return m ? m[1] : v;
 };
+
+// Custom range slider: filled track, value bubble and optional tick labels.
+export function Slider({ value, min = 0, max = 100, step = 1, onChange, marks = [], format = (v) => v, label, id }) {
+    const pct = ((value - min) / (max - min)) * 100;
+    return (
+        <div className="u-slider" style={{ "--p": `${pct}%`, "--pn": pct / 100 }}>
+            <div className="u-slider-rail">
+                <input
+                    id={id}
+                    type="range"
+                    min={min}
+                    max={max}
+                    step={step}
+                    value={value}
+                    aria-label={label}
+                    aria-valuetext={String(format(value))}
+                    onChange={(e) => onChange(Number(e.target.value))}
+                />
+                <output className="u-slider-bubble" htmlFor={id}>{format(value)}</output>
+            </div>
+            {marks.length > 0 && (
+                <div className="u-slider-marks" aria-hidden="true">
+                    {marks.map((m) => (
+                        <button type="button" tabIndex={-1} key={m} className={m === value ? "on" : ""} style={{ left: `${((m - min) / (max - min)) * 100}%` }} onClick={() => onChange(m)}>
+                            {format(m)}
+                        </button>
+                    ))}
+                </div>
+            )}
+        </div>
+    );
+}

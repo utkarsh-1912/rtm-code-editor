@@ -25,7 +25,7 @@ function exec({ cmd, args }, { cwd, stdin, timeoutMs }) {
         const cap = (buf, add) => (buf.length > MAX_OUTPUT ? buf : (buf + add).slice(0, MAX_OUTPUT));
         child.stdout.on("data", (d) => { stdout = cap(stdout, d.toString()); });
         child.stderr.on("data", (d) => { stderr = cap(stderr, d.toString()); });
-        child.on("error", (err) => { clearTimeout(timer); resolve({ code: -1, stdout, stderr: err.code === "ENOENT" ? `${cmd} is not installed on the runner` : err.message, killed }); });
+        child.on("error", (err) => { clearTimeout(timer); resolve({ code: -1, stdout, stderr: err.code === "ENOENT" ? `${path.basename(cmd)} is not installed on the runner` : err.message, killed, missing: err.code === "ENOENT" }); });
         child.on("close", (code) => { clearTimeout(timer); resolve({ code, stdout, stderr, killed }); });
         if (stdin) child.stdin.write(stdin);
         child.stdin.end();
@@ -33,17 +33,20 @@ function exec({ cmd, args }, { cwd, stdin, timeoutMs }) {
 }
 
 async function run({ spec, source, stdin, timeoutMs }) {
+    if (!spec.run) throw new Error(`${spec.label} has no local toolchain; configure Judge0`);
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), "colabs-run-"));
     const started = Date.now();
     try {
         fs.writeFileSync(path.join(dir, spec.file), source);
         if (spec.compile) {
             const c = await exec(spec.compile(dir), { cwd: dir, stdin: "", timeoutMs: timeoutMs * 2 });
+            if (c.missing) throw new Error(c.stderr); // let the next engine try
             if (c.code !== 0) {
                 return { ok: false, stdout: "", stderr: "", compileOutput: c.stderr || c.stdout, status: c.killed ? "Compilation timed out" : "Compilation Error", exitCode: c.code, timeMs: Date.now() - started, engine: "local" };
             }
         }
         const r = await exec(spec.run(dir), { cwd: dir, stdin, timeoutMs });
+        if (r.missing) throw new Error(r.stderr);
         return {
             ok: r.code === 0 && !r.killed,
             stdout: r.stdout,

@@ -31,7 +31,9 @@ const io = new Server(server, {
 
 // Middleware
 app.use(cors());
-app.use(express.json());
+// Bulk file imports parse their own (larger) bodies; everything else gets 2 MB.
+const jsonBody = express.json({ limit: '2mb' });
+app.use((req, res, next) => (req.path.endsWith('/files/bulk') ? next() : jsonBody(req, res, next)));
 
 // Request Logging Middleware
 app.use((req, res, next) => {

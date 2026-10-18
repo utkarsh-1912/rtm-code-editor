@@ -30,6 +30,8 @@ import Loader from "../components/ux/Loader";
 import { getBackendUrl } from "../utils/api";
 import { useAuth } from "../context/AuthContext";
 import { runCode, formatRun } from "../utils/runner";
+import { languageForFile, LANGS } from "../utils/languages";
+import { CLIENT_ID } from "../utils/clientId";
 import { resolveTheme, setThemePref } from "../utils/theme";
 import "../styles/app.css";
 import ACTIONS from "../Action";
@@ -226,10 +228,10 @@ const ProjectPage = () => {
         setOutput("Running…");
 
         const language = activeFile.name.split('.').pop();
-        const runtime = { cpp: 'cpp', h: 'cpp', py: 'python', java: 'java', js: 'javascript' }[language];
+        const runtime = languageForFile(activeFile.name);
         if (!runtime) {
             setIsExecuting(false);
-            setOutput(`Can't run .${language} files. Open a .cpp, .py, .java or .js file.`);
+            setOutput(`Can't run .${language} files. Open a source file (${LANGS.map((l) => '.' + l.ext[0]).join(' ')}).`);
             return;
         }
 
@@ -503,10 +505,12 @@ const ProjectPage = () => {
             projectId,
             userName: name,
             photoURL: user?.photoURL || null,
+            uid: user?.uid || null,
+            clientId: CLIENT_ID,
         });
 
         hasJoinedRef.current = true;
-    }, [projectId, user?.photoURL]);
+    }, [projectId, user?.photoURL, user?.uid]);
 
     useEffect(() => {
         const handleResize = () => {
@@ -1091,7 +1095,7 @@ const ProjectPage = () => {
                 isOpen={showAICopilot}
                 onClose={() => setShowAICopilot(false)}
                 code={activeFile?.content || ""}
-                language={activeFile?.name?.endsWith('.py') ? 'python' : activeFile?.name?.endsWith('.cpp') ? 'cpp' : 'javascript'}
+                language={languageForFile(activeFile?.name) || 'javascript'}
                 projectId={projectId}
                 userId={user?.uid}
                 onApplyCode={(newCode) => {
