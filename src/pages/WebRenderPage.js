@@ -11,12 +11,13 @@ import {
     Sun, 
     Moon,
     Copy,
-    Check,
-    Globe
+    Check
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { getBackendUrl } from '../utils/api';
-import LogoLoader from '../components/LogoLoader';
+import Loader from '../components/ux/Loader';
+import { resolveTheme, setThemePref } from '../utils/theme';
+import '../styles/app.css';
 import ACTIONS from '../Action';
 import { initSocket } from '../socket';
 
@@ -38,7 +39,7 @@ export default function WebRenderPage() {
     const [consoleLogs, setConsoleLogs] = useState([]);
     
     // Theme state
-    const [bgTheme, setBgTheme] = useState('dark'); // 'dark' | 'light'
+    const [bgTheme, setBgTheme] = useState(resolveTheme); // 'dark' | 'light'
     const [copied, setCopied] = useState(false);
     
     const socketRef = useRef(null);
@@ -181,374 +182,100 @@ export default function WebRenderPage() {
 
     const getViewportStyles = () => {
         if (viewport === 'mobile') {
-            return {
-                width: isLandscape ? '812px' : '375px',
-                height: isLandscape ? '375px' : '812px',
-                borderRadius: '36px',
-                border: '12px solid #1e293b',
-                boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)'
-            };
+            return { width: isLandscape ? '812px' : '375px', height: isLandscape ? '375px' : '812px', borderRadius: '36px', border: '10px solid var(--u-solid)' };
         }
         if (viewport === 'tablet') {
-            return {
-                width: isLandscape ? '1024px' : '768px',
-                height: isLandscape ? '768px' : '1024px',
-                borderRadius: '24px',
-                border: '14px solid #1e293b',
-                boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)'
-            };
+            return { width: isLandscape ? '1024px' : '768px', height: isLandscape ? '768px' : '1024px', borderRadius: '26px', border: '12px solid var(--u-solid)' };
         }
-        return {
-            width: '100%',
-            height: '100%',
-            borderRadius: '0px',
-            border: 'none',
-            boxShadow: 'none'
-        };
+        return { width: '100%', height: '100%', borderRadius: 0, border: 'none' };
+    };
+
+    const toggleTheme = () => {
+        const next = bgTheme === 'dark' ? 'light' : 'dark';
+        setBgTheme(next);
+        setThemePref(next);
     };
 
     if (loading) {
         return (
-            <div style={{ height: "100vh", display: "flex", alignItems: "center", justifyContent: "center", backgroundColor: "#0f172a", color: "white" }}>
-                <LogoLoader message="Building Standalone Web Render Engine..." />
+            <div className="ws">
+                <Loader variant="fill" message="Building preview" detail="Bundling project files" />
             </div>
         );
     }
 
     return (
-        <div style={{
-            height: '100vh',
-            display: 'flex',
-            flexDirection: 'column',
-            backgroundColor: bgTheme === 'dark' ? '#0f172a' : '#f8fafc',
-            color: bgTheme === 'dark' ? '#f8fafc' : '#0f172a',
-            fontFamily: "'Inter', sans-serif",
-            overflow: 'hidden'
-        }}>
-            {/* Header Toolbar */}
-            <div style={{
-                height: '52px',
-                backgroundColor: bgTheme === 'dark' ? '#1e293b' : '#ffffff',
-                borderBottom: `1px solid ${bgTheme === 'dark' ? '#334155' : '#e2e8f0'}`,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                padding: '0 16px',
-                zIndex: 100,
-                boxShadow: '0 2px 4px rgba(0,0,0,0.05)'
-            }}>
-                {/* Left Controls */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                    <button
-                        onClick={() => navigate(`/project/${projectId}`)}
-                        style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '6px',
-                            backgroundColor: 'transparent',
-                            border: `1px solid ${bgTheme === 'dark' ? '#475569' : '#cbd5e1'}`,
-                            color: bgTheme === 'dark' ? '#f8fafc' : '#334155',
-                            padding: '6px 12px',
-                            borderRadius: '6px',
-                            fontSize: '12px',
-                            fontWeight: '600',
-                            cursor: 'pointer'
-                        }}
-                    >
-                        <ArrowLeft size={14} /> Back to Editor
+        <div className="ws">
+            <header className="wsh">
+                <div className="wsh-left">
+                    <button className="u-btn u-btn--sm u-btn--ghost" onClick={() => navigate(`/project/${projectId}`)}>
+                        <ArrowLeft size={14} /> Editor
                     </button>
-
-                    <div style={{ height: '18px', width: '1px', backgroundColor: bgTheme === 'dark' ? '#475569' : '#cbd5e1' }} />
-
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <Globe size={16} color="#3b82f6" />
-                        <span style={{ fontSize: '13px', fontWeight: '700', color: bgTheme === 'dark' ? '#ffffff' : '#0f172a' }}>
-                            {project?.name || 'Web App'}
-                        </span>
-                        <span style={{ fontSize: '10px', backgroundColor: 'rgba(59, 130, 246, 0.1)', color: '#3b82f6', padding: '2px 6px', borderRadius: '4px', fontWeight: '700' }}>
-                            LIVE WEB RENDER
-                        </span>
+                    <div className="wsh-crumb">
+                        <span>preview</span><i>/</i>
+                        <button disabled>{project?.name || 'Web app'}</button>
+                        <span className="u-chip u-chip--mono u-chip--accent"><span className="u-dot" /> live</span>
                     </div>
                 </div>
 
-                {/* Viewport Mode Switcher */}
-                <div style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    backgroundColor: bgTheme === 'dark' ? '#0f172a' : '#f1f5f9',
-                    padding: '3px',
-                    borderRadius: '8px',
-                    border: `1px solid ${bgTheme === 'dark' ? '#334155' : '#cbd5e1'}`
-                }}>
-                    <button
-                        onClick={() => setViewport('desktop')}
-                        title="Desktop Viewport (100%)"
-                        style={{
-                            padding: '5px 10px',
-                            borderRadius: '6px',
-                            border: 'none',
-                            backgroundColor: viewport === 'desktop' ? '#3b82f6' : 'transparent',
-                            color: viewport === 'desktop' ? '#ffffff' : bgTheme === 'dark' ? '#94a3b8' : '#64748b',
-                            cursor: 'pointer',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '4px',
-                            fontSize: '11px',
-                            fontWeight: '600'
-                        }}
-                    >
-                        <Monitor size={14} /> Desktop
-                    </button>
-                    <button
-                        onClick={() => setViewport('tablet')}
-                        title="Tablet Viewport (768px)"
-                        style={{
-                            padding: '5px 10px',
-                            borderRadius: '6px',
-                            border: 'none',
-                            backgroundColor: viewport === 'tablet' ? '#3b82f6' : 'transparent',
-                            color: viewport === 'tablet' ? '#ffffff' : bgTheme === 'dark' ? '#94a3b8' : '#64748b',
-                            cursor: 'pointer',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '4px',
-                            fontSize: '11px',
-                            fontWeight: '600'
-                        }}
-                    >
-                        <Tablet size={14} /> Tablet
-                    </button>
-                    <button
-                        onClick={() => setViewport('mobile')}
-                        title="Mobile Viewport (375px)"
-                        style={{
-                            padding: '5px 10px',
-                            borderRadius: '6px',
-                            border: 'none',
-                            backgroundColor: viewport === 'mobile' ? '#3b82f6' : 'transparent',
-                            color: viewport === 'mobile' ? '#ffffff' : bgTheme === 'dark' ? '#94a3b8' : '#64748b',
-                            cursor: 'pointer',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '4px',
-                            fontSize: '11px',
-                            fontWeight: '600'
-                        }}
-                    >
-                        <Smartphone size={14} /> Mobile
-                    </button>
-
+                <div className="u-seg" role="tablist" aria-label="Viewport">
+                    {[
+                        ['desktop', <Monitor size={13} />, 'Desktop'],
+                        ['tablet', <Tablet size={13} />, 'Tablet'],
+                        ['mobile', <Smartphone size={13} />, 'Mobile'],
+                    ].map(([id, icon, label]) => (
+                        <button key={id} className={viewport === id ? 'on' : ''} onClick={() => setViewport(id)} title={label}>{icon}<span className="wr-hide">{label}</span></button>
+                    ))}
                     {viewport !== 'desktop' && (
-                        <button
-                            onClick={() => setIsLandscape(!isLandscape)}
-                            title="Toggle Orientation"
-                            style={{
-                                padding: '5px 8px',
-                                marginLeft: '4px',
-                                borderRadius: '6px',
-                                border: 'none',
-                                backgroundColor: isLandscape ? '#10b981' : 'transparent',
-                                color: isLandscape ? '#ffffff' : bgTheme === 'dark' ? '#94a3b8' : '#64748b',
-                                cursor: 'pointer',
-                                fontSize: '10px',
-                                fontWeight: '700'
-                            }}
-                        >
+                        <button className={isLandscape ? 'on' : ''} onClick={() => setIsLandscape(!isLandscape)} title="Toggle orientation">
                             {isLandscape ? 'Landscape' : 'Portrait'}
                         </button>
                     )}
                 </div>
 
-                {/* Right Action Tools */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <button
-                        onClick={() => setIsConsoleOpen(!isConsoleOpen)}
-                        title="Toggle Console Output"
-                        style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '5px',
-                            padding: '6px 10px',
-                            borderRadius: '6px',
-                            border: `1px solid ${bgTheme === 'dark' ? '#475569' : '#cbd5e1'}`,
-                            backgroundColor: isConsoleOpen ? '#3b82f6' : 'transparent',
-                            color: isConsoleOpen ? '#ffffff' : bgTheme === 'dark' ? '#f8fafc' : '#334155',
-                            fontSize: '11px',
-                            fontWeight: '600',
-                            cursor: 'pointer'
-                        }}
-                    >
-                        <Terminal size={14} /> Console {consoleLogs.length > 0 && `(${consoleLogs.length})`}
-                    </button>
-
-                    <button
-                        onClick={() => bundleWebApp(files)}
-                        title="Reload Web App"
-                        style={{
-                            padding: '6px',
-                            borderRadius: '6px',
-                            border: `1px solid ${bgTheme === 'dark' ? '#475569' : '#cbd5e1'}`,
-                            backgroundColor: 'transparent',
-                            color: bgTheme === 'dark' ? '#f8fafc' : '#334155',
-                            cursor: 'pointer',
-                            display: 'flex'
-                        }}
-                    >
-                        <RotateCcw size={14} />
-                    </button>
-
-                    <button
-                        onClick={copyShareUrl}
-                        title="Copy Shareable Link"
-                        style={{
-                            padding: '6px',
-                            borderRadius: '6px',
-                            border: `1px solid ${bgTheme === 'dark' ? '#475569' : '#cbd5e1'}`,
-                            backgroundColor: 'transparent',
-                            color: bgTheme === 'dark' ? '#f8fafc' : '#334155',
-                            cursor: 'pointer',
-                            display: 'flex'
-                        }}
-                    >
-                        {copied ? <Check size={14} color="#10b981" /> : <Copy size={14} />}
-                    </button>
-
-                    <button
-                        onClick={() => setBgTheme(bgTheme === 'dark' ? 'light' : 'dark')}
-                        title="Toggle Background Theme"
-                        style={{
-                            padding: '6px',
-                            borderRadius: '6px',
-                            border: `1px solid ${bgTheme === 'dark' ? '#475569' : '#cbd5e1'}`,
-                            backgroundColor: 'transparent',
-                            color: bgTheme === 'dark' ? '#f8fafc' : '#334155',
-                            cursor: 'pointer',
-                            display: 'flex'
-                        }}
-                    >
-                        {bgTheme === 'dark' ? <Sun size={14} /> : <Moon size={14} />}
-                    </button>
+                <div className="wsh-right">
+                    <div className="wsh-group" style={{ borderLeft: 0 }}>
+                        <button className={`u-icon${isConsoleOpen ? ' on' : ''}`} onClick={() => setIsConsoleOpen(!isConsoleOpen)} title="Console" aria-label="Toggle console">
+                            <Terminal size={17} />
+                            {consoleLogs.length > 0 && <span className="u-badge" />}
+                        </button>
+                        <button className="u-icon" onClick={() => bundleWebApp(files)} title="Reload" aria-label="Reload preview"><RotateCcw size={17} /></button>
+                        <button className="u-icon" onClick={copyShareUrl} title="Copy link" aria-label="Copy shareable link">{copied ? <Check size={17} /> : <Copy size={17} />}</button>
+                        <button className="u-icon" onClick={toggleTheme} title="Toggle theme" aria-label="Toggle theme">{bgTheme === 'dark' ? <Sun size={17} /> : <Moon size={17} />}</button>
+                    </div>
                 </div>
-            </div>
+            </header>
 
-            {/* Main Render Area */}
-            <div style={{
-                flex: 1,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                position: 'relative',
-                overflow: 'hidden',
-                padding: viewport === 'desktop' ? '0' : '20px'
-            }}>
-                <div style={{
-                    ...getViewportStyles(),
-                    transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                    overflow: 'hidden',
-                    position: 'relative',
-                    backgroundColor: '#ffffff'
-                }}>
-                    {/* Simulated Browser URL bar for tablet/mobile frame */}
+            <div className="wr-stage" style={{ padding: viewport === 'desktop' ? 0 : 24 }}>
+                <div className="wr-device" style={getViewportStyles()}>
                     {viewport !== 'desktop' && (
-                        <div style={{
-                            height: '28px',
-                            backgroundColor: '#f1f5f9',
-                            borderBottom: '1px solid #cbd5e1',
-                            display: 'flex',
-                            alignItems: 'center',
-                            padding: '0 12px',
-                            gap: '8px'
-                        }}>
-                            <div style={{ display: 'flex', gap: '4px' }}>
-                                <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#ef4444' }} />
-                                <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#f59e0b' }} />
-                                <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#10b981' }} />
-                            </div>
-                            <div style={{
-                                flex: 1,
-                                backgroundColor: '#ffffff',
-                                height: '18px',
-                                borderRadius: '4px',
-                                border: '1px solid #cbd5e1',
-                                fontSize: '10px',
-                                color: '#64748b',
-                                display: 'flex',
-                                alignItems: 'center',
-                                padding: '0 8px',
-                                fontFamily: 'monospace'
-                            }}>
-                                http://localhost:3000/render/{projectId}
-                            </div>
-                        </div>
+                        <div className="ws-browser-bar"><i /><i /><i /><span>{window.location.host}/render/{projectId}</span></div>
                     )}
-
                     <iframe
                         key={webSrcDoc}
                         srcDoc={webSrcDoc}
                         title="Standalone Web App Preview"
-                        style={{
-                            width: '100%',
-                            height: viewport === 'desktop' ? '100%' : 'calc(100% - 28px)',
-                            border: 'none',
-                            backgroundColor: '#ffffff'
-                        }}
+                        style={{ width: '100%', height: viewport === 'desktop' ? '100%' : 'calc(100% - 30px)', border: 'none', background: '#fff', display: 'block' }}
                         sandbox="allow-scripts allow-modals allow-forms allow-same-origin"
                     />
                 </div>
             </div>
 
-            {/* Bottom Console Drawer */}
             {isConsoleOpen && (
-                <div style={{
-                    height: '200px',
-                    backgroundColor: '#090d16',
-                    borderTop: '1px solid #1e293b',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    zIndex: 90
-                }}>
-                    <div style={{
-                        padding: '6px 16px',
-                        backgroundColor: '#0f172a',
-                        borderBottom: '1px solid #1e293b',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between'
-                    }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <Terminal size={14} color="#3b82f6" />
-                            <span style={{ fontSize: '11px', fontWeight: '700', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                                Interactive Console Output
-                            </span>
-                        </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                            <button
-                                onClick={() => setConsoleLogs([])}
-                                title="Clear Console"
-                                style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', display: 'flex' }}
-                            >
-                                <Trash2 size={13} />
-                            </button>
-                        </div>
+                <div className="wr-console">
+                    <div className="ws-pane-head">
+                        <span><Terminal size={12} /> Console <b>{consoleLogs.length}</b></span>
+                        <button className="u-icon" style={{ width: 28, height: 28 }} onClick={() => setConsoleLogs([])} title="Clear console" aria-label="Clear console"><Trash2 size={13} /></button>
                     </div>
-
-                    <div style={{ flex: 1, padding: '12px 16px', overflowY: 'auto', fontFamily: 'monospace', fontSize: '12px', lineHeight: '1.6' }}>
+                    <div className="ws-console" style={{ padding: '10px 16px' }}>
                         {consoleLogs.length === 0 ? (
-                            <div style={{ color: '#475569', fontStyle: 'italic' }}>No console messages logged yet.</div>
-                        ) : (
-                            consoleLogs.map(log => (
-                                <div key={log.id} style={{
-                                    display: 'flex',
-                                    gap: '10px',
-                                    color: log.type === 'CONSOLE_ERROR' ? '#f87171' : log.type === 'CONSOLE_WARN' ? '#fbbf24' : '#4ade80',
-                                    borderBottom: '1px solid rgba(255,255,255,0.03)',
-                                    padding: '2px 0'
-                                }}>
-                                    <span style={{ color: '#64748b', fontSize: '10px', minWidth: '60px' }}>[{log.time}]</span>
-                                    <span style={{ flex: 1, whiteSpace: 'pre-wrap' }}>{log.message}</span>
-                                </div>
-                            ))
-                        )}
+                            <span className="u-faint">No console messages yet.</span>
+                        ) : consoleLogs.map((log) => (
+                            <div key={log.id} className={`wr-log ${log.type === 'CONSOLE_ERROR' ? 'err' : log.type === 'CONSOLE_WARN' ? 'warn' : ''}`}>
+                                <span>{log.time}</span>
+                                <span>{log.message}</span>
+                            </div>
+                        ))}
                     </div>
                 </div>
             )}

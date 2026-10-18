@@ -1,8 +1,9 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import {
     Video, VideoOff, Mic, MicOff, Maximize2, Minimize2,
-    ScreenShare, ScreenShareOff, LogOut
+    ScreenShare, ScreenShareOff, LogOut, Pencil, Expand, Shrink
 } from 'lucide-react';
+import CallAnnotations from './CallAnnotations';
 import toast from 'react-hot-toast';
 import ACTIONS from '../Action';
 
@@ -28,6 +29,8 @@ const VideoChat = ({
     const [isScreenSharing, setIsScreenSharing] = useState(false);
     const [inCall, setInCall] = useState(false);
     const [activeSpeaker, setActiveSpeaker] = useState(null);
+    const [isDrawing, setIsDrawing] = useState(false);
+    const [isLarge, setIsLarge] = useState(false);
 
     const [pipPosition, setPipPosition] = useState({ x: window.innerWidth - 240, y: window.innerHeight - 200 });
     const [isDragging, setIsDragging] = useState(false);
@@ -43,10 +46,10 @@ const VideoChat = ({
     const analysersRef = useRef({}); // { socketId: AnalyserNode }
     const pendingCandidatesRef = useRef({}); // Bug 2: ICE candidate queue per peer
 
-    const mediaStateRef = useRef({ isMuted, isVideoOff });
+    const mediaStateRef = useRef({ isMuted, isVideoOff, isScreenSharing });
     useEffect(() => {
-        mediaStateRef.current = { isMuted, isVideoOff };
-    }, [isMuted, isVideoOff]);
+        mediaStateRef.current = { isMuted, isVideoOff, isScreenSharing };
+    }, [isMuted, isVideoOff, isScreenSharing]);
 
     // --- Media Action Helper ---
     const broadcastMediaState = useCallback((state) => {
@@ -82,12 +85,14 @@ const VideoChat = ({
                 setLocalStream(displayStream);
             }
             setIsScreenSharing(false);
+            broadcastMediaState({ ...mediaStateRef.current, isScreenSharing: false });
         } catch (err) {
             console.error("Return to camera failed", err);
             toast.error("Could not restore camera");
             setIsScreenSharing(false);
+            broadcastMediaState({ ...mediaStateRef.current, isScreenSharing: false });
         }
-    }, [isVideoOff, localStream]);
+    }, [isVideoOff, localStream, broadcastMediaState]);
 
     const toggleScreenShare = useCallback(async () => {
         if (!isScreenSharing) {
@@ -110,6 +115,7 @@ const VideoChat = ({
                 if (currentAudio) displayStream.addTrack(currentAudio);
                 setLocalStream(displayStream);
                 setIsScreenSharing(true);
+                broadcastMediaState({ ...mediaStateRef.current, isScreenSharing: true });
 
             } catch (err) {
                 console.error("Screen share failed", err);
@@ -117,7 +123,7 @@ const VideoChat = ({
         } else {
             await stopScreenShare();
         }
-    }, [isScreenSharing, localStream, stopScreenShare]);
+    }, [isScreenSharing, localStream, stopScreenShare, broadcastMediaState]);
 
     // --- Core Media Logic (Defined first for hoisting) ---
     const setupAudioAnalysis = useCallback((stream, id) => {
@@ -634,11 +640,70 @@ const VideoChat = ({
 
     // --- UI Render Helpers ---
     const allParticipants = [
-        ...(!user?.isGuest ? [{ id: 'local', isLocal: true }] : []),
+        ...(!user?.isSpectator ? [{ id: 'local', isLocal: true }] : []),
         ...Object.entries(remoteUsers).map(([id, data]) => ({ id, ...data }))
     ];
 
     const paginatedParticipants = allParticipants.slice(page * pageSize, (page + 1) * pageSize);
+
+    // Pop-style stage: when someone shares their screen it takes the main area
+    const sharer = allParticipants.find((p) => (p.isLocal ? isScreenSharing : p.isScreenSharing));
+    const others = sharer ? allParticipants.filter((p) => p.id !== sharer.id) : [];
+
+    const renderTile = (p, { fit = 'cover', small = false, stage = false } = {}) => (
+        <div key={p.id} style={{ position: 'relative', borderRadius: '10px', overflow: 'hidden', backgroundColor: '#1f2937', outline: activeSpeaker === p.id ? '2px solid #22c55e' : 'none', minWidth: 0, minHeight: 0, flex: small ? '0 0 120px' : 1 }}>
+            {p.isLocal ? (
+                isVideoOff && !isScreenSharing ? (
+                    <div style={avatarCenterStyle}>
+                        <div style={avatarCircle(small ? 28 : 40)}>
+                            {(user?.name || socketRef.current?.userName || 'U')[0].toUpperCase()}
+                        </div>
+                    </div>
+                ) : (
+                    <video ref={(el) => { if (el && el.srcObject !== localStream) el.srcObject = localStream; }} autoPlay muted playsInline style={{ width: '100%', height: '100%', objectFit: fit, transform: isScreenSharing ? 'none' : 'scaleX(-1)' }} />
+                )
+            ) : (
+                <RemoteVideo user={p} isMini fit={fit} />
+            )}
+            <div style={{
+                position: 'absolute', bottom: '6px', left: '6px',
+                display: 'flex', alignItems: 'center', gap: '4px',
+                backgroundColor: 'rgba(0,0,0,0.65)', padding: '3px 8px',
+                borderRadius: '999px', fontSize: '10px', color: 'white',
+                border: '1px solid rgba(255,255,255,0.08)', zIndex: 10
+            }}>
+                {(p.isLocal ? isMuted : p.isMuted) ? <MicOff size={10} color="#ef4444" /> : <Mic size={10} color="#10b981" />}
+                <span style={{ fontWeight: '600' }}>{p.isLocal ? (stage ? 'Your screen' : 'You') : (stage ? `${p.name || 'Participant'}'s screen` : (p.name || 'Participant'))}</span>
+            </div>
+            {stage && <CallAnnotations socketRef={socketRef} projectId={projectId} drawing={isDrawing} userName={user?.name} />}
+        </div>
+    );
+
+    const renderExpanded = () => {
+        if (sharer) {
+            return (
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '6px', padding: '6px', backgroundColor: '#000', height: '100%', minHeight: 0 }}>
+                    {renderTile(sharer, { fit: 'contain', stage: true })}
+                    {others.length > 0 && (
+                        <div style={{ display: 'flex', gap: '6px', height: '84px', flex: '0 0 84px', overflowX: 'auto' }}>
+                            {others.map((p) => renderTile(p, { small: true }))}
+                        </div>
+                    )}
+                </div>
+            );
+        }
+        return (
+            <div style={{
+                flex: 1,
+                display: 'grid',
+                gridTemplateColumns: paginatedParticipants.length <= 1 ? '1fr' : paginatedParticipants.length <= 4 ? '1fr 1fr' : '1fr 1fr 1fr',
+                gridAutoRows: '1fr',
+                gap: '6px', padding: '6px', backgroundColor: '#000', overflow: 'hidden', height: '100%'
+            }}>
+                {paginatedParticipants.map((p) => renderTile(p))}
+            </div>
+        );
+    };
 
 
     if (!inCall) {
@@ -694,8 +759,12 @@ const VideoChat = ({
         );
     }
 
-    const width = isMinimized ? 240 : 480;
-    const height = isMinimized ? 160 : 320;
+    const maxW = window.innerWidth - 32;
+    const maxH = window.innerHeight - 96;
+    const width = Math.min(maxW, isMinimized ? 240 : isLarge ? 960 : sharer ? 720 : 480);
+    const height = Math.min(maxH, isMinimized ? 160 : isLarge ? 600 : sharer ? 460 : 320);
+    const posLeft = Math.max(8, Math.min(pipPosition.x, window.innerWidth - width - 8));
+    const posTop = Math.max(8, Math.min(pipPosition.y, window.innerHeight - height - 8));
 
     return (
         <div
@@ -716,8 +785,8 @@ const VideoChat = ({
                 ...minimizedOverlayStyle,
                 width: `${width}px`,
                 height: `${height}px`,
-                left: `${pipPosition.x}px`,
-                top: `${pipPosition.y}px`,
+                left: `${posLeft}px`,
+                top: `${posTop}px`,
                 bottom: 'auto',
                 right: 'auto',
                 border: isDragging ? '2px solid var(--primary)' : '1px solid rgba(255,255,255,0.1)',
@@ -746,50 +815,7 @@ const VideoChat = ({
                     )}
                 </div>
             ) : (
-                // Expanded Grid View: Show all participants in a neat layout
-                <div style={{
-                    flex: 1,
-                    display: 'grid',
-                    gridTemplateColumns: paginatedParticipants.length <= 1 ? '1fr' : '1fr 1fr',
-                    gridTemplateRows: paginatedParticipants.length <= 2 ? '1fr' : '1fr 1fr',
-                    gap: '6px',
-                    padding: '6px',
-                    backgroundColor: '#000',
-                    overflow: 'hidden',
-                    height: '100%'
-                }}>
-                    {paginatedParticipants.map((p) => (
-                        <div key={p.id} style={{ position: 'relative', borderRadius: '8px', overflow: 'hidden', backgroundColor: '#1f2937' }}>
-                            {p.isLocal ? (
-                                isVideoOff ? (
-                                    <div style={avatarCenterStyle}>
-                                        <div style={avatarCircle(32)}>
-                                            {(user?.name || socketRef.current?.userName || 'U')[0].toUpperCase()}
-                                        </div>
-                                    </div>
-                                ) : (
-                                    <video ref={(el) => { if (el) el.srcObject = localStream }} autoPlay muted playsInline style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                                )
-                            ) : (
-                                <RemoteVideo user={p} isMini />
-                            )}
-                            <div style={{
-                                position: 'absolute', bottom: '6px', left: '6px',
-                                display: 'flex', alignItems: 'center', gap: '4px',
-                                backgroundColor: 'rgba(0,0,0,0.65)', padding: '4px 8px',
-                                borderRadius: '6px', fontSize: '10px', color: 'white',
-                                border: '1px solid rgba(255,255,255,0.08)', zIndex: 10
-                            }}>
-                                {p.isLocal ? (
-                                    isMuted ? <MicOff size={10} color="#ef4444" /> : <Mic size={10} color="#10b981" />
-                                ) : (
-                                    p.isMuted ? <MicOff size={10} color="#ef4444" /> : <Mic size={10} color="#10b981" />
-                                )}
-                                <span style={{ fontWeight: '600' }}>{p.isLocal ? 'You' : p.name || 'Participant'}</span>
-                            </div>
-                        </div>
-                    ))}
-                </div>
+                renderExpanded()
             )}
 
             {/* Hover Controls Overlay */}
@@ -797,10 +823,10 @@ const VideoChat = ({
                 onMouseDown={(e) => e.stopPropagation()} // Prevent dragging when clicking controls!
                 style={{
                     ...miniControls,
-                    opacity: isHoveringMini || isDragging ? 1 : 0,
-                    transform: isHoveringMini || isDragging ? 'translate(-50%, 0) scale(1)' : 'translate(-50%, 12px) scale(0.92)',
+                    opacity: !isMinimized || isHoveringMini || isDragging ? 1 : 0,
+                    transform: !isMinimized || isHoveringMini || isDragging ? 'translate(-50%, 0) scale(1)' : 'translate(-50%, 12px) scale(0.92)',
                     transition: 'all 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
-                    pointerEvents: isHoveringMini ? 'auto' : 'none'
+                    pointerEvents: !isMinimized || isHoveringMini ? 'auto' : 'none'
                 }}
             >
                 <button
@@ -817,13 +843,27 @@ const VideoChat = ({
                 >
                     {isVideoOff ? <VideoOff size={13} /> : <Video size={13} />}
                 </button>
-                {!user?.isGuest && (
+                {!user?.isSpectator && (
                     <button
                         style={{ ...miniBtn, color: isScreenSharing ? '#10b981' : 'white' }}
                         onClick={toggleScreenShare}
                         title={isScreenSharing ? "Stop Sharing" : "Share Screen"}
                     >
                         {isScreenSharing ? <ScreenShareOff size={13} /> : <ScreenShare size={13} />}
+                    </button>
+                )}
+                {sharer && !isMinimized && (
+                    <button
+                        style={{ ...miniBtn, color: isDrawing ? '#3b82f6' : 'white', backgroundColor: isDrawing ? 'rgba(59,130,246,0.25)' : miniBtn.backgroundColor }}
+                        onClick={() => setIsDrawing(d => !d)}
+                        title={isDrawing ? "Stop drawing" : "Draw on shared screen"}
+                    >
+                        <Pencil size={13} />
+                    </button>
+                )}
+                {!isMinimized && !isMobile && (
+                    <button style={miniBtn} onClick={() => setIsLarge(l => !l)} title={isLarge ? "Smaller window" : "Larger window"}>
+                        {isLarge ? <Shrink size={13} /> : <Expand size={13} />}
                     </button>
                 )}
                 <button
@@ -844,7 +884,7 @@ const VideoChat = ({
         </div>);
 }
 
-const RemoteVideo = ({ user, isMini }) => {
+const RemoteVideo = ({ user, isMini, fit = 'cover' }) => {
     const videoRef = useRef();
     useEffect(() => {
         if (videoRef.current && user?.stream) {
@@ -856,14 +896,14 @@ const RemoteVideo = ({ user, isMini }) => {
 
     return (
         <>
-            {user.isVideoOff ? (
+            {user.isVideoOff && !user.isScreenSharing ? (
                 <div style={avatarCenterStyle}>
                     <div style={avatarCircle(isMini ? 32 : 64)}>
                         {(user.userName || user.name || 'U')[0].toUpperCase()}
                     </div>
                 </div>
             ) : (
-                <video ref={videoRef} autoPlay playsInline style={isMini ? miniVideoElement : videoElementStyle} />
+                <video ref={videoRef} autoPlay playsInline style={{ ...(isMini ? miniVideoElement : videoElementStyle), objectFit: fit }} />
             )}
             {!isMini ? (
                 <div style={tileOverlayStyle}>

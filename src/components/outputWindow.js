@@ -12,9 +12,7 @@ export default function OutputWindow({ output, isError, time, isMobile, stdin, s
             minHeight: "150px", // Ensure it has a minimum presence
             borderBottom: isMobile ? "2px solid var(--bg-dark)" : "none",
         }}>
-            <div style={{ padding: "6px 16px", backgroundColor: "var(--bg-card)", borderBottom: "1px solid var(--border-color)", color: "var(--text-muted)", fontWeight: "600", fontSize: "13px" }}>
-                Standard Input (stdin)
-            </div>
+            <div className="pane-head">Standard input</div>
             <textarea
                 value={stdin || ""}
                 onChange={(e) => setStdin && setStdin(e.target.value)}
@@ -38,13 +36,13 @@ export default function OutputWindow({ output, isError, time, isMobile, stdin, s
 
     const renderOutput = () => (
         <div style={{ flex: 1, display: "flex", flexDirection: "column", height: "100%" }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "6px 16px", backgroundColor: "var(--bg-card)", borderBottom: "1px solid var(--border-color)" }}>
+            <div className="pane-head">
                 <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                    <Terminal size={14} color="var(--text-muted)" />
-                    <span style={{ fontWeight: "600", color: "var(--text-muted)", fontSize: "13px" }}>Execution Output</span>
+                    <Terminal size={14} />
+                    <span>Output</span>
                 </div>
                 {(time !== null && time !== undefined) && (
-                    <span style={{ fontSize: "11px", color: "var(--text-muted)", backgroundColor: "var(--secondary)", padding: "2px 6px", borderRadius: "4px" }}>
+                    <span style={{ fontSize: "11px", color: "var(--text-muted)", backgroundColor: "var(--bg-dark)", border: "1px solid var(--border-color)", padding: "2px 8px", borderRadius: "999px", letterSpacing: 0, textTransform: "none", fontWeight: 600 }}>
                         Time: {time}s
                     </span>
                 )}

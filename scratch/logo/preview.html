@@ -1,0 +1,19 @@
+<!doctype html><meta charset=utf-8><title>logo</title>
+<style>body{margin:0;font-family:Inter,system-ui;display:grid;grid-template-columns:1fr 1fr;}
+.p{padding:40px;display:flex;flex-direction:column;gap:28px;align-items:flex-start}
+.d{background:#0B0B0A}.l{background:#F4F3EE}
+.row{display:flex;gap:24px;align-items:center}
+.name{display:inline-flex;gap:.28em;letter-spacing:-.035em;font-size:34px}
+.d .a{stroke:#E8E6DF}.d .b{stroke:#5B8DEF}.d .pre{font-weight:800;color:#E8E6DF}.d .co{font-weight:500;color:#9CC3FF}
+.l .a{stroke:#14246b}.l .b{stroke:#3a5bcf}.l .pre{font-weight:800;color:#14246b}.l .co{font-weight:500;color:#3358d4}
+svg *{fill:none;stroke-width:3.6;stroke-linecap:round;stroke-linejoin:round}
+.tile{border-radius:22%;display:grid;place-items:center}
+</style>
+<template id=m><svg viewBox="0 0 32 32"><path class=a d="M9 6.5V17a7 7 0 0 0 7 7"/><path class=a d="M6 6.5h6" style="stroke-width:2.4"/><path class=b d="M16 24a7 7 0 0 0 7-7V8"/><path class=b d="M18.2 12 23 7.2 27.8 12"/></svg></template>
+<script>
+for(const t of ['d','l']){document.body.insertAdjacentHTML('beforeend',`<div class="p ${t}">
+<div class=row>${[96,48,24,16].map(s=>`<span style="width:${s}px;height:${s}px;display:block" data-m></span>`).join('')}</div>
+<div class=row><span style="width:44px;height:44px;display:block" data-m></span><span class=name><span class=pre>Utkristi</span><span class=co>CoLabs</span></span></div>
+<div class="tile" style="width:96px;height:96px;background:${t=='d'?'#131311':'#fff'};border:1px solid #8884"><span style="width:60px;height:60px;display:block" data-m></span></div></div>`)}
+document.querySelectorAll('[data-m]').forEach(e=>e.innerHTML=document.getElementById('m').innerHTML)
+</script>

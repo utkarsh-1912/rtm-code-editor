@@ -6,15 +6,11 @@ import {
 } from "react-router-dom";
 import toast from "react-hot-toast";
 import {
-  Sun,
-  Moon,
   Download,
   Copy,
   LogOut,
   ChevronLeft,
   ChevronRight,
-  Play,
-  Pause,
   MessageSquare,
   Terminal,
   Code,
@@ -29,7 +25,7 @@ import "react-reflex/styles.css";
 
 import ACTIONS from "../Action";
 import { initSocket } from "../socket";
-import EditorComp from "../components/editorComp";
+import EditorComp, { roomFileName } from "../components/editorComp";
 import ChatWindow from "../components/chatWindow";
 import OutputWindow from "../components/outputWindow";
 import SettingsModal from "../components/SettingsModal";
@@ -38,16 +34,19 @@ import { Github } from "lucide-react";
 import Client from "../components/clients";
 import { LANGUAGES, THEMES } from "../config";
 import { useAuth } from "../context/AuthContext";
+import { resolveTheme, setThemePref } from "../utils/theme";
+import "../styles/app.css";
 import LoadingScreen from "../components/LoadingScreen";
 import SnippetModal from "../components/SnippetModal";
 import { ImportIcon, PencilLine } from "lucide-react";
 import WhiteboardModal from "../components/WhiteboardModal";
-import TabBar from "../components/TabBar";
 import AICopilotModal from "../components/AICopilotModal";
 import DiffViewerModal from "../components/DiffViewerModal";
 import AnalyticsDashboardModal from "../components/AnalyticsDashboardModal";
 import FocusModeModal from "../components/FocusModeModal";
-import { Bot, History, Activity } from "lucide-react";
+import { Bot, History, Activity, Video as VideoIcon } from "lucide-react";
+import VideoChat from "../components/VideoChat";
+import WorkspaceHeader from "../components/WorkspaceHeader";
 
 function Editor() {
   const socketRef = useRef(null);
@@ -79,17 +78,7 @@ function Editor() {
   const [socketConnected, setSocketConnected] = useState(false);
   const [showLoading, setShowLoading] = useState(false);
   const [isChatCollapsed, setIsChatCollapsed] = useState(false);
-  const [isLightMode, setIsLightMode] = useState(() => {
-    return localStorage.getItem("app-theme") === "light";
-  });
-
-  useEffect(() => {
-    if (isLightMode) {
-      document.documentElement.classList.add("light-theme");
-    } else {
-      document.documentElement.classList.remove("light-theme");
-    }
-  }, [isLightMode]);
+  const [isLightMode, setIsLightMode] = useState(() => resolveTheme() === "light");
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const [activeTab, setActiveTab] = useState("code"); // "code" | "output" | "chat"
 
@@ -122,7 +111,10 @@ function Editor() {
   const [showDiffViewer, setShowDiffViewer] = useState(false);
   const [showAnalytics, setShowAnalytics] = useState(false);
   const [showFocusModal, setShowFocusModal] = useState(false);
-  const [openFiles] = useState([{ name: `main.${language === 'python' ? 'py' : language === 'cpp' ? 'cpp' : 'js'}`, path: 'main', content: currentCode }]);
+  const [isMeetingActive, setIsMeetingActive] = useState(false);
+  const [isMeetingMinimized, setIsMeetingMinimized] = useState(false);
+  const [isMeetingStarting, setIsMeetingStarting] = useState(false);
+  const [mediaStates, setMediaStates] = useState({});
 
   useEffect(() => {
     localStorage.setItem("app-editor-settings", JSON.stringify(settings));
@@ -166,15 +158,7 @@ function Editor() {
   }, []);
 
   const toggleTheme = () => {
-    const newMode = !isLightMode;
-    setIsLightMode(newMode);
-    if (newMode) {
-      document.documentElement.classList.add("light-theme");
-      localStorage.setItem("app-theme", "light");
-    } else {
-      document.documentElement.classList.remove("light-theme");
-      localStorage.setItem("app-theme", "dark");
-    }
+    setIsLightMode(setThemePref(isLightMode ? "dark" : "light"));
   };
 
   const downloadCode = () => {
@@ -188,13 +172,7 @@ function Editor() {
     const a = document.createElement("a");
     a.href = url;
 
-    let ext = "txt";
-    if (language === "javascript") ext = "js";
-    else if (language === "python") ext = "py";
-    else if (language === "cpp") ext = "cpp";
-    else if (language === "java") ext = "java";
-
-    a.download = `script.${ext}`;
+    a.download = roomFileName(language);
     a.click();
     URL.revokeObjectURL(url);
     toast.success("Code downloaded successfully!");
@@ -334,6 +312,10 @@ function Editor() {
         }
       );
 
+      socketRef.current.on("media-state-update", ({ userId, state }) => {
+        setMediaStates((prev) => ({ ...prev, [userId]: { ...prev[userId], ...state } }));
+      });
+
       socketRef.current.on(ACTIONS.DISCONNECTED, ({ socketId, userName }) => {
         toast.error(`${userName} left the room !`);
         setClients((prev) => prev.filter((client) => client.socketId !== socketId));
@@ -407,8 +389,8 @@ function Editor() {
 
   if (authLoading) {
     return (
-      <div style={{ height: "100vh", display: "flex", alignItems: "center", justifyContent: "center", backgroundColor: "var(--bg-dark)", color: "white" }}>
-        <LoadingScreen isLightMode={isLightMode} />
+      <div className="ws">
+        <LoadingScreen message="Checking your session" />
       </div>
     );
   }
@@ -555,255 +537,42 @@ function Editor() {
   };
 
   return (
-    <div style={{ height: "100vh", width: "100vw", backgroundColor: "var(--bg-dark)", color: "var(--text-main)", overflow: "hidden", display: "flex", flexDirection: "column" }}>
+    <div className="ws">
 
-      {/* GLOBAL NAVBAR */}
-      <div style={{
-        height: isMobile ? "50px" : "56px",
-        backgroundColor: "var(--bg-card)",
-        borderBottom: "1px solid var(--border-color)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "space-between",
-        padding: isMobile ? "0 12px" : "0 20px",
-        flexShrink: 0,
-        zIndex: 100
-      }}>
-        <div style={{ display: "flex", alignItems: "center", gap: isMobile ? "8px" : "14px" }}>
-          <img
-            src={isMobile
-              ? (isLightMode ? "/utkristi-labs.png" : "/utkristi-labs-dark.png")
-              : (isLightMode ? "/utkristi-colabs.png" : "/utkristi-colabs-dark.png")
-            }
-            alt="Utkristi Colabs"
-            onClick={() => reactNavigator("/")}
-            style={{ height: isMobile ? "24px" : "32px", cursor: "pointer", objectFit: "contain" }}
-          />
+      <WorkspaceHeader
+        isMobile={isMobile}
+        isLightMode={isLightMode}
+        onLogo={() => reactNavigator("/")}
+        mode="Room"
+        title={roomId.substring(0, 8)}
+        onTitleClick={copyRoomId}
+        clients={clients}
+        currentUserName={userName}
+        onRun={handleCompile}
+        isExecuting={isExecuting}
+        onToggleTheme={toggleTheme}
+        actions={[
+          { id: "call", label: isMeetingActive ? "Leave call" : "Start voice & video call", icon: <VideoIcon size={18} />, onClick: () => setIsMeetingActive((v) => !v), active: isMeetingActive, tone: "green" },
+          { id: "board", label: "Whiteboard", icon: <PencilLine size={18} />, onClick: () => setShowWhiteboard(true) },
+          { id: "ai", label: "AI Copilot", icon: <Bot size={18} />, onClick: () => setShowAICopilot(true) },
+          { id: "share", label: "Copy editor link", icon: <Share2 size={18} />, onClick: () => handleShare("editor") },
+          { id: "viewer", label: "Copy spectator link", icon: <Users size={18} />, onClick: () => handleShare("viewer"), section: "more" },
+          { id: "history", label: "Version history", icon: <History size={18} />, onClick: () => setShowDiffViewer(true), section: "more" },
+          { id: "analytics", label: "Analytics", icon: <Activity size={18} />, onClick: () => setShowAnalytics(true), section: "more" },
+          ...(user ? [
+            { id: "focus", label: "Focus mode (Alt+F)", icon: <Zap size={18} />, onClick: () => setShowFocusModal(true), section: "more" },
+            { id: "snippet", label: "Import snippet", icon: <ImportIcon size={18} />, onClick: () => setShowSnippetModal(true), section: "more" },
+          ] : []),
+          { id: "gist", label: "Export to GitHub Gist", icon: <Github size={18} />, onClick: () => setShowGistModal(true), section: "more" },
+          { id: "download", label: "Download code", icon: <Download size={18} />, onClick: downloadCode, section: "more" },
+          { id: "copy", label: "Copy room ID", icon: <Copy size={18} />, onClick: copyRoomId, section: "more" },
+          { id: "settings", label: "Editor settings", icon: <Settings size={18} />, onClick: () => setShowSettings(true), section: "more" },
+          ...(user ? [{ id: "dash", label: "Back to dashboard", icon: <LayoutDashboard size={18} />, onClick: () => reactNavigator("/dashboard"), section: "more" }] : []),
+          { id: "leave", label: "Leave room", icon: <LogOut size={18} />, onClick: leaveRoom, section: "more", tone: "red" },
+        ]}
+      />
 
-          {user && !isMobile && (
-            <button
-              onClick={() => reactNavigator("/dashboard")}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "6px",
-                padding: "6px",
-                backgroundColor: "transparent",
-                border: "1px solid var(--border-color)",
-                borderRadius: "8px",
-                color: "var(--text-muted)",
-                fontSize: "12px",
-                fontWeight: "600",
-                cursor: "pointer",
-                transition: "all 0.2s"
-              }}
-              onMouseOver={(e) => { e.currentTarget.style.borderColor = "var(--primary)"; e.currentTarget.style.color = "var(--primary)"; }}
-              onMouseOut={(e) => { e.currentTarget.style.borderColor = "var(--border-color)"; e.currentTarget.style.color = "var(--text-muted)"; }}
-            >
-              <LayoutDashboard size={14} />
-              Dashboard
-            </button>
-          )}
-
-          {!isMobile && <div style={{ height: "20px", width: "1px", backgroundColor: "var(--border-color)" }} />}
-          {!isMobile && (
-            <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-              <span style={{ fontSize: "12px", fontWeight: "500", color: "var(--text-muted)" }}>Room</span>
-              <span style={{ fontSize: "12px", fontFamily: "monospace", color: "var(--text-main)", backgroundColor: "var(--secondary)", padding: "2px 8px", borderRadius: "4px", border: "1px solid var(--border-color)" }}>
-                {roomId.substring(0, 8)}
-              </span>
-            </div>
-          )}
-        </div>
-
-        <div style={{ display: "flex", alignItems: "center", gap: isMobile ? "8px" : "12px" }}>
-          {!isMobile && (
-            <div style={{ display: "flex", alignItems: "center" }}>
-              {clients.slice(0, 5).map((client, idx) => (
-                <div key={client.socketId} style={{ marginLeft: idx === 0 ? 0 : "-8px", zIndex: 5 - idx }}>
-                  <Client userName={client.userName} isCompact={true} isCurrentUser={client.userName === userName} />
-                </div>
-              ))}
-              {clients.length > 5 && (
-                <div style={{ marginLeft: "-8px", width: "32px", height: "32px", borderRadius: "50%", backgroundColor: "var(--secondary)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "11px", fontWeight: "700", color: "var(--text-muted)", border: "2px solid var(--bg-card)" }}>
-                  +{clients.length - 5}
-                </div>
-              )}
-            </div>
-          )}
-
-          <div style={{
-            display: "flex",
-            alignItems: "center",
-            gap: "4px",
-            backgroundColor: "var(--secondary)",
-            padding: "4px",
-            borderRadius: "10px",
-            border: "1px solid var(--border-color)"
-          }}>
-            <button
-              onClick={handleCompile}
-              disabled={isExecuting}
-              style={{ display: "flex", alignItems: "center", justifyContent: "center", width: "32px", height: "32px", color: isExecuting ? "#4ade80" : "#22c55e", backgroundColor: "transparent", borderRadius: "6px", border: "none", cursor: isExecuting ? "default" : "pointer", transition: "all 0.2s" }}
-              onMouseOver={(e) => !isExecuting && (e.currentTarget.style.backgroundColor = "rgba(34, 197, 94, 0.1)")}
-              onMouseOut={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
-              title="Run Code"
-            >
-              {isExecuting ? <Pause size={18} fill="#4ade80" /> : <Play size={18} fill="#22c55e" />}
-            </button>
-            <button
-              onClick={() => setShowAICopilot(true)}
-              style={{ display: "flex", alignItems: "center", justifyContent: "center", width: "32px", height: "32px", color: "var(--primary)", backgroundColor: "rgba(59, 130, 246, 0.1)", borderRadius: "6px", border: "1px solid rgba(59, 130, 246, 0.2)", cursor: "pointer", transition: "all 0.2s" }}
-              title="AI Copilot Studio"
-            >
-              <Bot size={18} />
-            </button>
-
-            <button
-              onClick={() => setShowDiffViewer(true)}
-              style={{ display: isMobile ? "none" : "flex", alignItems: "center", justifyContent: "center", width: "32px", height: "32px", color: "var(--text-muted)", backgroundColor: "transparent", borderRadius: "6px", border: "none", cursor: "pointer", transition: "all 0.2s" }}
-              onMouseOver={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-card)")}
-              onMouseOut={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
-              title="Version History & Diff Viewer"
-            >
-              <History size={18} />
-            </button>
-
-            <button
-              onClick={() => setShowAnalytics(true)}
-              style={{ display: isMobile ? "none" : "flex", alignItems: "center", justifyContent: "center", width: "32px", height: "32px", color: "var(--text-muted)", backgroundColor: "transparent", borderRadius: "6px", border: "none", cursor: "pointer", transition: "all 0.2s" }}
-              onMouseOver={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-card)")}
-              onMouseOut={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
-              title="Workspace Telemetry Analytics"
-            >
-              <Activity size={18} />
-            </button>
-
-            <button
-              onClick={() => setShowSettings(true)}
-              style={{ display: isMobile ? "none" : "flex", alignItems: "center", justifyContent: "center", width: "32px", height: "32px", color: "var(--text-muted)", backgroundColor: "transparent", borderRadius: "6px", border: "none", cursor: "pointer", transition: "all 0.2s" }}
-              onMouseOver={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-card)")}
-              onMouseOut={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
-              title="Settings"
-            >
-              <Settings size={18} />
-            </button>
-            <button
-              onClick={toggleTheme}
-              style={{ display: "flex", alignItems: "center", justifyContent: "center", width: "32px", height: "32px", color: isLightMode ? "#fbbf24" : "var(--text-muted)", backgroundColor: "transparent", borderRadius: "6px", border: "none", cursor: "pointer", transition: "all 0.2s" }}
-              onMouseOver={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-card)")}
-              onMouseOut={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
-              title="Toggle Theme"
-            >
-              {isLightMode ? <Sun size={18} /> : <Moon size={18} />}
-            </button>
-            {!isMobile && <div style={{ width: "1px", height: "18px", backgroundColor: "var(--border-color)", margin: "0 2px" }} />}
-            <button
-              onClick={() => handleShare("editor")}
-              style={{ width: "32px", height: "32px", color: "var(--primary)", background: "transparent", border: "none", borderRadius: "6px", cursor: "pointer", transition: "all 0.2s" }}
-              onMouseOver={(e) => (e.currentTarget.style.backgroundColor = "rgba(59, 130, 246, 0.1)")}
-              onMouseOut={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
-              title="Share Editor Link"
-            >
-              <Share2 size={18} />
-            </button>
-            <button
-              onClick={() => handleShare("viewer")}
-              style={{ width: "32px", height: "32px", color: "#a855f7", background: "transparent", border: "none", borderRadius: "6px", cursor: "pointer", transition: "all 0.2s" }}
-              onMouseOver={(e) => (e.currentTarget.style.backgroundColor = "rgba(168, 85, 247, 0.1)")}
-              onMouseOut={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
-              title="Share Spectator Link"
-            >
-              <Users size={18} />
-            </button>
-            {!isMobile && (
-              <>
-                <button
-                  onClick={() => setShowGistModal(true)}
-                  style={{ width: "32px", height: "32px", color: "var(--text-main)", background: "transparent", border: "none", borderRadius: "6px", cursor: "pointer", transition: "all 0.2s" }}
-                  onMouseOver={(e) => (e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.05)")}
-                  onMouseOut={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
-                  title="Export to GitHub Gist"
-                >
-                  <Github size={18} />
-                </button>
-                <div style={{ width: "1px", height: "18px", backgroundColor: "var(--border-color)", margin: "0 2px" }} />
-                <button
-                  onClick={downloadCode}
-                  style={{ width: "32px", height: "32px", color: "var(--text-muted)", background: "transparent", border: "none", borderRadius: "6px", cursor: "pointer", transition: "all 0.2s" }}
-                  onMouseOver={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-card)")}
-                  onMouseOut={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
-                  title="Download"
-                >
-                  <Download size={18} />
-                </button>
-                {user && (
-                  <>
-                    <button
-                      onClick={() => setShowSnippetModal(true)}
-                      style={{ width: "32px", height: "32px", color: "var(--text-muted)", background: "transparent", border: "none", borderRadius: "6px", cursor: "pointer", transition: "all 0.2s" }}
-                      onMouseOver={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-card)")}
-                      onMouseOut={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
-                      title="Import Snippet"
-                    >
-                      <ImportIcon size={18} />
-                    </button>
-                    <button
-                      onClick={() => setShowWhiteboard(true)}
-                      style={{ width: "32px", height: "32px", color: "var(--text-muted)", background: "transparent", border: "none", borderRadius: "6px", cursor: "pointer", transition: "all 0.2s" }}
-                      onMouseOver={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-card)")}
-                      onMouseOut={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
-                      title="Collaborative Whiteboard"
-                    >
-                      <PencilLine size={18} />
-                    </button>
-                    <button
-                      onClick={() => setShowFocusModal(true)}
-                      style={{ width: "32px", height: "32px", color: "var(--text-muted)", background: "transparent", border: "none", borderRadius: "6px", cursor: "pointer", transition: "all 0.2s" }}
-                      onMouseOver={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-card)")}
-                      onMouseOut={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
-                      title="Focus Mode (Alt+F)"
-                    >
-                      <Zap size={18} />
-                    </button>
-                  </>
-                )}
-                <button
-                  onClick={copyRoomId}
-                  style={{ width: "32px", height: "32px", color: "var(--text-muted)", background: "transparent", border: "none", borderRadius: "6px", cursor: "pointer", transition: "all 0.2s" }}
-                  onMouseOver={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-card)")}
-                  onMouseOut={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
-                  title="Copy ID"
-                >
-                  <Copy size={18} />
-                </button>
-                <button
-                  onClick={leaveRoom}
-                  style={{ width: "32px", height: "32px", color: "#f87171", background: "transparent", border: "none", borderRadius: "6px", cursor: "pointer", transition: "all 0.2s" }}
-                  onMouseOver={(e) => (e.currentTarget.style.backgroundColor = "rgba(248, 113, 113, 0.1)")}
-                  onMouseOut={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
-                  title="Leave"
-                >
-                  <LogOut size={18} />
-                </button>
-              </>
-            )}
-            {isMobile && (
-              <button
-                onClick={leaveRoom}
-                style={{ width: "32px", height: "32px", color: "#f87171", background: "transparent", border: "none", borderRadius: "6px", cursor: "pointer", transition: "all 0.2s" }}
-                onMouseOver={(e) => (e.currentTarget.style.backgroundColor = "rgba(248, 113, 113, 0.1)")}
-                onMouseOut={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
-                title="Leave"
-              >
-                <LogOut size={18} />
-              </button>
-            )}
-          </div>
-        </div>
-      </div>
-
-      <div style={{ flex: 1, overflow: "hidden", position: "relative" }}>
+      <div className="ws-body" style={{ flexDirection: "column" }}>
         {socketConnected ? (
           <>
             {isMobile ? (
@@ -849,24 +618,14 @@ function Editor() {
                     />
                   )}
                   {activeTab === "people" && (
-                    <div style={{ height: "100%", width: "100%", backgroundColor: "var(--bg-dark)", padding: "20px", display: "flex", flexDirection: "column", gap: "10px", overflowY: "auto" }}>
-                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "10px" }}>
-                        <h3 style={{ margin: 0, fontSize: "16px", fontWeight: "700", color: "var(--text-main)" }}>Collaborators</h3>
-                        <span style={{ fontSize: "12px", color: "var(--text-muted)", backgroundColor: "rgba(59, 130, 246, 0.1)", padding: "2px 8px", borderRadius: "100px" }}>{clients.length} online</span>
-                      </div>
-                      <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
+                    <div style={{ height: "100%", overflowY: "auto" }}>
+                      <div className="ws-pane-head"><span>People</span><b>{clients.length} online</b></div>
+                      <div className="ws-people">
                         {clients.map((client) => (
-                          <div key={client.socketId} style={{
-                            backgroundColor: "var(--bg-card)",
-                            borderRadius: "12px",
-                            border: "1px solid var(--border-color)",
-                            transition: "all 0.2s"
-                          }}>
-                            <Client
-                              userName={client.userName}
-                              isCompact={false}
-                              isCurrentUser={client.userName === userName}
-                            />
+                          <div key={client.socketId} className="ws-person">
+                            <Client userName={client.userName} isCompact isCurrentUser={client.userName === userName} />
+                            <b>{client.userName}</b>
+                            {client.userName === userName && <em>you</em>}
                           </div>
                         ))}
                       </div>
@@ -875,147 +634,58 @@ function Editor() {
                 </div>
 
                 {/* MOBILE BOTTOM NAV */}
-                <div style={{
-                  height: "60px",
-                  backgroundColor: "var(--bg-card)",
-                  borderTop: "1px solid var(--border-color)",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-around",
-                  paddingBottom: "env(safe-area-inset-bottom)"
-                }}>
+                <nav className="ws-tabbar" aria-label="Room">
                   {[
-                    { id: "code", icon: <Code size={20} />, label: "Code" },
-                    { id: "output", icon: <Terminal size={20} />, label: "I/O" },
-                    { id: "chat", icon: <MessageSquare size={20} />, label: "Chat" },
-                    { id: "people", icon: <Users size={20} />, label: "People" }
+                    { id: "code", icon: <Code size={19} />, label: "Code" },
+                    { id: "output", icon: <Terminal size={19} />, label: "I/O" },
+                    { id: "chat", icon: <MessageSquare size={19} />, label: "Chat" },
+                    { id: "people", icon: <Users size={19} />, label: "People" }
                   ].map((tab) => (
-                    <button
-                      key={tab.id}
-                      onClick={() => setActiveTab(tab.id)}
-                      style={{
-                        display: "flex",
-                        flexDirection: "column",
-                        alignItems: "center",
-                        gap: "4px",
-                        background: "transparent",
-                        border: "none",
-                        color: activeTab === tab.id ? "var(--primary)" : "var(--text-muted)",
-                        cursor: "pointer",
-                        transition: "all 0.2s"
-                      }}
-                    >
-                      <div style={{ position: "relative" }}>
-                        {tab.icon}
-                        {tab.id === "chat" && unreadChatCount > 0 && (
-                          <span style={{
-                            position: "absolute",
-                            top: "-6px",
-                            right: "-8px",
-                            backgroundColor: "#f87171",
-                            color: "white",
-                            fontSize: "10px",
-                            padding: "1px 5px",
-                            borderRadius: "100px",
-                            border: "2px solid var(--bg-card)",
-                            fontWeight: "bold"
-                          }}>
-                            {unreadChatCount}
-                          </span>
-                        )}
-                      </div>
-                      <span style={{ fontSize: "10px", fontWeight: "600" }}>{tab.label}</span>
+                    <button key={tab.id} className={activeTab === tab.id ? "on" : ""} onClick={() => setActiveTab(tab.id)}>
+                      {tab.icon}<span>{tab.label}</span>
+                      {tab.id === "chat" && unreadChatCount > 0 && <span className="u-count">{unreadChatCount}</span>}
                     </button>
                   ))}
-                  <button
-                    onClick={() => setShowSettings(true)}
-                    style={{
-                      display: "flex",
-                      flexDirection: "column",
-                      alignItems: "center",
-                      gap: "4px",
-                      background: "transparent",
-                      border: "none",
-                      color: "var(--text-muted)",
-                      cursor: "pointer",
-                      transition: "all 0.2s"
-                    }}
-                  >
-                    <Settings size={20} />
-                    <span style={{ fontSize: "10px", fontWeight: "600" }}>Settings</span>
+                  <button onClick={() => setShowSettings(true)}>
+                    <Settings size={19} /><span>Settings</span>
                   </button>
-                </div>
+                </nav>
               </div>
             ) : (
               <div style={{ height: "100%", width: "100%", position: "relative" }}>
                 {/* Toggle Notch for Chat Pane */}
-                <button
-                  onClick={() => setIsChatCollapsed(!isChatCollapsed)}
-                  style={{
-                    position: "absolute",
-                    left: 0,
-                    top: "50%",
-                    transform: "translateY(-50%)",
-                    zIndex: 100,
-                    backgroundColor: "var(--bg-card)",
-                    border: "1px solid var(--border-color)",
-                    borderLeft: "none",
-                    padding: "16px 4px",
-                    borderTopRightRadius: "8px",
-                    borderBottomRightRadius: "8px",
-                    cursor: "pointer",
-                    color: "var(--text-main)",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    boxShadow: "2px 0 8px rgba(0,0,0,0.3)",
-                  }}
-                >
-                  {isChatCollapsed ? <ChevronLeft size={14} /> : <ChevronRight size={14} />}
-                  {isChatCollapsed && unreadChatCount > 0 && (
-                    <span style={{
-                      position: "absolute",
-                      top: "-8px",
-                      left: "-8px",
-                      backgroundColor: "#f87171",
-                      color: "white",
-                      fontSize: "10px",
-                      padding: "2px 6px",
-                      borderRadius: "100px",
-                      border: "2px solid var(--bg-dark)",
-                      fontWeight: "bold",
-                      boxShadow: "0 2px 4px rgba(0,0,0,0.2)"
-                    }}>
-                      {unreadChatCount}
-                    </span>
-                  )}
+                <button className="ws-notch" onClick={() => setIsChatCollapsed(!isChatCollapsed)} aria-label={isChatCollapsed ? "Show chat" : "Hide chat"} title={isChatCollapsed ? "Show chat" : "Hide chat"}>
+                  {isChatCollapsed ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
+                  {isChatCollapsed && unreadChatCount > 0 && <span className="u-count">{unreadChatCount}</span>}
                 </button>
 
                 <ReflexContainer orientation="vertical">
                   {!isChatCollapsed && (
                     <ReflexElement key="chat-pane" className="left-pane" flex={0.25} minSize={250}>
-                      <div style={{ height: "100%", width: "100%", overflow: "hidden" }}>
-                        <ChatWindow
-                          socketRef={socketRef}
-                          roomId={roomId}
-                          userName={userName}
-                          isLightMode={isLightMode}
-                          messages={messages}
-                          setMessages={setMessages}
-                        />
+                      <div style={{ height: "100%", width: "100%", overflow: "hidden", display: "flex", flexDirection: "column" }}>
+                        <div className="ws-pane-head"><span>Room chat</span><b>{clients.length} online</b></div>
+                        <div style={{ flex: 1, minHeight: 0 }}>
+                          <ChatWindow
+                            socketRef={socketRef}
+                            roomId={roomId}
+                            userName={userName}
+                            isLightMode={isLightMode}
+                            messages={messages}
+                            setMessages={setMessages}
+                          />
+                        </div>
                       </div>
                     </ReflexElement>
                   )}
 
                   {!isChatCollapsed && (
-                    <ReflexSplitter key="chat-splitter" style={{ border: "none", width: "4px", backgroundColor: "var(--border-color)", cursor: "col-resize" }} />
+                    <ReflexSplitter key="chat-splitter" />
                   )}
 
                   <ReflexElement key="main-pane" className="right-pane" flex={isChatCollapsed ? 1 : 0.75}>
                     <ReflexContainer orientation="horizontal">
                       <ReflexElement className="editor-pane" flex={0.65} minSize={200}>
                         <div style={{ height: "100%", width: "100%", overflow: "hidden", display: "flex", flexDirection: "column" }}>
-                          <TabBar openFiles={openFiles} activeFile={openFiles[0]} isMobile={isMobile} />
                           <div style={{ flex: 1, overflow: "hidden" }}>
                             <EditorComp
                             socketRef={socketRef}
@@ -1042,7 +712,7 @@ function Editor() {
                         </div>
                       </ReflexElement>
 
-                      <ReflexSplitter style={{ border: "none", height: "4px", backgroundColor: "var(--border-color)", cursor: "row-resize" }} />
+                      <ReflexSplitter />
 
                       <ReflexElement className="terminal-pane" flex={0.35} minSize={100}>
                         <div style={{ height: "100%", width: "100%", overflow: "hidden" }}>
@@ -1064,11 +734,51 @@ function Editor() {
             )}
           </>
         ) : (
-          showLoading ? <LoadingScreen isLightMode={isLightMode} /> : (
-            <div style={{ height: "100%", width: "100%", backgroundColor: "var(--bg-dark)" }} />
+          showLoading ? <LoadingScreen /> : (
+            <div style={{ height: "100%", width: "100%" }} />
           )
         )}
       </div>
+
+      {!isMobile && (
+        <footer className="ws-status">
+          <div>
+            <span><span className={`u-dot${socketConnected ? "" : " u-dot--warn"}`} /> {socketConnected ? "connected" : "connecting…"}</span>
+            <span>room/{roomId}</span>
+            {isReadOnly && <span>spectator</span>}
+          </div>
+          <div>
+            <span>{(LANGUAGES.find((l) => l.value === language)?.name || language).toLowerCase()}</span>
+            <span>{clients.length} online</span>
+            <button className={!isChatCollapsed ? "on" : ""} onClick={() => setIsChatCollapsed(!isChatCollapsed)}>
+              <MessageSquare size={12} /> chat{isChatCollapsed && unreadChatCount > 0 ? ` (${unreadChatCount})` : ""}
+            </button>
+            <button onClick={() => handleShare("editor")}><Share2 size={12} /> invite</button>
+          </div>
+        </footer>
+      )}
+
+      {isMeetingActive && (
+        <div style={isMobile ? { position: "fixed", inset: 0, zIndex: 9998, backgroundColor: "#000" } : undefined}>
+          <VideoChat
+            socketRef={socketRef}
+            projectId={roomId}
+            user={user || { name: userName || "Guest" }}
+            isMinimized={isMobile ? false : isMeetingMinimized}
+            onMinimizeToggle={(val) => setIsMeetingMinimized(val)}
+            externalInCall={isMeetingStarting}
+            onCallStateChange={(active) => {
+              setIsMeetingStarting(active);
+              if (!active) setIsMeetingActive(false);
+            }}
+            clients={clients}
+            mediaStates={mediaStates}
+            initialAudioState={true}
+            initialVideoState={true}
+            isMobile={isMobile}
+          />
+        </div>
+      )}
 
       <SettingsModal
         isOpen={showSettings}
@@ -1090,7 +800,7 @@ function Editor() {
           onClose={() => setShowGistModal(false)}
           code={codeRef.current}
           language={language}
-          fileName={`${roomId}.${language === 'javascript' ? 'js' : language === 'python' ? 'py' : 'txt'}`}
+          fileName={roomFileName(language)}
         />
       )}
 
@@ -1106,61 +816,30 @@ function Editor() {
       )}
 
       {showGuestModal && (
-        <div style={{
-          position: "fixed",
-          inset: 0,
-          backgroundColor: "rgba(0, 0, 0, 0.6)",
-          backdropFilter: "blur(8px)",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          zIndex: 99999
-        }}>
-          <div style={{
-            backgroundColor: "var(--bg-floating)",
-            padding: "32px",
-            borderRadius: "var(--radius-card)",
-            border: "1px solid var(--border-color)",
-            width: "360px",
-            boxShadow: "var(--glass-shadow)",
-            textAlign: "center"
+        <div className="u-modal-back">
+          <form className="u-modal" style={{ maxWidth: 420 }} onSubmit={(e) => {
+            e.preventDefault();
+            if (guestInput.trim()) {
+              localStorage.setItem("guest-name", guestInput.trim());
+              setUserName(guestInput.trim());
+              setShowGuestModal(false);
+            }
           }}>
-            <h2 style={{ fontSize: "20px", fontWeight: "800", marginBottom: "8px", color: "white", fontFamily: "'Outfit', sans-serif" }}>Join Workspace</h2>
-            <p style={{ fontSize: "13px", color: "var(--text-muted)", marginBottom: "24px" }}>Please enter a display name to join the room.</p>
-            <form onSubmit={(e) => {
-              e.preventDefault();
-              if (guestInput.trim()) {
-                localStorage.setItem("guest-name", guestInput.trim());
-                setUserName(guestInput.trim());
-                setShowGuestModal(false);
-              }
-            }}>
-              <input
-                autoFocus
-                placeholder="Your name..."
-                value={guestInput}
-                onChange={(e) => setGuestInput(e.target.value)}
-                style={{
-                  width: "100%",
-                  padding: "12px 16px",
-                  borderRadius: "var(--radius-btn)",
-                  backgroundColor: "var(--bg-dark)",
-                  border: "1px solid var(--border-color)",
-                  color: "white",
-                  fontSize: "14px",
-                  outline: "none",
-                  marginBottom: "20px"
-                }}
-              />
-              <button
-                type="submit"
-                className="primary-action-btn hover-bounce"
-                style={{ width: "100%", padding: "12px", borderRadius: "var(--radius-btn)", fontWeight: "700" }}
-              >
-                Join Room
-              </button>
-            </form>
-          </div>
+            <div className="u-modal-head">
+              <div>
+                <span className="u-label">room/{roomId}</span>
+                <h3>Join the room</h3>
+                <p>Pick a name so everyone knows who is typing.</p>
+              </div>
+            </div>
+            <div className="u-modal-body">
+              <div className="u-field">
+                <label htmlFor="room-guest">Display name</label>
+                <input id="room-guest" className="u-input" autoFocus placeholder="e.g. Ada Lovelace" value={guestInput} onChange={(e) => setGuestInput(e.target.value)} />
+              </div>
+              <button type="submit" className="u-btn u-btn--solid u-btn--lg u-btn--block" disabled={!guestInput.trim()}>Join room</button>
+            </div>
+          </form>
         </div>
       )}
 
@@ -1208,7 +887,7 @@ function Editor() {
           socketRef.current?.emit(ACTIONS.CODE_CHANGE, { roomId, code: val });
         }}
         language={language}
-        fileName={`room-${roomId}`}
+        fileName={roomFileName(language)}
         isLightMode={isLightMode}
       />
     </div>

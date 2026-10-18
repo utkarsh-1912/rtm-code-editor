@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo } from "react";
-import { Download } from "lucide-react";
+import { Download, FileCode2 } from "lucide-react";
 import CodeMirror from "@uiw/react-codemirror";
 import { javascript, esLint } from "@codemirror/lang-javascript";
 import { python } from "@codemirror/lang-python";
@@ -12,6 +12,9 @@ import { emacs } from "@replit/codemirror-emacs";
 import { linter, lintGutter } from "@codemirror/lint";
 import ACTIONS from "../Action";
 import { LANGUAGES } from "../config";
+
+const FILE_NAMES = { javascript: "main.js", python: "main.py", cpp: "main.cpp", java: "Main.java" };
+export const roomFileName = (language) => FILE_NAMES[language] || `main.${language || "txt"}`;
 
 // Remote cursor widget
 class CursorWidget extends WidgetType {
@@ -263,67 +266,27 @@ function EditorComp({
   ], [language, settings?.wordWrap, settings?.keybinding, esLintLinter, memoizedCursorPlugin]);
 
 
+  const fileName = filename || roomFileName(language);
+
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%", backgroundColor: "var(--bg-dark)" }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 16px", backgroundColor: "var(--bg-card)", borderBottom: "1px solid var(--border-color)" }}>
-
-        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-          <div style={{ fontSize: "14px", fontWeight: "700", color: "var(--text-main)", opacity: 0.9 }}>
-            {filename || `main.${language === "javascript" ? "js" : language === "python" ? "py" : language === "cpp" ? "cpp" : "java"}`}
-          </div>
+      {/* Single file strip: the tab name always follows the chosen language. */}
+      <div className="ws-tabs ec-bar">
+        <div className="ws-tab on" title={fileName}>
+          <FileCode2 size={13} />
+          <span>{fileName}</span>
+          {isReadOnly && <em className="ec-ro">read only</em>}
         </div>
-
-        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-          {isMobile && (
-            <button
-              onClick={onDownload}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                width: "24px",
-                height: "24px",
-                color: "var(--text-muted)",
-                backgroundColor: "var(--secondary)",
-                borderRadius: "6px",
-                border: "1px solid var(--border-color)",
-                cursor: "pointer",
-                transition: "all 0.2s"
-              }}
-              onMouseOver={(e) => e.currentTarget.style.borderColor = "var(--primary)"}
-              onMouseOut={(e) => e.currentTarget.style.borderColor = "var(--border-color)"}
-              title="Download Code"
-            >
-              <Download size={12} />
-            </button>
+        <div className="ec-tools">
+          {isMobile && onDownload && (
+            <button className="u-icon" onClick={onDownload} title="Download code" aria-label="Download code"><Download size={15} /></button>
           )}
-
           {!lockLanguage && (
-            <select
-              value={language}
-              onChange={(e) => onLanguageChange(e.target.value)}
-              style={{
-                backgroundColor: "var(--secondary)",
-                border: "1px solid var(--border-color)",
-                color: "var(--text-muted)",
-                fontSize: "12px",
-                fontWeight: "500",
-                outline: "none",
-                cursor: "pointer",
-                padding: "4px 10px",
-                borderRadius: "6px",
-                transition: "all 0.2s"
-              }}
-              onMouseOver={(e) => e.target.style.borderColor = "var(--primary)"}
-              onMouseOut={(e) => e.target.style.borderColor = "var(--border-color)"}
-            >
-              {LANGUAGES.map(l => (
-                <option key={l.value} value={l.value} style={{ backgroundColor: "var(--bg-card)", color: "var(--text-main)" }}>{l.name}</option>
-              ))}
+            <select className="u-select ec-lang" value={language} onChange={(e) => onLanguageChange(e.target.value)} aria-label="Language">
+              {LANGUAGES.map((l) => <option key={l.value} value={l.value}>{l.name}</option>)}
             </select>
           )}
         </div>
-
       </div>
 
       <div style={{ flex: 1, overflow: "auto", fontSize: settings?.fontSize ? `${settings.fontSize}px` : "16px" }}>

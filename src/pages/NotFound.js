@@ -1,50 +1,25 @@
-import React from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Home, Frown } from 'lucide-react';
+import React from "react";
+import { Link, useLocation } from "react-router-dom";
+import { ArrowUpRight } from "lucide-react";
+import SiteLayout from "../components/Site/SiteLayout";
+import { RollingNumber } from "../components/ux/primitives";
 
 const NotFound = () => {
-    const navigate = useNavigate();
-
+    const { pathname } = useLocation();
     return (
-        <div style={{
-            height: '100vh',
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            backgroundColor: 'var(--bg-dark)',
-            color: 'var(--text-main)',
-            textAlign: 'center',
-            padding: '20px'
-        }}>
-            <Frown size={80} color="var(--primary)" style={{ marginBottom: '20px' }} />
-            <h1 style={{ fontSize: '4rem', margin: '0' }}>404</h1>
-            <h2 style={{ fontSize: '1.5rem', marginBottom: '30px', color: 'var(--text-muted)' }}>
-                The room you're looking for doesn't exist or was moved.
-            </h2>
-            <button
-                onClick={() => navigate('/')}
-                style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '10px',
-                    padding: '12px 24px',
-                    backgroundColor: 'var(--primary)',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '8px',
-                    fontSize: '16px',
-                    fontWeight: '600',
-                    cursor: 'pointer',
-                    transition: 'opacity 0.2s'
-                }}
-                onMouseOver={(e) => e.currentTarget.style.opacity = '0.9'}
-                onMouseOut={(e) => e.currentTarget.style.opacity = '1'}
-            >
-                <Home size={20} />
-                Back to Home
-            </button>
-        </div>
+        <SiteLayout>
+            <section className="nf">
+                <span className="u-label" data-rise>Error · {pathname}</span>
+                <h1 className="nf-num" style={{ margin: 0 }}><RollingNumber value={404} /></h1>
+                <p className="u-lede" data-rise style={{ "--d": "200ms" }}>
+                    <b>Room not found.</b> The page does not exist or has moved. The room may also have ended.
+                </p>
+                <div className="u-head-actions" data-rise style={{ "--d": "260ms" }}>
+                    <Link to="/" className="u-btn u-btn--solid u-btn--lg">Back home <ArrowUpRight size={15} /></Link>
+                    <Link to="/support" className="u-btn u-btn--ghost u-btn--lg">Contact support</Link>
+                </div>
+            </section>
+        </SiteLayout>
     );
 };
 

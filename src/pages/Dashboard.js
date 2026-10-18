@@ -1,982 +1,534 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
-import {
-    Plus,
-    Terminal,
-    Search,
-    MoreVertical,
-    Edit2,
-    Trash2,
-    Calendar,
-    Users,
-    Zap,
-    Folder,
-    ChevronRight,
-    ChevronLeft,
-    Coffee,
-    Globe,
-    FileCode
-} from 'lucide-react';
+import { Plus, Search, MoreHorizontal, Pencil, Trash2, Folder, Terminal, Globe, FileCode, Coffee, Link2, ArrowUpRight, ArrowRight, Check, Sparkles, RotateCcw, Code2 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { useAuth } from '../context/AuthContext';
 import AppLayout from '../components/AppLayout';
-import { getBackendUrl } from '../utils/api';
 import SpaceLoader from '../components/SpaceLoader';
+import { getBackendUrl } from '../utils/api';
+import useWorkspace, { itemDate, mergeActivity } from '../components/ux/useWorkspace';
+import { Modal, RollingNumber, newRoomId, timeAgo, greeting, extractRoomId, pad2 } from '../components/ux/primitives';
+
+const TEMPLATES = [
+    { id: 'web', name: 'Web starter', desc: 'html · css · js', icon: Globe },
+    { id: 'cpp', name: 'C++ console', desc: 'main.cpp', icon: Terminal },
+    { id: 'python', name: 'Python script', desc: 'main.py', icon: FileCode },
+    { id: 'java', name: 'Java class', desc: 'Main.java', icon: Coffee },
+];
+
+const DAYS = 14;
+
+const STEPS = [
+    { title: 'Create', copy: 'One click makes a private room with its own link. Nothing to install.' },
+    { title: 'Share', copy: 'Send the link. Teammates join with just a name, even before they sign up.' },
+    { title: 'Build', copy: 'Edit, talk, draw and run code in the same room, live.' },
+];
+
+// Item count per day for the last DAYS days, oldest first.
+const activityByDay = (items) => {
+    const start = new Date();
+    start.setHours(0, 0, 0, 0);
+    start.setDate(start.getDate() - (DAYS - 1));
+    const counts = Array(DAYS).fill(0);
+    items.forEach((it) => {
+        const d = itemDate(it);
+        if (!d) return;
+        const idx = Math.floor((d.getTime() - start.getTime()) / 86400000);
+        if (idx >= 0 && idx < DAYS) counts[idx] += 1;
+    });
+    return counts;
+};
+
+function RowMenu({ open, onToggle, children }) {
+    const ref = useRef(null);
+    useEffect(() => {
+        if (!open) return undefined;
+        const close = (e) => { if (ref.current && !ref.current.contains(e.target)) onToggle(false); };
+        document.addEventListener('mousedown', close);
+        return () => document.removeEventListener('mousedown', close);
+    }, [open, onToggle]);
+    return (
+        <div className="d-menu-wrap" ref={ref} onClick={(e) => e.stopPropagation()}>
+            <button className={`u-icon${open ? ' on' : ''}`} onClick={() => onToggle(!open)} aria-label="More actions" aria-expanded={open}>
+                <MoreHorizontal size={18} />
+            </button>
+            {open && <div className="u-pop" role="menu" style={{ minWidth: 200 }}>{children}</div>}
+        </div>
+    );
+}
 
 const Dashboard = () => {
-    const { user, loading } = useAuth();
+    const { user, loading, refreshProfile } = useAuth();
     const navigate = useNavigate();
     const location = useLocation();
-    const [projects, setProjects] = useState([]);
-    const [recentRooms, setRecentRooms] = useState([]);
-    const [loadingRooms, setLoadingRooms] = useState(true);
-    const [stats, setStats] = useState({ totalRooms: 0, sessions: 0, hours: 0 });
-    const [searchTerm, setSearchTerm] = useState('');
+    const { rooms, projects, stats, loading: loadingData, error, reload } = useWorkspace(user);
 
-    // UI States
-    const [showActionMenu, setShowActionMenu] = useState(null);
-    const [showRenameModal, setShowRenameModal] = useState(null);
-    const [showDeleteModal, setShowDeleteModal] = useState(null);
+    const [view, setView] = useState('all'); // all | rooms | projects
+    const [lang, setLang] = useState(null);
+    const [sort, setSort] = useState('recent');
+    const [query, setQuery] = useState('');
+    const [menuFor, setMenuFor] = useState(null);
+    const [renameTarget, setRenameTarget] = useState(null);
+    const [deleteTarget, setDeleteTarget] = useState(null);
     const [newName, setNewName] = useState('');
-    const [activeTab, setActiveTab] = useState('rooms'); // rooms, projects
-    const [showCreateProjectModal, setShowCreateProjectModal] = useState(false);
-    const [newProjectName, setNewProjectName] = useState('');
-    const [newProjectDesc, setNewProjectDesc] = useState('');
-    const [newProjectType, setNewProjectType] = useState('web');
+    const [createOpen, setCreateOpen] = useState(false);
+    const [form, setForm] = useState({ name: '', description: '', type: 'web' });
+    const [busy, setBusy] = useState(false);
+    const [roomInput, setRoomInput] = useState('');
+    const [snippetCount, setSnippetCount] = useState(null);
+    const [step, setStep] = useState(0);
+    const [autoStep, setAutoStep] = useState(true);
+    const profiled = useRef(false);
 
-    // Carousel Items
-    const activityItems = React.useMemo(() => {
-        return [
-            ...projects.slice(0, 10).map(p => ({ ...p, type: 'project' })),
-            ...recentRooms.slice(0, 10).map(r => ({ ...r, type: 'room' }))
-        ].sort((a, b) => new Date(b.updatedAt || Date.now()) - new Date(a.updatedAt || Date.now()));
-    }, [projects, recentRooms]);
-
-    // Refs for Carousel
-    const carouselRef = React.useRef(null);
-    const [scrollIndex, setScrollIndex] = useState(0);
-
-    const handleCarouselScroll = () => {
-        if (!carouselRef.current) return;
-        const scrollLeft = carouselRef.current.scrollLeft;
-        const cardWidth = 344; // card + gap
-        const index = Math.round(scrollLeft / cardWidth);
-        if (index !== scrollIndex) setScrollIndex(index);
-    };
-
-    const scrollCarousel = (direction) => {
-        if (!carouselRef.current) return;
-        const scrollAmount = 344;
-        carouselRef.current.scrollBy({
-            left: direction === 'right' ? scrollAmount : -scrollAmount,
-            behavior: 'smooth'
-        });
-    };
-
-    const scrollToItem = (index) => {
-        if (!carouselRef.current) return;
-        carouselRef.current.scrollTo({
-            left: index * 344,
-            behavior: 'smooth'
-        });
-    };
-
-    // Click outside listener for dropdown
+    // Invite links land on /?room=…; "/" forwards here with the query intact.
     useEffect(() => {
-        const handleClickOutside = (event) => {
-            if (showActionMenu && !event.target.closest('.action-menu-container')) {
-                setShowActionMenu(null);
-            }
-        };
-        document.addEventListener('mousedown', handleClickOutside);
-        return () => document.removeEventListener('mousedown', handleClickOutside);
-    }, [showActionMenu]);
+        const room = new URLSearchParams(location.search).get('room');
+        if (room) setRoomInput(room);
+    }, [location.search]);
 
     useEffect(() => {
-        if (!loading && !user) {
-            navigate('/login');
-        }
+        if (!user?.uid || profiled.current) return;
+        profiled.current = true;
+        refreshProfile(user.uid);
+        fetch(`${getBackendUrl()}/api/snippets?userId=${user.uid}`)
+            .then((r) => r.json())
+            .then((d) => setSnippetCount(Array.isArray(d) ? d.length : 0))
+            .catch(() => setSnippetCount(null));
+    }, [user?.uid, refreshProfile]);
+
+    useEffect(() => {
+        if (!autoStep) return undefined;
+        const id = setTimeout(() => setStep((v) => (v + 1) % STEPS.length), 5000);
+        return () => clearTimeout(id);
+    }, [step, autoStep]);
+
+    useEffect(() => {
+        if (!loading && !user) navigate('/login');
         if (location.state?.openCreateProject) {
-            setShowCreateProjectModal(true);
-            setActiveTab('projects');
-            // Clear state to avoid reopening on refresh
-            window.history.replaceState({}, document.title);
+            setCreateOpen(true);
+            setView('projects');
+            window.history.replaceState({}, document.title, window.location.pathname + window.location.search);
         }
     }, [user, loading, navigate, location]);
 
-    const fetchDashboardData = useCallback(async () => {
-        if (!user) return;
-        try {
-            const backendUrl = getBackendUrl();
-            const response = await fetch(`${backendUrl}/api/user-dashboard?userId=${user.uid}`);
-            if (!response.ok) throw new Error(`Dashboard API error: ${response.status}`);
-            const data = await response.json();
-
-            setRecentRooms(data.rooms || []);
-            setStats(data.stats || { totalRooms: 0, sessions: 0, hours: 0 });
-
-            // Fetch Projects
-            const projRes = await fetch(`${backendUrl}/api/projects?userId=${user.uid}`);
-            if (!projRes.ok) throw new Error(`Projects API error: ${projRes.status}`);
-            const projData = await projRes.json();
-            setProjects(Array.isArray(projData) ? projData : []);
-        } catch (err) {
-            console.error("Dashboard Fetch Error:", err);
-            toast.error("Failed to load your workspace data.");
-        } finally {
-            setLoadingRooms(false);
-        }
-    }, [user]);
-
     useEffect(() => {
-        fetchDashboardData();
-    }, [fetchDashboardData]);
+        if (error) toast.error('Failed to load your workspace data.');
+    }, [error]);
 
-    const handleDeleteRoom = async (roomId) => {
+    const languages = useMemo(() => {
+        const map = {};
+        rooms.forEach((r) => { if (r.lang) map[r.lang] = (map[r.lang] || 0) + 1; });
+        return Object.entries(map).sort((a, b) => b[1] - a[1]);
+    }, [rooms]);
+
+    const items = useMemo(() => {
+        let list = view === 'rooms' ? rooms.map((r) => ({ ...r, kind: 'room' }))
+            : view === 'projects' ? projects.map((p) => ({ ...p, kind: 'project' }))
+                : mergeActivity(rooms, projects);
+        if (lang) list = list.filter((i) => i.kind === 'room' && i.lang === lang);
+        const q = query.trim().toLowerCase();
+        if (q) list = list.filter((i) => [i.name, i.id, i.description, i.lang, i.type].some((v) => (v || '').toString().toLowerCase().includes(q)));
+        if (sort === 'name') list = [...list].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+        else if (view !== 'all') list = [...list].sort((a, b) => (itemDate(b)?.getTime() || 0) - (itemDate(a)?.getTime() || 0));
+        return list;
+    }, [view, rooms, projects, lang, query, sort]);
+
+    const bars = useMemo(() => activityByDay([...rooms, ...projects]), [rooms, projects]);
+    const maxBar = Math.max(1, ...bars);
+    const latest = mergeActivity(rooms, projects)[0];
+
+    const enterRoom = (id, role = 'editor') => navigate(`/editor/${id}`, { state: { userName: user?.name || '', role } });
+
+    const joinRoom = (e) => {
+        e?.preventDefault();
+        const id = extractRoomId(roomInput);
+        if (!id) return toast.error('Paste a room ID or invite link first.');
+        enterRoom(id, new URLSearchParams(location.search).get('role') || 'editor');
+    };
+
+    const openItem = (item) => {
+        if (item.kind === 'project') navigate(`/project/${item.id}`);
+        else navigate(`/editor/${item.id}`, { state: { userName: user?.name || '', role: 'editor' } });
+    };
+
+    const copyRoomLink = async (id) => {
         try {
-            const backendUrl = getBackendUrl();
-            const response = await fetch(`${backendUrl}/api/remove-room`, {
-                method: 'DELETE',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ userId: user.uid, roomId })
-            });
-
-            if (response.ok) {
-                toast.success("Room deleted successfully");
-                fetchDashboardData();
-                setShowDeleteModal(null);
-            }
-        } catch (err) {
-            toast.error("Failed to delete room");
+            await navigator.clipboard.writeText(`${window.location.origin}/?room=${id}`);
+            toast.success('Room link copied');
+        } catch {
+            toast.error('Could not copy link');
         }
     };
 
-    const handleRenameRoom = async (roomId) => {
-        if (!newName.trim()) return;
+    const handleRename = async () => {
+        if (!newName.trim() || !renameTarget) return;
+        setBusy(true);
         try {
-            const backendUrl = getBackendUrl();
-            const response = await fetch(`${backendUrl}/api/rename-room`, {
+            const res = await fetch(`${getBackendUrl()}/api/rename-room`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ roomId, newName })
+                body: JSON.stringify({ roomId: renameTarget.id, newName }),
             });
-
-            if (response.ok) {
-                toast.success("Room renamed");
-                fetchDashboardData();
-                setShowRenameModal(null);
-                setNewName('');
-            } else {
-                toast.error("Failed to rename: server error");
-            }
-        } catch (err) {
-            toast.error("Failed to rename room");
+            if (!res.ok) throw new Error('rename failed');
+            toast.success('Room renamed');
+            setRenameTarget(null);
+            setNewName('');
+            reload();
+        } catch {
+            toast.error('Failed to rename room');
+        } finally {
+            setBusy(false);
         }
     };
 
-    const handleCreateProject = async (e) => {
-        e.preventDefault();
-        if (!newProjectName.trim()) return;
+    const handleDelete = async () => {
+        if (!deleteTarget) return;
+        setBusy(true);
         try {
-            const backendUrl = getBackendUrl();
-            const response = await fetch(`${backendUrl}/api/projects`, {
+            const res = deleteTarget.kind === 'project'
+                ? await fetch(`${getBackendUrl()}/api/projects/${deleteTarget.id}`, { method: 'DELETE' })
+                : await fetch(`${getBackendUrl()}/api/remove-room`, {
+                    method: 'DELETE',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ userId: user.uid, roomId: deleteTarget.id }),
+                });
+            if (!res.ok) throw new Error('delete failed');
+            toast.success(deleteTarget.kind === 'project' ? 'Project deleted' : 'Room deleted');
+            setDeleteTarget(null);
+            reload();
+        } catch {
+            toast.error('Delete failed');
+        } finally {
+            setBusy(false);
+        }
+    };
+
+    const handleCreateProject = async () => {
+        if (!form.name.trim()) return toast.error('Give your project a name.');
+        setBusy(true);
+        try {
+            const res = await fetch(`${getBackendUrl()}/api/projects`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    userId: user.uid,
-                    name: newProjectName,
-                    description: newProjectDesc,
-                    type: newProjectType
-                })
+                body: JSON.stringify({ userId: user.uid, name: form.name, description: form.description, type: form.type }),
             });
-            if (response.ok) {
-                const project = await response.json();
-                toast.success("Project created");
-                setShowCreateProjectModal(false);
-                setNewProjectName('');
-                setNewProjectDesc('');
-                setNewProjectType('web');
-                navigate(`/project/${project.id}`);
-            }
-        } catch (err) {
-            toast.error("Failed to create project");
+            if (!res.ok) throw new Error('create failed');
+            const project = await res.json();
+            toast.success('Project created');
+            setCreateOpen(false);
+            setForm({ name: '', description: '', type: 'web' });
+            navigate(`/project/${project.id}`);
+        } catch {
+            toast.error('Failed to create project');
+        } finally {
+            setBusy(false);
         }
     };
 
-    const handleDeleteProject = async (projectId) => {
-        try {
-            const backendUrl = getBackendUrl();
-            const response = await fetch(`${backendUrl}/api/projects/${projectId}`, {
-                method: 'DELETE'
-            });
-            if (response.ok) {
-                toast.success("Project deleted");
-                setShowDeleteModal(null);
-                fetchDashboardData();
-            } else {
-                toast.error("Failed to delete project");
-            }
-        } catch (err) {
-            toast.error("Delete failed");
-        }
-    };
+    if (loading || !user) return <SpaceLoader />;
 
-    const filteredRooms = recentRooms.filter(room =>
-        (room.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (room.id || '').toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    const statItems = [
+        { label: 'Projects', value: projects.length, note: 'Multi-file workspaces' },
+        { label: 'Rooms', value: stats.totalRooms || rooms.length, note: 'Rooms you have opened' },
+        { label: 'Sessions', value: stats.sessions || rooms.length, note: 'Times you joined a room' },
+        { label: 'Hours', value: stats.hours || 0, suffix: 'h', note: 'Spent coding together' },
+    ];
 
-    if (loading || !user) {
-        return <SpaceLoader />;
-    }
+    const first = (user?.name || user?.email || 'there').split(/[\s@]/)[0];
+    const today = new Date().toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' });
 
-    const StatCard = ({ icon: Icon, label, value, color }) => (
-        <div style={{
-            padding: '20px',
-            backgroundColor: 'var(--bg-card)',
-            border: '1px solid var(--border-color)',
-            borderRadius: '8px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '20px',
-            transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-            cursor: 'default',
-            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
-            position: 'relative',
-            overflow: 'hidden'
-        }} className="stat-card">
-            <div style={{
-                width: '48px',
-                height: '48px',
-                borderRadius: '12px',
-                backgroundColor: `${color}15`,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: color
-            }}>
-                <Icon size={24} />
-            </div>
-            <div>
-                <p style={{ color: 'var(--text-muted)', fontSize: '13px', fontWeight: '600', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{label}</p>
-                <h3 style={{ fontSize: '24px', fontWeight: '800', margin: 0, color: 'var(--text-main)' }}>{value}</h3>
-            </div>
-            <div style={{
-                position: 'absolute',
-                top: '-20px',
-                right: '-20px',
-                width: '60px',
-                height: '60px',
-                borderRadius: '50%',
-                background: `radial-gradient(circle, ${color}10 0%, transparent 70%)`
-            }} />
-        </div>
-    );
+    const checklist = [
+        { text: 'Open your first room', done: rooms.length > 0 },
+        { text: 'Create a project', done: projects.length > 0 },
+        { text: 'Spend an hour pairing', done: (stats.hours || 0) >= 1 },
+    ];
 
     return (
         <AppLayout>
-            <div className="dashboard-container">
-                <div style={{
-                    marginBottom: '32px',
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    flexWrap: 'wrap',
-                    gap: '24px',
-                    padding: '12px 0'
-                }}>
-                    <div>
-                        <p style={{ color: 'var(--primary)', fontSize: '13px', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '4px' }}>Workspace</p>
-                        <h1 style={{
-                            fontSize: '32px',
-                            fontWeight: '900',
-                            marginBottom: '4px',
-                            color: 'var(--text-main)',
-                            letterSpacing: '-0.03em'
-                        }}>
-                            Welcome back, <span style={{ color: 'var(--text-main)' }}>{(user?.name || user?.email || 'User').split(' ')[0]}</span>
-                        </h1>
-                        <p style={{ color: 'var(--text-muted)', fontSize: '14px' }}>Let's build something amazing today.</p>
-                    </div>
+            <div className="h-top" data-rise>
+                <span className="u-label">{greeting()} · {today}</span>
+                <span className="u-label"><span className="u-dot" /> Workspace synced</span>
+            </div>
 
-                    <div style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '16px',
-                        flexWrap: 'wrap'
-                    }}>
-                        <button
-                            onClick={() => setShowCreateProjectModal(true)}
-                            className="secondary-action-btn hover-bounce"
-                            style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 20px', fontSize: '14px', borderRadius: 'var(--radius-btn)', fontWeight: '700' }}
-                        >
-                            <Folder size={18} /> New Project
-                        </button>
-                        <button
-                            onClick={() => navigate('/')}
-                            className="primary-action-btn hover-bounce glow-effect"
-                            style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 20px', fontSize: '14px', borderRadius: 'var(--radius-btn)', fontWeight: '700' }}
-                        >
-                            <Plus size={20} strokeWidth={2.5} /> New Room
+            <h1 className="u-display u-giant h-name u-lines">
+                <span><span style={{ '--d': '60ms' }}>Hello,</span></span>
+                <span><span style={{ '--d': '160ms' }}>{first}<span className="u-faint">.</span></span></span>
+            </h1>
+
+            <div className="h-grid">
+                <section className="u-pane h-pane h-start" data-rise aria-label="Start or join a room">
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
+                        <span className="u-label">Instant room</span>
+                        <span className="u-label">{pad2(step + 1)} of {pad2(STEPS.length)}</span>
+                    </div>
+                    <h2>Start a room. <span>Share the link and everyone codes together.</span></h2>
+
+                    <form className="h-join" onSubmit={joinRoom}>
+                        <input
+                            className="u-input"
+                            value={roomInput}
+                            onChange={(e) => setRoomInput(e.target.value)}
+                            placeholder="Paste a room ID or invite link"
+                            aria-label="Room ID or invite link"
+                        />
+                        <button type="submit" className="u-btn u-btn--ghost u-btn--lg">Join <ArrowRight size={16} /></button>
+                    </form>
+
+                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                        <button className="u-btn u-btn--solid u-btn--lg" onClick={() => enterRoom(newRoomId())}>
+                            <Plus size={17} /> Create a new room
                         </button>
                     </div>
-                </div>
 
-                {/* Dashboard Stats */}
-                <div style={{
-                    display: 'grid',
-                    gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
-                    gap: '20px',
-                    marginBottom: '40px'
-                }}>
-                    <StatCard icon={Folder} label="Active Projects" value={projects.length} color="#3b82f6" />
-                    <StatCard icon={Users} label="Total Sessions" value={stats.sessions || recentRooms.length} color="#8b5cf6" />
-                    <StatCard icon={Zap} label="Coding Hours" value={stats.hours ? `${stats.hours}h` : '2h'} color="#f59e0b" />
-                </div>
-
-                {/* Recent Activity Section */}
-                {(recentRooms.length > 0 || projects.length > 0) && (
-                    <div style={{ marginBottom: '64px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                                <div style={{ width: '8px', height: '24px', backgroundColor: 'var(--primary)', borderRadius: '4px' }} />
-                                <h2 style={{ fontSize: '20px', fontWeight: '800', margin: 0, letterSpacing: '-0.02em', color: 'var(--text-main)' }}>Recent Activity</h2>
+                    {user?.last_room_id && (
+                        <div className="h-resume" onClick={() => enterRoom(user.last_room_id)} role="button" tabIndex={0}
+                            onKeyDown={(e) => e.key === 'Enter' && enterRoom(user.last_room_id)}>
+                            <RotateCcw size={18} />
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                                <div style={{ fontSize: 14, fontWeight: 500 }}>Continue where you left off</div>
+                                <div className="u-mono u-muted" style={{ fontSize: 12 }}>room/{user.last_room_id}</div>
                             </div>
-                            
-                            <div style={{ display: 'flex', gap: '10px' }}>
-                                <button 
-                                    onClick={() => scrollCarousel('left')}
-                                    style={carouselBtnStyle}
-                                    title="Scroll Left"
-                                >
-                                    <ChevronLeft size={18} />
-                                </button>
-                                <button 
-                                    onClick={() => scrollCarousel('right')}
-                                    style={carouselBtnStyle}
-                                    title="Scroll Right"
-                                >
-                                    <ChevronRight size={18} />
-                                </button>
-                            </div>
+                            <span className="u-circ u-circ--sm"><ArrowUpRight size={15} /></span>
                         </div>
+                    )}
 
-                        <div style={{ position: 'relative', width: '100%', minWidth: 0 }}>
-                            <div 
-                                ref={carouselRef}
-                                onScroll={handleCarouselScroll}
-                                style={{
-                                    display: 'flex',
-                                    gap: '20px',
-                                    overflowX: 'auto',
-                                    padding: '4px 4px 24px 4px',
-                                    scrollSnapType: 'x mandatory',
-                                    scrollbarWidth: 'none',
-                                    msOverflowStyle: 'none',
-                                    WebkitOverflowScrolling: 'touch',
-                                    minHeight: '180px'
-                                }}
-                                className="activity-carousel"
-                            >
-                                <style>{`
-                                    .activity-carousel::-webkit-scrollbar { display: none; }
-                                `}</style>
+                    <div className="h-start-foot">
+                        <p className="h-steps-copy" key={step}>{STEPS[step].copy}</p>
+                        <div className="u-steps" style={{ '--n': STEPS.length, '--dur': '5s' }}>
+                            {STEPS.map((s, i) => (
+                                <button
+                                    key={s.title}
+                                    className={`u-step${i === step ? ' on' : ''}${autoStep ? ' run' : ''}`}
+                                    onClick={() => { setStep(i); setAutoStep(false); }}
+                                >
+                                    <span className="u-label">{pad2(i + 1)}</span>
+                                    <b>{s.title}</b>
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                </section>
 
-                                {activityItems.map((item, idx) => (
-                                    <div
-                                        key={`recent-${item.type}-${item.id}`}
-                                        onClick={() => navigate(item.type === 'project' ? `/project/${item.id}` : `/editor/${item.id}`)}
-                                        className="activity-card"
-                                        style={{
-                                            flex: '0 0 300px',
-                                            height: '160px',
-                                            padding: '20px',
-                                            backgroundColor: 'var(--bg-card)',
-                                            border: '1px solid var(--border-color)',
-                                            borderRadius: '16px',
-                                            cursor: 'pointer',
-                                            transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                                            display: 'flex',
-                                            flexDirection: 'column',
-                                            justifyContent: 'space-between',
-                                            position: 'relative',
-                                            scrollSnapAlign: 'start',
-                                            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
-                                        }}
-                                        onMouseOver={(e) => {
-                                            e.currentTarget.style.transform = 'translateY(-4px)';
-                                            e.currentTarget.style.borderColor = 'var(--primary)';
-                                            e.currentTarget.style.boxShadow = '0 10px 15px -3px rgba(37, 99, 235, 0.15)';
-                                        }}
-                                        onMouseOut={(e) => {
-                                            e.currentTarget.style.transform = 'translateY(0)';
-                                            e.currentTarget.style.borderColor = 'var(--border-color)';
-                                            e.currentTarget.style.boxShadow = '0 4px 6px -1px rgba(0, 0, 0, 0.1)';
-                                        }}
-                                    >
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                            <div style={{
-                                                width: '36px',
-                                                height: '36px',
-                                                borderRadius: '10px',
-                                                backgroundColor: item.type === 'project' ? 'rgba(59, 130, 246, 0.1)' : 'rgba(139, 92, 246, 0.1)',
-                                                color: item.type === 'project' ? '#3b82f6' : '#8b5cf6',
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                justifyContent: 'center'
-                                            }}>
-                                                {item.type === 'project' ? <Folder size={18} /> : <Terminal size={18} />}
-                                            </div>
-                                            <span style={{
-                                                fontSize: '10px',
-                                                fontWeight: '700',
-                                                textTransform: 'uppercase',
-                                                color: 'var(--text-muted)',
-                                                letterSpacing: '0.05em'
-                                            }}>{item.type}</span>
-                                        </div>
-                                        
-                                        <div>
-                                            <h3 style={{ fontSize: '16px', fontWeight: '700', margin: '0 0 4px 0', color: 'var(--text-main)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                                {item.name}
-                                            </h3>
-                                            <p style={{ fontSize: '13px', color: 'var(--text-muted)', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                                {item.type === 'project' ? (item.description || 'Active development') : `ID: ${item.id.substring(0, 8)}`}
-                                            </p>
-                                        </div>
+                <div className="h-side">
+                    <button className="u-card h-card u-hover" data-rise style={{ '--d': '80ms' }} onClick={() => setCreateOpen(true)}>
+                        <span className="u-label"><Folder size={13} /> Project · {loadingData ? '…' : projects.length} so far</span>
+                        <div className="h-card-row">
+                            <div>
+                                <h3>New project</h3>
+                                <p>A multi-file workspace with preview, history and invites.</p>
+                            </div>
+                            <span className="u-circ"><ArrowUpRight size={17} /></span>
+                        </div>
+                    </button>
+                    <button className="u-card h-card u-hover" data-rise style={{ '--d': '160ms' }} onClick={() => navigate('/snippets')}>
+                        <span className="u-label"><Code2 size={13} /> Library · {snippetCount ?? '…'} snippets</span>
+                        <div className="h-card-row">
+                            <div>
+                                <h3>Snippets</h3>
+                                <p>Reusable code you can drop into any room.</p>
+                            </div>
+                            <span className="u-circ"><ArrowUpRight size={17} /></span>
+                        </div>
+                    </button>
+                </div>
+            </div>
 
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', color: 'var(--text-muted)' }}>
-                                            <Calendar size={12} /> 
-                                            <span>Recently {item.type === 'project' ? 'built' : 'opened'}</span>
-                                        </div>
-                                    </div>
-                                ))}
+            <div className="u-section-head" data-rise style={{ marginTop: 'clamp(56px, 8vw, 96px)' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                    <span className="u-label">Your workspace</span>
+                    <p className="u-lede"><b>Everything you're building.</b> Rooms for quick sessions, projects that stick around.</p>
+                </div>
+            </div>
+
+            <div className="u-stats" data-rise>
+                {statItems.map((s) => (
+                    <div className="u-stat" key={s.label}>
+                        <span className="u-label">{s.label}</span>
+                        {loadingData ? <span className="u-skel" style={{ height: 80, width: '60%' }} /> : <RollingNumber value={s.value} suffix={s.suffix} />}
+                        <p>{s.note}</p>
+                    </div>
+                ))}
+            </div>
+
+            <section className="u-section" style={{ marginTop: 40 }} id="board">
+                <div className="u-sheetbox">
+                    <div className="d-board">
+                        <aside className="u-card d-side" aria-label="Filter">
+                            {[
+                                ['all', 'Everything', rooms.length + projects.length],
+                                ['rooms', 'Rooms', rooms.length],
+                                ['projects', 'Projects', projects.length],
+                            ].map(([id, label, count]) => (
+                                <button key={id} className={view === id && !lang ? 'on' : ''} onClick={() => { setView(id); setLang(null); }}>
+                                    {label} <em>{count}</em>
+                                </button>
+                            ))}
+                            {languages.length > 0 && <hr />}
+                            {languages.length > 0 && <span className="u-label">Room language</span>}
+                            {languages.map(([l, n]) => (
+                                <button key={l} className={lang === l ? 'on' : ''} onClick={() => { setLang(lang === l ? null : l); setView('rooms'); }}>
+                                    <span className="u-mono" style={{ fontSize: 12.5 }}>{l}</span> <em>{n}</em>
+                                </button>
+                            ))}
+                        </aside>
+
+                        <div className="u-card d-list">
+                            <div className="d-toolbar">
+                                <label className="u-search">
+                                    <Search size={15} />
+                                    <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder={`Search ${view === 'all' ? 'rooms and projects' : view}`} aria-label="Search" />
+                                </label>
+                                <div className="u-seg" role="tablist" aria-label="Sort">
+                                    <button className={sort === 'recent' ? 'on' : ''} onClick={() => setSort('recent')}>Recent</button>
+                                    <button className={sort === 'name' ? 'on' : ''} onClick={() => setSort('name')}>A–Z</button>
+                                </div>
                             </div>
 
-                            {/* Pagination Dots */}
-                            {activityItems.length > 1 && (
-                                <div style={{
-                                    position: 'absolute',
-                                    bottom: '-2px',
-                                    left: '50%',
-                                    transform: 'translateX(-50%)',
-                                    display: 'flex',
-                                    gap: '6px',
-                                    padding: '8px',
-                                    zIndex: 5
-                                }}>
-                                    {activityItems.map((_, i) => (
-                                        <button
-                                            key={`dot-${i}`}
-                                            onClick={() => scrollToItem(i)}
-                                            style={{
-                                                width: scrollIndex === i ? '20px' : '6px',
-                                                height: '6px',
-                                                borderRadius: '3px',
-                                                backgroundColor: scrollIndex === i ? 'var(--primary)' : 'var(--border-color)',
-                                                border: 'none',
-                                                cursor: 'pointer',
-                                                padding: 0,
-                                                transition: 'all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)'
-                                            }}
-                                            aria-label={`Show slide ${i + 1}`}
-                                        />
-                                    ))}
+                            {loadingData ? (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: '6px 0' }}>
+                                    {[0, 1, 2, 3].map((i) => <div key={i} className="u-skel" style={{ height: 58 }} />)}
                                 </div>
+                            ) : items.length === 0 ? (
+                                <div className="u-empty">
+                                    <span className="u-display">{query ? 'No match' : 'Empty'}</span>
+                                    <p>{query ? `Nothing matches “${query}”.` : view === 'projects' ? 'No projects yet. Start one to keep files, history and teammates together.' : 'No rooms yet. Start one and share the link.'}</p>
+                                    {!query && (view === 'projects'
+                                        ? <button className="u-btn u-btn--solid" onClick={() => setCreateOpen(true)}><Plus size={16} /> New project</button>
+                                        : <button className="u-btn u-btn--solid" onClick={() => navigate(`/editor/${newRoomId()}`)}><Plus size={16} /> New room</button>)}
+                                </div>
+                            ) : (
+                                <ul className="u-rows">
+                                    {items.map((item) => {
+                                        const isProject = item.kind === 'project';
+                                        const key = `${item.kind}-${item.id}`;
+                                        const when = itemDate(item);
+                                        return (
+                                            <li key={key} className="u-row d-row" tabIndex={0} onClick={() => openItem(item)} onKeyDown={(e) => e.key === 'Enter' && openItem(item)}>
+                                                <span className="d-ico">{isProject ? <Folder size={17} /> : <Terminal size={17} />}</span>
+                                                <div className="u-row-main">
+                                                    <span className="u-row-title u-ellipsis">{item.name || item.id}</span>
+                                                    <span className="u-row-meta">
+                                                        <span className="u-chip u-chip--mono">{isProject ? (item.type || 'project') : (item.lang || 'room')}</span>
+                                                        <span className="u-mono u-ellipsis">{isProject ? (item.description || 'Multi-file project') : `room/${item.id}`}</span>
+                                                    </span>
+                                                </div>
+                                                <div className="u-row-side">
+                                                    <span className="u-row-when">{when ? timeAgo(when) : (item.lastActive || 'Just now').split(',')[0]}</span>
+                                                    <RowMenu open={menuFor === key} onToggle={(v) => setMenuFor(v ? key : null)}>
+                                                        <button onClick={() => { setMenuFor(null); openItem(item); }}><ArrowUpRight size={16} />Open</button>
+                                                        {!isProject && <button onClick={() => { setMenuFor(null); copyRoomLink(item.id); }}><Link2 size={16} />Copy invite link</button>}
+                                                        {!isProject && <button onClick={() => { setMenuFor(null); setRenameTarget(item); setNewName(item.name || ''); }}><Pencil size={16} />Rename</button>}
+                                                        <button className="danger" onClick={() => { setMenuFor(null); setDeleteTarget(item); }}><Trash2 size={16} />Delete</button>
+                                                    </RowMenu>
+                                                </div>
+                                            </li>
+                                        );
+                                    })}
+                                </ul>
                             )}
                         </div>
-                    </div>
-                )}
 
-                <div style={workspaceCardStyle}>
-                    <div style={workspaceHeaderStyle}>
-                        <div style={pillTabContainerStyle}>
-                            <button
-                                onClick={() => setActiveTab('rooms')}
-                                style={pillTabButtonStyle(activeTab === 'rooms')}
-                            >
-                                Single Rooms
-                            </button>
-                            <button
-                                onClick={() => setActiveTab('projects')}
-                                style={pillTabButtonStyle(activeTab === 'projects')}
-                            >
-                                Pro Projects
-                            </button>
-                        </div>
-                        <div style={searchContainerStyle}>
-                            <Search size={14} color="var(--text-muted)" />
-                            <input
-                                type="text"
-                                placeholder={`Search ${activeTab}...`}
-                                value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
-                                style={searchInputStyle}
-                            />
-                        </div>
-                    </div>
-
-                    <div style={{ padding: '32px' }}>
-                        {loadingRooms ? (
-                            <div style={{ padding: '60px', textAlign: 'center', color: 'var(--text-muted)' }}>
-                                <SpaceLoader />
+                        <aside className="u-card d-read" aria-label="Summary">
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                                <h4><Sparkles size={15} /> The read</h4>
+                                {loadingData ? <span className="u-skel" style={{ height: 60 }} /> : latest ? (
+                                    <p>
+                                        You have <mark>{rooms.length} room{rooms.length === 1 ? '' : 's'}</mark> and <mark>{projects.length} project{projects.length === 1 ? '' : 's'}</mark>.
+                                        {' '}Most recent is <mark>{latest.name || latest.id}</mark>{itemDate(latest) ? `, ${timeAgo(itemDate(latest))}` : ''}.
+                                        {languages[0] && <> You mostly write <mark>{languages[0][0]}</mark>.</>}
+                                    </p>
+                                ) : <p>Nothing here yet. Start a room and it will show up in this list.</p>}
                             </div>
-                        ) : activeTab === 'rooms' ? (
-                            filteredRooms.length > 0 ? (
-                                <div className="responsive-grid">
-                                    {filteredRooms.map((room) => (
-                                        <div
-                                            key={room.id}
-                                            style={sharpItemCardStyle}
-                                            onMouseOver={(e) => {
-                                                e.currentTarget.style.borderColor = "var(--primary)";
-                                                e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.02)";
-                                            }}
-                                            onMouseOut={(e) => {
-                                                e.currentTarget.style.borderColor = "var(--border-color)";
-                                                e.currentTarget.style.backgroundColor = "transparent";
-                                            }}
-                                        >
-                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                                                <span style={sharpLangBadgeStyle(room.lang)}>
-                                                    {room.lang}
-                                                </span>
-                                                <div style={{ position: 'relative' }} className="action-menu-container">
-                                                    <button
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            setShowActionMenu(showActionMenu === room.id ? null : room.id);
-                                                        }}
-                                                        style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '4px' }}
-                                                    >
-                                                        <MoreVertical size={16} />
-                                                    </button>
-                                                    {showActionMenu === room.id && (
-                                                        <div style={sharpMenuStyle}>
-                                                            <button onClick={() => { setShowRenameModal(room); setShowActionMenu(null); }} style={menuButtonStyle}><Edit2 size={13} /> Rename</button>
-                                                            <button onClick={() => { setShowDeleteModal(room); setShowActionMenu(null); }} style={{ ...menuButtonStyle, color: '#f87171' }}><Trash2 size={13} /> Delete</button>
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            </div>
-                                            <h4 style={{ fontSize: '16px', fontWeight: '700', marginBottom: '4px', color: 'var(--text-main)' }}>{room.name}</h4>
-                                            <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '24px', fontFamily: 'monospace' }}>ID: {room.id}</p>
-                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 'auto' }}>
-                                                <div style={{ color: 'var(--text-muted)', fontSize: '11px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                                    <Calendar size={12} /> {room.lastActive?.split(',')[0] || "Just now"}
-                                                </div>
-                                                <button onClick={() => navigate(`/editor/${room.id}`)} style={sharpCardButtonStyle}>Open Workspace</button>
-                                            </div>
-                                        </div>
+
+                            <div>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 10 }}>
+                                    <span className="u-label">Activity · {DAYS} days</span>
+                                    <span className="u-label">{bars.reduce((a, b) => a + b, 0)}</span>
+                                </div>
+                                <div className="d-bars" aria-label="Rooms and projects touched per day">
+                                    {bars.map((n, i) => (
+                                        <i key={i} className={n === 0 ? 'zero' : ''} title={`${n}`} style={{ height: `${n === 0 ? 100 : Math.max(8, (n / maxBar) * 100)}%`, '--d': `${i * 35}ms`, opacity: n === 0 ? 0.6 : 1 }} />
                                     ))}
                                 </div>
-                            ) : (
-                                <div style={emptyStateStyle}>
-                                    <Terminal size={48} style={{ opacity: 0.1, marginBottom: '16px' }} />
-                                    <p>No rooms found matching your search</p>
-                                </div>
-                            )
-                        ) : (
-                            projects.length > 0 ? (
-                                <div className="responsive-grid">
-                                    {projects.map((proj) => (
-                                        <div
-                                            key={proj.id}
-                                            style={sharpItemCardStyle}
-                                            onMouseOver={(e) => {
-                                                e.currentTarget.style.borderColor = "var(--primary)";
-                                                e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.02)";
-                                            }}
-                                            onMouseOut={(e) => {
-                                                e.currentTarget.style.borderColor = "var(--border-color)";
-                                                e.currentTarget.style.backgroundColor = "transparent";
-                                            }}
-                                        >
-                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-                                                <div style={{ color: 'var(--primary)' }}><Folder size={24} /></div>
-                                                <div style={{ position: 'relative' }} className="action-menu-container">
-                                                    <button
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            setShowActionMenu(showActionMenu === proj.id ? null : proj.id);
-                                                        }}
-                                                        style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '4px' }}
-                                                    >
-                                                        <MoreVertical size={16} />
-                                                    </button>
-                                                    {showActionMenu === proj.id && (
-                                                        <div style={sharpMenuStyle}>
-                                                            <button onClick={() => { setShowDeleteModal({ ...proj, isProject: true }); setShowActionMenu(null); }} style={{ ...menuButtonStyle, color: '#f87171' }}><Trash2 size={13} /> Delete</button>
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            </div>
-                                            <h4 style={{ fontSize: '18px', fontWeight: '800', marginBottom: '8px', color: 'var(--text-main)' }}>{proj.name}</h4>
-                                            <p style={{ fontSize: '13px', color: 'var(--text-muted)', lineHeight: '1.6', marginBottom: '24px' }}>{proj.description || "Multi-file project workspace"}</p>
-                                            <button onClick={() => navigate(`/project/${proj.id}`)} style={sharpCardButtonStyle}>Join Project</button>
-                                        </div>
+                                <div className="d-bars-x"><span>{DAYS}d ago</span><span>today</span></div>
+                            </div>
+
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                                <span className="u-label">Getting started</span>
+                                <ul className="d-check">
+                                    {checklist.map((c) => (
+                                        <li key={c.text} className={c.done ? 'done' : ''}><i>{c.done && <Check size={11} strokeWidth={3} />}</i>{c.text}</li>
                                     ))}
-                                </div>
-                            ) : (
-                                <div style={emptyStateStyle}>
-                                    <Folder size={48} style={{ opacity: 0.1, marginBottom: '16px' }} />
-                                    <p>No projects created yet</p>
-                                </div>
-                            )
-                        )}
+                                </ul>
+                            </div>
+                        </aside>
                     </div>
                 </div>
+            </section>
 
-                {/* Modals - Clean Overlays */}
-                {(showRenameModal || showDeleteModal || showCreateProjectModal) && (
-                    <div style={modalOverlayStyle}>
-                        {showCreateProjectModal && (
-                            <div style={modalContentStyle}>
-                                <h3 style={{ fontSize: '18px', fontWeight: '700', marginBottom: '8px' }}>Create Pro Project</h3>
-                                <p style={{ color: 'var(--text-muted)', marginBottom: '20px', fontSize: '13px' }}>Start a multi-file workspace with real-time preview.</p>
-                                <form onSubmit={handleCreateProject}>
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                                        <div>
-                                            <label style={{ fontSize: '11px', fontWeight: '800', color: 'var(--text-muted)', marginBottom: '8px', display: 'block' }}>PROJECT NAME</label>
-                                            <input
-                                                style={modalInputStyle}
-                                                value={newProjectName}
-                                                onChange={(e) => setNewProjectName(e.target.value)}
-                                                placeholder="e.g. My Portfolio Website"
-                                                autoFocus
-                                            />
-                                        </div>
-                                        <div>
-                                            <label style={{ fontSize: '11px', fontWeight: '800', color: 'var(--text-muted)', marginBottom: '8px', display: 'block' }}>DESCRIPTION</label>
-                                            <input
-                                                style={modalInputStyle}
-                                                value={newProjectDesc}
-                                                onChange={(e) => setNewProjectDesc(e.target.value)}
-                                                placeholder="Short summary of your project..."
-                                            />
-                                        </div>
-                                        <div>
-                                            <label style={{ fontSize: '11px', fontWeight: '800', color: 'var(--text-muted)', marginBottom: '8px', display: 'block' }}>SELECT TEMPLATE</label>
-                                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px', marginTop: '8px' }}>
-                                                {[
-                                                    { id: 'web', name: 'Web Starter', desc: 'HTML5, CSS3 & JS', icon: <Globe size={18} /> },
-                                                    { id: 'cpp', name: 'C++ Console', desc: 'main.cpp structure', icon: <Terminal size={18} /> },
-                                                    { id: 'python', name: 'Python Script', desc: 'main.py script', icon: <FileCode size={18} /> },
-                                                    { id: 'java', name: 'Java Class', desc: 'Main.java boiler', icon: <Coffee size={18} /> }
-                                                ].map(tpl => {
-                                                    const isSelected = newProjectType === tpl.id;
-                                                    return (
-                                                        <div
-                                                            key={tpl.id}
-                                                            onClick={() => setNewProjectType(tpl.id)}
-                                                            style={{
-                                                                padding: '12px 14px',
-                                                                borderRadius: 'var(--radius-card)',
-                                                                border: isSelected ? '1.5px solid var(--primary)' : '1px solid var(--border-color)',
-                                                                backgroundColor: isSelected ? 'rgba(59, 130, 246, 0.05)' : 'var(--bg-dark)',
-                                                                cursor: 'pointer',
-                                                                transition: 'all var(--transition-normal)',
-                                                                display: 'flex',
-                                                                alignItems: 'center',
-                                                                gap: '10px',
-                                                                textAlign: 'left'
-                                                            }}
-                                                        >
-                                                            <div style={{
-                                                                color: isSelected ? 'var(--primary)' : 'var(--text-muted)',
-                                                                backgroundColor: isSelected ? 'rgba(59, 130, 246, 0.1)' : 'rgba(255,255,255,0.02)',
-                                                                width: '32px',
-                                                                height: '32px',
-                                                                borderRadius: 'var(--radius-btn)',
-                                                                display: 'flex',
-                                                                alignItems: 'center',
-                                                                justifyContent: 'center',
-                                                                flexShrink: 0
-                                                            }}>
-                                                                {tpl.icon}
-                                                            </div>
-                                                            <div style={{ flex: 1, minWidth: 0 }}>
-                                                                <div style={{ fontSize: '12px', fontWeight: '700', color: isSelected ? 'var(--primary)' : 'var(--text-main)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{tpl.name}</div>
-                                                                <div style={{ fontSize: '10px', color: 'var(--text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{tpl.desc}</div>
-                                                            </div>
-                                                        </div>
-                                                    );
-                                                })}
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div style={{ display: 'flex', gap: '12px', marginTop: '32px', justifyContent: 'flex-end' }}>
-                                        <button type="button" onClick={() => setShowCreateProjectModal(false)} style={{ ...cancelButtonStyle, flex: 1 }}>Cancel</button>
-                                        <button type="submit" style={{ ...confirmButtonStyle, flex: 1 }}>Create Project</button>
-                                    </div>
-                                </form>
-                            </div>
-                        )}
-                        {showRenameModal && (
-                            <div style={modalContentStyle}>
-                                <h3 style={{ fontSize: '18px', fontWeight: '700', marginBottom: '8px' }}>Rename Workspace</h3>
-                                <p style={{ color: 'var(--text-muted)', marginBottom: '20px', fontSize: '13px' }}>Enter a new name for this collaborative space.</p>
-                                <input
-                                    style={modalInputStyle}
-                                    value={newName}
-                                    onChange={(e) => setNewName(e.target.value)}
-                                    placeholder="Workspace name"
-                                    autoFocus
-                                />
-                                <div style={{ display: 'flex', gap: '12px', marginTop: '24px', justifyContent: 'flex-end' }}>
-                                    <button onClick={() => setShowRenameModal(null)} style={cancelButtonStyle}>Cancel</button>
-                                    <button onClick={() => handleRenameRoom(showRenameModal.id)} style={confirmButtonStyle}>Rename</button>
-                                </div>
-                            </div>
-                        )}
-
-                        {showDeleteModal && (
-                            <div style={modalOverlayStyle} onClick={() => setShowDeleteModal(null)}>
-                                <div style={modalContentStyle} onClick={e => e.stopPropagation()}>
-                                    <h2 style={{ fontSize: '20px', fontWeight: '800', marginBottom: '8px', color: '#f87171' }}>Confirm Delete</h2>
-                                    <p style={{ fontSize: '14px', color: 'var(--text-muted)', marginBottom: '24px' }}>
-                                        Are you sure you want to delete <strong>{showDeleteModal.name}</strong>? This action cannot be undone.
-                                    </p>
-                                    <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
-                                        <button onClick={() => setShowDeleteModal(null)} style={cancelButtonStyle}>Cancel</button>
-                                        <button
-                                            onClick={() => {
-                                                if (showDeleteModal.isProject) handleDeleteProject(showDeleteModal.id);
-                                                else handleDeleteRoom(showDeleteModal.id);
-                                            }}
-                                            style={{ ...confirmButtonStyle, backgroundColor: '#f87171' }}
-                                        >
-                                            Delete
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                        )}
+            <Modal
+                open={createOpen}
+                onClose={() => setCreateOpen(false)}
+                label="New project"
+                title="Start a project"
+                description="A multi-file workspace with live preview, history and invites."
+                onSubmit={handleCreateProject}
+                footer={<>
+                    <button type="button" className="u-btn u-btn--ghost" onClick={() => setCreateOpen(false)}>Cancel</button>
+                    <button type="submit" className="u-btn u-btn--solid" disabled={busy}>{busy ? 'Creating…' : 'Create project'}</button>
+                </>}
+            >
+                <div className="u-field">
+                    <label htmlFor="np-name">Name</label>
+                    <input id="np-name" className="u-input" autoFocus value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="e.g. Portfolio website" />
+                </div>
+                <div className="u-field">
+                    <label htmlFor="np-desc">Description <span className="u-faint">(optional)</span></label>
+                    <input id="np-desc" className="u-input" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="One line about what it does" />
+                </div>
+                <div className="u-field">
+                    <span className="u-field-label">Template</span>
+                    <div className="u-tiles">
+                        {TEMPLATES.map(({ id, name, desc, icon: Icon }) => (
+                            <button type="button" key={id} className={`u-tile${form.type === id ? ' on' : ''}`} onClick={() => setForm({ ...form, type: id })} aria-pressed={form.type === id}>
+                                <span className="u-tile-ico"><Icon size={17} /></span>
+                                <span><b>{name}</b><span>{desc}</span></span>
+                            </button>
+                        ))}
                     </div>
-                )}
-            </div>
+                </div>
+            </Modal>
+
+            <Modal
+                open={!!renameTarget}
+                onClose={() => setRenameTarget(null)}
+                label={`room/${renameTarget?.id || ''}`}
+                title="Rename room"
+                onSubmit={handleRename}
+                footer={<>
+                    <button type="button" className="u-btn u-btn--ghost" onClick={() => setRenameTarget(null)}>Cancel</button>
+                    <button type="submit" className="u-btn u-btn--solid" disabled={busy || !newName.trim()}>Rename</button>
+                </>}
+            >
+                <div className="u-field">
+                    <label htmlFor="rn-name">Room name</label>
+                    <input id="rn-name" className="u-input" autoFocus value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Room name" />
+                </div>
+            </Modal>
+
+            <Modal
+                open={!!deleteTarget}
+                onClose={() => setDeleteTarget(null)}
+                label={deleteTarget?.kind === 'project' ? 'Delete project' : 'Delete room'}
+                title={`Delete “${deleteTarget?.name || deleteTarget?.id || ''}”?`}
+                description="This can't be undone."
+                footer={<>
+                    <button type="button" className="u-btn u-btn--ghost" onClick={() => setDeleteTarget(null)}>Cancel</button>
+                    <button type="button" className="u-btn u-btn--danger" disabled={busy} onClick={handleDelete}><Trash2 size={15} /> Delete</button>
+                </>}
+            />
         </AppLayout>
     );
-};
-
-// Styles
-// Modern Sharp Styles
-const workspaceCardStyle = {
-    backgroundColor: 'var(--glass-bg)',
-    border: '1px solid var(--border-color)',
-    borderRadius: 'var(--radius-card)',
-    boxShadow: 'var(--glass-shadow)',
-    overflow: 'hidden',
-    backdropFilter: 'blur(var(--glass-blur))'
-};
-
-const workspaceHeaderStyle = {
-    padding: '16px 24px',
-    borderBottom: '1px solid var(--border-color)',
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.01)',
-    flexWrap: 'wrap',
-    gap: '20px'
-};
-
-const pillTabContainerStyle = {
-    display: 'flex',
-    backgroundColor: 'var(--bg-dark)',
-    padding: '4px',
-    borderRadius: 'var(--radius-btn)',
-    border: '1px solid var(--border-color)'
-};
-
-const pillTabButtonStyle = (active) => ({
-    padding: '8px 24px',
-    borderRadius: '8px',
-    backgroundColor: active ? 'var(--bg-card)' : 'transparent',
-    color: active ? 'var(--primary)' : 'var(--text-muted)',
-    border: 'none',
-    fontSize: '13px',
-    fontWeight: '700',
-    cursor: 'pointer',
-    transition: 'all var(--transition-fast)',
-    boxShadow: active ? '0 2px 8px rgba(0,0,0,0.15)' : 'none',
-    fontFamily: "'Outfit', sans-serif"
-});
-
-const searchContainerStyle = {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '12px',
-    padding: '10px 16px',
-    backgroundColor: 'var(--bg-dark)',
-    borderRadius: 'var(--radius-btn)',
-    border: '1px solid var(--border-color)',
-    minWidth: window.innerWidth < 768 ? '180px' : '280px',
-    transition: 'border-color var(--transition-normal)'
-};
-
-const searchInputStyle = {
-    background: 'transparent',
-    border: 'none',
-    color: 'var(--text-main)',
-    fontSize: '14px',
-    width: '100%',
-    outline: 'none'
-};
-
-const sharpItemCardStyle = {
-    padding: '24px',
-    backgroundColor: 'var(--glass-bg)',
-    borderRadius: 'var(--radius-card)',
-    border: '1px solid var(--glass-border)',
-    boxShadow: 'var(--glass-shadow)',
-    display: 'flex',
-    flexDirection: 'column',
-    transition: 'all var(--transition-spring)',
-    minHeight: '180px',
-    cursor: 'pointer'
-};
-
-const sharpCardButtonStyle = {
-    padding: '8px 16px',
-    borderRadius: 'var(--radius-badge)',
-    backgroundColor: 'var(--bg-dark)',
-    border: '1px solid var(--border-color)',
-    color: 'var(--text-main)',
-    fontWeight: '700',
-    fontSize: '12px',
-    cursor: 'pointer',
-    transition: 'all var(--transition-normal)',
-    fontFamily: "'Outfit', sans-serif"
-};
-
-const sharpLangBadgeStyle = (lang) => ({
-    fontSize: '10px',
-    fontWeight: '800',
-    padding: '4px 8px',
-    backgroundColor: 'rgba(59, 130, 246, 0.08)',
-    color: 'var(--primary)',
-    borderRadius: 'var(--radius-badge)',
-    textTransform: 'uppercase',
-    fontFamily: "'Outfit', sans-serif"
-});
-
-const sharpMenuStyle = {
-    position: 'absolute',
-    right: 0,
-    top: '28px',
-    backgroundColor: 'var(--bg-floating)',
-    border: '1px solid var(--border-color)',
-    borderRadius: 'var(--radius-btn)',
-    padding: '6px',
-    zIndex: 100,
-    minWidth: '140px',
-    boxShadow: '0 8px 24px rgba(0,0,0,0.3)',
-    backdropFilter: 'blur(12px)'
-};
-
-const emptyStateStyle = {
-    padding: '80px 20px',
-    textAlign: 'center',
-    color: 'var(--text-muted)',
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center'
-};
-
-const menuButtonStyle = {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '8px',
-    width: '100%',
-    padding: '8px 12px',
-    border: 'none',
-    backgroundColor: 'transparent',
-    color: 'var(--text-main)',
-    fontSize: '13px',
-    fontWeight: '600',
-    cursor: 'pointer',
-    textAlign: 'left',
-    borderRadius: '6px',
-    transition: 'background var(--transition-fast)'
-};
-
-const modalOverlayStyle = {
-    position: 'fixed',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: 1000,
-    padding: '24px',
-    backdropFilter: 'blur(8px)'
-};
-
-const modalContentStyle = {
-    backgroundColor: 'var(--bg-floating)',
-    padding: '32px',
-    borderRadius: 'var(--radius-card)',
-    border: '1px solid var(--border-color)',
-    width: '100%',
-    maxWidth: '480px',
-    boxShadow: 'var(--glass-shadow)',
-    position: 'relative',
-    backdropFilter: 'blur(16px)'
-};
-
-const modalInputStyle = {
-    width: '100%',
-    padding: '14px 16px',
-    backgroundColor: 'var(--bg-dark)',
-    border: '1px solid var(--border-color)',
-    borderRadius: 'var(--radius-btn)',
-    color: 'var(--text-main)',
-    fontSize: '15px',
-    outline: 'none',
-    transition: 'border-color var(--transition-normal)',
-    boxSizing: 'border-box'
-};
-
-const cancelButtonStyle = {
-    padding: '12px 20px',
-    backgroundColor: 'transparent',
-    border: '1px solid var(--border-color)',
-    borderRadius: 'var(--radius-btn)',
-    color: 'var(--text-muted)',
-    fontSize: '14px',
-    fontWeight: '600',
-    cursor: 'pointer',
-    transition: 'all var(--transition-normal)'
-};
-
-const confirmButtonStyle = {
-    padding: '12px 24px',
-    backgroundColor: 'var(--primary)',
-    border: 'none',
-    borderRadius: 'var(--radius-btn)',
-    color: 'white',
-    fontSize: '14px',
-    fontWeight: '700',
-    cursor: 'pointer',
-    transition: 'all var(--transition-normal)',
-    boxShadow: '0 4px 12px rgba(59, 130, 246, 0.3)'
-};
-
-const carouselBtnStyle = {
-    border: '1px solid var(--border-color)',
-    background: 'var(--bg-card)',
-    color: 'var(--text-main)',
-    padding: '8px',
-    borderRadius: '8px',
-    cursor: 'pointer',
-    transition: 'all var(--transition-normal)',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center'
 };
 
 export default Dashboard;

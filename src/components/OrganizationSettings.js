@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { X, Plus, Users, Shield, Mail } from 'lucide-react';
+import { Plus, Mail, Trash2 } from 'lucide-react';
+import { Modal } from './ux/primitives';
 import { getBackendUrl } from '../utils/api';
 import toast from 'react-hot-toast';
 
@@ -122,217 +123,88 @@ const OrganizationSettings = ({ isOpen, onClose, userId, userName }) => {
     if (!isOpen) return null;
 
     return (
-        <div style={overlayStyle} onClick={onClose}>
-            <div style={modalStyle} onClick={e => e.stopPropagation()}>
-                <div style={headerStyle}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                        <Users size={24} color="var(--primary)" />
-                        <div>
-                            <h2 style={{ margin: 0, fontSize: '20px', fontWeight: '800' }}>Team Vaults</h2>
-                            <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-muted)' }}>Collaborate on snippets with your team</p>
-                        </div>
+        <Modal open onClose={onClose} wide label="Teams" title="Team vaults" description="Share snippets with the people you work with.">
+            <div className="og-grid">
+                <aside className="og-side">
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span className="u-label">Your teams · {organizations.length || 0}</span>
+                        <button type="button" className={`u-icon${showCreate ? ' on' : ''}`} onClick={() => setShowCreate(true)} aria-label="New team"><Plus size={16} /></button>
                     </div>
-                    <button onClick={onClose} style={closeButtonStyle}><X size={20} /></button>
-                </div>
-
-                <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
-                    {/* Sidebar: Org List */}
-                    <div style={sidebarStyle}>
-                        <div style={{ padding: '16px', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <span style={{ fontSize: '11px', fontWeight: '700', color: 'var(--text-muted)' }}>YOUR TEAMS</span>
-                            <button onClick={() => setShowCreate(true)} style={plusButtonStyle}><Plus size={14} /></button>
-                        </div>
-                        <div style={{ flex: 1, overflowY: 'auto', padding: '8px' }}>
-                            {organizations.map(org => (
-                                <div
-                                    key={org.id}
-                                    onClick={() => handleSelectOrg(org)}
-                                    style={orgItemStyle(activeOrg?.id === org.id)}
-                                >
-                                    <Shield size={14} style={{ opacity: 0.6 }} />
-                                    <span style={{ fontSize: '14px', fontWeight: '600' }}>{org.name}</span>
-                                </div>
+                    {loading ? (
+                        <div className="u-skel" style={{ height: 80 }} />
+                    ) : organizations.length === 0 ? (
+                        <p className="u-small u-muted" style={{ margin: '8px 0' }}>No teams yet.</p>
+                    ) : (
+                        <div className="d-side" style={{ position: 'static', padding: 0 }}>
+                            {organizations.map((org) => (
+                                <button type="button" key={org.id} className={activeOrg?.id === org.id && !showCreate ? 'on' : ''} onClick={() => { setShowCreate(false); setShowDeleteConfirm(false); handleSelectOrg(org); }}>
+                                    <span className="u-ellipsis">{org.name}</span>
+                                </button>
                             ))}
-                            {organizations.length === 0 && !loading && (
-                                <p style={{ padding: '20px', fontSize: '12px', color: 'var(--text-muted)', textAlign: 'center' }}>No teams yet</p>
+                        </div>
+                    )}
+                </aside>
+
+                <section className="og-main">
+                    {showCreate ? (
+                        <form onSubmit={handleCreateOrg} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                            <h4 className="og-title">New team</h4>
+                            <div className="u-field">
+                                <label htmlFor="org-name">Team name</label>
+                                <input id="org-name" className="u-input" autoFocus placeholder="e.g. Platform team" value={newOrgName} onChange={(e) => setNewOrgName(e.target.value)} />
+                            </div>
+                            <div style={{ display: 'flex', gap: 8 }}>
+                                <button type="button" className="u-btn u-btn--ghost" onClick={() => setShowCreate(false)}>Cancel</button>
+                                <button type="submit" className="u-btn u-btn--solid" disabled={!newOrgName.trim()}>Create team</button>
+                            </div>
+                        </form>
+                    ) : activeOrg ? (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+                            <h4 className="og-title">{activeOrg.name}</h4>
+                            <form className="h-join" onSubmit={handleInvite}>
+                                <input className="u-input" type="email" placeholder="teammate@company.com" value={inviteEmail} onChange={(e) => setInviteEmail(e.target.value)} aria-label="Invite by email" />
+                                <button type="submit" className="u-btn u-btn--solid u-btn--lg" disabled={!inviteEmail.trim()}><Mail size={15} /> Invite</button>
+                            </form>
+                            <div>
+                                <span className="u-label">Members · {members.length || 0}</span>
+                                <div className="ws-people" style={{ padding: '8px 0 0' }}>
+                                    {(Array.isArray(members) ? members : []).map((m) => (
+                                        <div key={m.id || m.email} className="ws-person" style={{ padding: '8px 4px' }}>
+                                            <span className="ws-person-av" style={{ background: 'var(--u-mark)' }}>{(m.name || m.email || '?').slice(0, 2).toUpperCase()}</span>
+                                            <div style={{ minWidth: 0 }}>
+                                                <b style={{ display: 'block' }} className="u-ellipsis">{m.name || m.email}</b>
+                                                <span className="u-mono u-faint u-ellipsis" style={{ fontSize: 11, display: 'block' }}>{m.email}</span>
+                                            </div>
+                                            <em>{m.role}</em>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                            {activeOrg.role === 'admin' && (
+                                <div style={{ borderTop: '1px solid var(--u-line)', paddingTop: 16 }}>
+                                    {!showDeleteConfirm ? (
+                                        <button type="button" className="u-btn u-btn--ghost u-btn--sm" style={{ color: 'var(--u-bad)' }} onClick={() => setShowDeleteConfirm(true)}><Trash2 size={14} /> Delete team</button>
+                                    ) : (
+                                        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                                            <span className="u-small" style={{ color: 'var(--u-bad)' }}>Delete “{activeOrg.name}” for everyone?</span>
+                                            <button type="button" className="u-btn u-btn--ghost u-btn--sm" onClick={() => setShowDeleteConfirm(false)}>Cancel</button>
+                                            <button type="button" className="u-btn u-btn--danger u-btn--sm" onClick={handleDeleteOrg}>Delete</button>
+                                        </div>
+                                    )}
+                                </div>
                             )}
                         </div>
-                    </div>
-
-                    {/* Main Content: Members & Settings */}
-                    <div style={contentStyle}>
-                        {showCreate ? (
-                            <div style={formContainerStyle}>
-                                <h3 style={{ marginTop: 0 }}>Create New Team</h3>
-                                <form onSubmit={handleCreateOrg}>
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '16px' }}>
-                                        <label style={labelStyle}>TEAM NAME</label>
-                                        <input
-                                            value={newOrgName}
-                                            onChange={e => setNewOrgName(e.target.value)}
-                                            placeholder="e.g. Frontend Squad"
-                                            style={inputStyle}
-                                            autoFocus
-                                        />
-                                    </div>
-                                    <div style={{ display: 'flex', gap: '12px' }}>
-                                        <button type="button" onClick={() => setShowCreate(false)} style={secondaryButtonStyle}>Cancel</button>
-                                        <button type="submit" style={primaryButtonStyle}>Create Team</button>
-                                    </div>
-                                </form>
-                            </div>
-                        ) : activeOrg ? (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', padding: '24px' }}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                    <h3 style={{ margin: 0 }}>{activeOrg.name}</h3>
-                                    <span style={roleBadgeStyle}>{activeOrg.role}</span>
-                                </div>
-
-                                <div style={memberSectionStyle}>
-                                    <label style={labelStyle}>INVITE MEMBER</label>
-                                    <form onSubmit={handleInvite} style={{ display: 'flex', gap: '8px' }}>
-                                        <div style={{ flex: 1, position: 'relative' }}>
-                                            <Mail size={14} style={inputIconStyle} />
-                                            <input
-                                                type="email"
-                                                value={inviteEmail}
-                                                onChange={e => setInviteEmail(e.target.value)}
-                                                placeholder="colleague@example.com"
-                                                style={{ ...inputStyle, paddingLeft: '36px' }}
-                                            />
-                                        </div>
-                                        <button type="submit" style={inviteButtonStyle}>Add</button>
-                                    </form>
-                                </div>
-
-                                <div style={{ flex: 1 }}>
-                                    <label style={labelStyle}>TEAM MEMBERS ({members.length})</label>
-                                    <div style={memberListStyle}>
-                                        {members.map(member => (
-                                            <div key={member.id} style={memberItemStyle}>
-                                                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                                                    <div style={avatarStyle}>{member.name[0]}</div>
-                                                    <div>
-                                                        <div style={{ fontSize: '14px', fontWeight: '600' }}>{member.name}</div>
-                                                        <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{member.email}</div>
-                                                    </div>
-                                                </div>
-                                                <span style={{ fontSize: '11px', opacity: 0.6 }}>{member.role}</span>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-
-                                {activeOrg.role === 'admin' && (
-                                    <div style={{ marginTop: 'auto', paddingTop: '20px', borderTop: '1px solid var(--border-color)' }}>
-                                        {!showDeleteConfirm ? (
-                                            <button
-                                                onClick={() => setShowDeleteConfirm(true)}
-                                                style={{ ...secondaryButtonStyle, color: '#ef4444', borderColor: 'rgba(239, 68, 68, 0.2)', width: '100%' }}
-                                            >
-                                                Delete Team
-                                            </button>
-                                        ) : (
-                                            <div style={{ padding: '16px', backgroundColor: 'rgba(239, 68, 68, 0.05)', borderRadius: '12px', border: '1px solid rgba(239, 68, 68, 0.2)' }}>
-                                                <p style={{ margin: '0 0 12px', fontSize: '13px', color: '#ef4444', fontWeight: '600' }}>Confirm deletion? This cannot be undone.</p>
-                                                <div style={{ display: 'flex', gap: '8px' }}>
-                                                    <button onClick={() => setShowDeleteConfirm(false)} style={{ ...secondaryButtonStyle, flex: 1 }}>Cancel</button>
-                                                    <button onClick={handleDeleteOrg} style={{ ...primaryButtonStyle, backgroundColor: '#ef4444', flex: 1 }}>Confirm Delete</button>
-                                                </div>
-                                            </div>
-                                        )}
-                                    </div>
-                                )}
-                            </div>
-                        ) : (
-                            <div style={emptyContentStyle}>
-                                <Users size={48} style={{ opacity: 0.1, marginBottom: '16px' }} />
-                                <p>Select a team to manage members</p>
-                            </div>
-                        )}
-                    </div>
-                </div>
+                    ) : (
+                        <div className="u-empty" style={{ padding: '32px 0' }}>
+                            <span className="u-display">No team</span>
+                            <p>Create a team to share a snippet vault.</p>
+                            <button type="button" className="u-btn u-btn--solid" onClick={() => setShowCreate(true)}><Plus size={15} /> New team</button>
+                        </div>
+                    )}
+                </section>
             </div>
-        </div>
+        </Modal>
     );
 };
-
-const overlayStyle = {
-    position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.6)', backdropFilter: 'blur(8px)',
-    display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 3000
-};
-
-const modalStyle = {
-    backgroundColor: 'var(--bg-floating)', width: '90%', maxWidth: '800px', height: '80vh',
-    borderRadius: 'var(--radius-card)', border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', overflow: 'hidden',
-    boxShadow: 'var(--glass-shadow)', backdropFilter: 'blur(16px)'
-};
-
-const headerStyle = {
-    padding: '24px', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center'
-};
-
-const sidebarStyle = {
-    width: '240px', borderRight: '1px solid var(--border-color)', backgroundColor: 'var(--bg-dark)', display: 'flex', flexDirection: 'column'
-};
-
-const contentStyle = { flex: 1, backgroundColor: 'transparent', overflowY: 'auto' };
-
-const closeButtonStyle = { background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' };
-
-const plusButtonStyle = {
-    padding: '4px', borderRadius: 'var(--radius-badge)', border: '1px solid var(--border-color)', backgroundColor: 'transparent', color: 'var(--primary)', cursor: 'pointer',
-    transition: 'all var(--transition-normal)'
-};
-
-const orgItemStyle = (active) => ({
-    padding: '12px 16px', borderRadius: 'var(--radius-btn)', display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer',
-    backgroundColor: active ? 'rgba(59, 130, 246, 0.1)' : 'transparent', color: active ? 'var(--primary)' : 'var(--text-main)',
-    marginBottom: '4px', transition: 'all var(--transition-normal)',
-    fontFamily: "'Outfit', sans-serif"
-});
-
-const inputStyle = {
-    width: '100%', padding: '12px 14px', backgroundColor: 'var(--bg-dark)', border: '1px solid var(--border-color)',
-    borderRadius: 'var(--radius-btn)', color: 'var(--text-main)', fontSize: '14px', outline: 'none',
-    transition: 'border-color var(--transition-normal)'
-};
-
-const primaryButtonStyle = {
-    padding: '10px 20px', backgroundColor: 'var(--primary)', color: 'white', border: 'none', borderRadius: 'var(--radius-btn)', fontWeight: '700', cursor: 'pointer',
-    transition: 'all var(--transition-spring)', fontFamily: "'Outfit', sans-serif", boxShadow: '0 4px 12px var(--accent-glow)'
-};
-
-const secondaryButtonStyle = {
-    padding: '10px 20px', backgroundColor: 'transparent', color: 'var(--text-muted)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-btn)', fontWeight: '600', cursor: 'pointer',
-    transition: 'all var(--transition-normal)', fontFamily: "'Outfit', sans-serif"
-};
-
-const labelStyle = { fontSize: '11px', fontWeight: '800', color: 'var(--text-muted)', marginBottom: '8px', display: 'block', textTransform: 'uppercase', fontFamily: "'Outfit', sans-serif" };
-
-const roleBadgeStyle = {
-    fontSize: '10px', fontWeight: '800', textTransform: 'uppercase', padding: '4px 8px', backgroundColor: 'rgba(59, 130, 246, 0.1)', color: 'var(--primary)', borderRadius: 'var(--radius-badge)',
-    fontFamily: "'Outfit', sans-serif"
-};
-
-const inputIconStyle = { position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', opacity: 0.4 };
-
-const inviteButtonStyle = { padding: '0 20px', backgroundColor: 'var(--primary)', color: 'white', border: 'none', borderRadius: 'var(--radius-btn)', fontWeight: '700', cursor: 'pointer', fontFamily: "'Outfit', sans-serif" };
-
-const memberListStyle = { display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '12px' };
-
-const memberItemStyle = {
-    padding: '12px', backgroundColor: 'var(--bg-dark)', borderRadius: 'var(--radius-btn)', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-    border: '1px solid var(--border-color)'
-};
-
-const avatarStyle = { width: '32px', height: '32px', borderRadius: '50%', backgroundColor: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: '800', fontSize: '14px', fontFamily: "'Outfit', sans-serif" };
-
-const emptyContentStyle = { height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)' };
-
-const formContainerStyle = { padding: '40px', maxWidth: '400px', margin: '0 auto' };
-
-const memberSectionStyle = { padding: '16px', backgroundColor: 'var(--bg-dark)', borderRadius: 'var(--radius-card)', border: '1px solid var(--border-color)' };
 
 export default OrganizationSettings;

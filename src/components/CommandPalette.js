@@ -140,7 +140,7 @@ const CommandPalette = ({ isOpen, onClose, actions = [], isLightMode }) => {
                 <div style={footerStyle}>
                     <div style={footerItemStyle}><span style={miniKbdStyle}>↑↓</span> Navigate</div>
                     <div style={footerItemStyle}><span style={miniKbdStyle}>↵</span> Select</div>
-                    <div style={footerItemStyle}><span style={miniKbdStyle}>ALT+Z</span> Zen</div>
+                    <div style={footerItemStyle}><span style={miniKbdStyle}>Alt F</span> Focus</div>
                     <div style={footerItemStyle}><span style={miniKbdStyle}>#</span> Files</div>
                 </div>
             </div>
@@ -159,48 +159,50 @@ const CommandPalette = ({ isOpen, onClose, actions = [], isLightMode }) => {
     );
 };
 
-// Styles (Internal to component for maximum control)
+// Styles: follow the workspace tokens so the palette matches both themes.
 const overlayStyle = {
     position: 'fixed',
     inset: 0,
-    backgroundColor: 'rgba(0,0,0,0.4)',
-    backdropFilter: 'blur(12px)',
+    backgroundColor: 'rgba(5,5,4,0.5)',
+    backdropFilter: 'blur(6px)',
     zIndex: 9999,
     display: 'flex',
     alignItems: 'flex-start',
     justifyContent: 'center',
-    paddingTop: '12vh',
+    padding: '12vh 16px 16px',
     animation: 'fadeIn 0.2s ease-out'
 };
 
 const paletteContainerStyle = {
     width: '100%',
     maxWidth: '640px',
-    backgroundColor: 'rgba(15, 23, 42, 0.9)',
-    backdropFilter: 'blur(24px)',
-    border: '1px solid rgba(255,255,255,0.1)',
-    borderRadius: '16px',
-    boxShadow: '0 25px 50px -12px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.05)',
+    backgroundColor: 'var(--u-raise, #181816)',
+    color: 'var(--u-ink, #E8E6DF)',
+    border: '1px solid var(--u-line, rgba(232,230,223,.1))',
+    borderRadius: '20px',
+    boxShadow: 'var(--u-shadow, 0 30px 80px -30px rgba(0,0,0,.7))',
     overflow: 'hidden',
-    animation: 'scaleIn 0.15s ease-out',
+    animation: 'scaleIn 0.25s cubic-bezier(.22,1,.36,1)',
     display: 'flex',
-    flexDirection: 'column'
+    flexDirection: 'column',
+    fontFamily: 'var(--u-text, inherit)'
 };
 
 const headerStyle = {
     display: 'flex',
     alignItems: 'center',
-    padding: '20px 24px',
-    borderBottom: '1px solid rgba(255,255,255,0.06)',
-    gap: '16px'
+    padding: '18px 22px',
+    borderBottom: '1px solid var(--u-line)',
+    gap: '14px',
+    color: 'var(--u-ink-3)'
 };
 
 const inputStyle = {
     flex: 1,
     background: 'none',
     border: 'none',
-    color: '#fff',
-    fontSize: '18px',
+    color: 'var(--u-ink)',
+    fontSize: '19px',
     fontWeight: '500',
     outline: 'none',
     fontFamily: 'inherit',
@@ -208,122 +210,117 @@ const inputStyle = {
 };
 
 const kbdStyle = {
-    padding: '4px 8px',
-    backgroundColor: 'rgba(255,255,255,0.05)',
+    padding: '3px 7px',
     borderRadius: '6px',
-    fontSize: '10px',
-    fontWeight: '800',
-    color: 'rgba(255,255,255,0.4)',
-    border: '1px solid rgba(255,255,255,0.1)'
+    fontSize: '10.5px',
+    fontFamily: 'var(--u-mono)',
+    color: 'var(--u-ink-3)',
+    border: '1px solid var(--u-line)'
 };
 
 const listContainerStyle = {
     maxHeight: '440px',
     overflowY: 'auto',
-    padding: '12px'
+    padding: '8px'
 };
 
 const categoryHeaderStyle = {
     padding: '12px 12px 6px',
-    fontSize: '10px',
-    fontWeight: '900',
-    color: 'var(--primary)',
+    fontSize: '11px',
+    fontFamily: 'var(--u-mono)',
+    color: 'var(--u-ink-3)',
     textTransform: 'uppercase',
-    letterSpacing: '0.12em',
-    opacity: 0.9
+    letterSpacing: '0.08em'
 };
 
 const actionItemStyle = (selected) => ({
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: '12px 16px',
+    padding: '10px 12px',
     borderRadius: '12px',
     cursor: 'pointer',
-    backgroundColor: selected ? 'rgba(59, 130, 246, 0.18)' : 'transparent',
-    transition: 'all 0.15s cubic-bezier(0.4, 0, 0.2, 1)',
-    marginBottom: '2px',
-    transform: selected ? 'translateX(4px)' : 'none'
+    backgroundColor: selected ? 'var(--u-tint)' : 'transparent',
+    boxShadow: selected ? 'inset 2px 0 0 var(--u-accent)' : 'none',
+    transition: 'background-color .15s',
+    marginBottom: '2px'
 });
 
 const actionLeftStyle = {
     display: 'flex',
     alignItems: 'center',
-    gap: '16px'
+    gap: '14px',
+    minWidth: 0
 };
 
 const iconWrapperStyle = (selected) => ({
     width: '32px',
     height: '32px',
+    flex: 'none',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: '10px',
-    backgroundColor: selected ? 'rgba(59, 130, 246, 0.25)' : 'rgba(255,255,255,0.04)',
-    color: selected ? 'var(--primary)' : 'rgba(255,255,255,0.6)',
-    transition: 'all 0.2s ease',
-    border: selected ? '1px solid rgba(59, 130, 246, 0.3)' : '1px solid transparent'
+    backgroundColor: selected ? 'var(--u-solid)' : 'var(--u-tint)',
+    color: selected ? 'var(--u-on-solid)' : 'var(--u-ink-2)',
+    transition: 'all 0.2s ease'
 });
 
 const actionTextContainerStyle = {
     display: 'flex',
-    flexDirection: 'column'
+    flexDirection: 'column',
+    minWidth: 0
 };
 
 const actionLabelStyle = {
     fontSize: '14.5px',
-    fontWeight: '650',
-    color: '#fff'
+    fontWeight: '500',
+    color: 'var(--u-ink)'
 };
 
 const actionDescStyle = {
-    fontSize: '11px',
-    color: 'rgba(255,255,255,0.45)',
-    marginTop: '2px',
-    fontWeight: '500'
+    fontSize: '12px',
+    color: 'var(--u-ink-3)',
+    marginTop: '2px'
 };
 
 const shortcutStyle = (selected) => ({
-    fontSize: '10px',
-    fontWeight: '800',
-    color: selected ? 'var(--primary)' : 'rgba(255,255,255,0.25)',
-    letterSpacing: '0.04em'
+    fontSize: '11px',
+    fontFamily: 'var(--u-mono)',
+    color: selected ? 'var(--u-ink)' : 'var(--u-ink-3)'
 });
 
 const footerStyle = {
-    padding: '12px 24px',
-    backgroundColor: 'rgba(0,0,0,0.25)',
-    borderTop: '1px solid rgba(255,255,255,0.06)',
+    padding: '10px 22px',
+    borderTop: '1px solid var(--u-line)',
     display: 'flex',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: '32px'
+    justifyContent: 'flex-start',
+    gap: '22px',
+    flexWrap: 'wrap'
 };
 
 const footerItemStyle = {
     display: 'flex',
     alignItems: 'center',
-    gap: '8px',
-    fontSize: '10.5px',
-    color: 'rgba(255,255,255,0.4)',
-    fontWeight: '600',
-    letterSpacing: '0.02em'
+    gap: '7px',
+    fontSize: '11px',
+    fontFamily: 'var(--u-mono)',
+    color: 'var(--u-ink-3)'
 };
 
 const miniKbdStyle = {
-    padding: '2px 6px',
-    backgroundColor: 'rgba(255,255,255,0.04)',
-    borderRadius: '4px',
-    border: '1px solid rgba(255,255,255,0.08)',
-    fontSize: '9px',
-    fontWeight: '900',
-    color: 'rgba(255,255,255,0.6)'
+    padding: '1px 6px',
+    borderRadius: '5px',
+    border: '1px solid var(--u-line)',
+    fontSize: '10px',
+    color: 'var(--u-ink-2)'
 };
 
 const emptyStateStyle = {
-    padding: '80px 24px',
+    padding: '64px 24px',
     textAlign: 'center',
-    color: '#fff',
+    color: 'var(--u-ink-2)',
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center'

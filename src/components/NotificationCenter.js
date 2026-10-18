@@ -113,7 +113,7 @@ const NotificationCenter = ({ isOpen, onClose }) => {
 
             <div style={contentStyle}>
                 {loading ? (
-                    <div style={statusTextStyle}><LogoLoader size={30} message="" /></div>
+                    <div style={statusTextStyle}><LogoLoader message="Loading" /></div>
                 ) : notifications.length > 0 ? (
                     notifications.map((n) => (
                         <div key={n.id} style={notificationItemStyle} className="notification-item">
@@ -174,7 +174,7 @@ const headerStyle = {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.02)'
+    backgroundColor: 'var(--u-bg-2)'
 };
 
 const clearButtonStyle = {
@@ -200,7 +200,7 @@ const notificationItemStyle = {
     transition: 'background 0.2s',
     position: 'relative',
     '&:hover': {
-        backgroundColor: 'rgba(255,255,255,0.03)'
+        backgroundColor: 'var(--u-bg-2)'
     }
 };
 
@@ -269,7 +269,7 @@ const pointerStyle = {
 const deleteItemButtonStyle = {
     background: 'rgba(239, 68, 68, 0.1)',
     border: 'none',
-    color: '#ef4444',
+    color: "var(--u-bad)",
     padding: '4px',
     borderRadius: '4px',
     cursor: 'pointer',
@@ -285,7 +285,7 @@ const CustomStyles = () => (
             to { opacity: 1; transform: translateY(0); }
         }
         .notification-item:hover {
-            background-color: rgba(255, 255, 255, 0.03);
+            background-color: var(--u-bg-2);
         }
         .notification-item:hover .delete-btn {
             opacity: 1 !important;

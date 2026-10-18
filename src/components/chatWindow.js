@@ -110,7 +110,7 @@ export default function ChatWindow({ socketRef, roomId, userName, isLightMode, i
                                     ) : (
                                         <div style={{
                                             padding: "8px 12px",
-                                            borderRadius: "12px",
+                                            borderRadius: "18px",
                                             fontSize: "14px",
                                             maxWidth: "80%",
                                             width: "fit-content",
@@ -119,8 +119,8 @@ export default function ChatWindow({ socketRef, roomId, userName, isLightMode, i
                                             whiteSpace: "pre-wrap",
                                             backgroundColor: isMe ? "var(--primary)" : "var(--secondary)",
                                             color: isMe ? "white" : "var(--text-main)",
-                                            borderBottomRightRadius: isMe ? 0 : "12px",
-                                            borderBottomLeftRadius: isMe ? "12px" : 0,
+                                            borderBottomRightRadius: isMe ? "4px" : "18px",
+                                            borderBottomLeftRadius: isMe ? "18px" : "4px",
                                             border: isMe ? "none" : "1px solid var(--border-color)",
                                             boxShadow: "0 2px 4px rgba(0,0,0,0.02)"
                                         }}>

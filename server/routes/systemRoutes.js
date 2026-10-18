@@ -98,4 +98,27 @@ router.get('/search', async (req, res) => {
     }
 });
 
+// Support / contact form (delivered to SUPPORT_EMAIL)
+const escapeHtml = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+router.post('/support', async (req, res) => {
+    try {
+        const { name, email, message } = req.body || {};
+        if (!name || !email || !message) return res.status(400).json({ error: "Name, email and message are required" });
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return res.status(400).json({ error: "Invalid email address" });
+        if (String(message).length > 5000) return res.status(400).json({ error: "Message is too long" });
+
+        const to = process.env.SUPPORT_EMAIL;
+        if (!to) return res.status(503).json({ error: "Support inbox is not configured yet" });
+
+        const html = `<p><strong>${escapeHtml(name)}</strong> &lt;${escapeHtml(email)}&gt;</p><p style="white-space:pre-wrap">${escapeHtml(message)}</p>`;
+        const result = await MailService.sendMail({ to, subject: `Support request from ${String(name).slice(0, 80)}`, html });
+        if (result && result.success === false) return res.status(503).json({ error: "Email delivery is not configured" });
+        res.json({ success: true });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: "Could not send message" });
+    }
+});
+
 module.exports = router;

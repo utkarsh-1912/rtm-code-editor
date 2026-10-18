@@ -1,68 +1,59 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Settings as SettingsIcon, User, Bell, Shield, Palette, Save, Check, Moon, Sun, Monitor, Laptop, Smartphone, Tablet } from 'lucide-react';
+import { Save, Check, Monitor, Laptop, Smartphone, Tablet, LogOut, Trash2 } from 'lucide-react';
+import toast from 'react-hot-toast';
 import AppLayout from '../components/AppLayout';
 import { useAuth } from '../context/AuthContext';
 import { getBackendUrl } from '../utils/api';
-import toast from 'react-hot-toast';
+import { getThemePref, setThemePref } from '../utils/theme';
+import { Modal, pad2, timeAgo } from '../components/ux/primitives';
+
+const SECTIONS = [
+    { id: 'profile', title: 'Profile' },
+    { id: 'appearance', title: 'Appearance' },
+    { id: 'notifications', title: 'Notifications' },
+    { id: 'security', title: 'Security' },
+];
+
+const NOTIFS = [
+    { id: 'joins', title: 'Join and leave alerts', text: 'A note when someone enters or leaves your room.', on: true },
+    { id: 'chat', title: 'Chat messages', text: 'A ping for new messages in room chat.', on: true },
+    { id: 'updates', title: 'Product updates', text: 'New features and planned maintenance.', on: false },
+];
+
+const THEMES = [
+    { id: 'dark', name: 'Night' },
+    { id: 'light', name: 'Paper' },
+    { id: 'system', name: 'System' },
+];
+
+const loadNotifPrefs = () => {
+    const base = Object.fromEntries(NOTIFS.map((n) => [n.id, n.on]));
+    try { return { ...base, ...JSON.parse(localStorage.getItem('notif-prefs') || '{}') }; } catch { return base; }
+};
+
+const deviceIcon = (device) => {
+    const d = (device || '').toLowerCase();
+    if (d.includes('iphone') || d.includes('android')) return <Smartphone size={17} />;
+    if (d.includes('tablet') || d.includes('ipad')) return <Tablet size={17} />;
+    if (d.includes('mac')) return <Laptop size={17} />;
+    return <Monitor size={17} />;
+};
 
 const Settings = () => {
     const { user } = useAuth();
-    const [activeTab, setActiveTab] = useState('profile');
+    const [active, setActive] = useState('profile');
     const [saving, setSaving] = useState(false);
+    const [profile, setProfile] = useState({ name: user?.name || '', bio: '', socials: { twitter: '', github: '' } });
+    const [theme, setTheme] = useState(getThemePref);
+    const [notifs, setNotifs] = useState(loadNotifPrefs);
     const [sessions, setSessions] = useState([]);
-    const [showDeleteModal, setShowDeleteModal] = useState(false);
-
-    const fetchSessions = useCallback(async () => {
-        if (!user) return;
-        try {
-            const response = await fetch(`${getBackendUrl()}/api/sessions?userId=${user.uid}`);
-            const data = await response.json();
-            setSessions(data);
-        } catch (error) {
-            console.error('Failed to fetch sessions:', error);
-        }
-    }, [user]);
+    const [sessionsLoading, setSessionsLoading] = useState(false);
+    const [deleteOpen, setDeleteOpen] = useState(false);
+    const [confirmText, setConfirmText] = useState('');
 
     useEffect(() => {
-        if (activeTab === 'security') {
-            fetchSessions();
-        }
-    }, [activeTab, fetchSessions]);
-
-    const handleSignOutOthers = async () => {
-        const currentId = localStorage.getItem('rtm_db_session_id');
-        try {
-            await fetch(`${getBackendUrl()}/api/sessions/others?userId=${user.uid}&currentSessionId=${currentId || -1}`, {
-                method: 'DELETE'
-            });
-            toast.success('Signed out other devices');
-            fetchSessions();
-        } catch (error) {
-            toast.error('Failed to sign out other devices');
-        }
-    };
-
-    // Profile State
-    const [profile, setProfile] = useState({
-        name: user?.name || '',
-        bio: '',
-        socials: { twitter: '', github: '' }
-    });
-
-    // Theme State
-    const [theme, setTheme] = useState(() => localStorage.getItem('app-theme') || 'dark');
-
-    const sections = [
-        { id: 'profile', title: 'Personal Information', icon: <User size={20} /> },
-        { id: 'appearance', title: 'Appearance & Theme', icon: <Palette size={20} /> },
-        { id: 'notifications', title: 'Notification Center', icon: <Bell size={20} /> },
-        { id: 'security', title: 'Security & Privacy', icon: <Shield size={20} /> }
-    ];
-
-    useEffect(() => {
-        // Fetch existing profile data if needed
-        const fetchProfile = async () => {
-            if (!user?.uid) return;
+        if (!user?.uid) return;
+        (async () => {
             try {
                 const res = await fetch(`${getBackendUrl()}/api/user-dashboard?userId=${user.uid}`);
                 const data = await res.json();
@@ -70,527 +61,261 @@ const Settings = () => {
                     setProfile({
                         name: data.user.name || user.name || '',
                         bio: data.user.bio || '',
-                        socials: data.user.social_links || { twitter: '', github: '' }
+                        socials: { twitter: '', github: '', ...(data.user.social_links || {}) },
                     });
                 }
             } catch (err) {
-                console.error("Failed to fetch profile:", err);
+                console.error('Failed to fetch profile:', err);
             }
-        };
-        fetchProfile();
+        })();
     }, [user]);
 
-    const handleSaveProfile = async (e) => {
+    const fetchSessions = useCallback(async () => {
+        if (!user) return;
+        setSessionsLoading(true);
+        try {
+            const res = await fetch(`${getBackendUrl()}/api/sessions?userId=${user.uid}`);
+            const data = await res.json();
+            setSessions(Array.isArray(data) ? data : []);
+        } catch (error) {
+            console.error('Failed to fetch sessions:', error);
+        } finally {
+            setSessionsLoading(false);
+        }
+    }, [user]);
+
+    useEffect(() => { if (active === 'security') fetchSessions(); }, [active, fetchSessions]);
+
+    const saveProfile = async (e) => {
         e.preventDefault();
         setSaving(true);
         try {
             const res = await fetch(`${getBackendUrl()}/api/user/profile`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    userId: user.uid,
-                    profileData: {
-                        name: profile.name,
-                        bio: profile.bio,
-                        social_links: profile.socials
-                    }
-                })
+                body: JSON.stringify({ userId: user.uid, profileData: { name: profile.name, bio: profile.bio, social_links: profile.socials } }),
             });
-
-            if (res.ok) {
-                toast.success("Profile updated successfully");
-            } else {
-                toast.error("Failed to update profile");
-            }
-        } catch (err) {
-            toast.error("An error occurred");
+            if (res.ok) toast.success('Profile saved');
+            else toast.error('Failed to update profile');
+        } catch {
+            toast.error('An error occurred');
         } finally {
             setSaving(false);
         }
     };
 
-    const handleThemeChange = (newTheme) => {
-        setTheme(newTheme);
-        localStorage.setItem('app-theme', newTheme);
-        if (newTheme === 'light') {
-            document.documentElement.classList.add('light-theme');
-        } else {
-            document.documentElement.classList.remove('light-theme');
-        }
-        toast.success(`Theme set to ${newTheme}`);
+    const chooseTheme = (id) => {
+        setTheme(id);
+        setThemePref(id);
     };
 
-    const handleDeleteAccount = async () => {
+    const toggleNotif = (id) => {
+        const next = { ...notifs, [id]: !notifs[id] };
+        setNotifs(next);
+        try { localStorage.setItem('notif-prefs', JSON.stringify(next)); } catch { /* storage blocked */ }
+    };
+
+    const signOutOthers = async () => {
+        const currentId = localStorage.getItem('rtm_db_session_id');
         try {
-            const res = await fetch(`${getBackendUrl()}/api/user?userId=${user.uid}`, {
-                method: 'DELETE'
-            });
+            await fetch(`${getBackendUrl()}/api/sessions/others?userId=${user.uid}&currentSessionId=${currentId || -1}`, { method: 'DELETE' });
+            toast.success('Signed out other devices');
+            fetchSessions();
+        } catch {
+            toast.error('Failed to sign out other devices');
+        }
+    };
+
+    const deleteAccount = async () => {
+        try {
+            const res = await fetch(`${getBackendUrl()}/api/user?userId=${user.uid}`, { method: 'DELETE' });
             if (res.ok) {
-                toast.success("Account deleted permanently");
+                toast.success('Account deleted');
                 window.location.href = '/login';
             } else {
-                toast.error("Failed to delete account");
+                toast.error('Failed to delete account');
             }
-        } catch (err) {
-            toast.error("An error occurred");
+        } catch {
+            toast.error('An error occurred');
         }
     };
 
-    const renderContent = () => {
-        switch (activeTab) {
-            case 'profile':
-                return (
-                    <form onSubmit={handleSaveProfile}>
-                        <div style={sectionHeaderStyle}>
-                            <h2 style={sectionTitleStyle}>Personal Information</h2>
-                            <p style={sectionSubtitleStyle}>Manage your public identity across the platform.</p>
-                        </div>
-
-                        <div style={formGroupStyle}>
-                            <label style={labelStyle}>Display Name</label>
-                            <input
-                                style={inputStyle}
-                                value={profile.name}
-                                onChange={e => setProfile({ ...profile, name: e.target.value })}
-                                placeholder="e.g. Utkarsh"
-                            />
-                        </div>
-
-                        <div style={formGroupStyle}>
-                            <label style={labelStyle}>Bio</label>
-                            <textarea
-                                style={{ ...inputStyle, minHeight: '100px', resize: 'vertical' }}
-                                value={profile.bio}
-                                onChange={e => setProfile({ ...profile, bio: e.target.value })}
-                                placeholder="Tell us about yourself..."
-                            />
-                        </div>
-
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
-                            <div style={formGroupStyle}>
-                                <label style={labelStyle}>GitHub Username</label>
-                                <input
-                                    style={inputStyle}
-                                    value={profile.socials.github}
-                                    onChange={e => setProfile({ ...profile, socials: { ...profile.socials, github: e.target.value } })}
-                                    placeholder="github_handle"
-                                />
-                            </div>
-                            <div style={formGroupStyle}>
-                                <label style={labelStyle}>Twitter Handle</label>
-                                <input
-                                    style={inputStyle}
-                                    value={profile.socials.twitter}
-                                    onChange={e => setProfile({ ...profile, socials: { ...profile.socials, twitter: e.target.value } })}
-                                    placeholder="@handle"
-                                />
-                            </div>
-                        </div>
-
-                        <button type="submit" disabled={saving} style={saveButtonStyle}>
-                            {saving ? 'Saving...' : <><Save size={16} /> Save Changes</>}
-                        </button>
-                    </form>
-                );
-            case 'appearance':
-                return (
-                    <div>
-                        <div style={sectionHeaderStyle}>
-                            <h2 style={sectionTitleStyle}>Appearance & Theme</h2>
-                            <p style={sectionSubtitleStyle}>Customize the visual feel of your workspace.</p>
-                        </div>
-
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' }}>
-                            {[
-                                { id: 'dark', label: 'Dark Mode', icon: <Moon size={20} /> },
-                                { id: 'light', label: 'Light Mode', icon: <Sun size={20} /> },
-                                { id: 'system', label: 'System Default', icon: <Monitor size={20} /> }
-                            ].map(opt => (
-                                <div
-                                    key={opt.id}
-                                    onClick={() => handleThemeChange(opt.id)}
-                                    style={{
-                                        ...themeOptionStyle,
-                                        border: theme === opt.id ? '2px solid var(--primary)' : '1px solid var(--border-color)',
-                                        backgroundColor: theme === opt.id ? 'rgba(59, 130, 246, 0.05)' : 'var(--bg-dark)'
-                                    }}
-                                >
-                                    <div style={{ color: theme === opt.id ? 'var(--primary)' : 'var(--text-muted)' }}>
-                                        {opt.icon}
-                                    </div>
-                                    <span style={{ fontSize: '13px', fontWeight: '600', marginTop: '8px' }}>{opt.label}</span>
-                                    {theme === opt.id && <Check size={14} style={{ position: 'absolute', top: '8px', right: '8px', color: 'var(--primary)' }} />}
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                );
-            case 'notifications':
-                return (
-                    <div>
-                        <div style={sectionHeaderStyle}>
-                            <h2 style={sectionTitleStyle}>Notification Center</h2>
-                            <p style={sectionSubtitleStyle}>Control how you receive alerts and updates.</p>
-                        </div>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                            <ToggleItem label="Join/Leave Alerts" description="Notify when someone joins or leaves your room" enabled={true} />
-                            <ToggleItem label="Chat Messages" description="Receive pings for new messages in the chat" enabled={true} />
-                            <ToggleItem label="System Updates" description="Stay informed about new features and maintenance" enabled={false} />
-                        </div>
-                    </div>
-                );
-            case 'security':
-                const currentSessionId = localStorage.getItem('rtm_db_session_id');
-                return (
-                    <div>
-                        <div style={sectionHeaderStyle}>
-                            <h2 style={sectionTitleStyle}>Security & Privacy</h2>
-                            <p style={sectionSubtitleStyle}>Protect your account and workspace data.</p>
-                        </div>
-
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-                            <div style={{ ...dangerZoneItemStyle, flexDirection: 'column', alignItems: 'flex-start', gap: '16px' }}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center' }}>
-                                    <div>
-                                        <h4 style={{ margin: '0 0 4px', fontSize: '14px', fontWeight: '600' }}>Active Sessions</h4>
-                                        <p style={{ margin: 0, fontSize: '12px', color: 'var(--text-muted)' }}>Devices currently logged into your account.</p>
-                                    </div>
-                                    <button
-                                        style={ghostButtonStyle}
-                                        onClick={handleSignOutOthers}
-                                        disabled={sessions.length <= 1}
-                                    >
-                                        Sign out others
-                                    </button>
-                                </div>
-
-                                <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                    {sessions.map(s => {
-                                        const isCurrent = String(s.id) === String(currentSessionId);
-                                        const getDeviceIcon = (device) => {
-                                            const d = device?.toLowerCase() || '';
-                                            if (d.includes('pc') || d.includes('linux') || d.includes('windows')) return <Monitor size={16} />;
-                                            if (d.includes('macbook')) return <Laptop size={16} />;
-                                            if (d.includes('iphone') || d.includes('android')) return <Smartphone size={16} />;
-                                            if (d.includes('tablet') || d.includes('ipad')) return <Tablet size={16} />;
-                                            return <Monitor size={16} />;
-                                        };
-
-                                        return (
-                                            <div key={s.id} style={{
-                                                padding: '12px 16px',
-                                                backgroundColor: isCurrent ? 'rgba(59, 130, 246, 0.05)' : 'rgba(255,255,255,0.02)',
-                                                borderRadius: '6px',
-                                                border: isCurrent ? '1px solid var(--primary)' : '1px solid var(--border-color)',
-                                                display: 'flex',
-                                                justifyContent: 'space-between',
-                                                alignItems: 'center',
-                                                transition: 'all 0.2s'
-                                            }}>
-                                                <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
-                                                    <div style={{
-                                                        width: '36px',
-                                                        height: '36px',
-                                                        borderRadius: '6px',
-                                                        backgroundColor: 'var(--bg-card)',
-                                                        display: 'flex',
-                                                        alignItems: 'center',
-                                                        justifyContent: 'center',
-                                                        color: isCurrent ? 'var(--primary)' : 'var(--text-muted)',
-                                                        border: '1px solid var(--border-color)'
-                                                    }}>
-                                                        {getDeviceIcon(s.device)}
-                                                    </div>
-                                                    <div>
-                                                        <div style={{ fontSize: '13px', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-main)' }}>
-                                                            {s.device || 'Unknown Device'}
-                                                            {isCurrent && (
-                                                                <span style={{ fontSize: '10px', padding: '2px 8px', backgroundColor: 'var(--primary)', color: 'white', borderRadius: '4px', fontWeight: '800', textTransform: 'uppercase' }}>Current</span>
-                                                            )}
-                                                        </div>
-                                                        <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>
-                                                            <span style={{ color: s.ip === 'Localhost' ? 'var(--primary)' : 'var(--text-muted)' }}>{s.ip}</span> • Last active {new Date(s.last_active).toLocaleDateString()} at {new Date(s.last_active).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-                            </div>
-
-                            <div style={{ ...dangerZoneItemStyle, border: '1px solid rgba(239, 68, 68, 0.2)', backgroundColor: 'rgba(239, 68, 68, 0.02)' }}>
-                                <div>
-                                    <h4 style={{ margin: '0 0 4px', fontSize: '14px', fontWeight: '600', color: '#ef4444' }}>Delete Account</h4>
-                                    <p style={{ margin: 0, fontSize: '12px', color: 'var(--text-muted)' }}>Permanently remove your account and all associated workspaces.</p>
-                                </div>
-                                <button
-                                    style={{ ...ghostButtonStyle, color: '#ef4444' }}
-                                    onClick={() => setShowDeleteModal(true)}
-                                >
-                                    Delete Account
-                                </button>
-                            </div>
-                        </div>
-
-                        {showDeleteModal && (
-                            <div style={modalOverlayStyle}>
-                                <div style={modalContentStyle}>
-                                    <h3 style={{ fontSize: '18px', fontWeight: '700', marginBottom: '8px', color: '#ef4444' }}>Delete Account</h3>
-                                    <p style={{ color: 'var(--text-muted)', marginBottom: '24px', fontSize: '13px' }}>
-                                        Are you sure you want to delete your account? This action is <strong>permanent</strong> and will remove all your rooms, snippets, and settings.
-                                    </p>
-                                    <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
-                                        <button onClick={() => setShowDeleteModal(false)} style={ghostButtonStyle}>Cancel</button>
-                                        <button
-                                            onClick={handleDeleteAccount}
-                                            style={{ ...saveButtonStyle, backgroundColor: '#ef4444' }}
-                                        >
-                                            Delete Permanently
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-                    </div>
-                );
-            default:
-                return null;
-        }
-    };
+    const avatar = user?.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.name || 'U')}&background=1C1C19&color=E8E6DF`;
+    const currentSessionId = localStorage.getItem('rtm_db_session_id');
+    const idx = SECTIONS.findIndex((s) => s.id === active);
 
     return (
         <AppLayout>
-            <div className="settings-page">
-                <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '32px' }}>
-                    <div style={headerIconWrapperStyle}>
-                        <SettingsIcon size={20} />
-                    </div>
-                    <div>
-                        <h1 style={{ fontSize: '24px', fontWeight: '700', margin: 0, color: 'var(--text-main)' }}>Account Settings</h1>
-                        <p style={{ color: 'var(--text-muted)', fontSize: '13px', margin: 0 }}>Configure your personal preferences and security.</p>
-                    </div>
-                </div>
-
-                <div className="settings-grid" style={gridStyle}>
-                    <div className="settings-nav" style={sidebarNavStyle}>
-                        {sections.map(section => (
-                            <button
-                                key={section.id}
-                                onClick={() => setActiveTab(section.id)}
-                                style={{
-                                    ...sidebarButtonStyle,
-                                    backgroundColor: activeTab === section.id ? 'rgba(59, 130, 246, 0.08)' : 'transparent',
-                                    color: activeTab === section.id ? 'var(--primary)' : 'var(--text-muted)',
-                                    fontWeight: activeTab === section.id ? '600' : '500'
-                                }}
-                            >
-                                {React.cloneElement(section.icon, { size: 18 })}
-                                {section.title}
-                            </button>
-                        ))}
-                    </div>
-
-                    <div className="settings-content" style={contentAreaStyle}>
-                        {renderContent()}
-                    </div>
+            <div className="u-head">
+                <span className="u-label" data-rise>03 — Account</span>
+                <div className="u-head-body">
+                    <h1 className="u-lede" data-rise style={{ '--d': '60ms' }}>
+                        <b>Your account, your rules.</b> Profile, theme, alerts and the devices signed in.
+                    </h1>
                 </div>
             </div>
 
-            <style>{`
-                @media (max-width: 992px) {
-                    .settings-grid { grid-template-columns: 1fr !important; gap: 24px !important; }
-                    .settings-nav { 
-                        flex-direction: row !important; 
-                        overflow-x: auto; 
-                        padding: 8px !important;
-                        white-space: nowrap;
-                    }
-                    .settings-nav button { flex: 0 0 auto; }
-                    .settings-content { padding: 24px !important; }
-                }
-            `}</style>
+            <div className="g-layout">
+                <nav className="g-index" aria-label="Settings sections" data-rise>
+                    {SECTIONS.map((s, i) => (
+                        <button key={s.id} className={active === s.id ? 'on' : ''} onClick={() => setActive(s.id)} aria-current={active === s.id ? 'page' : undefined}>
+                            <span>{pad2(i + 1)}</span><span>{s.title}</span>
+                        </button>
+                    ))}
+                </nav>
+
+                <div className="g-content" key={active}>
+                    <h2 className="u-display u-lg u-lines is-in" style={{ marginBottom: 8 }}>
+                        <span><span>{SECTIONS[idx].title}</span></span>
+                    </h2>
+
+                    {active === 'profile' && (
+                        <form className="u-card u-enter" onSubmit={saveProfile}>
+                            <div className="g-profile">
+                                <img src={avatar} alt="" />
+                                <div style={{ minWidth: 0 }}>
+                                    <h4 className="u-ellipsis">{profile.name || user?.name || 'Your name'}</h4>
+                                    <span className="u-mono u-faint u-ellipsis" style={{ fontSize: 12, display: 'block' }}>{user?.email}</span>
+                                </div>
+                            </div>
+                            <div className="g-form">
+                                <div className="u-field">
+                                    <label htmlFor="pf-name">Display name</label>
+                                    <input id="pf-name" className="u-input" value={profile.name} onChange={(e) => setProfile({ ...profile, name: e.target.value })} placeholder="How teammates see you" />
+                                </div>
+                                <div className="u-field">
+                                    <label htmlFor="pf-bio">Bio</label>
+                                    <textarea id="pf-bio" className="u-textarea" value={profile.bio} onChange={(e) => setProfile({ ...profile, bio: e.target.value })} placeholder="A line or two about what you build" />
+                                </div>
+                                <div className="g-two">
+                                    <div className="u-field">
+                                        <label htmlFor="pf-gh">GitHub</label>
+                                        <input id="pf-gh" className="u-input" value={profile.socials.github} onChange={(e) => setProfile({ ...profile, socials: { ...profile.socials, github: e.target.value } })} placeholder="username" />
+                                    </div>
+                                    <div className="u-field">
+                                        <label htmlFor="pf-tw">X / Twitter</label>
+                                        <input id="pf-tw" className="u-input" value={profile.socials.twitter} onChange={(e) => setProfile({ ...profile, socials: { ...profile.socials, twitter: e.target.value } })} placeholder="@handle" />
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="u-modal-foot" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
+                                <span className="u-label">Visible to people in your rooms</span>
+                                <button type="submit" className="u-btn u-btn--solid" disabled={saving}><Save size={15} /> {saving ? 'Saving…' : 'Save profile'}</button>
+                            </div>
+                        </form>
+                    )}
+
+                    {active === 'appearance' && (
+                        <div className="u-card u-enter">
+                            <div className="g-panel-head"><strong>Theme</strong><span className="u-label">Saved on this device</span></div>
+                            <div className="g-themes">
+                                {THEMES.map((t) => (
+                                    <button key={t.id} className={`g-theme${theme === t.id ? ' on' : ''}`} onClick={() => chooseTheme(t.id)} aria-pressed={theme === t.id}>
+                                        <div className={`g-theme-prev ${t.id}`}>
+                                            <b>{t.name}</b>
+                                            <i style={{ width: '70%' }} /><i style={{ width: '45%' }} /><i style={{ width: '58%' }} />
+                                        </div>
+                                        <div className="g-theme-name">
+                                            <span>{t.id === 'system' ? 'Match my device' : t.id === 'dark' ? 'Dark' : 'Light'}</span>
+                                            {theme === t.id && <Check size={16} />}
+                                        </div>
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {active === 'notifications' && (
+                        <div className="u-card u-enter">
+                            <div className="g-panel-head"><strong>Alerts</strong><span className="u-label">Saved on this device</span></div>
+                            <ul className="g-rules">
+                                {NOTIFS.map((n, i) => (
+                                    <li key={n.id}>
+                                        <span>{pad2(i + 1)}</span>
+                                        <div>
+                                            <h5>{n.title}</h5>
+                                            <p>{n.text}</p>
+                                            <div className="g-cap">{notifs[n.id] ? 'on' : 'off'}</div>
+                                        </div>
+                                        <button className="u-switch" role="switch" aria-checked={!!notifs[n.id]} aria-label={n.title} onClick={() => toggleNotif(n.id)} />
+                                    </li>
+                                ))}
+                            </ul>
+                        </div>
+                    )}
+
+                    {active === 'security' && (
+                        <>
+                            <div className="u-card u-enter">
+                                <div className="g-panel-head">
+                                    <div>
+                                        <strong>Active sessions</strong>
+                                        <div className="u-small u-muted">Devices signed in to your account.</div>
+                                    </div>
+                                    <button className="u-btn u-btn--ghost u-btn--sm" onClick={signOutOthers} disabled={sessions.length <= 1}><LogOut size={14} /> Sign out others</button>
+                                </div>
+                                {sessionsLoading && sessions.length === 0 ? (
+                                    <div style={{ padding: 18, display: 'flex', flexDirection: 'column', gap: 10 }}>
+                                        {[0, 1].map((i) => <div key={i} className="u-skel" style={{ height: 44 }} />)}
+                                    </div>
+                                ) : sessions.length === 0 ? (
+                                    <p className="u-muted u-small" style={{ padding: 18, margin: 0 }}>No sessions found.</p>
+                                ) : sessions.map((s) => {
+                                    const isCurrent = String(s.id) === String(currentSessionId);
+                                    return (
+                                        <div key={s.id} className="g-session">
+                                            <span className="d-ico" style={isCurrent ? { background: 'var(--u-solid)', color: 'var(--u-on-solid)' } : undefined}>{deviceIcon(s.device)}</span>
+                                            <div style={{ minWidth: 0 }}>
+                                                <div style={{ fontSize: 14.5, fontWeight: 500, display: 'flex', gap: 8, alignItems: 'center' }}>
+                                                    <span className="u-ellipsis">{s.device || 'Unknown device'}</span>
+                                                    {isCurrent && <span className="u-chip u-chip--mono u-chip--accent">This device</span>}
+                                                </div>
+                                                <div className="u-mono u-faint" style={{ fontSize: 11.5 }}>{s.ip} · {s.last_active ? timeAgo(s.last_active) : '—'}</div>
+                                            </div>
+                                            {isCurrent && <span className="u-dot" />}
+                                        </div>
+                                    );
+                                })}
+                            </div>
+
+                            <div className="u-card g-danger u-enter" style={{ '--d': '80ms' }}>
+                                <ul className="g-rules">
+                                    <li>
+                                        <span>!!</span>
+                                        <div>
+                                            <h5>Delete account</h5>
+                                            <p>Removes your account with every room, project and snippet. This can't be undone.</p>
+                                        </div>
+                                        <button className="u-btn u-btn--ghost u-btn--sm" style={{ color: 'var(--u-bad)' }} onClick={() => { setConfirmText(''); setDeleteOpen(true); }}>
+                                            <Trash2 size={14} /> Delete
+                                        </button>
+                                    </li>
+                                </ul>
+                            </div>
+                        </>
+                    )}
+                </div>
+            </div>
+
+            <Modal
+                open={deleteOpen}
+                onClose={() => setDeleteOpen(false)}
+                label="Delete account"
+                title="This is permanent."
+                description="Every room, project, snippet and setting tied to this account will be removed."
+                onSubmit={() => confirmText.trim().toLowerCase() === 'delete' && deleteAccount()}
+                footer={<>
+                    <button type="button" className="u-btn u-btn--ghost" onClick={() => setDeleteOpen(false)}>Cancel</button>
+                    <button type="submit" className="u-btn u-btn--danger" disabled={confirmText.trim().toLowerCase() !== 'delete'}>Delete my account</button>
+                </>}
+            >
+                <div className="u-field">
+                    <label htmlFor="del-confirm">Type <span className="u-mono">delete</span> to confirm</label>
+                    <input id="del-confirm" className="u-input" autoFocus value={confirmText} onChange={(e) => setConfirmText(e.target.value)} autoComplete="off" />
+                </div>
+            </Modal>
         </AppLayout>
     );
-};
-
-const ToggleItem = ({ label, description, enabled }) => {
-    const [isOn, setIsOn] = useState(enabled);
-    return (
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div>
-                <h4 style={{ margin: '0 0 2px', fontSize: '14px', fontWeight: '600' }}>{label}</h4>
-                <p style={{ margin: 0, fontSize: '12px', color: 'var(--text-muted)' }}>{description}</p>
-            </div>
-            <div
-                onClick={() => setIsOn(!isOn)}
-                style={{
-                    width: '36px',
-                    height: '20px',
-                    borderRadius: '20px',
-                    backgroundColor: isOn ? 'var(--primary)' : 'var(--border-color)',
-                    position: 'relative',
-                    cursor: 'pointer',
-                    transition: 'background 0.2s'
-                }}
-            >
-                <div style={{
-                    width: '14px',
-                    height: '14px',
-                    backgroundColor: 'white',
-                    borderRadius: '50%',
-                    position: 'absolute',
-                    top: '3px',
-                    left: isOn ? '19px' : '3px',
-                    transition: 'left 0.2s'
-                }}></div>
-            </div>
-        </div>
-    );
-};
-// Styles
-const gridStyle = { display: 'grid', gridTemplateColumns: '260px 1fr', gap: '32px', alignItems: 'start' };
-
-const sidebarNavStyle = {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '4px',
-    backgroundColor: 'var(--glass-bg)',
-    padding: '12px',
-    borderRadius: 'var(--radius-card)',
-    border: '1px solid var(--border-color)',
-    boxShadow: 'var(--glass-shadow)',
-    backdropFilter: 'blur(var(--glass-blur))'
-};
-
-const sidebarButtonStyle = {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '12px',
-    padding: '10px 16px',
-    border: 'none',
-    borderRadius: 'var(--radius-btn)',
-    fontSize: '14px',
-    textAlign: 'left',
-    cursor: 'pointer',
-    transition: 'all var(--transition-normal)',
-    fontFamily: "'Outfit', sans-serif"
-};
-
-const contentAreaStyle = {
-    backgroundColor: 'var(--glass-bg)',
-    padding: '32px',
-    borderRadius: 'var(--radius-card)',
-    border: '1px solid var(--border-color)',
-    minHeight: '500px',
-    boxShadow: 'var(--glass-shadow)',
-    backdropFilter: 'blur(var(--glass-blur))'
-};
-
-const headerIconWrapperStyle = {
-    width: '40px',
-    height: '40px',
-    borderRadius: 'var(--radius-btn)',
-    backgroundColor: 'rgba(59, 130, 246, 0.1)',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    color: 'var(--primary)',
-    border: '1px solid var(--border-color)'
-};
-
-const sectionHeaderStyle = { marginBottom: '32px', borderBottom: '1px solid var(--border-color)', paddingBottom: '20px' };
-const sectionTitleStyle = { fontSize: '18px', fontWeight: '800', margin: '0 0 8px', fontFamily: "'Outfit', sans-serif" };
-const sectionSubtitleStyle = { color: 'var(--text-muted)', fontSize: '14px', margin: 0 };
-const formGroupStyle = { marginBottom: '24px' };
-const labelStyle = { display: 'block', fontSize: '13px', fontWeight: '700', color: 'var(--text-muted)', marginBottom: '8px', textTransform: 'uppercase', fontFamily: "'Outfit', sans-serif" };
-
-const inputStyle = {
-    width: '100%',
-    padding: '12px 16px',
-    backgroundColor: 'var(--bg-dark)',
-    border: '1px solid var(--border-color)',
-    borderRadius: 'var(--radius-btn)',
-    color: 'var(--text-main)',
-    fontSize: '14px',
-    outline: 'none',
-    transition: 'border-color var(--transition-normal)'
-};
-
-const saveButtonStyle = {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '10px',
-    padding: '12px 24px',
-    backgroundColor: 'var(--primary)',
-    color: 'white',
-    border: 'none',
-    borderRadius: 'var(--radius-btn)',
-    fontSize: '14px',
-    fontWeight: '700',
-    cursor: 'pointer',
-    transition: 'all var(--transition-spring)',
-    fontFamily: "'Outfit', sans-serif",
-    boxShadow: '0 4px 12px var(--accent-glow)'
-};
-
-const themeOptionStyle = {
-    padding: '24px 16px',
-    borderRadius: 'var(--radius-card)',
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    cursor: 'pointer',
-    position: 'relative',
-    transition: 'all var(--transition-normal)'
-};
-
-const dangerZoneItemStyle = {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: '16px',
-    borderRadius: 'var(--radius-card)',
-    border: '1px solid var(--border-color)',
-    backgroundColor: 'var(--bg-dark)'
-};
-
-const ghostButtonStyle = {
-    padding: '8px 16px',
-    backgroundColor: 'transparent',
-    border: '1px solid var(--border-color)',
-    borderRadius: 'var(--radius-btn)',
-    color: 'var(--text-main)',
-    fontSize: '13px',
-    fontWeight: '700',
-    cursor: 'pointer',
-    transition: 'all var(--transition-normal)',
-    fontFamily: "'Outfit', sans-serif"
-};
-
-const modalOverlayStyle = {
-    position: 'fixed',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: 2000,
-    backdropFilter: 'blur(8px)'
-};
-
-const modalContentStyle = {
-    backgroundColor: 'var(--bg-floating)',
-    padding: '32px',
-    borderRadius: 'var(--radius-card)',
-    border: '1px solid var(--border-color)',
-    width: '90%',
-    maxWidth: '450px',
-    boxShadow: 'var(--glass-shadow)',
-    backdropFilter: 'blur(16px)'
 };
 
 export default Settings;

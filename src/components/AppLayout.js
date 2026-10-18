@@ -1,294 +1,145 @@
-import React, { useState } from 'react';
-import Sidebar from './Sidebar';
-import { Search, Bell, Sun, Moon } from 'lucide-react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Search, Bell, Sun, Moon, LogOut, Settings as SettingsIcon, LayoutGrid, Code2, Plus, Keyboard } from 'lucide-react';
+import toast from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
+import { getBackendUrl } from '../utils/api';
 import SearchModal from './SearchModal';
 import NotificationCenter from './NotificationCenter';
+import Shell, { useOnline, useThemeToggle } from './ux/Shell';
+import { newRoomId } from './ux/primitives';
+
+// One home for signed-in users: the workspace lives at /dashboard ("/" redirects there).
+const NAV = [
+    { to: '/dashboard', label: 'Workspace', icon: LayoutGrid },
+    { to: '/snippets', label: 'Snippets', icon: Code2 },
+    { to: '/settings', label: 'Settings', icon: SettingsIcon },
+];
+
+const LEGAL = [['Support', '/support'], ['Status', '/status'], ['Privacy', '/privacy'], ['Terms', '/terms']];
 
 const AppLayout = ({ children }) => {
-    const { user } = useAuth();
-    const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-    const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
-        return localStorage.getItem('sidebar-collapsed') === 'true';
-    });
-    const [isSearchOpen, setIsSearchOpen] = useState(false);
-    const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
+    const { user, logout } = useAuth();
+    const navigate = useNavigate();
+    const userRef = useRef(null);
+    const [isLight, toggleTheme] = useThemeToggle();
+    const [userMenu, setUserMenu] = useState(false);
+    const [searchOpen, setSearchOpen] = useState(false);
+    const [notifOpen, setNotifOpen] = useState(false);
     const [hasUnread, setHasUnread] = useState(false);
-    const [isLightMode, setIsLightMode] = useState(() => {
-        return document.documentElement.classList.contains('light-theme');
-    });
+    const online = useOnline();
 
-    React.useEffect(() => {
-        if (isLightMode) {
-            document.documentElement.classList.add('light-theme');
-        } else {
-            document.documentElement.classList.remove('light-theme');
-        }
-    }, [isLightMode]);
-
-    const toggleTheme = () => {
-        const newMode = !isLightMode;
-        setIsLightMode(newMode);
-        if (newMode) {
-            document.documentElement.classList.add('light-theme');
-            localStorage.setItem('app-theme', 'light');
-        } else {
-            document.documentElement.classList.remove('light-theme');
-            localStorage.setItem('app-theme', 'dark');
-        }
-    };
-
-    const toggleSidebarCollapse = () => {
-        const newState = !isSidebarCollapsed;
-        setIsSidebarCollapsed(newState);
-        localStorage.setItem('sidebar-collapsed', newState);
-    };
-
-    // Fetch unread status
-    const checkNotifications = React.useCallback(async () => {
+    const checkNotifications = useCallback(async () => {
         if (!user?.uid) return;
         try {
-            const { getBackendUrl } = await import('../utils/api');
-            const response = await fetch(`${getBackendUrl()}/api/notifications?userId=${user.uid}`);
-            const notifications = await response.json();
-            const unread = notifications.some(n => !n.is_read);
-            setHasUnread(unread);
-        } catch (error) {
-            console.error('Failed to check notifications:', error);
+            const res = await fetch(`${getBackendUrl()}/api/notifications?userId=${user.uid}`);
+            const list = await res.json();
+            setHasUnread(Array.isArray(list) && list.some((n) => !n.is_read));
+        } catch (err) {
+            /* offline: leave badge as is */
         }
     }, [user?.uid]);
 
-    React.useEffect(() => {
+    useEffect(() => {
         checkNotifications();
-        const interval = setInterval(checkNotifications, 60000); // Check every minute
-        return () => clearInterval(interval);
+        const id = setInterval(checkNotifications, 60000);
+        return () => clearInterval(id);
     }, [checkNotifications]);
 
-    // Keyboard shortcut for search
-    React.useEffect(() => {
-        const handleKeyDown = (e) => {
-            if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+    useEffect(() => {
+        const onKey = (e) => {
+            if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
                 e.preventDefault();
-                setIsSearchOpen(true);
+                setSearchOpen(true);
             }
         };
-        window.addEventListener('keydown', handleKeyDown);
-        return () => window.removeEventListener('keydown', handleKeyDown);
+        window.addEventListener('keydown', onKey);
+        return () => window.removeEventListener('keydown', onKey);
     }, []);
 
+    useEffect(() => {
+        if (!userMenu) return undefined;
+        const close = (e) => { if (userRef.current && !userRef.current.contains(e.target)) setUserMenu(false); };
+        const esc = (e) => e.key === 'Escape' && setUserMenu(false);
+        document.addEventListener('mousedown', close);
+        document.addEventListener('keydown', esc);
+        return () => { document.removeEventListener('mousedown', close); document.removeEventListener('keydown', esc); };
+    }, [userMenu]);
+
+    const closeSearch = useCallback(() => setSearchOpen(false), []);
+
+    const signOut = () => {
+        logout();
+        toast.success('Signed out');
+        navigate('/');
+    };
+
+    const startRoom = () => navigate(`/editor/${newRoomId()}`, { state: { userName: user?.name || '', role: 'editor' } });
+
+    const avatar = user?.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.name || 'U')}&background=1C1C19&color=E8E6DF`;
+
     return (
-        <div style={{
-            minHeight: '100vh',
-            backgroundColor: 'var(--bg-dark)',
-            display: 'flex'
-        }}>
-            {/* Overlay for mobile drawer */}
-            {isSidebarOpen && (
-                <div
-                    style={{
-                        position: 'fixed',
-                        top: 0, left: 0, right: 0, bottom: 0,
-                        backgroundColor: 'rgba(0,0,0,0.6)',
-                        zIndex: 1500,
-                        backdropFilter: 'blur(2px)'
-                    }}
-                    onClick={() => setIsSidebarOpen(false)}
-                />
-            )}
-
-            <Sidebar
-                isMobile={true}
-                isOpen={isSidebarOpen}
-                onClose={() => setIsSidebarOpen(false)}
-                isLightMode={isLightMode}
-            />
-
-            <Sidebar
-                isMobile={false}
-                isCollapsed={isSidebarCollapsed}
-                onToggleCollapse={toggleSidebarCollapse}
-                isLightMode={isLightMode}
-            />
-
-            <div
-                className="main-layout-container"
-                style={{
-                    flex: 1,
-                    display: 'flex',
-                    flexDirection: 'column',
-                    transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                    width: '100%',
-                    minWidth: 0
-                }}
-            >
-                {/* Industry Standard Header */}
-                <header style={{
-                    height: '64px',
-                    backgroundColor: 'var(--bg-card)',
-                    borderBottom: '1px solid var(--border-color)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    padding: '0 24px',
-                    position: 'sticky',
-                    top: 0,
-                    zIndex: 90
-                }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                        <img
-                            className="header-logo"
-                            src={isLightMode ? "/utkristi-colabs.png" : "/utkristi-colabs-dark.png"}
-                            alt="Utkristi Colabs"
-                            style={{ height: '28px', cursor: 'pointer' }}
-                            onClick={() => window.location.href = '/'}
-                        />
-                    </div>
-
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
-                        <button
-                            style={headerIconStyle}
-                            onClick={() => setIsSearchOpen(true)}
-                            title="Search (Ctrl+K)"
-                        >
-                            <Search size={18} />
-                        </button>
-                        <div style={{ position: 'relative' }}>
-                            <button
-                                style={headerIconStyle}
-                                onClick={() => {
-                                    setIsNotificationsOpen(!isNotificationsOpen);
-                                    setHasUnread(false);
-                                }}
-                            >
-                                <Bell size={18} />
-                                {hasUnread && <span style={unreadBadgeStyle}></span>}
-                            </button>
-                            <NotificationCenter
-                                isOpen={isNotificationsOpen}
-                                onClose={() => setIsNotificationsOpen(false)}
-                            />
-                        </div>
-
-                        {/* Theme Toggle for Large Screens (Replaces PFP) */}
-                        <div className="desktop-inline" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                            <div style={{ width: '1px', height: '24px', backgroundColor: 'var(--border-color)', margin: '0 4px' }}></div>
-                            <button
-                                onClick={toggleTheme}
-                                style={{
-                                    ...headerIconStyle,
-                                    color: isLightMode ? '#f59e0b' : 'var(--text-muted)',
-                                    backgroundColor: isLightMode ? 'rgba(245, 158, 11, 0.1)' : 'transparent'
-                                }}
-                                title={isLightMode ? "Switch to Dark Mode" : "Switch to Light Mode"}
-                            >
-                                {isLightMode ? <Sun size={20} /> : <Moon size={20} />}
-                            </button>
-                        </div>
-
-                        <div
-                            onClick={() => {
-                                if (window.innerWidth <= 992) {
-                                    setIsSidebarOpen(true);
-                                }
-                            }}
-                            className="mobile-only"
-                            style={{
-                                display: 'none',
-                                alignItems: 'center',
-                                gap: '10px',
-                                cursor: 'pointer'
-                            }}
-                        >
-                            <div style={{
-                                width: '32px',
-                                height: '32px',
-                                borderRadius: '50%',
-                                backgroundColor: 'var(--bg-dark)',
-                                border: '1px solid var(--border-color)',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                overflow: 'hidden'
-                            }}>
-                                {user?.photoURL ? (
-                                    <img src={user.photoURL} alt="pfp" style={{ width: '100%', height: '100%' }} />
-                                ) : (
-                                    <div style={{ backgroundColor: 'var(--primary)', width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: '800', fontSize: '12px' }}>
-                                        {user?.name?.charAt(0) || 'U'}
-                                    </div>
-                                )}
+        <Shell
+            homeTo="/dashboard"
+            links={NAV}
+            legal={LEGAL}
+            holdHeader={userMenu || notifOpen}
+            stripLeft={<>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                    <span className={`u-dot${online ? '' : ' u-dot--bad'}`} />
+                    {online ? 'Connected' : 'Offline'}
+                </span>
+                <span className="u-strip-hide u-ellipsis">Signed in as {user?.email || user?.name || 'you'}</span>
+            </>}
+            stripRight={<button onClick={() => setSearchOpen(true)}>Search <kbd style={{ font: 'inherit' }}>Ctrl K</kbd></button>}
+            right={<>
+                <button className="u-icon u-icon--hide" onClick={() => setSearchOpen(true)} aria-label="Search"><Search size={18} /></button>
+                <div style={{ position: 'relative' }}>
+                    <button className={`u-icon${notifOpen ? ' on' : ''}`} onClick={() => { setNotifOpen((v) => !v); setHasUnread(false); }} aria-label="Notifications">
+                        <Bell size={18} />
+                        {hasUnread && <span className="u-badge" />}
+                    </button>
+                    <NotificationCenter isOpen={notifOpen} onClose={() => setNotifOpen(false)} />
+                </div>
+                <button className="u-icon u-icon--hide" onClick={toggleTheme} aria-label="Toggle theme">
+                    {isLight ? <Moon size={18} /> : <Sun size={18} />}
+                </button>
+                <button className="u-btn u-btn--solid u-nav-new" style={{ marginLeft: 6 }} onClick={startRoom}>
+                    <Plus size={16} /> New room
+                </button>
+                <div ref={userRef} style={{ position: 'relative' }}>
+                    <button className="u-avatar" onClick={() => setUserMenu((v) => !v)} aria-label="Account menu" aria-expanded={userMenu}>
+                        <img src={avatar} alt="" />
+                    </button>
+                    {userMenu && (
+                        <div className="u-pop" role="menu">
+                            <div className="u-pop-head">
+                                <strong>{user?.name || 'User'}</strong>
+                                <span className="u-ellipsis">{user?.email}</span>
                             </div>
+                            {NAV.map(({ to, label, icon: Icon }) => (
+                                <button key={to} role="menuitem" onClick={() => { setUserMenu(false); navigate(to); }}><Icon size={16} />{label}</button>
+                            ))}
+                            <button role="menuitem" onClick={() => { setUserMenu(false); setSearchOpen(true); }}><Keyboard size={16} />Search <kbd>Ctrl K</kbd></button>
+                            <button role="menuitem" onClick={() => { setUserMenu(false); toggleTheme(); }}>{isLight ? <Moon size={16} /> : <Sun size={16} />}{isLight ? 'Dark' : 'Light'} theme</button>
+                            <button role="menuitem" className="danger" onClick={signOut}><LogOut size={16} />Sign out</button>
                         </div>
-                    </div>
-                </header>
-
-                <main style={{
-                    flex: 1,
-                    padding: '32px',
-                    maxWidth: '1600px',
-                    width: '100%',
-                    margin: '0 auto'
-                }}>
-                    {children}
-                </main>
-            </div>
-
-            <SearchModal
-                isOpen={isSearchOpen}
-                onClose={() => setIsSearchOpen(false)}
-            />
-
-            <style>{`
-                :root {
-                    --sidebar-width: ${isSidebarCollapsed ? '72px' : '240px'};
-                }
-                .main-layout-container {
-                    margin-left: var(--sidebar-width);
-                }
-                @media (max-width: 992px) {
-                    :root { --sidebar-width: 0px !important; }
-                    .main-layout-container { margin-left: 0 !important; }
-                    .mobile-only { display: flex !important; }
-                    .desktop-inline { display: none !important; }
-                    .sidebar-desktop { display: none !important; }
-                    .header-logo { display: block !important; }
-                    main { padding: 24px 16px !important; }
-                }
-                @media (min-width: 993px) {
-                    .header-logo { display: none !important; }
-                    .sidebar-desktop { display: block !important; }
-                }
-            `}</style>
-        </div>
+                    )}
+                </div>
+            </>}
+            sheetFoot={<>
+                <button className="u-btn u-btn--solid" onClick={startRoom}><Plus size={16} /> New room</button>
+                <div style={{ display: 'flex', gap: 6 }}>
+                    <button className="u-btn u-btn--ghost" onClick={toggleTheme}>{isLight ? <Moon size={16} /> : <Sun size={16} />} Theme</button>
+                    <button className="u-btn u-btn--ghost" onClick={signOut}><LogOut size={16} /> Sign out</button>
+                </div>
+            </>}
+            footerExtra={<button onClick={startRoom}>New room</button>}
+            after={<SearchModal isOpen={searchOpen} onClose={closeSearch} />}
+        >
+            {children}
+        </Shell>
     );
-};
-
-const headerIconStyle = {
-    background: 'transparent',
-    border: 'none',
-    color: 'var(--text-muted)',
-    cursor: 'pointer',
-    padding: '8px',
-    borderRadius: '8px',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    transition: 'all 0.2s',
-    '&:hover': {
-        color: 'var(--text-main)',
-        backgroundColor: 'rgba(255,255,255,0.05)'
-    }
-};
-
-const unreadBadgeStyle = {
-    position: 'absolute',
-    top: '8px',
-    right: '8px',
-    width: '8px',
-    height: '8px',
-    backgroundColor: '#ef4444',
-    borderRadius: '50%',
-    border: '2px solid var(--bg-card)'
 };
 
 export default AppLayout;

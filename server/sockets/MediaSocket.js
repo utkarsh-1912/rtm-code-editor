@@ -20,6 +20,21 @@ function setupMediaSocket(io, socket, safeSocket, context) {
     socket.on('video-answer', safeSocket(({ to, answer }) => io.to(to).emit('video-answer', { from: socket.id, answer })));
     socket.on('new-ice-candidate', safeSocket(({ to, candidate }) => io.to(to).emit('new-ice-candidate', { from: socket.id, candidate })));
 
+    // Relay mute / camera / screen-share state to everyone else in the call
+    socket.on(ACTIONS.MEDIA_STATE_CHANGE, safeSocket(({ roomId, state }) => {
+        if (!roomId || !state) return;
+        const name = userSocketMap[socket.id];
+        const payload = { userId: socket.id, state: name ? { ...state, name } : state };
+        socket.to(roomId).emit(ACTIONS.MEDIA_STATE_CHANGE, payload);
+        socket.to(roomId).emit('media-state-update', payload);
+    }));
+
+    // Drawing + pointers over a shared screen
+    socket.on('call-annotate', safeSocket(({ projectId, event }) => {
+        if (!projectId || !event) return;
+        socket.to(`project-${projectId}`).emit('call-annotate', { userId: socket.id, name: userSocketMap[socket.id], event });
+    }));
+
     socket.on('leave-video-chat', safeSocket(({ projectId }) => {
         const roomId = `project-${projectId}`;
         socket.leave(roomId);

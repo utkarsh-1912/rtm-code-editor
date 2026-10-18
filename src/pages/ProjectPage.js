@@ -4,7 +4,6 @@ import { ReflexContainer, ReflexSplitter, ReflexElement } from "react-reflex";
 import "react-reflex/styles.css";
 import "./ProjectPage.css";
 import {
-    FileText,
     Folder,
     Plus,
     X,
@@ -16,7 +15,6 @@ import {
     Moon,
     Users,
     Play,
-    Pause,
     Globe,
     RotateCcw,
     Trash2,
@@ -25,9 +23,13 @@ import {
 } from "lucide-react";
 import toast from "react-hot-toast";
 import ProjectEditor from "../components/ProjectEditor";
-import LogoLoader from "../components/LogoLoader";
+import ProjectFileTree, { FileIcon } from "../components/ProjectFileTree";
+import WorkspaceHeader from "../components/WorkspaceHeader";
+import Loader from "../components/ux/Loader";
 import { getBackendUrl } from "../utils/api";
 import { useAuth } from "../context/AuthContext";
+import { resolveTheme, setThemePref } from "../utils/theme";
+import "../styles/app.css";
 import ACTIONS from "../Action";
 import { initSocket } from "../socket";
 import VideoChat from "../components/VideoChat";
@@ -35,7 +37,6 @@ import WhiteboardModal from "../components/WhiteboardModal";
 import ChatWindow from "../components/chatWindow";
 import InviteModal from "../components/InviteModal";
 import CommandPalette from "../components/CommandPalette";
-import Client from "../components/clients";
 import AICopilotModal from "../components/AICopilotModal";
 import DiffViewerModal from "../components/DiffViewerModal";
 import AnalyticsDashboardModal from "../components/AnalyticsDashboardModal";
@@ -96,7 +97,7 @@ const ProjectPage = () => {
     const [sidebarTab, setSidebarTab] = useState('files');
     const [isSidebarOpen, setIsSidebarOpen] = useState(true);
     const [isMeetingActive, setIsMeetingActive] = useState(false);
-    const [theme, setTheme] = useState(localStorage.getItem("app-theme") || "dark");
+    const [theme, setTheme] = useState(resolveTheme);
     const [isExecuting, setIsExecuting] = useState(false);
     const [output, setOutput] = useState("");
     const [mediaStates, setMediaStates] = useState({});
@@ -131,12 +132,7 @@ const ProjectPage = () => {
     const toggleTheme = React.useCallback(() => {
         const newTheme = theme === "dark" ? "light" : "dark";
         setTheme(newTheme);
-        localStorage.setItem("app-theme", newTheme);
-        if (newTheme === "light") {
-            document.documentElement.classList.add("light-theme");
-        } else {
-            document.documentElement.classList.remove("light-theme");
-        }
+        setThemePref(newTheme);
     }, [theme]);
 
     useEffect(() => {
@@ -382,106 +378,39 @@ const ProjectPage = () => {
     }, [project, activeFile, files, pollExecutionResult]);
 
     const renderOutputPanel = () => (
-        <div style={{ backgroundColor: 'var(--bg-dark)', display: 'flex', flexDirection: 'column', height: '100%', width: '100%' }}>
-            <div style={outputHeaderStyle}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <div style={{ display: 'flex', gap: '2px', backgroundColor: 'rgba(0,0,0,0.3)', padding: '2px', borderRadius: '6px', border: '1px solid var(--border-color)' }}>
-                        <button
-                            onClick={() => setOutputTab('preview')}
-                            style={{
-                                padding: '3px 10px',
-                                fontSize: '10px',
-                                fontWeight: '750',
-                                borderRadius: '4px',
-                                border: 'none',
-                                cursor: 'pointer',
-                                backgroundColor: outputTab === 'preview' ? 'var(--primary)' : 'transparent',
-                                color: outputTab === 'preview' ? '#ffffff' : 'var(--text-muted)',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '5px',
-                                transition: 'all 0.2s'
-                            }}
-                        >
-                            <Globe size={12} /> Live Preview
-                        </button>
-                        <button
-                            onClick={() => setOutputTab('terminal')}
-                            style={{
-                                padding: '3px 10px',
-                                fontSize: '10px',
-                                fontWeight: '750',
-                                borderRadius: '4px',
-                                border: 'none',
-                                cursor: 'pointer',
-                                backgroundColor: outputTab === 'terminal' ? 'var(--primary)' : 'transparent',
-                                color: outputTab === 'terminal' ? '#ffffff' : 'var(--text-muted)',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '5px',
-                                transition: 'all 0.2s'
-                            }}
-                        >
-                            <Terminal size={12} /> Terminal Console
-                        </button>
-                    </div>
+        <div className="ws-out">
+            <div className="ws-pane-head">
+                <div className="u-seg" role="tablist" aria-label="Output">
+                    <button className={outputTab === 'preview' ? 'on' : ''} onClick={() => setOutputTab('preview')}><Globe size={12} /> Preview</button>
+                    <button className={outputTab === 'terminal' ? 'on' : ''} onClick={() => setOutputTab('terminal')}><Terminal size={12} /> Console</button>
                 </div>
-
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div className="ws-out-actions">
                     {outputTab === 'terminal' && (
-                        <button
-                            onClick={() => setOutput("")}
-                            title="Clear Terminal Logs"
-                            style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
-                        >
-                            <Trash2 size={13} />
-                        </button>
+                        <button className="u-icon" onClick={() => setOutput("")} title="Clear console" aria-label="Clear console"><Trash2 size={14} /></button>
                     )}
                     {outputTab === 'preview' && (
                         <>
-                            <button
-                                onClick={handleCompile}
-                                title="Refresh Web App"
-                                style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
-                            >
-                                <RotateCcw size={13} />
-                            </button>
-                            <button
-                                onClick={() => window.open(`/render/${projectId}`, '_blank')}
-                                title="Open Full Standalone Render Page in New Tab"
-                                style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
-                            >
-                                <ExternalLink size={13} />
-                            </button>
+                            <button className="u-icon" onClick={handleCompile} title="Rebuild preview" aria-label="Rebuild preview"><RotateCcw size={14} /></button>
+                            <button className="u-icon" onClick={() => window.open(`/render/${projectId}`, '_blank')} title="Open preview in a new tab" aria-label="Open preview in a new tab"><ExternalLink size={14} /></button>
                         </>
                     )}
-                    <X size={14} style={{ cursor: 'pointer', color: 'var(--text-muted)' }} onClick={() => setIsOutputVisible(false)} />
+                    <button className="u-icon" onClick={() => setIsOutputVisible(false)} title="Hide panel" aria-label="Hide panel"><X size={14} /></button>
                 </div>
             </div>
 
-            <div style={{ flex: 1, width: '100%', height: 'calc(100% - 36px)', position: 'relative', overflow: 'hidden' }}>
+            <div style={{ flex: 1, position: 'relative', overflow: 'hidden', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
                 {outputTab === 'preview' ? (
-                    <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', backgroundColor: '#ffffff' }}>
-                        <div style={{ height: '26px', backgroundColor: '#f1f5f9', borderBottom: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', padding: '0 10px', gap: '8px' }}>
-                            <div style={{ display: 'flex', gap: '4px' }}>
-                                <div style={{ width: '7px', height: '7px', borderRadius: '50%', backgroundColor: '#ef4444' }} />
-                                <div style={{ width: '7px', height: '7px', borderRadius: '50%', backgroundColor: '#f59e0b' }} />
-                                <div style={{ width: '7px', height: '7px', borderRadius: '50%', backgroundColor: '#10b981' }} />
-                            </div>
-                            <div style={{ flex: 1, backgroundColor: '#ffffff', height: '18px', borderRadius: '4px', border: '1px solid #cbd5e1', fontSize: '10px', color: '#64748b', display: 'flex', alignItems: 'center', padding: '0 8px', fontFamily: 'monospace' }}>
-                                http://localhost:3000/app
-                            </div>
-                        </div>
+                    <div className="ws-browser">
+                        <div className="ws-browser-bar"><i /><i /><i /><span>{(project?.name || 'app').toLowerCase().replace(/\s+/g, '-')}.preview</span></div>
                         <iframe
                             key={webSrcDoc}
-                            srcDoc={webSrcDoc || '<!DOCTYPE html><html><body style="font-family:sans-serif;padding:20px;color:#333">Click <b>RUN</b> to build & preview your web app.</body></html>'}
+                            srcDoc={webSrcDoc || '<!DOCTYPE html><html><body style="margin:0;height:100vh;display:flex;align-items:center;justify-content:center;font-family:system-ui,sans-serif;color:#8E8C85;background:#fff">Press Run to build the preview.</body></html>'}
                             title="Web Preview"
-                            style={{ width: '100%', flex: 1, border: 'none', backgroundColor: '#ffffff' }}
                             sandbox="allow-scripts allow-modals allow-forms allow-same-origin"
                         />
                     </div>
                 ) : (
-                    <pre style={outputTextStyle}>{output || "No console output yet. Click RUN to execute your web app or code."}</pre>
+                    <pre className="ws-console">{output || <span className="u-caret">No output yet. Press Run</span>}</pre>
                 )}
             </div>
         </div>
@@ -809,7 +738,7 @@ const ProjectPage = () => {
         }
     };
 
-    const handleAddFile = async () => {
+    const handleAddFile = async (nameArg) => {
         const type = project?.type || "web";
         let allowed = [];
         if (type === "web") allowed = ["html", "css", "js"];
@@ -817,7 +746,7 @@ const ProjectPage = () => {
         else if (type === "python") allowed = ["py"];
         else if (type === "java") allowed = ["java"];
 
-        const fileName = prompt(`Enter file name (Allowed: ${allowed.join(", ")}):`);
+        const fileName = typeof nameArg === "string" ? nameArg : prompt(`Enter file name (Allowed: ${allowed.join(", ")}):`);
         if (!fileName) return;
 
         const ext = fileName.split('.').pop().toLowerCase();
@@ -861,6 +790,21 @@ const ProjectPage = () => {
     };
 
 
+
+    const handleDeleteFile = async (file) => {
+        if (!window.confirm(`Delete ${file.name}? This cannot be undone.`)) return;
+        try {
+            const res = await fetch(`${getBackendUrl()}/api/projects/${projectId}/files?path=${encodeURIComponent(file.path || `/${file.name}`)}`, { method: 'DELETE' });
+            if (!res.ok) throw new Error("Delete failed");
+            setFiles(prev => prev.filter(f => f.id !== file.id));
+            const nextOpen = openFiles.filter(f => f.id !== file.id);
+            setOpenFiles(nextOpen);
+            if (activeFile?.id === file.id) setActiveFile(nextOpen[nextOpen.length - 1] || null);
+            toast.success("File deleted");
+        } catch (err) {
+            toast.error("Could not delete file");
+        }
+    };
 
     const handleImportFile = (e) => {
         const file = e.target.files[0];
@@ -908,8 +852,8 @@ const ProjectPage = () => {
 
     if (loading) {
         return (
-            <div style={{ height: "100vh", display: "flex", alignItems: "center", justifyContent: "center", backgroundColor: "var(--bg-dark)", color: "white" }}>
-                <LogoLoader message="Initialising Project Workspace..." />
+            <div className="ws">
+                <Loader variant="fill" message="Opening project" detail="Loading files and joining the session" />
             </div>
         );
     }
@@ -923,367 +867,132 @@ const ProjectPage = () => {
         }
     };
 
-    return (
-        <div className="project-workspace" style={{ height: '100vh', display: 'flex', flexDirection: 'column', backgroundColor: 'var(--bg-dark)', color: 'var(--text-main)', overflow: 'hidden' }}>
-            {/* Workspace Core Header */}
-            {!isZenMode && (
-                <div style={{
-                    height: isMobile ? "50px" : "56px",
-                    backgroundColor: "var(--bg-card)",
-                    borderBottom: "1px solid var(--border-color)",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    padding: isMobile ? "0 12px" : "0 20px",
-                    flexShrink: 0,
-                    zIndex: 100
-                }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: isMobile ? "8px" : "14px" }}>
-                        <div style={logoWrapperStyle} onClick={() => navigate('/dashboard')}>
-                            <img
-                                src={isMobile
-                                    ? (isLightMode ? "/utkristi-labs.png" : "/utkristi-labs-dark.png")
-                                    : (isLightMode ? "/utkristi-colabs.png" : "/utkristi-colabs-dark.png")
-                                }
-                                alt="Logo"
-                                style={{ height: isMobile ? '24px' : '32px', objectFit: 'contain' }}
-                            />
-                        </div>
-                        {!isMobile && <div style={{ height: "20px", width: "1px", backgroundColor: "var(--border-color)" }} />}
-                        {!isMobile && (
-                            <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                                <span style={{ fontSize: "12px", fontWeight: "700", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.05em" }}>Project</span>
-                                <span style={{ fontSize: "12px", fontFamily: "monospace", color: "var(--text-main)", backgroundColor: "var(--secondary)", padding: "2px 8px", borderRadius: "4px", border: "1px solid var(--border-color)", fontWeight: "600" }}>
-                                    {project?.name || "Loading..."}
-                                </span>
-                            </div>
-                        )}
-                    </div>
+    const me = user?.name || guestName;
 
-                    <div style={{ display: "flex", alignItems: "center", gap: isMobile ? "8px" : "12px" }}>
-                        {!isMobile && (
-                            <div style={{ display: "flex", alignItems: "center" }}>
-                                {clients.slice(0, 5).map((client, idx) => (
-                                    <div key={client.socketId || idx} style={{ marginLeft: idx === 0 ? 0 : "-8px", zIndex: 5 - idx }}>
-                                        <Client 
-                                            userName={client.userName || client.name} 
-                                            isCompact={true} 
-                                            isCurrentUser={(client.userName || client.name) === (user?.name || guestName)} 
-                                        />
-                                    </div>
-                                ))}
-                                {clients.length > 5 && (
-                                    <div style={{ 
-                                        marginLeft: "-8px", 
-                                        width: "32px", 
-                                        height: "32px", 
-                                        borderRadius: "50%", 
-                                        backgroundColor: "var(--secondary)", 
-                                        display: "flex", 
-                                        alignItems: "center", 
-                                        justifyContent: "center", 
-                                        fontSize: "11px", 
-                                        fontWeight: "700", 
-                                        color: "var(--text-muted)", 
-                                        border: "2px solid var(--bg-card)" 
-                                    }}>
-                                        +{clients.length - 5}
-                                    </div>
-                                )}
-                            </div>
-                        )}
-                        {/* Redesigned Icon Tray (Clean IDE Style, matching editor.js) */}
-                        <div style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: "4px",
-                            backgroundColor: "var(--secondary)",
-                            padding: "4px",
-                            borderRadius: "10px",
-                            border: "1px solid var(--border-color)"
-                        }}>
-                            {!isMobile && (
-                                <>
-                                    <button
-                                        onClick={() => toggleSidebarTab('files')}
-                                        style={{
-                                            display: "flex", alignItems: "center", justifyContent: "center", width: "32px", height: "32px",
-                                            color: (isSidebarOpen && sidebarTab === 'files') ? "var(--primary)" : "var(--text-muted)",
-                                            backgroundColor: (isSidebarOpen && sidebarTab === 'files') ? "rgba(59, 130, 246, 0.1)" : "transparent",
-                                            borderRadius: "6px", border: "none", cursor: "pointer", transition: "all 0.2s"
-                                        }}
-                                        onMouseOver={(e) => !(isSidebarOpen && sidebarTab === 'files') && (e.currentTarget.style.backgroundColor = "var(--bg-card)")}
-                                        onMouseOut={(e) => !(isSidebarOpen && sidebarTab === 'files') && (e.currentTarget.style.backgroundColor = "transparent")}
-                                        title="Files Explorer"
-                                    >
-                                        <Folder size={18} />
-                                    </button>
-                                    <button
-                                        onClick={() => toggleSidebarTab('chat')}
-                                        style={{
-                                            display: "flex", alignItems: "center", justifyContent: "center", width: "32px", height: "32px",
-                                            color: (isSidebarOpen && sidebarTab === 'chat') ? "var(--primary)" : "var(--text-muted)",
-                                            backgroundColor: (isSidebarOpen && sidebarTab === 'chat') ? "rgba(59, 130, 246, 0.1)" : "transparent",
-                                            borderRadius: "6px", border: "none", cursor: "pointer", transition: "all 0.2s",
-                                            position: "relative"
-                                        }}
-                                        onMouseOver={(e) => !(isSidebarOpen && sidebarTab === 'chat') && (e.currentTarget.style.backgroundColor = "var(--bg-card)")}
-                                        onMouseOut={(e) => !(isSidebarOpen && sidebarTab === 'chat') && (e.currentTarget.style.backgroundColor = "transparent")}
-                                        title="Project Chat"
-                                    >
-                                        <MessageSquare size={18} />
-                                        {messages.length > 0 && <div style={{ position: 'absolute', top: '4px', right: '4px', width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#ef4444' }} />}
-                                    </button>
-                                    <button
-                                        onClick={() => toggleSidebarTab('users')}
-                                        style={{
-                                            display: "flex", alignItems: "center", justifyContent: "center", width: "32px", height: "32px",
-                                            color: (isSidebarOpen && sidebarTab === 'users') ? "var(--primary)" : "var(--text-muted)",
-                                            backgroundColor: (isSidebarOpen && sidebarTab === 'users') ? "rgba(59, 130, 246, 0.1)" : "transparent",
-                                            borderRadius: "6px", border: "none", cursor: "pointer", transition: "all 0.2s"
-                                        }}
-                                        onMouseOver={(e) => !(isSidebarOpen && sidebarTab === 'users') && (e.currentTarget.style.backgroundColor = "var(--bg-card)")}
-                                        onMouseOut={(e) => !(isSidebarOpen && sidebarTab === 'users') && (e.currentTarget.style.backgroundColor = "transparent")}
-                                        title="Team Collaborators"
-                                    >
-                                        <Users size={18} />
-                                    </button>
-                                    <button
-                                        onClick={() => setShowWhiteboard(true)}
-                                        style={{
-                                            display: "flex", alignItems: "center", justifyContent: "center", width: "32px", height: "32px",
-                                            color: "var(--text-muted)", backgroundColor: "transparent",
-                                            borderRadius: "6px", border: "none", cursor: "pointer", transition: "all 0.2s"
-                                        }}
-                                        onMouseOver={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-card)")}
-                                        onMouseOut={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
-                                        title="Infinite Board"
-                                    >
-                                        <Layout size={18} />
-                                    </button>
-                                    <button
-                                        onClick={() => setIsMeetingActive(!isMeetingActive)}
-                                        style={{
-                                            display: "flex", alignItems: "center", justifyContent: "center", width: "32px", height: "32px",
-                                            color: isMeetingActive ? "#22c55e" : "var(--text-muted)",
-                                            backgroundColor: isMeetingActive ? "rgba(34, 197, 94, 0.1)" : "transparent",
-                                            borderRadius: "6px", border: "none", cursor: "pointer", transition: "all 0.2s"
-                                        }}
-                                        onMouseOver={(e) => !isMeetingActive && (e.currentTarget.style.backgroundColor = "var(--bg-card)")}
-                                        onMouseOut={(e) => !isMeetingActive && (e.currentTarget.style.backgroundColor = "transparent")}
-                                        title={isMeetingActive ? "Leave Video Call" : "Join Video Call"}
-                                    >
-                                        <Video size={18} />
-                                    </button>
-                                    <button
-                                        onClick={() => setShowAICopilot(true)}
-                                        style={{
-                                            display: "flex", alignItems: "center", justifyContent: "center", width: "32px", height: "32px",
-                                            color: "var(--primary)", backgroundColor: "rgba(59, 130, 246, 0.1)",
-                                            borderRadius: "6px", border: "1px solid rgba(59, 130, 246, 0.2)", cursor: "pointer", transition: "all 0.2s"
-                                        }}
-                                        title="AI Copilot Studio"
-                                    >
-                                        <Bot size={18} />
-                                    </button>
-                                    <button
-                                        onClick={() => setShowFocusModal(true)}
-                                        style={{
-                                            display: "flex", alignItems: "center", justifyContent: "center", width: "32px", height: "32px",
-                                            color: "var(--text-muted)", backgroundColor: "transparent",
-                                            borderRadius: "6px", border: "none", cursor: "pointer", transition: "all 0.2s"
-                                        }}
-                                        onMouseOver={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-card)")}
-                                        onMouseOut={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
-                                        title="Focus Mode (Alt+F)"
-                                    >
-                                        <Zap size={18} />
-                                    </button>
-                                    <button
-                                        onClick={() => setShowDiffViewer(true)}
-                                        style={{
-                                            display: "flex", alignItems: "center", justifyContent: "center", width: "32px", height: "32px",
-                                            color: "var(--text-muted)", backgroundColor: "transparent",
-                                            borderRadius: "6px", border: "none", cursor: "pointer", transition: "all 0.2s"
-                                        }}
-                                        onMouseOver={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-card)")}
-                                        onMouseOut={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
-                                        title="Version History & Diff Viewer"
-                                    >
-                                        <History size={18} />
-                                    </button>
-                                    <button
-                                        onClick={() => setShowAnalytics(true)}
-                                        style={{
-                                            display: "flex", alignItems: "center", justifyContent: "center", width: "32px", height: "32px",
-                                            color: "var(--text-muted)", backgroundColor: "transparent",
-                                            borderRadius: "6px", border: "none", cursor: "pointer", transition: "all 0.2s"
-                                        }}
-                                        onMouseOver={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-card)")}
-                                        onMouseOut={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
-                                        title="Workspace Telemetry Analytics"
-                                    >
-                                        <Activity size={18} />
-                                    </button>
-                                    <div style={{ width: "1px", height: "18px", backgroundColor: "var(--border-color)", margin: "0 2px" }} />
-                                </>
-                            )}
-                            <button
-                                onClick={handleCompile}
-                                disabled={isExecuting}
-                                style={{
-                                    display: "flex", alignItems: "center", justifyContent: "center", width: "32px", height: "32px",
-                                    color: isExecuting ? "#4ade80" : "#22c55e", backgroundColor: "transparent",
-                                    borderRadius: "6px", border: "none", cursor: isExecuting ? "default" : "pointer", transition: "all 0.2s"
-                                }}
-                                onMouseOver={(e) => !isExecuting && (e.currentTarget.style.backgroundColor = "rgba(34, 197, 94, 0.1)")}
-                                onMouseOut={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
-                                title="Run Code"
-                            >
-                                {isExecuting ? <Pause size={18} fill="#4ade80" /> : <Play size={18} fill="#22c55e" />}
-                            </button>
-                            <button
-                                onClick={toggleTheme}
-                                style={{
-                                    display: "flex", alignItems: "center", justifyContent: "center", width: "32px", height: "32px",
-                                    color: isLightMode ? "#fbbf24" : "var(--text-muted)", backgroundColor: "transparent",
-                                    borderRadius: "6px", border: "none", cursor: "pointer", transition: "all 0.2s"
-                                }}
-                                onMouseOver={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-card)")}
-                                onMouseOut={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
-                                title="Toggle Theme"
-                            >
-                                {isLightMode ? <Sun size={18} /> : <Moon size={18} />}
-                            </button>
-                            {!isMobile && (
-                                <>
-                                    <div style={{ width: "1px", height: "18px", backgroundColor: "var(--border-color)", margin: "0 2px" }} />
-                                    <button
-                                        onClick={() => setShowCommandPalette(true)}
-                                        style={{
-                                            display: "flex", alignItems: "center", justifyContent: "center", width: "32px", height: "32px",
-                                            color: "var(--text-muted)", backgroundColor: "transparent",
-                                            borderRadius: "6px", border: "none", cursor: "pointer", transition: "all 0.2s"
-                                        }}
-                                        onMouseOver={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-card)")}
-                                        onMouseOut={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
-                                        title="Command Palette (Ctrl+K)"
-                                    >
-                                        <Search size={18} />
-                                    </button>
-                                    <button
-                                        onClick={() => setShowInviteModal(true)}
-                                        style={{
-                                            display: "flex", alignItems: "center", justifyContent: "center", width: "32px", height: "32px",
-                                            color: "#a855f7", backgroundColor: "transparent",
-                                            borderRadius: "6px", border: "none", cursor: "pointer", transition: "all 0.2s"
-                                        }}
-                                        onMouseOver={(e) => (e.currentTarget.style.backgroundColor = "rgba(168, 85, 247, 0.1)")}
-                                        onMouseOut={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
-                                        title="Invite Team"
-                                    >
-                                        <Plus size={18} />
-                                    </button>
-                                </>
-                            )}
-                        </div>
-                    </div>
+    const renderTabs = () => (
+        <div className="ws-tabs" role="tablist" aria-label="Open files">
+            {openFiles.map(file => (
+                <div key={file.id} role="tab" aria-selected={activeFile?.id === file.id} className={`ws-tab${activeFile?.id === file.id ? ' on' : ''}`} onClick={() => handleFileClick(file)}>
+                    <FileIcon name={file.name} size={13} />
+                    <span>{file.name}</span>
+                    <button onClick={(e) => handleCloseTab(e, file.id)} aria-label={`Close ${file.name}`}><X size={12} /></button>
                 </div>
+            ))}
+        </div>
+    );
+
+    const renderEditor = () => (activeFile ? (
+        <ProjectEditor
+            key={activeFile.id}
+            socketRef={socketRef}
+            roomId={`project-${projectId}`}
+            fileId={activeFile.id}
+            onCodeChange={handleSaveFile}
+            code={activeFile.content}
+            filename={activeFile.name}
+            language={activeFile.name.split('.').pop()}
+            settings={settings}
+            userName={me}
+            isLightMode={isLightMode}
+        />
+    ) : (
+        <div className="ws-empty">
+            <span className="u-display">No file open</span>
+            <p style={{ margin: 0 }}>Pick a file from the tree, or create one.</p>
+            <button className="u-btn u-btn--ghost u-btn--sm" onClick={() => { setSidebarTab('files'); setIsSidebarOpen(true); setActiveTab('files'); }}><Folder size={14} /> Show files</button>
+        </div>
+    ));
+
+    const renderPeople = () => (
+        <div className="ws-people">
+            {clients.map((client, i) => {
+                const name = client.userName || client.name || 'Guest';
+                return (
+                    <div key={client.socketId || i} className="ws-person">
+                        <span className="ws-person-av" style={{ background: avatarColor(name) }}>{name.slice(0, 2).toUpperCase()}</span>
+                        <b>{name}</b>
+                        {name === me && <em>you</em>}
+                    </div>
+                );
+            })}
+        </div>
+    );
+
+    const renderWorkArea = (outputFlex) => (
+        <div style={{ height: '100%', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+            {renderTabs()}
+            <div style={{ flex: 1, position: 'relative', minHeight: 0 }}>
+                <ReflexContainer orientation="horizontal">
+                    <ReflexElement flex={isOutputVisible ? 1 - outputFlex : 1} minSize={120}>
+                        {renderEditor()}
+                    </ReflexElement>
+                    {isOutputVisible && <ReflexSplitter />}
+                    {isOutputVisible && (
+                        <ReflexElement flex={outputFlex} minSize={90}>
+                            {renderOutputPanel()}
+                        </ReflexElement>
+                    )}
+                </ReflexContainer>
+            </div>
+        </div>
+    );
+
+    return (
+        <div className="ws project-workspace">
+            {!isZenMode && (
+                <WorkspaceHeader
+                    isMobile={isMobile}
+                    isLightMode={isLightMode}
+                    onLogo={() => navigate('/dashboard')}
+                    mode="Project"
+                    title={project?.name || "Loading..."}
+                    subtitle={project?.type}
+                    clients={clients}
+                    currentUserName={me}
+                    onRun={handleCompile}
+                    isExecuting={isExecuting}
+                    onToggleTheme={toggleTheme}
+                    tabs={[
+                        { id: 'files', label: 'Files', icon: <Folder size={14} />, active: isSidebarOpen && sidebarTab === 'files', onClick: () => toggleSidebarTab('files') },
+                        { id: 'chat', label: 'Chat', icon: <MessageSquare size={14} />, active: isSidebarOpen && sidebarTab === 'chat', badge: messages.length > 0, onClick: () => toggleSidebarTab('chat') },
+                        { id: 'users', label: 'People', icon: <Users size={14} />, active: isSidebarOpen && sidebarTab === 'users', onClick: () => toggleSidebarTab('users') },
+                    ]}
+                    actions={[
+                        { id: 'call', label: isMeetingActive ? 'Leave call' : 'Start voice & video call', icon: <Video size={18} />, onClick: () => setIsMeetingActive(!isMeetingActive), active: isMeetingActive, tone: 'green' },
+                        { id: 'board', label: 'Whiteboard', icon: <Layout size={18} />, onClick: () => setShowWhiteboard(true) },
+                        { id: 'ai', label: 'AI Copilot', icon: <Bot size={18} />, onClick: () => setShowAICopilot(true) },
+                        { id: 'invite', label: 'Invite team', icon: <Plus size={18} />, onClick: () => setShowInviteModal(true) },
+                        { id: 'search', label: 'Command palette (Ctrl+K)', icon: <Search size={18} />, onClick: () => setShowCommandPalette(true), section: 'more' },
+                        { id: 'focus', label: 'Focus mode (Alt+F)', icon: <Zap size={18} />, onClick: () => setShowFocusModal(true), section: 'more' },
+                        { id: 'history', label: 'Version history', icon: <History size={18} />, onClick: () => setShowDiffViewer(true), section: 'more' },
+                        { id: 'analytics', label: 'Analytics', icon: <Activity size={18} />, onClick: () => setShowAnalytics(true), section: 'more' },
+                        { id: 'dash', label: 'Back to dashboard', icon: <Layout size={18} />, onClick: () => navigate('/dashboard'), section: 'more' },
+                    ]}
+                />
             )}
 
-            {/* Main Content Area */}
-            <div style={{ flex: 1, display: 'flex', overflow: 'hidden', position: 'relative' }}>
+            <div className="ws-body">
                 {isMobile ? (
-                    // MOBILE VIEW: Render view dynamically based on bottom tab
-                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', paddingBottom: '56px' }}>
-                        {activeTab === 'code' && (
-                            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-                                <div style={studioTabContainerStyle}>
-                                    {openFiles.map(file => (
-                                        <div key={file.id} onClick={() => handleFileClick(file)} style={studioTabStyle(activeFile?.id === file.id, isLightMode)}>
-                                            <FileText size={12} />
-                                            <span>{file.name}</span>
-                                            <button style={closeTabStyle} onClick={(e) => handleCloseTab(e, file.id)}><X size={10} /></button>
-                                        </div>
-                                    ))}
-                                </div>
-                                <div style={{ flex: 1, position: 'relative' }}>
-                                    <ReflexContainer orientation="horizontal">
-                                        <ReflexElement flex={isOutputVisible ? 0.65 : 1}>
-                                            {activeFile ? (
-                                                <ProjectEditor
-                                                    key={activeFile.id}
-                                                    socketRef={socketRef}
-                                                    roomId={`project-${projectId}`}
-                                                    fileId={activeFile.id}
-                                                    onCodeChange={handleSaveFile}
-                                                    code={activeFile.content}
-                                                    filename={activeFile.name}
-                                                    language={activeFile.name.split('.').pop()}
-                                                    settings={settings}
-                                                    userName={user?.name || guestName}
-                                                    isLightMode={isLightMode}
-                                                />
-                                            ) : (
-                                                <div style={emptyEditorStyle}><Terminal size={48} style={{ opacity: 0.1 }} /></div>
-                                            )}
-                                        </ReflexElement>
-                                        {isOutputVisible && <ReflexSplitter style={splitterStyle} />}
-                                        {isOutputVisible && (
-                                            <ReflexElement flex={0.4} style={{ backgroundColor: 'var(--bg-dark)' }}>
-                                                {renderOutputPanel()}
-                                            </ReflexElement>
-                                        )}
-                                    </ReflexContainer>
-                                </div>
-                            </div>
-                        )}
+                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+                        {activeTab === 'code' && renderWorkArea(0.4)}
                         {activeTab === 'files' && (
-                            <div style={{ flex: 1, backgroundColor: 'var(--bg-dark)', padding: '16px', overflowY: 'auto' }}>
-                                <h3 style={{ fontSize: '14px', fontWeight: '800', color: 'var(--primary)', textTransform: 'uppercase', marginBottom: '16px', letterSpacing: '0.1em' }}>Files Explorer</h3>
-                                <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '16px' }}>
-                                    <label style={{ cursor: 'pointer', opacity: 0.8, color: 'var(--text-main)', display: 'flex', gap: '6px', alignItems: 'center', fontSize: '12px', border: '1px solid var(--border-color)', padding: '6px 12px', borderRadius: '6px', backgroundColor: 'var(--bg-card)' }} title="Import File">
-                                        <Plus size={14} /> Import File
-                                        <input type="file" style={{ display: 'none' }} onChange={handleImportFile} />
-                                    </label>
-                                    <button style={{ color: 'var(--text-main)', display: 'flex', gap: '6px', alignItems: 'center', fontSize: '12px', border: '1px solid var(--border-color)', padding: '6px 12px', borderRadius: '6px', backgroundColor: 'var(--bg-card)', cursor: 'pointer' }} onClick={handleAddFile} title="New File">
-                                        <Plus size={14} /> New File
-                                    </button>
-                                </div>
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                                    {files.map(file => (
-                                        <div key={file.id} onClick={() => handleFileClick(file)} style={fileItemStyle(activeFile?.id === file.id)}>
-                                            <FileCode size={14} />
-                                            <span>{file.name}</span>
-                                        </div>
-                                    ))}
-                                </div>
+                            <div style={{ flex: 1, background: 'var(--u-bg-2)', overflow: 'hidden' }}>
+                                <ProjectFileTree files={files} activeFile={activeFile} project={project} onSelect={(f) => { handleFileClick(f); setActiveTab('code'); }} onCreate={handleAddFile} onDelete={handleDeleteFile} onImport={handleImportFile} />
                             </div>
                         )}
                         {activeTab === 'chat' && (
                             <div style={{ flex: 1, overflow: 'hidden' }}>
-                                <ChatWindow socketRef={socketRef} roomId={`project-${projectId}`} userName={user?.name || guestName} isLightMode={isLightMode} isMobile={isMobile} messages={messages} setMessages={setMessages} />
+                                <ChatWindow socketRef={socketRef} roomId={`project-${projectId}`} userName={me} isLightMode={isLightMode} isMobile={isMobile} messages={messages} setMessages={setMessages} />
                             </div>
                         )}
                         {activeTab === 'users' && (
-                            <div style={{ flex: 1, backgroundColor: 'var(--bg-dark)', padding: '16px', overflowY: 'auto' }}>
-                                <h3 style={{ fontSize: '14px', fontWeight: '800', color: 'var(--primary)', textTransform: 'uppercase', marginBottom: '16px', letterSpacing: '0.1em' }}>Team Members ({clients.length})</h3>
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                                    {clients.map((client, i) => (
-                                        <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px', backgroundColor: 'var(--bg-card)', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
-                                            <div style={miniAvatarStyle}>
-                                                {(client.userName || client.name || 'U')[0].toUpperCase()}
-                                            </div>
-                                            <span style={{ fontSize: '13px', fontWeight: '600' }}>
-                                                {client.userName || client.name} {client.name === (user?.name || guestName) && "(You)"}
-                                            </span>
-                                        </div>
-                                    ))}
-                                </div>
+                            <div style={{ flex: 1, overflowY: 'auto' }}>
+                                <div className="ws-pane-head"><span>People</span><b>{clients.length} online</b></div>
+                                {renderPeople()}
                             </div>
                         )}
                         {activeTab === 'video' && (
-                            <div style={{ flex: 1, backgroundColor: 'var(--bg-dark)', display: 'flex', flexDirection: 'column', position: 'relative' }}>
+                            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', position: 'relative' }}>
                                 <VideoChat
                                     socketRef={socketRef}
                                     projectId={projectId}
@@ -1302,108 +1011,32 @@ const ProjectPage = () => {
                         )}
                     </div>
                 ) : (
-                    // DESKTOP WORKSPACE LAYOUT
                     <ReflexContainer orientation="vertical" style={{ flex: 1, height: '100%', minHeight: 0 }}>
                         {!isZenMode && isSidebarOpen && ['files', 'chat', 'users'].includes(sidebarTab) && (
-                            <ReflexElement flex={0.18} minSize={250} style={{ 
-                                height: '100%', 
-                                minHeight: 0, 
-                                backgroundColor: 'var(--bg-card)', 
-                                borderRight: '1px solid var(--border-color)',
-                                display: 'flex',
-                                flexDirection: 'column'
-                            }}>
-                                <div style={sidebarHeaderStyle}>
-                                    <span style={{ fontSize: '10px', fontWeight: '900', letterSpacing: '0.12em', color: 'var(--primary)', textTransform: 'uppercase' }}>
-                                        {sidebarTab === 'chat' ? 'Messages' : sidebarTab === 'users' ? 'Team' : sidebarTab}
-                                    </span>
-                                    {sidebarTab === 'files' && (
-                                        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                                            <label style={{ cursor: 'pointer', opacity: 0.6 }} title="Import File">
-                                                <FileText size={14} />
-                                                <input type="file" style={{ display: 'none' }} onChange={handleImportFile} />
-                                            </label>
-                                            <Plus size={14} style={{ cursor: 'pointer', opacity: 0.6 }} onClick={handleAddFile} title="New File" />
-                                        </div>
-                                    )}
-                                </div>
-                                <div style={{ flex: 1, overflowY: 'auto', minHeight: 0, backgroundColor: 'var(--bg-card)' }}>
-                                    {sidebarTab === 'files' && (
-                                        <div style={{ padding: '8px' }}>
-                                            {files.map(file => (
-                                                <div key={file.id} onClick={() => handleFileClick(file)} style={fileItemStyle(activeFile?.id === file.id)}>
-                                                    <FileCode size={13} />
-                                                    <span style={{ fontSize: '12px' }}>{file.name}</span>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    )}
-                                    {sidebarTab === 'chat' && <ChatWindow socketRef={socketRef} roomId={`project-${projectId}`} userName={user?.name || guestName} isLightMode={isLightMode} isMobile={isMobile} messages={messages} setMessages={setMessages} />}
-                                    {sidebarTab === 'users' && (
-                                        <div style={{ padding: '12px' }}>
-                                            {clients.map((client, i) => (
-                                                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px', borderRadius: '6px', marginBottom: '4px', backgroundColor: 'rgba(255,255,255,0.01)' }}>
-                                                    <div style={miniAvatarStyle}>
-                                                        {(client.userName || client.name || 'U')[0].toUpperCase()}
-                                                    </div>
-                                                    <span style={{ fontSize: '12px', fontWeight: '500' }}>
-                                                        {client.userName || client.name} {client.name === (user?.name || guestName) && "(You)"}
-                                                    </span>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    )}
+                            <ReflexElement flex={0.2} minSize={240} style={{ height: '100%', minHeight: 0, background: 'var(--u-bg-2)', display: 'flex', flexDirection: 'column' }}>
+                                {sidebarTab !== 'files' && (
+                                    <div className="ws-pane-head">
+                                        <span>{sidebarTab === 'chat' ? 'Messages' : 'People'}</span>
+                                        <b>{clients.length} online</b>
+                                    </div>
+                                )}
+                                <div style={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
+                                    {sidebarTab === 'files' && <ProjectFileTree files={files} activeFile={activeFile} project={project} onSelect={handleFileClick} onCreate={handleAddFile} onDelete={handleDeleteFile} onImport={handleImportFile} />}
+                                    {sidebarTab === 'chat' && <ChatWindow socketRef={socketRef} roomId={`project-${projectId}`} userName={me} isLightMode={isLightMode} isMobile={isMobile} messages={messages} setMessages={setMessages} />}
+                                    {sidebarTab === 'users' && renderPeople()}
                                 </div>
                             </ReflexElement>
                         )}
-                        
-                        {!isZenMode && isSidebarOpen && ['files', 'chat', 'users'].includes(sidebarTab) && <ReflexSplitter style={splitterStyle} />}
-                        
+
+                        {!isZenMode && isSidebarOpen && ['files', 'chat', 'users'].includes(sidebarTab) && <ReflexSplitter />}
+
                         <ReflexElement flex={1} style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-                            <div style={studioTabContainerStyle}>
-                                {openFiles.map(file => (
-                                    <div key={file.id} onClick={() => handleFileClick(file)} style={studioTabStyle(activeFile?.id === file.id, isLightMode)}>
-                                        <FileText size={12} />
-                                        <span>{file.name}</span>
-                                        <button style={closeTabStyle} onClick={(e) => handleCloseTab(e, file.id)}><X size={10} /></button>
-                                    </div>
-                                ))}
-                            </div>
-                            <div style={{ flex: 1, position: 'relative' }}>
-                                <ReflexContainer orientation="horizontal">
-                                    <ReflexElement flex={isOutputVisible ? 0.7 : 1}>
-                                    {activeFile ? (
-                                        <ProjectEditor 
-                                            key={activeFile.id}
-                                            socketRef={socketRef}
-                                            roomId={`project-${projectId}`}
-                                            fileId={activeFile.id}
-                                            onCodeChange={handleSaveFile}
-                                            code={activeFile.content}
-                                            filename={activeFile.name}
-                                            language={activeFile.name.split('.').pop()}
-                                            settings={settings}
-                                            userName={user?.name || guestName}
-                                            isLightMode={isLightMode}
-                                        />
-                                    ) : (
-                                        <div style={emptyEditorStyle}><Terminal size={48} style={{ opacity: 0.1 }} /></div>
-                                    )}
-                                    </ReflexElement>
-                                    {isOutputVisible && <ReflexSplitter style={splitterStyle} />}
-                                    {isOutputVisible && (
-                                        <ReflexElement flex={0.4} style={{ backgroundColor: 'var(--bg-dark)' }}>
-                                            {renderOutputPanel()}
-                                        </ReflexElement>
-                                    )}
-                                </ReflexContainer>
-                            </div>
+                            {renderWorkArea(0.36)}
                         </ReflexElement>
                     </ReflexContainer>
                 )}
             </div>
 
-            {/* Draggable Mini Video Floating Box (Mounted on call activate) */}
             {isMeetingActive && !isMobile && (
                 <VideoChat
                     socketRef={socketRef}
@@ -1424,135 +1057,69 @@ const ProjectPage = () => {
                 />
             )}
 
-            {/* Studio Footer */}
-            <footer style={studioFooterStyle}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <div style={{
-                        width: '6px',
-                        height: '6px',
-                        borderRadius: '50%',
-                        backgroundColor: '#10b981',
-                        boxShadow: '0 0 6px rgba(16, 185, 129, 0.4)'
-                    }} />
-                    <span style={{ fontSize: '9px', fontWeight: '750', color: 'var(--text-muted)' }}>
-                        {project?.type?.toUpperCase()} ENGINE
-                    </span>
-                </div>
-
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', height: '100%' }}>
-                    <button
-                        onClick={() => setIsOutputVisible(!isOutputVisible)}
-                        title="Toggle Terminal"
-                        style={{
-                            background: 'none',
-                            border: 'none',
-                            color: isOutputVisible ? 'var(--primary)' : 'var(--text-muted)',
-                            cursor: 'pointer',
-                            display: 'flex',
-                            alignItems: 'center',
-                            padding: '4px',
-                            transition: 'all 0.2s'
-                        }}
-                    >
-                        <Terminal size={14} />
-                    </button>
-
-                    <div style={{ width: '1px', height: '12px', backgroundColor: 'var(--border-color)', margin: '0 4px' }} />
-
-                    <button
-                        onClick={handleCompile}
-                        disabled={isExecuting}
-                        style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '6px',
-                            padding: '0 12px',
-                            borderRadius: '4px',
-                            border: 'none',
-                            backgroundColor: 'var(--primary)',
-                            color: 'white',
-                            fontSize: '9px',
-                            fontWeight: '900',
-                            cursor: isExecuting ? 'wait' : 'pointer',
-                            height: '20px',
-                            boxShadow: '0 2px 8px rgba(59, 130, 246, 0.2)',
-                            transition: 'all 0.2s'
-                        }}
-                    >
-                        <Play size={10} fill="currentColor" />
-                        {isExecuting ? '...' : 'RUN'}
-                    </button>
-                </div>
-            </footer>
-
-            {/* Guest Entry Name Overlay Modal */}
-            {showGuestModal && (
-                <div style={{
-                    position: 'fixed',
-                    inset: 0,
-                    backgroundColor: 'rgba(0,0,0,0.7)',
-                    backdropFilter: 'blur(8px)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    zIndex: 99999
-                }}>
-                    <div style={{
-                        backgroundColor: 'var(--bg-card)',
-                        padding: '32px',
-                        borderRadius: '16px',
-                        border: '1px solid var(--border-color)',
-                        width: '360px',
-                        boxShadow: '0 20px 45px rgba(0,0,0,0.5)',
-                        textAlign: 'center'
-                    }}>
-                        <h2 style={{ fontSize: '20px', fontWeight: '800', marginBottom: '8px', color: 'white' }}>Join Studio</h2>
-                        <p style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: '24px' }}>Please enter a display name to enter the workspace.</p>
-                        <form onSubmit={(e) => {
-                            e.preventDefault();
-                            if (guestName.trim()) {
-                                localStorage.setItem('guest-name', guestName.trim());
-                                joinProject(guestName.trim());
-                                setShowGuestModal(false);
-                            }
-                        }}>
-                            <input
-                                autoFocus
-                                value={guestName}
-                                onChange={(e) => setGuestName(e.target.value)}
-                                style={{
-                                    width: '100%',
-                                    padding: '12px 16px',
-                                    borderRadius: '8px',
-                                    backgroundColor: 'var(--bg-dark)',
-                                    border: '1px solid var(--border-color)',
-                                    color: 'white',
-                                    fontSize: '14px',
-                                    marginBottom: '20px',
-                                    outline: 'none',
-                                    textAlign: 'center'
-                                }}
-                                placeholder="Enter Display Name"
-                                required
-                            />
-                            <button type="submit" style={{
-                                width: '100%',
-                                padding: '12px',
-                                borderRadius: '8px',
-                                border: 'none',
-                                backgroundColor: 'var(--primary)',
-                                color: 'white',
-                                fontWeight: '700',
-                                cursor: 'pointer',
-                                fontSize: '14px',
-                                boxShadow: '0 4px 12px rgba(59, 130, 246, 0.3)'
-                            }}>Join Workspace</button>
-                        </form>
+            {!isMobile && (
+                <footer className="ws-status">
+                    <div>
+                        <span><span className="u-dot" /> live</span>
+                        <span>{(project?.type || 'project')} engine</span>
+                        <span>{files.length} file{files.length === 1 ? '' : 's'}</span>
+                        {activeFile && <span>{activeFile.path || `/${activeFile.name}`}</span>}
                     </div>
+                    <div>
+                        <span>{clients.length} online</span>
+                        <button className={isOutputVisible ? 'on' : ''} onClick={() => setIsOutputVisible(!isOutputVisible)} title="Toggle output panel">
+                            <Terminal size={12} /> output
+                        </button>
+                        <button onClick={handleCompile} disabled={isExecuting}><Play size={10} fill="currentColor" /> {isExecuting ? 'running…' : 'run'}</button>
+                    </div>
+                </footer>
+            )}
+
+            {isMobile && (
+                <nav className="ws-tabbar" aria-label="Workspace">
+                    {[
+                        { id: 'code', icon: <FileCode size={19} />, label: 'Code' },
+                        { id: 'files', icon: <Folder size={19} />, label: 'Files' },
+                        { id: 'chat', icon: <MessageSquare size={19} />, label: 'Chat', dot: messages.length > 0 },
+                        { id: 'users', icon: <Users size={19} />, label: 'People' },
+                        { id: 'video', icon: <Video size={19} />, label: 'Meet' },
+                    ].map((t) => (
+                        <button key={t.id} className={activeTab === t.id ? 'on' : ''} onClick={() => setActiveTab(t.id)}>
+                            {t.icon}<span>{t.label}</span>
+                            {t.dot && <span className="u-count" style={{ minWidth: 8, height: 8, padding: 0 }} />}
+                        </button>
+                    ))}
+                </nav>
+            )}
+
+            {showGuestModal && (
+                <div className="u-modal-back">
+                    <form className="u-modal" style={{ maxWidth: 420 }} onSubmit={(e) => {
+                        e.preventDefault();
+                        if (guestName.trim()) {
+                            localStorage.setItem('guest-name', guestName.trim());
+                            joinProject(guestName.trim());
+                            setShowGuestModal(false);
+                        }
+                    }}>
+                        <div className="u-modal-head">
+                            <div>
+                                <span className="u-label">project/{project?.name || projectId}</span>
+                                <h3>Join the project</h3>
+                                <p>Pick a name so teammates know who is typing.</p>
+                            </div>
+                        </div>
+                        <div className="u-modal-body">
+                            <div className="u-field">
+                                <label htmlFor="guest-name">Display name</label>
+                                <input id="guest-name" className="u-input" autoFocus value={guestName} onChange={(e) => setGuestName(e.target.value)} placeholder="e.g. Ada Lovelace" required />
+                            </div>
+                            <button type="submit" className="u-btn u-btn--solid u-btn--lg u-btn--block">Join workspace</button>
+                        </div>
+                    </form>
                 </div>
             )}
 
-            {/* v2.0 Modals */}
             <AICopilotModal
                 isOpen={showAICopilot}
                 onClose={() => setShowAICopilot(false)}
@@ -1594,66 +1161,14 @@ const ProjectPage = () => {
                 isLightMode={isLightMode}
             />
 
-            {/* Mobile Bottom Navigation Bar */}
-            {isMobile && (
-                <nav style={{
-                    position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 500,
-                    height: '56px', backgroundColor: 'var(--bg-card)',
-                    borderTop: '1px solid var(--border-color)',
-                    display: 'flex', alignItems: 'center', justifyContent: 'space-around',
-                    padding: '0 8px',
-                    backdropFilter: 'blur(16px)',
-                    WebkitBackdropFilter: 'blur(16px)',
-                }}>
-                    <button
-                        onClick={() => setActiveTab('code')}
-                        style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px', background: 'none', border: 'none', color: activeTab === 'code' ? 'var(--primary)' : 'var(--text-muted)', cursor: 'pointer', padding: '8px', fontSize: '9px', fontWeight: '700', transition: 'all 0.2s' }}
-                    >
-                        <FileCode size={18} />
-                        <span>Code</span>
-                    </button>
-                    <button
-                        onClick={() => setActiveTab('files')}
-                        style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px', background: 'none', border: 'none', color: activeTab === 'files' ? 'var(--primary)' : 'var(--text-muted)', cursor: 'pointer', padding: '8px', fontSize: '9px', fontWeight: '700', transition: 'all 0.2s' }}
-                    >
-                        <Folder size={18} />
-                        <span>Files</span>
-                    </button>
-                    <button
-                        onClick={() => setActiveTab('chat')}
-                        style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px', background: 'none', border: 'none', color: activeTab === 'chat' ? 'var(--primary)' : 'var(--text-muted)', cursor: 'pointer', padding: '8px', fontSize: '9px', fontWeight: '700', transition: 'all 0.2s', position: 'relative' }}
-                    >
-                        <MessageSquare size={18} />
-                        {messages.length > 0 && <div style={{ position: 'absolute', top: '6px', right: '50%', transform: 'translateX(8px)', width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#ef4444' }} />}
-                        <span>Chat</span>
-                    </button>
-                    <button
-                        onClick={() => setActiveTab('users')}
-                        style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px', background: 'none', border: 'none', color: activeTab === 'users' ? 'var(--primary)' : 'var(--text-muted)', cursor: 'pointer', padding: '8px', fontSize: '9px', fontWeight: '700', transition: 'all 0.2s' }}
-                    >
-                        <Users size={18} />
-                        <span>People</span>
-                    </button>
-                    <button
-                        onClick={() => setActiveTab('video')}
-                        style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px', background: 'none', border: 'none', color: activeTab === 'video' ? 'var(--primary)' : 'var(--text-muted)', cursor: 'pointer', padding: '8px', fontSize: '9px', fontWeight: '700', transition: 'all 0.2s' }}
-                    >
-                        <Video size={18} />
-                        <span>Meet</span>
-                    </button>
-                </nav>
-            )}
-
-            {/* Team Invite Modal */}
             <InviteModal
                 isOpen={showInviteModal}
                 onClose={() => setShowInviteModal(false)}
                 projectId={projectId}
                 projectName={project?.name || "this project"}
-                inviterName={user?.name || guestName}
+                inviterName={me}
             />
 
-            {/* Whiteboard Modal */}
             <WhiteboardModal
                 isOpen={showWhiteboard}
                 onClose={() => setShowWhiteboard(false)}
@@ -1662,7 +1177,7 @@ const ProjectPage = () => {
                 user={user || { name: guestName || 'Guest' }}
             />
 
-            <CommandPalette 
+            <CommandPalette
                 isOpen={showCommandPalette}
                 onClose={() => setShowCommandPalette(false)}
                 actions={commandActions}
@@ -1670,190 +1185,19 @@ const ProjectPage = () => {
             />
 
             {isZenMode && (
-                <button 
-                    onClick={() => setIsZenMode(false)}
-                    style={{
-                        position: 'fixed',
-                        bottom: '24px',
-                        left: '50%',
-                        transform: 'translateX(-50%)',
-                        zIndex: 1000,
-                        backgroundColor: 'var(--primary)',
-                        color: 'white',
-                        border: 'none',
-                        padding: '12px 24px',
-                        borderRadius: '100px',
-                        fontSize: '11px',
-                        fontWeight: '900',
-                        cursor: 'pointer',
-                        boxShadow: '0 10px 25px rgba(59, 130, 246, 0.5)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '10px',
-                        letterSpacing: '0.05em'
-                    }}
-                >
-                    <Eye size={14} /> EXIT ZEN MODE
+                <button className="u-btn u-btn--solid ws-zen-exit" onClick={() => setIsZenMode(false)}>
+                    <Eye size={15} /> Exit zen mode
                 </button>
             )}
-
         </div>
     );
 };
 
-const logoWrapperStyle = {
-    width: 'auto',
-    minWidth: '36px',
-    height: '36px',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    cursor: 'pointer',
-    transition: 'all 0.2s'
+const AVATAR_COLORS = ["#5B8DEF", "#8B5CF6", "#EC4899", "#F59E0B", "#10B981", "#06B6D4", "#F43F5E", "#6366F1"];
+const avatarColor = (name = "") => {
+    let hash = 0;
+    for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
+    return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
 };
-
-
-const sidebarHeaderStyle = {
-    padding: '12px 16px',
-    borderBottom: '1px solid var(--border-color)',
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: 'var(--bg-card)',
-    height: '40px'
-};
-
-
-const fileItemStyle = (active) => ({
-    padding: '10px 12px',
-    borderRadius: '6px',
-    marginBottom: '2px',
-    cursor: 'pointer',
-    display: 'flex',
-    alignItems: 'center',
-    gap: '12px',
-    backgroundColor: active ? 'rgba(59, 130, 246, 0.08)' : 'transparent',
-    color: active ? 'var(--primary)' : 'var(--text-main)',
-    transition: 'all 0.2s',
-    border: active ? '1px solid rgba(59, 130, 246, 0.1)' : '1px solid transparent'
-});
-
-const studioTabContainerStyle = {
-    height: '40px',
-    backgroundColor: 'var(--bg-card)',
-    borderBottom: '1px solid var(--border-color)',
-    display: 'flex',
-    alignItems: 'flex-end',
-    padding: '0 4px',
-    overflowX: 'auto',
-    gap: '4px'
-};
-
-const studioTabStyle = (active, isLight) => ({
-    height: '34px',
-    padding: '0 16px',
-    backgroundColor: active ? (isLight ? '#fff' : '#0d1117') : 'transparent',
-    border: '1px solid var(--border-color)',
-    borderBottom: active ? (isLight ? '1px solid #fff' : '1px solid #0d1117') : '1px solid var(--border-color)',
-    borderRadius: '4px 4px 0 0',
-    display: 'flex',
-    alignItems: 'center',
-    gap: '10px',
-    fontSize: '11px',
-    fontWeight: active ? '750' : '600',
-    color: active ? 'var(--primary)' : 'var(--text-muted)',
-    cursor: 'pointer',
-    minWidth: '130px',
-    zIndex: active ? 2 : 1,
-    marginBottom: '-1px',
-    transition: 'all 0.2s ease'
-});
-
-const studioFooterStyle = {
-    height: '28px',
-    backgroundColor: 'var(--bg-card)',
-    borderTop: '1px solid var(--border-color)',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: '0 12px',
-    fontSize: '9px',
-    fontWeight: '700',
-    color: 'var(--text-muted)',
-    textTransform: 'uppercase',
-    letterSpacing: '0.08em'
-};
-
-
-const emptyEditorStyle = {
-    height: '100%',
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#0d1117'
-};
-
-const splitterStyle = {
-    backgroundColor: 'var(--border-color)',
-    width: '1px',
-    opacity: 0.5
-};
-
-const miniAvatarStyle = {
-    width: '24px',
-    height: '24px',
-    borderRadius: '50%',
-    backgroundColor: 'var(--primary)',
-    color: 'white',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    fontSize: '10px',
-    fontWeight: '800',
-    border: '2px solid var(--bg-card)'
-};
-
-
-const outputHeaderStyle = {
-    padding: '8px 16px',
-    backgroundColor: 'var(--bg-card)',
-    borderBottom: '1px solid var(--border-color)',
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    fontSize: '10px',
-    fontWeight: '800',
-    color: 'var(--text-muted)',
-    textTransform: 'uppercase',
-    letterSpacing: '0.1em'
-};
-
-const outputTextStyle = {
-    padding: '16px',
-    margin: 0,
-    color: 'var(--text-main)',
-    fontSize: '13px',
-    lineHeight: '1.6',
-    fontFamily: 'monospace',
-    whiteSpace: 'pre-wrap',
-    overflowY: 'auto',
-    height: '100%',
-    opacity: 0.95
-};
-
-const closeTabStyle = {
-    background: 'transparent',
-    border: 'none',
-    color: 'var(--text-muted)',
-    fontSize: '14px',
-    cursor: 'pointer',
-    padding: '4px',
-    display: 'flex',
-    alignItems: 'center'
-};
-
-
-
 
 export default ProjectPage;

@@ -4,9 +4,13 @@ import { useNavigate } from 'react-router-dom';
 import { getBackendUrl } from '../utils/api';
 import { useAuth } from '../context/AuthContext';
 
+const NO_RESULTS = { rooms: [], snippets: [] };
+// Keep the same object when already empty so effects that depend on `results` settle.
+const clearResults = (prev) => (prev?.rooms?.length || prev?.snippets?.length ? NO_RESULTS : prev);
+
 const SearchModal = ({ isOpen, onClose }) => {
     const [query, setQuery] = useState('');
-    const [results, setResults] = useState({ rooms: [], snippets: [] });
+    const [results, setResults] = useState(NO_RESULTS);
     const [loading, setLoading] = useState(false);
     const [selectedIndex, setSelectedIndex] = useState(0);
     const modalRef = useRef(null);
@@ -52,7 +56,7 @@ const SearchModal = ({ isOpen, onClose }) => {
             window.removeEventListener('keydown', handleKeyDown);
             document.body.style.overflow = 'auto';
             setQuery('');
-            setResults({ rooms: [], snippets: [] });
+            setResults(clearResults);
         }
 
         return () => {
@@ -63,7 +67,7 @@ const SearchModal = ({ isOpen, onClose }) => {
 
     useEffect(() => {
         if (!query.trim()) {
-            setResults({ rooms: [], snippets: [] });
+            setResults(clearResults);
             return;
         }
 
@@ -148,8 +152,9 @@ const SearchModal = ({ isOpen, onClose }) => {
                             onMouseEnter={() => setSelectedIndex(globalIdx)}
                             style={{
                                 ...itemStyle,
-                                backgroundColor: isSelected ? 'rgba(59, 130, 246, 0.1)' : 'transparent',
-                                border: isSelected ? '1px solid var(--primary)' : '1px solid transparent'
+                                backgroundColor: isSelected ? 'var(--u-tint)' : 'transparent',
+                                border: '1px solid transparent',
+                                boxShadow: isSelected ? 'inset 2px 0 0 var(--u-accent)' : 'none'
                             }}
                         >
                             <div style={itemIconWrapperStyle}>
@@ -159,7 +164,7 @@ const SearchModal = ({ isOpen, onClose }) => {
                                 <div style={itemTitleStyle}>{item.name}</div>
                                 <div style={itemSubtitleStyle}>{type === 'room' ? `ID: ${item.id}` : item.lang}</div>
                             </div>
-                            {isSelected && <ArrowRight size={14} color="var(--primary)" />}
+                            {isSelected && <ArrowRight size={14} color="var(--u-ink)" />}
                         </div>
                     );
                 })}
@@ -171,21 +176,21 @@ const SearchModal = ({ isOpen, onClose }) => {
 const overlayStyle = {
     position: 'fixed',
     top: 0, left: 0, right: 0, bottom: 0,
-    backgroundColor: 'rgba(0,0,0,0.75)',
+    backgroundColor: 'rgba(5,5,4,0.5)',
     zIndex: 2000,
     display: 'flex',
     justifyContent: 'center',
-    paddingTop: '100px',
+    padding: '12vh 16px 16px',
     backdropFilter: 'blur(4px)'
 };
 
 const modalStyle = {
     width: '100%',
     maxWidth: '600px',
-    backgroundColor: 'var(--bg-card)',
-    borderRadius: '6px',
+    backgroundColor: 'var(--u-raise, var(--bg-card))',
+    borderRadius: '20px',
     border: '1px solid var(--border-color)',
-    boxShadow: '0 20px 50px rgba(0,0,0,0.5)',
+    boxShadow: 'var(--u-shadow, 0 20px 50px rgba(0,0,0,0.5))',
     overflow: 'hidden',
     display: 'flex',
     flexDirection: 'column',

@@ -194,7 +194,7 @@ const WhiteboardModal = ({ isOpen, onClose, socketRef, roomId }) => {
         const gridSize = 40;
         const startX = -pan.x / zoom, startY = -pan.y / zoom;
         const endX = startX + canvas.width / (zoom * window.devicePixelRatio), endY = startY + canvas.height / (zoom * window.devicePixelRatio);
-        ctx.strokeStyle = "rgba(255, 255, 255, 0.05)";
+        ctx.strokeStyle = "var(--u-tint)";
         ctx.lineWidth = 1 / zoom;
         ctx.beginPath();
         for (let x = Math.floor(startX / gridSize) * gridSize; x < endX; x += gridSize) { ctx.moveTo(x, startY); ctx.lineTo(x, endY); }
@@ -329,7 +329,7 @@ const WhiteboardModal = ({ isOpen, onClose, socketRef, roomId }) => {
 
     if (!isOpen) return null;
 
-    const COLORS = ["#ffffff", "#94a3b8", "#ef4444", "#f59e0b", "#10b981", "#3b82f6", "#8b5cf6", "#ec4899"];
+    const COLORS = ["#ffffff", "#94a3b8", "var(--u-bad)", "#f59e0b", "#10b981", "#3b82f6", "#8b5cf6", "#ec4899"];
 
     const ToolBtn = ({ id, icon, label }) => (
         <button
@@ -363,35 +363,35 @@ const WhiteboardModal = ({ isOpen, onClose, socketRef, roomId }) => {
                 height: isMobileUI ? "100dvh" : "90vh",
                 backgroundColor: "var(--bg-dark)",
                 borderRadius: isMobileUI ? 0 : "24px",
-                border: isMobileUI ? "none" : "1px solid rgba(255,255,255,0.1)",
+                border: isMobileUI ? "none" : "1px solid var(--u-line)",
                 display: "flex", flexDirection: "column", overflow: "hidden",
                 boxShadow: "0 35px 60px -15px rgba(0, 0, 0, 0.7)"
             }}>
 
                 {/* ── Header / Toolbar ── */}
                 <div style={{
-                    backgroundColor: "rgba(255,255,255,0.02)",
-                    borderBottom: "1px solid rgba(255,255,255,0.07)",
+                    backgroundColor: "var(--u-bg-2)",
+                    borderBottom: "1px solid var(--u-line)",
                     flexShrink: 0
                 }}>
                     {/* Row 1: Title + zoom + close */}
                     <div style={{ padding: isMobileUI ? "10px 12px" : "12px 20px", display: "flex", alignItems: "center", gap: "8px" }}>
                         <span style={{ fontSize: "13px", fontWeight: "800", color: "var(--text-main)", letterSpacing: "0.06em", flex: 1 }}>WHITEBOARD</span>
-                        <button onClick={handleUndo} disabled={historyIndex === 0} style={{ padding: "6px", borderRadius: "8px", border: "none", background: "rgba(255,255,255,0.05)", color: historyIndex === 0 ? "rgba(255,255,255,0.2)" : "var(--text-main)", cursor: historyIndex === 0 ? "not-allowed" : "pointer", display: "flex" }}>
+                        <button onClick={handleUndo} disabled={historyIndex === 0} style={{ padding: "6px", borderRadius: "8px", border: "none", background: "var(--u-tint)", color: historyIndex === 0 ? "var(--u-ink-3)" : "var(--text-main)", cursor: historyIndex === 0 ? "not-allowed" : "pointer", display: "flex" }}>
                             <Undo2 size={16} />
                         </button>
-                        <button onClick={handleRedo} disabled={historyIndex === history.length - 1} style={{ padding: "6px", borderRadius: "8px", border: "none", background: "rgba(255,255,255,0.05)", color: historyIndex === history.length - 1 ? "rgba(255,255,255,0.2)" : "var(--text-main)", cursor: historyIndex === history.length - 1 ? "not-allowed" : "pointer", display: "flex" }}>
+                        <button onClick={handleRedo} disabled={historyIndex === history.length - 1} style={{ padding: "6px", borderRadius: "8px", border: "none", background: "var(--u-tint)", color: historyIndex === history.length - 1 ? "var(--u-ink-3)" : "var(--text-main)", cursor: historyIndex === history.length - 1 ? "not-allowed" : "pointer", display: "flex" }}>
                             <Redo2 size={16} />
                         </button>
-                        <div style={{ display: "flex", alignItems: "center", gap: "4px", backgroundColor: "rgba(0,0,0,0.3)", borderRadius: "8px", padding: "4px 8px" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: "4px", backgroundColor: "var(--u-tint)", borderRadius: "8px", padding: "4px 8px" }}>
                             <ZoomOut size={13} style={{ cursor: "pointer", color: "var(--text-muted)" }} onClick={() => setZoom(z => Math.max(z / 1.2, 0.1))} />
                             <span style={{ fontSize: "11px", fontWeight: "700", color: "var(--text-muted)", minWidth: "32px", textAlign: "center" }}>{Math.round(zoom * 100)}%</span>
                             <ZoomIn size={13} style={{ cursor: "pointer", color: "var(--text-muted)" }} onClick={() => setZoom(z => Math.min(z * 1.2, 5))} />
                         </div>
-                        <button onClick={clearCanvas} title="Clear" style={{ padding: "6px 10px", borderRadius: "8px", border: "1px solid rgba(239,68,68,0.3)", backgroundColor: "rgba(239,68,68,0.08)", color: "#ef4444", cursor: "pointer", display: "flex" }}>
+                        <button onClick={clearCanvas} title="Clear" style={{ padding: "6px 10px", borderRadius: "8px", border: "1px solid rgba(239,68,68,0.3)", backgroundColor: "rgba(239,68,68,0.08)", color: "var(--u-bad)", cursor: "pointer", display: "flex" }}>
                             <Trash2 size={14} />
                         </button>
-                        <button onClick={downloadImage} title="Export" style={{ padding: "6px 10px", borderRadius: "8px", border: "1px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.05)", color: "var(--text-main)", cursor: "pointer", display: "flex" }}>
+                        <button onClick={downloadImage} title="Export" style={{ padding: "6px 10px", borderRadius: "8px", border: "1px solid var(--u-line)", background: "var(--u-tint)", color: "var(--text-main)", cursor: "pointer", display: "flex" }}>
                             <Download size={14} />
                         </button>
                         <button onClick={onClose} style={{ padding: "6px", background: "transparent", border: "none", color: "var(--text-muted)", cursor: "pointer", display: "flex", marginLeft: "4px" }}>
@@ -407,19 +407,19 @@ const WhiteboardModal = ({ isOpen, onClose, socketRef, roomId }) => {
                         scrollbarWidth: "none"
                     }}>
                         {/* Tool group */}
-                        <div style={{ display: "flex", backgroundColor: "rgba(0,0,0,0.3)", borderRadius: "12px", padding: "3px", gap: "2px", flexShrink: 0 }}>
+                        <div style={{ display: "flex", backgroundColor: "var(--u-tint)", borderRadius: "12px", padding: "3px", gap: "2px", flexShrink: 0 }}>
                             <ToolBtn id="hand"   icon={<Hand   size={size} />} label="Pan" />
                             <ToolBtn id="pencil" icon={<Pencil size={size} />} label="Pencil" />
                             <ToolBtn id="eraser" icon={<Eraser size={size} />} label="Eraser" />
                             <ToolBtn id="text"   icon={<Type   size={size} />} label="Text" />
                         </div>
-                        <div style={{ width: "1px", height: "28px", backgroundColor: "rgba(255,255,255,0.08)", flexShrink: 0 }} />
-                        <div style={{ display: "flex", backgroundColor: "rgba(0,0,0,0.3)", borderRadius: "12px", padding: "3px", gap: "2px", flexShrink: 0 }}>
+                        <div style={{ width: "1px", height: "28px", backgroundColor: "var(--u-line)", flexShrink: 0 }} />
+                        <div style={{ display: "flex", backgroundColor: "var(--u-tint)", borderRadius: "12px", padding: "3px", gap: "2px", flexShrink: 0 }}>
                             <ToolBtn id="square" icon={<Square size={size} />} label="Rectangle" />
                             <ToolBtn id="circle" icon={<Circle size={size} />} label="Circle" />
                             <ToolBtn id="line"   icon={<Minus  size={size} />} label="Line" />
                         </div>
-                        <div style={{ width: "1px", height: "28px", backgroundColor: "rgba(255,255,255,0.08)", flexShrink: 0 }} />
+                        <div style={{ width: "1px", height: "28px", backgroundColor: "var(--u-line)", flexShrink: 0 }} />
                         {/* Colors */}
                         <div style={{ display: "flex", gap: "5px", alignItems: "center", flexShrink: 0 }}>
                             {COLORS.map(c => (
@@ -437,10 +437,10 @@ const WhiteboardModal = ({ isOpen, onClose, socketRef, roomId }) => {
                                 title="Custom color"
                             />
                         </div>
-                        <div style={{ width: "1px", height: "28px", backgroundColor: "rgba(255,255,255,0.08)", flexShrink: 0 }} />
+                        <div style={{ width: "1px", height: "28px", backgroundColor: "var(--u-line)", flexShrink: 0 }} />
                         {/* Brush size */}
                         <div style={{ display: "flex", alignItems: "center", gap: "6px", flexShrink: 0 }}>
-                            <div style={{ width: `${Math.max(4, brushSize * 2)}px`, height: `${Math.max(4, brushSize * 2)}px`, borderRadius: "50%", backgroundColor: color, border: "1px solid rgba(255,255,255,0.2)", transition: "all 0.15s", flexShrink: 0 }} />
+                            <div style={{ width: `${Math.max(4, brushSize * 2)}px`, height: `${Math.max(4, brushSize * 2)}px`, borderRadius: "50%", backgroundColor: color, border: "1px solid var(--u-ink-3)", transition: "all 0.15s", flexShrink: 0 }} />
                             <input type="range" min="1" max="25" value={brushSize}
                                 onChange={e => setBrushSize(parseInt(e.target.value))}
                                 style={{ width: isMobileUI ? "60px" : "80px", accentColor: "var(--primary)", cursor: "pointer" }}
@@ -502,7 +502,7 @@ const WhiteboardModal = ({ isOpen, onClose, socketRef, roomId }) => {
 
                 {/* ── Mobile hint ── */}
                 {isMobileUI && (
-                    <div style={{ padding: "6px 12px 10px", fontSize: "10px", color: "rgba(255,255,255,0.3)", textAlign: "center" }}>
+                    <div style={{ padding: "6px 12px 10px", fontSize: "10px", color: "var(--u-ink-3)", textAlign: "center" }}>
                         Pinch to zoom · Two fingers to pan · Press Esc to cancel text
                     </div>
                 )}

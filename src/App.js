@@ -6,7 +6,14 @@ import Editor from "./pages/editor";
 import About from "./pages/About";
 import Privacy from "./pages/Privacy";
 import Terms from "./pages/Terms";
+import Features from "./pages/Features";
+import Pricing from "./pages/Pricing";
+import Download from "./pages/Download";
+import Status from "./pages/Status";
+import Security from "./pages/Security";
+import Support from "./pages/Support";
 import { Toaster } from "react-hot-toast";
+import { applyTheme, getThemePref } from "./utils/theme";
 
 import { AuthProvider } from "./context/AuthContext";
 import Login from "./pages/Login";
@@ -33,12 +40,12 @@ function App() {
     const backendUrl = getBackendUrl();
     fetch(`${backendUrl}/api/ping`).catch(() => { });
 
-    const savedTheme = localStorage.getItem("app-theme");
-    if (savedTheme === "light") {
-      document.documentElement.classList.add("light-theme");
-    } else {
-      document.documentElement.classList.remove("light-theme");
-    }
+    applyTheme();
+    // Follow the OS while the preference is "system"
+    const mq = window.matchMedia ? window.matchMedia("(prefers-color-scheme: light)") : null;
+    const onChange = () => getThemePref() === "system" && applyTheme("system");
+    mq?.addEventListener?.("change", onChange);
+    return () => mq?.removeEventListener?.("change", onChange);
   }, []);
 
   return (
@@ -48,7 +55,11 @@ function App() {
         <div>
           <Toaster
             position="top-right"
-            toastOptions={{ success: { theme: { primary: "#003bfb" } } }}
+            toastOptions={{
+              style: { borderRadius: 14, fontFamily: "Archivo, Inter, sans-serif", fontSize: 14, background: "#151513", color: "#E8E6DF", border: "1px solid rgba(232,230,223,.12)" },
+              success: { iconTheme: { primary: "#4ADE80", secondary: "#151513" } },
+              error: { iconTheme: { primary: "#F87171", secondary: "#151513" } },
+            }}
           ></Toaster>
         </div>
         <BrowserRouter>
@@ -58,6 +69,12 @@ function App() {
             <Route path="/about" element={<About />} />
             <Route path="/privacy" element={<Privacy />} />
             <Route path="/terms" element={<Terms />} />
+            <Route path="/features" element={<Features />} />
+            <Route path="/pricing" element={<Pricing />} />
+            <Route path="/download" element={<Download />} />
+            <Route path="/status" element={<Status />} />
+            <Route path="/security" element={<Security />} />
+            <Route path="/support" element={<Support />} />
             <Route path="/login" element={<Login />} />
             <Route path="/signup" element={<SignUp />} />
             <Route path="/dashboard" element={<Dashboard />} />

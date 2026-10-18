@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Search, X, Save, Shield, Code } from 'lucide-react';
+import { Search, X, Save } from 'lucide-react';
+import { Modal } from './ux/primitives';
 import { getBackendUrl } from '../utils/api';
 import toast from 'react-hot-toast';
 
@@ -32,7 +33,7 @@ const SnippetModal = ({ isOpen, onClose, onImport, userId, code: currentCode, la
     }, [fetchSnippets, isOpen, activeTab]);
 
     const handleSave = async (e) => {
-        e.preventDefault();
+        e?.preventDefault?.();
         if (!saveData.title.trim()) return toast.error("Please enter a title");
 
         setIsSaving(true);
@@ -102,254 +103,102 @@ const SnippetModal = ({ isOpen, onClose, onImport, userId, code: currentCode, la
 
     if (!isOpen) return null;
 
+    const tagList = (saveData.tags || '').split(',').map((t) => t.trim()).filter(Boolean);
+
     return (
-        <div style={{
-            position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-            backgroundColor: 'rgba(0, 0, 0, 0.85)', backdropFilter: 'blur(12px)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            zIndex: 2000, padding: '20px'
-        }} onClick={onClose}>
-            <div style={{
-                backgroundColor: 'var(--bg-card)', width: '100%', maxWidth: '640px',
-                maxHeight: '85vh', borderRadius: '24px', border: '1px solid var(--border-color)',
-                display: 'flex', flexDirection: 'column', overflow: 'hidden',
-                boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.7)'
-            }} onClick={e => e.stopPropagation()}>
+        <Modal
+            open
+            onClose={onClose}
+            wide
+            label="Snippets"
+            title={activeTab === 'import' ? 'Insert a snippet' : 'Save this code'}
+            onSubmit={activeTab === 'save' ? handleSave : undefined}
+            footer={activeTab === 'save' ? <>
+                <button type="button" className="u-btn u-btn--ghost" onClick={() => setActiveTab('import')}>Back</button>
+                <button type="submit" className="u-btn u-btn--solid" disabled={isSaving || !currentCode}><Save size={15} /> {isSaving ? 'Saving…' : 'Save snippet'}</button>
+            </> : null}
+        >
+            <div className="u-seg" role="tablist" style={{ alignSelf: 'flex-start' }}>
+                <button type="button" className={activeTab === 'import' ? 'on' : ''} onClick={() => setActiveTab('import')}>Browse</button>
+                <button type="button" className={activeTab === 'save' ? 'on' : ''} onClick={() => setActiveTab('save')}>Save current code</button>
+            </div>
 
-                {/* Header */}
-                <div style={{ padding: '24px', borderBottom: '1px solid var(--border-color)', position: 'relative' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
-                        <div style={{
-                            padding: '10px', borderRadius: '12px',
-                            backgroundColor: 'rgba(59, 130, 246, 0.1)', color: 'var(--primary)'
-                        }}>
-                            <Shield size={22} />
+            {activeTab === 'import' ? (
+                <>
+                    <label className="u-search">
+                        <Search size={15} />
+                        <input autoFocus placeholder="Search by title, language or tag" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} aria-label="Search snippets" />
+                    </label>
+                    {loading ? (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>{[0, 1, 2].map((i) => <div key={i} className="u-skel" style={{ height: 56 }} />)}</div>
+                    ) : filteredSnippets.length === 0 ? (
+                        <div className="u-empty" style={{ padding: '32px 0' }}>
+                            <span className="u-display">{searchTerm ? 'No match' : 'Empty'}</span>
+                            <p>{searchTerm ? 'Try a different search.' : 'Save code from a room and it shows up here.'}</p>
                         </div>
-                        <div>
-                            <h3 style={{ margin: 0, fontSize: '20px', fontWeight: '800', color: 'var(--text-main)' }}>Snippet Vault</h3>
-                            <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-muted)' }}>Securely manage your reusable logic blocks</p>
-                        </div>
-                        <button onClick={onClose} style={{
-                            position: 'absolute', top: '24px', right: '24px',
-                            background: 'transparent', border: 'none', color: 'var(--text-muted)',
-                            cursor: 'pointer', padding: '8px'
-                        }}>
-                            <X size={20} />
-                        </button>
-                    </div>
-
-                    {/* Tabs */}
-                    <div style={{ display: 'flex', gap: '8px', backgroundColor: 'var(--bg-dark)', padding: '4px', borderRadius: '12px' }}>
-                        <button
-                            onClick={() => setActiveTab('import')}
-                            style={tabStyle(activeTab === 'import')}
-                        >
-                            Browse Vault
-                        </button>
-                        <button
-                            onClick={() => setActiveTab('save')}
-                            style={tabStyle(activeTab === 'save')}
-                        >
-                            Save Current
-                        </button>
-                    </div>
-                </div>
-
-                {activeTab === 'import' ? (
-                    <>
-                        <div style={{ padding: '16px 24px' }}>
-                            <div style={{
-                                display: 'flex', alignItems: 'center', gap: '10px',
-                                padding: '12px 16px', backgroundColor: 'var(--bg-dark)',
-                                borderRadius: '12px', border: '1px solid var(--border-color)'
-                            }}>
-                                <Search size={18} color="var(--text-muted)" />
-                                <input
-                                    type="text" placeholder="Search snippets..."
-                                    value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}
-                                    style={{ background: 'transparent', border: 'none', color: 'white', fontSize: '14px', width: '100%', outline: 'none' }}
-                                    autoFocus
-                                />
-                            </div>
-                        </div>
-
-                        <div style={{ flex: 1, overflowY: 'auto', padding: '0 24px 24px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                            {loading ? (
-                                <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>Loading...</div>
-                            ) : filteredSnippets.length > 0 ? (
-                                filteredSnippets.map(snippet => (
-                                    <div key={snippet.id} style={snippetCardStyle}>
-                                        <div style={{ flex: 1, minWidth: 0 }}>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-                                                <h4 style={{ margin: 0, fontSize: '15px', fontWeight: '700', color: 'var(--text-main)', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>{snippet.title}</h4>
-                                                <span style={langBadgeStyle}>{snippet.language}</span>
-                                            </div>
-                                            <div style={previewStyle}>
-                                                <code>{snippet.code.slice(0, 80)}{snippet.code.length > 80 ? '...' : ''}</code>
-                                            </div>
-                                            {snippet.tags && snippet.tags.length > 0 && (
-                                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '8px' }}>
-                                                    {snippet.tags.map(tag => (
-                                                        <span key={tag} style={tagStyle}>#{tag}</span>
-                                                    ))}
-                                                </div>
-                                            )}
-                                        </div>
-                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                            <button
-                                                onClick={() => onImport(snippet.code, 'insert')}
-                                                style={actionButtonStyle(true)}
-                                            >
-                                                Add Snippet
-                                            </button>
-                                            <button
-                                                onClick={() => handleSync(snippet)}
-                                                disabled={isSaving}
-                                                style={actionButtonStyle(false)}
-                                            >
-                                                Sync Changes
-                                            </button>
-                                        </div>
+                    ) : (
+                        <ul className="u-rows" style={{ maxHeight: '46vh', overflowY: 'auto' }}>
+                            {filteredSnippets.map((snippet) => (
+                                <li key={snippet.id} className="u-row s-item" style={{ cursor: 'default' }}>
+                                    <span className="s-lang">{(snippet.language || '?').slice(0, 3)}</span>
+                                    <div className="u-row-main">
+                                        <span className="u-row-title u-ellipsis" style={{ fontSize: 15 }}>{snippet.title}</span>
+                                        <span className="u-row-meta">
+                                            <span className="u-mono u-ellipsis" style={{ maxWidth: 320 }}>{snippet.code.split('\n')[0].slice(0, 60)}</span>
+                                            {(snippet.tags || []).slice(0, 2).map((t) => <span key={t} className="u-mono">#{t}</span>)}
+                                        </span>
                                     </div>
-                                ))
-                            ) : (
-                                <div style={{ textAlign: 'center', padding: '40px' }}>
-                                    <p style={{ color: 'var(--text-muted)', fontSize: '14px' }}>Vault is empty or no matches found.</p>
-                                </div>
-                            )}
+                                    <div className="u-row-side">
+                                        <button type="button" className="u-btn u-btn--ghost u-btn--sm" onClick={() => handleSync(snippet)} disabled={isSaving} title="Overwrite this snippet with the room's code">Update</button>
+                                        <button type="button" className="u-btn u-btn--solid u-btn--sm" onClick={() => onImport(snippet.code, 'insert')}>Insert</button>
+                                    </div>
+                                </li>
+                            ))}
+                        </ul>
+                    )}
+                </>
+            ) : (
+                <>
+                    <div className="g-two s-formrow">
+                        <div className="u-field">
+                            <label htmlFor="sm-title">Title</label>
+                            <input id="sm-title" className="u-input" autoFocus placeholder="e.g. Binary search" value={saveData.title} onChange={(e) => setSaveData({ ...saveData, title: e.target.value })} />
                         </div>
-                    </>
-                ) : (
-                    <div style={{ flex: 1, overflowY: 'auto', padding: '32px 24px', display: 'flex', flexDirection: 'column', gap: '24px' }}>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                            <label style={{ fontSize: '13px', fontWeight: '700', color: 'var(--text-muted)' }}>SNIPPET TITLE</label>
-                            <input
-                                placeholder="e.g. Binary Search implementation"
-                                value={saveData.title}
-                                onChange={e => setSaveData({ ...saveData, title: e.target.value })}
-                                style={inputStyle}
-                                autoFocus
-                            />
-                        </div>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                            <label style={{ fontSize: '13px', fontWeight: '700', color: 'var(--text-muted)' }}>LANGUAGE</label>
-                            <select
-                                value={saveData.language}
-                                onChange={e => setSaveData({ ...saveData, language: e.target.value })}
-                                style={inputStyle}
-                            >
-                                <option value="javascript">JavaScript</option>
-                                <option value="python">Python</option>
-                                <option value="cpp">C++</option>
-                                <option value="java">Java</option>
-                                <option value="html">HTML</option>
-                                <option value="css">CSS</option>
+                        <div className="u-field">
+                            <label htmlFor="sm-lang">Language</label>
+                            <select id="sm-lang" className="u-select" value={saveData.language} onChange={(e) => setSaveData({ ...saveData, language: e.target.value })}>
+                                {[['javascript', 'JavaScript'], ['python', 'Python'], ['cpp', 'C++'], ['java', 'Java'], ['html', 'HTML'], ['css', 'CSS']].map(([v, n]) => <option key={v} value={v}>{n}</option>)}
                             </select>
                         </div>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                            <label style={{ fontSize: '13px', fontWeight: '700', color: 'var(--text-muted)' }}>TAGS (PRESS ENTER TO ADD)</label>
-                            <div style={{ ...inputStyle, display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'center', padding: '8px 12px' }}>
-                                {(saveData.tags || "").split(',').filter(t => t.trim()).map((tag, i) => (
-                                    <span key={i} style={{ ...tagStyle, display: 'flex', alignItems: 'center', gap: '4px', backgroundColor: 'var(--primary)', color: 'white' }}>
-                                        {tag.trim()}
-                                        <X size={10} style={{ cursor: 'pointer' }} onClick={() => {
-                                            const tags = saveData.tags.split(',').filter(t => t.trim());
-                                            tags.splice(i, 1);
-                                            setSaveData({ ...saveData, tags: tags.join(',') });
-                                        }} />
-                                    </span>
-                                ))}
-                                <input
-                                    placeholder={saveData.tags ? "" : "e.g. react, hooks"}
-                                    style={{ background: 'transparent', border: 'none', color: 'white', fontSize: '14px', outline: 'none', flex: 1, minWidth: '60px' }}
-                                    onKeyDown={(e) => {
-                                        if (e.key === 'Enter' || e.key === ',') {
-                                            e.preventDefault();
-                                            const val = e.target.value.trim();
-                                            if (val && !saveData.tags.includes(val)) {
-                                                setSaveData({ ...saveData, tags: saveData.tags ? `${saveData.tags},${val}` : val });
-                                                e.target.value = '';
-                                            }
-                                        }
-                                    }}
-                                />
-                            </div>
-                        </div>
-                        <div style={{ backgroundColor: 'var(--bg-dark)', padding: '16px', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px', color: 'var(--text-muted)' }}>
-                                <Code size={14} /> <span style={{ fontSize: '12px', fontWeight: '600' }}>CURRENT CODE PREVIEW</span>
-                            </div>
-                            <pre style={{ margin: 0, fontSize: '12px', color: 'rgba(255,255,255,0.5)', overflow: 'hidden', whiteSpace: 'pre-wrap', maxHeight: '100px' }}>
-                                {currentCode || '// No code to save'}
-                            </pre>
-                        </div>
-                        <button
-                            onClick={handleSave}
-                            disabled={isSaving || !currentCode}
-                            style={{
-                                padding: '16px', borderRadius: '12px',
-                                backgroundColor: 'var(--primary)', color: 'white',
-                                border: 'none', fontWeight: '700', fontSize: '16px',
-                                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px',
-                                cursor: 'pointer', transition: 'all 0.2s',
-                                opacity: (isSaving || !currentCode) ? 0.6 : 1
-                            }}
-                        >
-                            {isSaving ? 'Securing...' : <><Save size={20} /> Save to Vault</>}
-                        </button>
                     </div>
-                )}
-            </div>
-        </div>
+                    <div className="u-field">
+                        <label htmlFor="sm-tags">Tags <span className="u-faint">— Enter or comma to add</span></label>
+                        <div className="u-tagbox">
+                            {tagList.map((tag) => (
+                                <span key={tag} className="u-chip u-chip--mono">#{tag}
+                                    <button type="button" aria-label={`Remove ${tag}`} onClick={() => setSaveData({ ...saveData, tags: tagList.filter((t) => t !== tag).join(',') })}><X size={11} /></button>
+                                </span>
+                            ))}
+                            <input id="sm-tags" placeholder={tagList.length ? '' : 'react, hooks'}
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter' || e.key === ',') {
+                                        e.preventDefault();
+                                        const val = e.target.value.trim();
+                                        if (val && !tagList.includes(val)) setSaveData({ ...saveData, tags: [...tagList, val].join(',') });
+                                        e.target.value = '';
+                                    }
+                                }} />
+                        </div>
+                    </div>
+                    <div className="u-pane" style={{ maxHeight: 200, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+                        <pre className="u-code" style={{ padding: '12px 0' }}>
+                            {(currentCode || '// Nothing to save yet').split('\n').slice(0, 12).map((l, i) => <span key={i}>{l || ' '}</span>)}
+                        </pre>
+                    </div>
+                </>
+            )}
+        </Modal>
     );
-};
-
-const tabStyle = (active) => ({
-    flex: 1, padding: '10px', border: 'none', borderRadius: '10px',
-    backgroundColor: active ? 'var(--bg-card)' : 'transparent',
-    color: active ? 'var(--text-main)' : 'var(--text-muted)',
-    fontSize: '13px', fontWeight: '700', cursor: 'pointer',
-    transition: 'all 0.2s', boxShadow: active ? '0 4px 12px rgba(0,0,0,0.2)' : 'none'
-});
-
-const snippetCardStyle = {
-    padding: '16px', backgroundColor: 'var(--bg-dark)', borderRadius: '16px',
-    border: '1px solid var(--border-color)', display: 'flex', gap: '16px',
-    alignItems: 'center', transition: 'all 0.2s'
-};
-
-const langBadgeStyle = {
-    fontSize: '9px', fontWeight: '800', padding: '2px 6px',
-    backgroundColor: 'rgba(59, 130, 246, 0.1)', color: 'var(--primary)',
-    borderRadius: '6px', textTransform: 'uppercase', letterSpacing: '0.5px'
-};
-
-const previewStyle = {
-    backgroundColor: 'rgba(0,0,0,0.2)', padding: '8px 12px', borderRadius: '8px',
-    fontSize: '12px', color: 'rgba(255,255,255,0.4)', fontFamily: 'monospace',
-    overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis'
-};
-
-const actionButtonStyle = (isPrimary) => ({
-    padding: '8px 12px', borderRadius: '10px', fontSize: '12px', fontWeight: '700',
-    cursor: 'pointer', transition: 'all 0.2s', border: 'none',
-    backgroundColor: isPrimary ? 'var(--primary)' : 'rgba(255,255,255,0.05)',
-    color: isPrimary ? 'white' : 'var(--text-main)',
-    display: 'flex', alignItems: 'center', gap: '6px', whiteSpace: 'nowrap'
-});
-
-const inputStyle = {
-    padding: '14px 16px', backgroundColor: 'var(--bg-dark)', border: '1px solid var(--border-color)',
-    borderRadius: '12px', color: 'white', fontSize: '14px', outline: 'none'
-};
-
-const tagStyle = {
-    fontSize: '10px',
-    color: 'var(--text-muted)',
-    backgroundColor: 'rgba(255,255,255,0.05)',
-    padding: '2px 6px',
-    borderRadius: '4px',
-    fontWeight: '600'
 };
 
 export default SnippetModal;

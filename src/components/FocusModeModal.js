@@ -282,20 +282,20 @@ export default function FocusModeModal({
         <div style={{
             position: 'fixed',
             inset: 0,
-            backgroundColor: 'rgba(5, 7, 15, 0.95)',
+            backgroundColor: 'var(--u-bg, rgba(5, 7, 15, 0.95))',
             backdropFilter: 'blur(16px)',
             zIndex: 999999,
             display: 'flex',
             flexDirection: 'column',
             color: 'var(--text-main)',
-            fontFamily: "'Inter', sans-serif"
+            fontFamily: "var(--u-text, 'Inter', sans-serif)"
         }}>
             {/* Focus Top Bar */}
             <div style={{
                 height: '56px',
                 padding: '0 24px',
-                backgroundColor: 'rgba(255, 255, 255, 0.03)',
-                borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
+                backgroundColor: 'var(--u-bg-2)',
+                borderBottom: '1px solid var(--u-line)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between'
@@ -311,12 +311,12 @@ export default function FocusModeModal({
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
-                            color: '#3b82f6'
+                            color: 'var(--u-accent)'
                         }}>
                             <Focus size={18} />
                         </div>
                         <div>
-                            <span style={{ fontSize: '14px', fontWeight: '800', letterSpacing: '-0.02em', color: '#ffffff' }}>
+                            <span style={{ fontSize: '14px', fontWeight: '800', letterSpacing: '-0.02em', color: 'var(--u-ink)' }}>
                                 FOCUS MODE
                             </span>
                         <div style={{ position: 'relative' }}>
@@ -326,9 +326,9 @@ export default function FocusModeModal({
                                     display: 'flex',
                                     alignItems: 'center',
                                     gap: '6px',
-                                    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-                                    border: '1px solid rgba(255, 255, 255, 0.15)',
-                                    color: '#ffffff',
+                                    backgroundColor: 'var(--u-line)',
+                                    border: '1px solid var(--u-line)',
+                                    color: 'var(--u-ink)',
                                     padding: '4px 10px',
                                     borderRadius: '6px',
                                     fontSize: '12px',
@@ -336,7 +336,7 @@ export default function FocusModeModal({
                                     cursor: 'pointer'
                                 }}
                             >
-                                <FileCode size={14} color="#3b82f6" />
+                                <FileCode size={14} color="var(--u-accent)" />
                                 <span>{currentFileName}</span>
                                 <ChevronDown size={12} color="var(--text-muted)" />
                             </button>
@@ -347,8 +347,8 @@ export default function FocusModeModal({
                                     top: '36px',
                                     left: 0,
                                     width: '220px',
-                                    backgroundColor: '#0f172a',
-                                    border: '1px solid rgba(255,255,255,0.15)',
+                                    backgroundColor: 'var(--u-bg-2)',
+                                    border: '1px solid var(--u-line)',
                                     borderRadius: '8px',
                                     boxShadow: '0 10px 25px rgba(0,0,0,0.5)',
                                     zIndex: 1000,
@@ -374,7 +374,7 @@ export default function FocusModeModal({
                                                     fontSize: '12px',
                                                     cursor: 'pointer',
                                                     backgroundColor: (f.name === currentFileName || f.id === activeFile?.id) ? 'rgba(59, 130, 246, 0.2)' : 'transparent',
-                                                    color: (f.name === currentFileName || f.id === activeFile?.id) ? '#3b82f6' : '#f8fafc'
+                                                    color: (f.name === currentFileName || f.id === activeFile?.id) ? 'var(--u-accent)' : 'var(--u-ink)'
                                                 }}
                                             >
                                                 <FileCode size={13} />
@@ -395,12 +395,12 @@ export default function FocusModeModal({
                         display: 'flex',
                         alignItems: 'center',
                         gap: '8px',
-                        backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                        backgroundColor: 'var(--u-tint)',
                         padding: '6px 14px',
                         borderRadius: '20px',
-                        border: '1px solid rgba(255, 255, 255, 0.1)'
+                        border: '1px solid var(--u-line)'
                     }}>
-                        <Target size={14} color="#3b82f6" />
+                        <Target size={14} color="var(--u-accent)" />
                         {isGoalEditing ? (
                             <input
                                 autoFocus
@@ -419,7 +419,7 @@ export default function FocusModeModal({
                                 style={{
                                     backgroundColor: 'transparent',
                                     border: 'none',
-                                    color: 'white',
+                                    color: 'var(--u-ink)',
                                     fontSize: '12px',
                                     outline: 'none',
                                     width: '280px'
@@ -429,7 +429,7 @@ export default function FocusModeModal({
                             <span 
                                 onClick={() => setIsGoalEditing(true)}
                                 title="Click to edit focus goal"
-                                style={{ fontSize: '12px', color: 'rgba(255,255,255,0.9)', cursor: 'pointer', fontWeight: '500' }}
+                                style={{ fontSize: '12px', color: 'var(--u-ink)', cursor: 'pointer', fontWeight: '500' }}
                             >
                                 {goal}
                             </span>
@@ -440,9 +440,9 @@ export default function FocusModeModal({
                 {/* Focus Timer & Controls */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
                     {/* Timer */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', backgroundColor: 'rgba(0,0,0,0.4)', padding: '4px 12px', borderRadius: '20px', border: '1px solid rgba(255,255,255,0.1)' }}>
-                        <Clock size={15} color={isTimerRunning ? '#10b981' : 'var(--text-muted)'} />
-                        <span style={{ fontSize: '16px', fontWeight: '800', fontFamily: 'monospace', color: isTimerRunning ? '#10b981' : '#ffffff' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', backgroundColor: 'rgba(0,0,0,0.4)', padding: '4px 12px', borderRadius: '20px', border: '1px solid var(--u-line)' }}>
+                        <Clock size={15} color={isTimerRunning ? 'var(--u-ok)' : 'var(--text-muted)'} />
+                        <span style={{ fontSize: '16px', fontWeight: '800', fontFamily: 'monospace', color: isTimerRunning ? 'var(--u-ok)' : 'var(--u-ink)' }}>
                             {formatTime(timeLeft)}
                         </span>
                         <button
@@ -450,7 +450,7 @@ export default function FocusModeModal({
                             style={{
                                 backgroundColor: isTimerRunning ? 'rgba(239, 68, 68, 0.2)' : 'rgba(16, 185, 129, 0.2)',
                                 border: `1px solid ${isTimerRunning ? 'rgba(239, 68, 68, 0.4)' : 'rgba(16, 185, 129, 0.4)'}`,
-                                color: isTimerRunning ? '#ef4444' : '#10b981',
+                                color: isTimerRunning ? "var(--u-bad)" : 'var(--u-ok)',
                                 borderRadius: '50%',
                                 width: '26px',
                                 height: '26px',
@@ -480,9 +480,9 @@ export default function FocusModeModal({
                                     padding: '4px 8px',
                                     fontSize: '11px',
                                     borderRadius: '6px',
-                                    border: '1px solid rgba(255,255,255,0.1)',
-                                    backgroundColor: timerMode === mins ? 'var(--primary)' : 'rgba(255,255,255,0.05)',
-                                    color: timerMode === mins ? '#ffffff' : 'var(--text-muted)',
+                                    border: '1px solid var(--u-line)',
+                                    backgroundColor: timerMode === mins ? 'var(--primary)' : 'var(--u-tint)',
+                                    color: timerMode === mins ? '#fff' : 'var(--text-muted)',
                                     cursor: 'pointer'
                                 }}
                             >
@@ -492,15 +492,15 @@ export default function FocusModeModal({
                     </div>
 
                     {/* Ambient Sound Generators */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', borderLeft: '1px solid rgba(255,255,255,0.1)', paddingLeft: '16px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', borderLeft: '1px solid var(--u-line)', paddingLeft: '16px' }}>
                         <Music size={15} color="var(--text-muted)" />
                         <select
                             value={soundMode}
                             onChange={(e) => setSoundMode(e.target.value)}
                             style={{
-                                backgroundColor: 'rgba(255,255,255,0.05)',
-                                border: '1px solid rgba(255,255,255,0.1)',
-                                color: 'white',
+                                backgroundColor: 'var(--u-tint)',
+                                border: '1px solid var(--u-line)',
+                                color: 'var(--u-ink)',
                                 fontSize: '11px',
                                 padding: '4px 8px',
                                 borderRadius: '6px',
@@ -508,10 +508,10 @@ export default function FocusModeModal({
                                 cursor: 'pointer'
                             }}
                         >
-                            <option value="off" style={{ background: '#1e293b' }}>Soundscape: Off</option>
-                            <option value="rain" style={{ background: '#1e293b' }}>🌧️ Rain Noise</option>
-                            <option value="binaural" style={{ background: '#1e293b' }}>🧠 10Hz Alpha Focus</option>
-                            <option value="synth" style={{ background: '#1e293b' }}>🚀 Deep Space Synth</option>
+                            <option value="off" style={{ background: 'var(--u-bg-2)' }}>Soundscape: Off</option>
+                            <option value="rain" style={{ background: 'var(--u-bg-2)' }}>🌧️ Rain Noise</option>
+                            <option value="binaural" style={{ background: 'var(--u-bg-2)' }}>🧠 10Hz Alpha Focus</option>
+                            <option value="synth" style={{ background: 'var(--u-bg-2)' }}>🚀 Deep Space Synth</option>
                         </select>
 
                         {soundMode !== 'off' && (
@@ -522,7 +522,7 @@ export default function FocusModeModal({
                                 step="0.05"
                                 value={volume}
                                 onChange={(e) => setVolume(parseFloat(e.target.value))}
-                                style={{ width: '60px', accentColor: '#3b82f6', cursor: 'pointer' }}
+                                style={{ width: '60px', accentColor: 'var(--u-accent)', cursor: 'pointer' }}
                                 title="Volume"
                             />
                         )}
@@ -533,9 +533,9 @@ export default function FocusModeModal({
                         onClick={onClose}
                         title="Exit Focus Mode (ESC)"
                         style={{
-                            backgroundColor: 'rgba(255, 255, 255, 0.08)',
-                            border: '1px solid rgba(255, 255, 255, 0.15)',
-                            color: 'white',
+                            backgroundColor: 'var(--u-line)',
+                            border: '1px solid var(--u-line)',
+                            color: 'var(--u-ink)',
                             padding: '6px 14px',
                             borderRadius: '8px',
                             fontSize: '12px',
@@ -558,14 +558,14 @@ export default function FocusModeModal({
                 <div style={{
                     width: '260px',
                     backgroundColor: 'rgba(0, 0, 0, 0.4)',
-                    borderRight: '1px solid rgba(255, 255, 255, 0.08)',
+                    borderRight: '1px solid var(--u-line)',
                     padding: '20px',
                     display: 'flex',
                     flexDirection: 'column',
                     gap: '16px'
                 }}>
                     {files.length > 1 && (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '12px' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', borderBottom: '1px solid var(--u-line)', paddingBottom: '12px' }}>
                             <span style={{ fontSize: '11px', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--text-muted)' }}>
                                 Project Files
                             </span>
@@ -582,12 +582,12 @@ export default function FocusModeModal({
                                             borderRadius: '6px',
                                             fontSize: '12px',
                                             cursor: 'pointer',
-                                            backgroundColor: (f.name === currentFileName || f.id === activeFile?.id) ? 'rgba(59, 130, 246, 0.2)' : 'rgba(255,255,255,0.03)',
-                                            border: `1px solid ${(f.name === currentFileName || f.id === activeFile?.id) ? 'rgba(59, 130, 246, 0.4)' : 'rgba(255,255,255,0.06)'}`,
-                                            color: (f.name === currentFileName || f.id === activeFile?.id) ? '#3b82f6' : 'white'
+                                            backgroundColor: (f.name === currentFileName || f.id === activeFile?.id) ? 'rgba(59, 130, 246, 0.2)' : 'var(--u-bg-2)',
+                                            border: `1px solid ${(f.name === currentFileName || f.id === activeFile?.id) ? 'rgba(59, 130, 246, 0.4)' : 'var(--u-tint)'}`,
+                                            color: (f.name === currentFileName || f.id === activeFile?.id) ? 'var(--u-accent)' : 'white'
                                         }}
                                     >
-                                        <FileCode size={13} color={(f.name === currentFileName || f.id === activeFile?.id) ? '#3b82f6' : 'var(--text-muted)'} />
+                                        <FileCode size={13} color={(f.name === currentFileName || f.id === activeFile?.id) ? 'var(--u-accent)' : 'var(--text-muted)'} />
                                         <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.name}</span>
                                     </div>
                                 ))}
@@ -599,7 +599,7 @@ export default function FocusModeModal({
                         <span style={{ fontSize: '11px', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--text-muted)' }}>
                             Sprint Checklist
                         </span>
-                        <span style={{ fontSize: '10px', color: '#10b981', fontWeight: '700' }}>
+                        <span style={{ fontSize: '10px', color: 'var(--u-ok)', fontWeight: '700' }}>
                             {tasks.filter(t => t.completed).length} / {tasks.length} Done
                         </span>
                     </div>
@@ -611,9 +611,9 @@ export default function FocusModeModal({
                             onChange={(e) => setNewTaskText(e.target.value)}
                             style={{
                                 flex: 1,
-                                backgroundColor: 'rgba(255,255,255,0.05)',
-                                border: '1px solid rgba(255,255,255,0.1)',
-                                color: 'white',
+                                backgroundColor: 'var(--u-tint)',
+                                border: '1px solid var(--u-line)',
+                                color: 'var(--u-ink)',
                                 padding: '6px 10px',
                                 borderRadius: '6px',
                                 fontSize: '12px',
@@ -633,15 +633,15 @@ export default function FocusModeModal({
                                     gap: '10px',
                                     padding: '8px 10px',
                                     borderRadius: '6px',
-                                    backgroundColor: t.completed ? 'rgba(16, 185, 129, 0.08)' : 'rgba(255, 255, 255, 0.03)',
-                                    border: `1px solid ${t.completed ? 'rgba(16, 185, 129, 0.2)' : 'rgba(255, 255, 255, 0.06)'}`,
+                                    backgroundColor: t.completed ? 'rgba(16, 185, 129, 0.08)' : 'var(--u-bg-2)',
+                                    border: `1px solid ${t.completed ? 'rgba(16, 185, 129, 0.2)' : 'var(--u-tint)'}`,
                                     cursor: 'pointer',
                                     fontSize: '12px',
-                                    color: t.completed ? 'rgba(255,255,255,0.5)' : 'white',
+                                    color: t.completed ? 'var(--u-ink-3)' : 'white',
                                     textDecoration: t.completed ? 'line-through' : 'none'
                                 }}
                             >
-                                <CheckCircle2 size={14} color={t.completed ? '#10b981' : 'var(--text-muted)'} />
+                                <CheckCircle2 size={14} color={t.completed ? 'var(--u-ok)' : 'var(--text-muted)'} />
                                 <span style={{ flex: 1 }}>{t.text}</span>
                             </div>
                         ))}
@@ -649,7 +649,7 @@ export default function FocusModeModal({
                 </div>
 
                 {/* Central Code Editor */}
-                <div style={{ flex: 1, height: '100%', backgroundColor: 'rgba(0,0,0,0.2)', position: 'relative' }}>
+                <div style={{ flex: 1, height: '100%', backgroundColor: 'var(--u-tint)', position: 'relative' }}>
                     <CodeMirror
                         value={focusCode}
                         height="100%"
@@ -675,7 +675,7 @@ export default function FocusModeModal({
                 height: '32px',
                 padding: '0 24px',
                 backgroundColor: 'rgba(0, 0, 0, 0.6)',
-                borderTop: '1px solid rgba(255, 255, 255, 0.08)',
+                borderTop: '1px solid var(--u-line)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
@@ -683,12 +683,12 @@ export default function FocusModeModal({
                 color: 'var(--text-muted)'
             }}>
                 <div style={{ display: 'flex', gap: '16px' }}>
-                    <span>Lines: <strong style={{ color: 'white' }}>{stats.lines}</strong></span>
-                    <span>Words: <strong style={{ color: 'white' }}>{stats.words}</strong></span>
-                    <span>Characters: <strong style={{ color: 'white' }}>{stats.chars}</strong></span>
+                    <span>Lines: <strong style={{ color: 'var(--u-ink)' }}>{stats.lines}</strong></span>
+                    <span>Words: <strong style={{ color: 'var(--u-ink)' }}>{stats.words}</strong></span>
+                    <span>Characters: <strong style={{ color: 'var(--u-ink)' }}>{stats.chars}</strong></span>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <Zap size={12} color="#10b981" />
+                    <Zap size={12} color="var(--u-ok)" />
                     <span>Distraction-Free Environment Active</span>
                 </div>
             </div>

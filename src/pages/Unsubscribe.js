@@ -1,13 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
-import {
-    XCircle,
-    Mail,
-    Loader2,
-    ShieldCheck,
-    Zap,
-    BellOff
-} from 'lucide-react';
+import { XCircle, Mail, Loader2, ShieldCheck, Bell, BellOff } from 'lucide-react';
 import toast from 'react-hot-toast';
 import ContentLayout from '../components/ContentLayout';
 
@@ -73,135 +66,52 @@ const Unsubscribe = () => {
 
     if (loading) {
         return (
-            <div style={{ minHeight: '60vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-                <Loader2 className="animate-spin" style={{ color: 'var(--primary)' }} size={40} />
-                <p style={{ marginTop: '24px', color: 'var(--text-muted)', fontSize: '14px', fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase' }}>Synchronizing...</p>
-                <style>{`
-                    .animate-spin { animation: spin 1s linear infinite; }
-                    @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-                `}</style>
-            </div>
+            <ContentLayout title="Email preferences" label="Account">
+                <div className="u-skel" style={{ height: 180 }} />
+                <p className="u-label" style={{ marginTop: 14 }}><Loader2 size={12} className="u-spin" /> Checking your preferences…</p>
+            </ContentLayout>
         );
     }
 
     if (!email) {
         return (
-            <ContentLayout title="Security Check">
-                <div style={{ textAlign: 'center', padding: '40px 0' }}>
-                    <XCircle style={{ color: '#ef4444', marginBottom: '24px' }} size={64} strokeWidth={1.5} />
-                    <p style={{ color: 'var(--text-main)', fontSize: '18px', lineHeight: 1.6, marginBottom: '32px' }}>
-                        This subscription management link is missing required authentication parameters.
-                        Please access your preferences via the link provided in your latest Utkristi Colabs email.
-                    </p>
-                    <Link to="/" style={{ color: 'var(--primary)', fontWeight: '700', textDecoration: 'none' }}>
-                        Back to Workspace
-                    </Link>
+            <ContentLayout title="Link incomplete" label="Account">
+                <div className="u-card g-danger" style={{ padding: 24, display: "flex", flexDirection: "column", gap: 16 }}>
+                    <XCircle size={28} style={{ color: "var(--u-bad)" }} />
+                    <p style={{ margin: 0 }}>This link is missing the email it should manage. Open the preferences link from your latest Utkristi CoLabs email instead.</p>
+                    <Link to="/" className="u-btn u-btn--ghost" style={{ alignSelf: "flex-start" }}>Back home</Link>
                 </div>
             </ContentLayout>
         );
     }
 
     return (
-        <ContentLayout title={isUnsubscribed ? "Preferences Set" : "Management Hub"}>
-            <div style={{ marginBottom: '48px' }}>
-                <p style={{ fontSize: '18px', lineHeight: '1.6', color: 'var(--text-main)', fontWeight: '500', marginBottom: '20px' }}>
+        <ContentLayout title={isUnsubscribed ? "You're unsubscribed" : "Email preferences"} label="Account">
+            <p>{isUnsubscribed ? "You will no longer receive invites and updates at:" : "Choose whether we send project invites and product updates to:"}</p>
+            <p><span className="u-chip u-chip--mono" style={{ fontSize: 12.5, height: 30 }}><Mail size={13} /> {email}</span></p>
+
+            <div className={isUnsubscribed ? "u-card" : "u-pane"} style={{ padding: 28, display: "flex", flexDirection: "column", gap: 16, marginTop: 28 }}>
+                <span className="u-label">{isUnsubscribed ? "Paused" : "Subscribed"}</span>
+                <h3 style={{ margin: 0, fontSize: 26, fontWeight: 500, letterSpacing: "-0.025em" }}>
+                    {isUnsubscribed ? "Emails are off." : "Stop these emails?"}
+                </h3>
+                <p className="u-muted" style={{ margin: 0 }}>
                     {isUnsubscribed
-                        ? "Your preferences have been updated. You will no longer receive communications at:"
-                        : "Configure how you receive project invites and technical updates for:"
-                    }
+                        ? "Changed your mind? Turn them back on and you will get invites and updates again."
+                        : "You will stop receiving automated invitations and product updates. You can come back here anytime to turn them on."}
                 </p>
-                <div style={{ padding: '12px 20px', backgroundColor: 'var(--bg-card)', borderRadius: '12px', display: 'inline-block', border: '1px solid var(--border-color)', color: 'var(--primary)', fontWeight: 700, fontSize: '15px', fontFamily: 'monospace' }}>
-                    {email}
-                </div>
+                <button
+                    className={`u-btn u-btn--lg ${isUnsubscribed ? "u-btn--solid" : "u-btn--danger"}`}
+                    style={{ alignSelf: "flex-start" }}
+                    onClick={() => handleAction(!isUnsubscribed)}
+                    disabled={processing}
+                >
+                    {processing ? <Loader2 size={16} className="u-spin" /> : isUnsubscribed ? <Bell size={16} /> : <BellOff size={16} />}
+                    {isUnsubscribed ? "Turn emails back on" : "Unsubscribe"}
+                </button>
             </div>
 
-            <div style={{ backgroundColor: 'var(--bg-card)', padding: '48px', borderRadius: '32px', border: '1px solid var(--border-color)', textAlign: 'center' }}>
-                <div style={{
-                    width: '72px',
-                    height: '72px',
-                    borderRadius: '20px',
-                    backgroundColor: isUnsubscribed ? 'rgba(245, 158, 11, 0.1)' : 'rgba(59, 130, 246, 0.1)',
-                    color: isUnsubscribed ? '#f59e0b' : 'var(--primary)',
-                    margin: '0 auto 32px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    transition: 'all 0.3s ease'
-                }}>
-                    {isUnsubscribed ? <BellOff size={32} /> : <Mail size={32} />}
-                </div>
-
-                {!isUnsubscribed ? (
-                    <>
-                        <h2 style={{ fontSize: '24px', fontWeight: '800', marginBottom: '16px' }}>Ready to Unsubscribe?</h2>
-                        <p style={{ color: 'var(--text-muted)', marginBottom: '40px', fontSize: '15px' }}>
-                            You will stop receiving all automated system invitations and technical reports. You can return here anytime to re-enable them.
-                        </p>
-                        <button
-                            onClick={() => handleAction(true)}
-                            disabled={processing}
-                            style={{
-                                backgroundColor: '#ef4444',
-                                color: '#white',
-                                fontWeight: 700,
-                                padding: '16px 40px',
-                                borderRadius: '16px',
-                                border: 'none',
-                                fontSize: '16px',
-                                cursor: 'pointer',
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '12px',
-                                transition: 'all 0.2s',
-                                opacity: processing ? 0.7 : 1
-                            }}
-                        >
-                            {processing ? <Loader2 className="animate-spin" size={20} /> : "Confirm Unsubscribe"}
-                        </button>
-                    </>
-                ) : (
-                    <>
-                        <h2 style={{ fontSize: '24px', fontWeight: '800', marginBottom: '16px' }}>Settings Synchronized</h2>
-                        <p style={{ color: 'var(--text-muted)', marginBottom: '40px', fontSize: '15px' }}>
-                            Your email has been removed from our automated relay system. If this was a mistake, you can re-activate your subscription below.
-                        </p>
-                        <button
-                            onClick={() => handleAction(false)}
-                            disabled={processing}
-                            style={{
-                                backgroundColor: 'var(--primary)',
-                                color: 'white',
-                                fontWeight: 700,
-                                padding: '16px 40px',
-                                borderRadius: '16px',
-                                border: 'none',
-                                fontSize: '16px',
-                                cursor: 'pointer',
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '12px',
-                                transition: 'all 0.2s',
-                                opacity: processing ? 0.7 : 1
-                            }}
-                        >
-                            {processing && <Loader2 className="animate-spin" size={20} />}
-                            Re-enable Communications
-                        </button>
-                    </>
-                )}
-            </div>
-
-            <div style={{ marginTop: '60px', display: 'flex', justifyContent: 'center', gap: '30px' }}>
-                <span style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', fontWeight: '600', color: 'var(--text-muted)' }}><ShieldCheck size={14} /> Privacy First</span>
-                <span style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', fontWeight: '600', color: 'var(--text-muted)' }}><Zap size={14} /> Instant Sync</span>
-            </div>
-
-            <style>{`
-                .animate-spin { animation: spin 1s linear infinite; }
-                @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-                button:hover { filter: brightness(1.1); transform: translateY(-1px); }
-                button:active { transform: translateY(0); }
-            `}</style>
+            <p className="u-label" style={{ marginTop: 24 }}><ShieldCheck size={12} /> We only use this address for account email</p>
         </ContentLayout>
     );
 };

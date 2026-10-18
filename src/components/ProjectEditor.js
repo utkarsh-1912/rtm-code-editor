@@ -130,18 +130,21 @@ function ProjectEditor({
         });
     };
 
+    // `lang` may be a language name or a file extension.
     const getLanguageExtension = (lang) => {
-        switch (lang) {
-            case "javascript": return javascript({ jsx: true });
-            case "python": return python();
-            case "cpp": return cpp();
-            case "html": return html();
+        switch ((lang || "").toLowerCase()) {
+            case "python": case "py": return python();
+            case "cpp": case "c": case "h": case "hpp": case "cc": return cpp();
+            case "html": case "htm": case "css": return html();
+            case "jsx": case "tsx": return javascript({ jsx: true });
+            case "ts": return javascript({ typescript: true });
+            case "javascript": case "js": return javascript({ jsx: true });
             default: return javascript();
         }
     };
 
     return (
-        <div style={{ height: "100%", backgroundColor: "#0d1117", overflow: "hidden", position: 'relative' }}>
+        <div style={{ height: "100%", backgroundColor: "var(--u-bg, #282a36)", overflow: "hidden", position: 'relative' }}>
             <CodeMirror
                 value={editorCode}
                 height="100%"

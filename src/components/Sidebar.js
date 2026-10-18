@@ -1,4 +1,5 @@
 import React from 'react';
+import Logo from "./Logo";
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
     Clock,
@@ -64,19 +65,7 @@ const Sidebar = ({ isOpen, onClose, isMobile, isCollapsed, onToggleCollapse, isL
                     }}
                     onClick={() => { navigate('/'); if (isMobile) onClose(); }}
                 >
-                    <img
-                        src={isCollapsed && !isMobile
-                            ? (isLightMode ? "/utkristi-labs.png" : "/utkristi-labs-dark.png")
-                            : (isLightMode ? "/utkristi-colabs.png" : "/utkristi-colabs-dark.png")
-                        }
-                        alt="Logo"
-                        style={{
-                            width: 'auto',
-                            height: isCollapsed && !isMobile ? '24px' : '32px',
-                            objectFit: 'contain',
-                            transition: 'all 0.3s'
-                        }}
-                    />
+                    <Logo size={isCollapsed && !isMobile ? 26 : 32} compact={isCollapsed && !isMobile} />
                 </div>
                 {isMobile && (
                     <button onClick={onClose} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}>
@@ -97,8 +86,8 @@ const Sidebar = ({ isOpen, onClose, isMobile, isCollapsed, onToggleCollapse, isL
                             justifyContent: isCollapsed && !isMobile ? 'center' : 'flex-start',
                             gap: '12px',
                             width: '100%',
-                            padding: '12px',
-                            borderRadius: '6px',
+                            padding: '12px 14px',
+                            borderRadius: '12px',
                             backgroundColor: isActive(item.id) ? 'rgba(59, 130, 246, 0.1)' : 'transparent',
                             color: isActive(item.id) ? 'var(--primary)' : 'var(--text-muted)',
                             border: 'none',
@@ -130,8 +119,8 @@ const Sidebar = ({ isOpen, onClose, isMobile, isCollapsed, onToggleCollapse, isL
                     justifyContent: isCollapsed && !isMobile ? 'center' : 'flex-start',
                     gap: '12px',
                     padding: isCollapsed && !isMobile ? '8px' : '12px',
-                    backgroundColor: 'rgba(0,0,0,0.1)',
-                    borderRadius: '8px',
+                    backgroundColor: 'transparent',
+                    borderRadius: '16px',
                     border: '1px solid var(--border-color)',
                     transition: 'all 0.3s'
                 }}>
@@ -141,7 +130,8 @@ const Sidebar = ({ isOpen, onClose, isMobile, isCollapsed, onToggleCollapse, isL
                         style={{
                             width: isCollapsed && !isMobile ? '28px' : '36px',
                             height: isCollapsed && !isMobile ? '28px' : '36px',
-                            borderRadius: '6px',
+                            borderRadius: '50%',
+                            objectFit: 'cover',
                             transition: 'all 0.3s'
                         }}
                     />
@@ -166,7 +156,7 @@ const Sidebar = ({ isOpen, onClose, isMobile, isCollapsed, onToggleCollapse, isL
                                 overflow: 'hidden',
                                 textOverflow: 'ellipsis'
                             }}>
-                                Pro Account
+                                {user?.email || 'Signed in'}
                             </p>
                         </div>
                     )}
@@ -179,7 +169,7 @@ const Sidebar = ({ isOpen, onClose, isMobile, isCollapsed, onToggleCollapse, isL
                                 border: '1px solid rgba(239, 68, 68, 0.2)',
                                 padding: '8px',
                                 color: '#ef4444',
-                                borderRadius: '6px',
+                                borderRadius: '999px',
                                 cursor: 'pointer',
                                 display: 'flex',
                                 transition: 'all 0.2s'
