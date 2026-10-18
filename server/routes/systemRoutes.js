@@ -5,11 +5,6 @@ const UserRepository = require('../repositories/UserRepository');
 const RoomRepository = require('../repositories/RoomRepository');
 const MailService = require('../services/MailService');
 
-// System Health Check
-router.get('/ping', (req, res) => {
-    res.json({ success: true, message: "pong" });
-});
-
 // Test Email Dispatch Endpoint
 router.get('/test-email', async (req, res) => {
     try {

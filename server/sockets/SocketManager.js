@@ -5,6 +5,8 @@ const setupWhiteboardSocket = require('./WhiteboardSocket');
 const setupMediaSocket = require('./MediaSocket');
 
 const userSocketMap = {};
+// socketId -> avatar URL for signed-in people (names stay in userSocketMap)
+const userPhotoMap = {};
 const roomChatHistory = {};
 const roomWhiteboardState = {};
 
@@ -20,12 +22,14 @@ function initializeSockets(io) {
             return {
                 socketId,
                 userName: userSocketMap[socketId] || "Guest",
+                photoURL: userPhotoMap[socketId] || null,
             };
         });
     }
 
     const context = {
         userSocketMap,
+        userPhotoMap,
         roomChatHistory,
         roomWhiteboardState,
         getAllClients
@@ -51,6 +55,7 @@ function initializeSockets(io) {
                 }
             });
             delete userSocketMap[socket.id];
+            delete userPhotoMap[socket.id];
         }));
     });
 }

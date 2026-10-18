@@ -1,79 +1,53 @@
 /**
- * AI Copilot Code Intelligence Service
+ * AI copilot: forwards chat messages to any OpenAI-compatible endpoint.
+ * Defaults to a local Ollama with a small open-weight code model, so nothing leaves
+ * your machine unless you point LLM_BASE_URL somewhere else.
+ *
+ *   LLM_BASE_URL  default http://localhost:11434/v1   (Ollama, llama.cpp server, LM Studio, vLLM…)
+ *   LLM_MODEL     default qwen2.5-coder:1.5b           (try qwen2.5-coder:7b or qwen3-coder:30b on bigger machines)
+ *   LLM_API_KEY   optional bearer token
  */
-async function processCopilotRequest({ action, code = "", language = "javascript", prompt = "", error = "" }) {
-    const langLower = (language || "javascript").toLowerCase();
+const BASE = () => (process.env.LLM_BASE_URL || "http://localhost:11434/v1").replace(/\/$/, "");
+const MODEL = () => process.env.LLM_MODEL || "qwen2.5-coder:1.5b";
+const MAX_CHARS = 16000;
 
-    if (action === "explain") {
-        return {
-            title: "Code Explanation",
-            explanation: `This ${language} block performs standard processing. It defines functions/components, manages runtime state, and ensures reliable data handling.`,
-            suggestions: [
-                "Consider adding explicit type checks or TypeScript annotations.",
-                "Ensure asynchronous calls handle rejection with try/catch blocks."
-            ]
-        };
-    }
-
-    if (action === "refactor") {
-        let refactoredCode = code;
-        if (langLower.includes("js") || langLower.includes("javascript")) {
-            refactoredCode = `// AI Refactored ${language} Code (Optimized)\n` + code;
-        } else if (langLower.includes("python") || langLower.includes("py")) {
-            refactoredCode = `# AI Refactored ${language} Code (PEP8 Optimized)\n` + code;
-        } else {
-            refactoredCode = `// AI Refactored ${language} Code\n` + code;
-        }
-        return {
-            title: "Refactored Code",
-            refactoredCode,
-            summary: "Code refactored for improved readability, structural clarity, and optimal performance."
-        };
-    }
-
-    if (action === "fix") {
-        const fixedCode = `// AI Bug Fix Applied\n` + code;
-        return {
-            title: "Automated Bug Audit & Fix",
-            fixedCode,
-            issuesFound: [
-                error ? `Caught Runtime Exception: ${error}` : "Potential null pointer dereference or unhandled async rejection."
-            ],
-            summary: "Resolved potential runtime exception and ensured robust memory safety."
-        };
-    }
-
-    if (action === "test") {
-        let testCode = "";
-        if (langLower.includes("js") || langLower.includes("javascript")) {
-            testCode = `describe('Automated Suite', () => {\n  test('should execute expected behavior', () => {\n    // Generated Test Case\n    expect(true).toBe(true);\n  });\n});`;
-        } else if (langLower.includes("python") || langLower.includes("py")) {
-            testCode = `import unittest\n\nclass TestSuite(unittest.TestCase):\n    def test_default(self):\n        self.assertTrue(True)\n\nif __name__ == '__main__':\n    unittest.main()`;
-        } else {
-            testCode = `// Unit tests for ${language}\nvoid runTests() { /* assertion checks */ }`;
-        }
-        return {
-            title: "Generated Unit Tests",
-            testCode,
-            summary: "Generated comprehensive unit test suite covering happy paths and edge cases."
-        };
-    }
-
-    // Default: Smart Code Generation / Prompt Completion
-    let generatedCode = "";
-    if (prompt) {
-        generatedCode = `// AI Generated Code for: ${prompt}\n` + code;
-    } else {
-        generatedCode = `// AI Assistant Suggestion\n` + code;
-    }
-
-    return {
-        title: "AI Code Suggestion",
-        generatedCode,
-        summary: `Generated code snippet matching requirements for ${language}.`
-    };
+function sanitize(messages) {
+    if (!Array.isArray(messages) || !messages.length) throw Object.assign(new Error("No messages"), { status: 400 });
+    let total = 0;
+    return messages.slice(-6).map((m) => {
+        const role = ["system", "user", "assistant"].includes(m?.role) ? m.role : "user";
+        const content = String(m?.content || "").slice(0, MAX_CHARS);
+        total += content.length;
+        if (total > MAX_CHARS * 2) throw Object.assign(new Error("Request is too large"), { status: 413 });
+        return { role, content };
+    });
 }
 
-module.exports = {
-    processCopilotRequest
-};
+async function complete({ messages }) {
+    const body = { model: MODEL(), messages: sanitize(messages), temperature: 0.2, stream: false };
+    const headers = { "content-type": "application/json" };
+    if (process.env.LLM_API_KEY) headers.authorization = `Bearer ${process.env.LLM_API_KEY}`;
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), Number(process.env.LLM_TIMEOUT_MS) || 120000);
+    try {
+        const res = await fetch(`${BASE()}/chat/completions`, { method: "POST", headers, body: JSON.stringify(body), signal: ctrl.signal });
+        if (!res.ok) {
+            const detail = await res.text().catch(() => "");
+            if (res.status === 404 && /not found/i.test(detail)) {
+                throw Object.assign(new Error(`The model "${body.model}" is not installed on the model server. Run: ollama pull ${body.model}`), { status: 503 });
+            }
+            throw Object.assign(new Error(`Model endpoint responded ${res.status}${detail ? `: ${detail.slice(0, 200)}` : ""}`), { status: 502 });
+        }
+        const data = await res.json();
+        const text = data.choices?.[0]?.message?.content || "";
+        return { text, model: data.model || body.model };
+    } catch (err) {
+        if (err.name === "AbortError") throw Object.assign(new Error("The model took too long to answer"), { status: 504 });
+        if (err.status) throw err;
+        throw Object.assign(new Error(`No AI model reachable at ${BASE()}. Start Ollama (ollama serve) and pull ${MODEL()}, or set LLM_BASE_URL.`), { status: 503 });
+    } finally {
+        clearTimeout(timer);
+    }
+}
+
+module.exports = { complete };

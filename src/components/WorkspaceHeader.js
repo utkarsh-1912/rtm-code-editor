@@ -64,7 +64,7 @@ export default function WorkspaceHeader({
                     <div className="wsh-avatars" title={`${clients.length} online`}>
                         {clients.slice(0, 4).map((c, i) => (
                             <div key={c.socketId || i} style={{ zIndex: 5 - i }}>
-                                <Client userName={nameOf(c)} isCompact isCurrentUser={nameOf(c) === currentUserName} />
+                                <Client userName={nameOf(c)} photoURL={c.photoURL} isCompact isCurrentUser={nameOf(c) === currentUserName} />
                             </div>
                         ))}
                         {clients.length > 4 && <span className="wsh-more">+{clients.length - 4}</span>}

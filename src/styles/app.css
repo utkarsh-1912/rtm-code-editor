@@ -448,7 +448,7 @@ button.u-chip:hover { border-color: var(--u-line-2); color: var(--u-ink); }
 .u-tile-ico { width: 36px; height: 36px; border-radius: 10px; display: flex; align-items: center; justify-content: center; background: var(--u-tint); color: var(--u-ink-2); flex: none; }
 .u-tile.on .u-tile-ico { background: var(--u-solid); color: var(--u-on-solid); }
 .u-tile b { display: block; font-size: 13.5px; font-weight: 600; }
-.u-tile span { display: block; font-size: 12px; color: var(--u-ink-3); font-family: var(--u-mono); }
+.u-tile-desc { display: block; font-size: 12px; color: var(--u-ink-3); font-family: var(--u-mono); }
 
 /* ---------- Empty ---------- */
 .u-empty { padding: 64px 20px; display: flex; flex-direction: column; align-items: center; gap: 14px; text-align: center; color: var(--u-ink-2); }
@@ -1089,3 +1089,70 @@ button.u-chip:hover { border-color: var(--u-line-2); color: var(--u-ink); }
   .ld-ring, .ld-dot, .ld-track i, .ld-dots i { animation: none !important; }
   .ld-ring { stroke-dashoffset: 0; }
 }
+
+/* =====================================================================
+   AVATARS, PROJECT I/O, SERVER WAKE, FOOTER, DOWNLOAD
+   ===================================================================== */
+.u-av {
+  display: inline-flex; align-items: center; justify-content: center; flex: none; border-radius: 50%; overflow: hidden;
+  color: #fff; font-weight: 600; letter-spacing: .02em; box-shadow: 0 0 0 2px var(--u-bg, #0B0B0A);
+}
+.u-av img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.u-av--me { box-shadow: 0 0 0 2px var(--u-bg, #0B0B0A), 0 0 0 3.5px var(--u-accent, #9CC3FF); }
+.u-avatar { display: inline-flex; align-items: center; justify-content: center; padding: 0; border: 0; background: none; }
+.u-avatar .u-av { box-shadow: none; }
+
+/* project output for non-web languages: stdin | output */
+.ws-io { flex-direction: row; }
+.ws-io-col { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+.ws-io-col + .ws-io-col { border-left: 1px solid var(--u-line); }
+.ws-stdin { flex: 1; resize: none; border: 0; outline: 0; padding: 14px 18px; background: var(--u-bg); color: var(--u-ink); font-family: var(--u-mono); font-size: 13px; line-height: 1.7; }
+.ws-stdin::placeholder { color: var(--u-ink-3); }
+@media (max-width: 700px) { .ws-io { flex-direction: column; } .ws-io-col + .ws-io-col { border-left: 0; border-top: 1px solid var(--u-line); } }
+
+/* cold-start notice */
+.sw {
+  position: fixed; left: 16px; bottom: 16px; z-index: 6000; width: min(420px, calc(100vw - 32px)); min-height: 0;
+  display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto auto; align-items: center; gap: 4px 12px;
+  padding: 12px 8px 14px 14px; border-radius: 18px; background: var(--u-raise); color: var(--u-ink);
+  border: 1px solid var(--u-line); box-shadow: var(--u-shadow); animation: u-up .5s var(--u-ease) both; overflow: hidden;
+}
+.sw-mark { width: 26px; height: 26px; border-radius: 8px; background: var(--u-ink); position: relative; }
+.sw-mark i { position: absolute; right: -3px; bottom: -3px; width: 11px; height: 11px; border-radius: 50%; background: var(--u-warn); box-shadow: 0 0 0 3px var(--u-raise); animation: ld-beat 1.6s var(--u-ease) infinite; }
+.sw-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.sw-text strong { font-size: 14px; font-weight: 600; }
+.sw-text span { font-size: 12px; color: var(--u-ink-2); line-height: 1.4; }
+.sw-time { font-variant-numeric: tabular-nums; }
+.sw .u-icon { width: 30px; height: 30px; }
+.sw-track { grid-column: 1 / -1; position: absolute; left: 0; right: 0; bottom: 0; height: 2px; background: var(--u-line); overflow: hidden; }
+.sw-track i { position: absolute; top: 0; bottom: 0; width: 30%; background: var(--u-warn); animation: ld-slide 1.6s var(--u-inout) infinite; }
+
+/* footer */
+.f-top { display: flex; justify-content: space-between; align-items: flex-end; gap: 20px; flex-wrap: wrap; padding-bottom: 28px; border-bottom: 1px solid var(--u-line); }
+.f-top .u-lede { max-width: 640px; }
+.f-cols { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)) minmax(220px, 1.3fr); gap: 28px; padding: 6px 0 4px; }
+.f-cols nav, .f-status { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.f-cols ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.f-cols a { font-size: 15px; color: var(--u-ink-2); transition: color .3s var(--u-ease); }
+.f-cols a:hover, .f-cols a.on { color: var(--u-ink); }
+.f-stat { display: inline-flex; align-items: center; gap: 10px; font-size: 15px; color: var(--u-ink); }
+.f-theme { align-self: flex-start; }
+.f-theme button { height: 28px; padding: 0 12px; font-size: 12px; }
+.f-word { display: flex; gap: .18em; flex-wrap: wrap; font-family: var(--u-display); font-stretch: 62%; font-weight: 700; text-transform: uppercase; line-height: .82; letter-spacing: -0.01em; font-size: clamp(64px, 15.5vw, 230px); padding-top: 12px; user-select: none; }
+.f-word .u-faint { color: var(--u-ink-3); }
+@media (max-width: 980px) { .f-cols { grid-template-columns: repeat(2, minmax(0, 1fr)); } .f-status { grid-column: 1 / -1; } }
+
+/* download */
+.dl-mine { background: var(--u-tint); }
+.dl-note { margin-top: 18px; padding: 18px 20px; display: flex; flex-direction: column; gap: 10px; }
+.dl-note p { margin: 0; }
+.dl-cmd { display: flex; align-items: center; gap: 8px; padding: 6px 6px 6px 14px; border-radius: 12px; background: var(--u-bg); border: 1px solid var(--u-line); min-width: 0; }
+.dl-cmd code { flex: 1; min-width: 0; overflow-x: auto; white-space: nowrap; font-family: var(--u-mono); font-size: 12.5px; color: var(--u-ink); scrollbar-width: none; }
+.dl-cmd .u-icon { width: 30px; height: 30px; }
+.dl-local { display: flex; flex-direction: column; gap: 22px; }
+.dl-steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.dl-step { padding: 22px; display: flex; flex-direction: column; gap: 12px; }
+.dl-step h3 { margin: 18px 0 0; font-size: 22px; font-weight: 500; letter-spacing: -0.02em; }
+.dl-step p { margin: 0; font-size: 14px; }
+@media (max-width: 980px) { .dl-steps { grid-template-columns: 1fr; } }
+@media (prefers-reduced-motion: reduce) { .sw, .sw-mark i, .sw-track i { animation: none !important; } }

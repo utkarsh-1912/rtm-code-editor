@@ -4,9 +4,11 @@ import { Modal, timeAgo } from './ux/primitives';
 import toast from 'react-hot-toast';
 import { getBackendUrl } from '../utils/api';
 
-function DiffViewerModal({ isOpen, onClose, roomId = null, projectId = null, currentCode = "", onRestoreSnapshot }) {
+function DiffViewerModal({ isOpen, onClose, roomId = null, projectId = null, currentCode = "", files = null, createdBy = "", onRestoreSnapshot }) {
     const [snapshots, setSnapshots] = useState([]);
     const [selectedSnapshot, setSelectedSnapshot] = useState(null);
+    const [snapName, setSnapName] = useState('');
+    const [saving, setSaving] = useState(false);
 
     const fetchSnapshots = useCallback(async () => {
         try {
@@ -30,6 +32,27 @@ function DiffViewerModal({ isOpen, onClose, roomId = null, projectId = null, cur
         fetchSnapshots();
     }, [isOpen, fetchSnapshots]);
 
+    const saveSnapshot = async (e) => {
+        e.preventDefault();
+        const name = snapName.trim() || `Snapshot ${new Date().toLocaleString()}`;
+        setSaving(true);
+        try {
+            const res = await fetch(`${getBackendUrl()}/api/snapshots`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ roomId, projectId, name, code: currentCode, files, createdBy }),
+            });
+            if (!res.ok) throw new Error(`Snapshot API error ${res.status}`);
+            toast.success(`Saved “${name}”`);
+            setSnapName('');
+            fetchSnapshots();
+        } catch (err) {
+            toast.error('Could not save the snapshot');
+        } finally {
+            setSaving(false);
+        }
+    };
+
     if (!isOpen) return null;
 
     const oldLines = (selectedSnapshot?.code || '').split('\n');
@@ -46,10 +69,15 @@ function DiffViewerModal({ isOpen, onClose, roomId = null, projectId = null, cur
                 </button>
             </> : null}
         >
+            <form className="h-join" onSubmit={saveSnapshot}>
+                <input className="u-input" value={snapName} onChange={(e) => setSnapName(e.target.value)} placeholder="Name this version, e.g. before refactor" aria-label="Snapshot name" />
+                <button type="submit" className="u-btn u-btn--solid u-btn--lg" disabled={saving}>{saving ? 'Saving…' : 'Save snapshot'}</button>
+            </form>
+
             {snapshots.length === 0 ? (
                 <div className="u-empty" style={{ padding: '40px 0' }}>
                     <span className="u-display">No snapshots</span>
-                    <p>Snapshots saved in this workspace will show up here.</p>
+                    <p>Save one above to keep a copy of the code you can compare against or restore.</p>
                 </div>
             ) : (
                 <div className="dv-grid">

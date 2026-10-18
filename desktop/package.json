@@ -1,0 +1,67 @@
+{
+  "name": "utkristi-colabs-desktop",
+  "productName": "Utkristi CoLabs",
+  "version": "1.0.0",
+  "description": "Desktop app for Utkristi CoLabs: real-time pair programming with local Judge0 and a local AI model.",
+  "main": "main.js",
+  "author": "Utkristi.io",
+  "license": "UNLICENSED",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --publish never",
+    "dist:win": "electron-builder --win --publish never",
+    "dist:mac": "electron-builder --mac --publish never",
+    "dist:linux": "electron-builder --linux --publish never"
+  },
+  "devDependencies": {
+    "electron": "^33.2.1",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "io.utkristi.colabs",
+    "productName": "Utkristi CoLabs",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "local.js",
+      "splash.html",
+      "build/icon.png"
+    ],
+    "win": {
+      "target": [{ "target": "nsis", "arch": ["x64"] }],
+      "artifactName": "Utkristi-CoLabs-win-x64.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "shortcutName": "Utkristi CoLabs"
+    },
+    "mac": {
+      "target": [{ "target": "dmg", "arch": ["universal"] }],
+      "category": "public.app-category.developer-tools",
+      "artifactName": "Utkristi-CoLabs-mac-universal.${ext}"
+    },
+    "linux": {
+      "target": [
+        { "target": "AppImage", "arch": ["x64"] },
+        { "target": "deb", "arch": ["x64"] }
+      ],
+      "category": "Development",
+      "maintainer": "Utkristi.io",
+      "artifactName": "Utkristi-CoLabs-linux-x64.${ext}"
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "utkarsh-1912",
+        "repo": "rtm-code-editor",
+        "releaseType": "release"
+      }
+    ]
+  }
+}

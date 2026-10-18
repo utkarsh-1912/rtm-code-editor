@@ -2,48 +2,26 @@ import React, { useState } from 'react';
 import { Sparkles, Code2, ShieldAlert, CheckCircle, Loader2, ArrowRight } from 'lucide-react';
 import { Modal } from './ux/primitives';
 import toast from 'react-hot-toast';
-import { getBackendUrl } from '../utils/api';
+import { askCopilot } from '../utils/copilot';
 
 function AICopilotModal({ isOpen, onClose, code = "", language = "javascript", onApplyCode, roomId = null, projectId = null, userId = null }) {
     const [action, setAction] = useState("explain");
     const [prompt, setPrompt] = useState("");
     const [loading, setLoading] = useState(false);
     const [response, setResponse] = useState(null);
+    const [error, setError] = useState(null);
 
     if (!isOpen) return null;
 
     const handleRunAI = async (selectedAction = action) => {
         setLoading(true);
         setAction(selectedAction);
+        setError(null);
         try {
-            const res = await fetch(`${getBackendUrl()}/api/copilot`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    action: selectedAction,
-                    code,
-                    language,
-                    prompt,
-                    roomId,
-                    projectId,
-                    userId
-                })
-            });
-
-            if (!res.ok) {
-                const errData = await res.json().catch(() => ({}));
-                throw new Error(errData.error || `Server error ${res.status}`);
-            }
-            const data = await res.json();
-            if (data.success) {
-                setResponse(data.result);
-                
-            } else {
-                toast.error(data.error || "AI service error");
-            }
+            setResponse(await askCopilot({ action: selectedAction, code, language, prompt, roomId, projectId, userId }));
         } catch (err) {
-            console.error(err);
-            toast.error("Failed to connect to AI Copilot");
+            setResponse(null);
+            setError(err.message);
         } finally {
             setLoading(false);
         }
@@ -81,6 +59,13 @@ function AICopilotModal({ isOpen, onClose, code = "", language = "javascript", o
                     <div className="u-skel" style={{ height: 14, width: '80%' }} />
                     <div className="u-skel" style={{ height: 14, width: '64%' }} />
                     <div className="u-skel" style={{ height: 90 }} />
+                </div>
+            )}
+
+            {error && !loading && (
+                <div className="u-card g-danger" style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    <span className="u-label" style={{ color: 'var(--u-bad)' }}>Model unavailable</span>
+                    <p className="u-small u-muted" style={{ margin: 0 }}>{error}</p>
                 </div>
             )}
 

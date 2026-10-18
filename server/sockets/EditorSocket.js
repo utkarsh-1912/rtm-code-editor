@@ -4,37 +4,48 @@ const UserRepository = require('../repositories/UserRepository');
 const ProjectRepository = require('../repositories/ProjectRepository');
 
 function setupEditorSocket(io, socket, safeSocket, context) {
-    const { userSocketMap, roomChatHistory, getAllClients } = context;
+    const { userSocketMap, userPhotoMap, roomChatHistory, getAllClients } = context;
+    const safePhoto = (url) => (typeof url === 'string' && /^https:\/\//.test(url) ? url.slice(0, 500) : null);
 
     socket.on(ACTIONS.JOIN, safeSocket(async ({ roomId, userName, userProfile }) => {
         const finalUserName = userName || "Guest";
         userSocketMap[socket.id] = finalUserName;
+        userPhotoMap[socket.id] = safePhoto(userProfile?.photoURL);
         socket.join(roomId);
 
-        let dbRoom = await RoomRepository.getRoom(roomId);
-        if (dbRoom) {
-            if (!roomChatHistory[roomId]) roomChatHistory[roomId] = dbRoom.chat_history || [];
-            if (dbRoom.code !== null) socket.emit(ACTIONS.CODE_CHANGE, { code: dbRoom.code });
-            if (dbRoom.language) socket.emit(ACTIONS.SYNC_LANGUAGE, { language: dbRoom.language });
-        } else {
-            await RoomRepository.saveRoom(roomId, "", "javascript", []);
-        }
-
-        if (userProfile?.uid) {
-            await UserRepository.findOrCreateUser(userProfile);
-            await RoomRepository.linkRoomToUser(userProfile.uid, roomId);
-            await RoomRepository.updateLastRoom(userProfile.uid, roomId);
-        }
-
-        const clients = getAllClients(roomId);
-        io.in(roomId).emit(ACTIONS.JOINED, { clients, userName: finalUserName, socketId: socket.id });
+        // Announce the join before touching the database so a slow or cold DB
+        // never blocks people from collaborating.
+        io.in(roomId).emit(ACTIONS.JOINED, { clients: getAllClients(roomId), userName: finalUserName, socketId: socket.id });
         if (roomChatHistory[roomId]?.length > 0) socket.emit(ACTIONS.SYNC_CHAT, { messages: roomChatHistory[roomId] });
+
+        try {
+            const dbRoom = await RoomRepository.getRoom(roomId);
+            if (dbRoom) {
+                if (!roomChatHistory[roomId]) {
+                    roomChatHistory[roomId] = dbRoom.chat_history || [];
+                    if (roomChatHistory[roomId].length) socket.emit(ACTIONS.SYNC_CHAT, { messages: roomChatHistory[roomId] });
+                }
+                // Only seed code from the DB when nobody else is in the room to sync it live.
+                if (getAllClients(roomId).length <= 1 && dbRoom.code !== null) socket.emit(ACTIONS.CODE_CHANGE, { code: dbRoom.code });
+                if (dbRoom.language) socket.emit(ACTIONS.SYNC_LANGUAGE, { language: dbRoom.language });
+            } else {
+                await RoomRepository.saveRoom(roomId, "", "javascript", []);
+            }
+            if (userProfile?.uid) {
+                await UserRepository.findOrCreateUser(userProfile);
+                await RoomRepository.linkRoomToUser(userProfile.uid, roomId);
+                await RoomRepository.updateLastRoom(userProfile.uid, roomId);
+            }
+        } catch (err) {
+            console.error("Room persistence unavailable:", err.message);
+        }
     }));
 
-    socket.on(ACTIONS.PROJECT_JOIN, safeSocket(async ({ projectId, userName }) => {
+    socket.on(ACTIONS.PROJECT_JOIN, safeSocket(async ({ projectId, userName, photoURL }) => {
         const finalUserName = userName || "Guest";
         const roomId = `project-${projectId}`;
         userSocketMap[socket.id] = finalUserName;
+        userPhotoMap[socket.id] = safePhoto(photoURL);
         socket.join(roomId);
 
         const files = await ProjectRepository.getProjectFiles(projectId);

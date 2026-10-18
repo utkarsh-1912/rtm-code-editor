@@ -51,7 +51,9 @@
     "eject": "react-scripts eject",
     "server:dev": "npx kill-port 5000 && nodemon server.js",
     "server:prod": "node server.js",
-    "setup-db": "node scripts/initialize.js"
+    "setup-db": "node scripts/initialize.js",
+    "runner": "node server/runner/standalone.js",
+    "desktop": "npm --prefix desktop start"
   },
   "eslintConfig": {
     "extends": [

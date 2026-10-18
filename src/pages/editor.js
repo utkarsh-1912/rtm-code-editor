@@ -34,6 +34,7 @@ import { Github } from "lucide-react";
 import Client from "../components/clients";
 import { LANGUAGES, THEMES } from "../config";
 import { useAuth } from "../context/AuthContext";
+import { runCode, formatRun } from "../utils/runner";
 import { resolveTheme, setThemePref } from "../utils/theme";
 import "../styles/app.css";
 import LoadingScreen from "../components/LoadingScreen";
@@ -47,6 +48,7 @@ import FocusModeModal from "../components/FocusModeModal";
 import { Bot, History, Activity, Video as VideoIcon } from "lucide-react";
 import VideoChat from "../components/VideoChat";
 import WorkspaceHeader from "../components/WorkspaceHeader";
+import CommandPalette from "../components/CommandPalette";
 
 function Editor() {
   const socketRef = useRef(null);
@@ -111,6 +113,8 @@ function Editor() {
   const [showDiffViewer, setShowDiffViewer] = useState(false);
   const [showAnalytics, setShowAnalytics] = useState(false);
   const [showFocusModal, setShowFocusModal] = useState(false);
+  const [showCommandPalette, setShowCommandPalette] = useState(false);
+  const runShortcutRef = useRef(null);
   const [isMeetingActive, setIsMeetingActive] = useState(false);
   const [isMeetingMinimized, setIsMeetingMinimized] = useState(false);
   const [isMeetingStarting, setIsMeetingStarting] = useState(false);
@@ -129,6 +133,14 @@ function Editor() {
       if (e.altKey && e.key.toLowerCase() === 'f') {
         e.preventDefault();
         setShowFocusModal(prev => !prev);
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setShowCommandPalette(prev => !prev);
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+        e.preventDefault();
+        runShortcutRef.current?.();
       }
     };
     window.addEventListener('keydown', handleKeyDown);
@@ -423,6 +435,9 @@ function Editor() {
     }
   };
 
+  // eslint-disable-next-line no-use-before-define
+  runShortcutRef.current = () => handleCompile();
+
   const handleCompile = async () => {
     if (isReadOnly) {
       toast.error("Spectators cannot execute code.");
@@ -430,110 +445,26 @@ function Editor() {
     }
     setIsExecuting(true);
     socketRef.current?.emit(ACTIONS.SYNC_EXECUTE, { roomId, isExecuting: true });
+    if (isMobile) setActiveTab("output");
 
-    const langObj = LANGUAGES.find((l) => l.value === language);
-    const languageId = langObj ? langObj.id : 63;
-
-    // Safe base64 encoding for Unicode/emoji characters
-    const safeBase64 = (str) => {
-      try {
-        return btoa(unescape(encodeURIComponent(str)));
-      } catch {
-        return btoa(str);
-      }
-    };
-    const formData = {
-      language_id: languageId,
-      source_code: safeBase64(codeRef.current),
-      ...(stdin.trim() && { stdin: safeBase64(stdin) })
-    };
-
-    const url = "https://judge0-ce.p.rapidapi.com/submissions?base64_encoded=true&fields=*";
-    const options = {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        'X-RapidAPI-Key': process.env.REACT_APP_RAPIDAPI_KEY || 'd08f949d60mshc3405a91834ca1fp1a2502jsn34e3da2dd121',
-        'X-RapidAPI-Host': 'judge0-ce.p.rapidapi.com'
-      },
-      body: JSON.stringify(formData)
-    };
-
+    let text;
+    let failed;
+    let time;
     try {
-      const response = await fetch(url, options);
-      const data = await response.json();
-      if (data.token) {
-        await pollExecutionResult(data.token);
-      } else {
-        throw new Error("Failed to get execution token.");
-      }
+      const result = await runCode({ language, source: codeRef.current, stdin });
+      text = formatRun(result);
+      failed = !result.ok;
+      time = result.timeMs != null ? (result.timeMs / 1000).toFixed(3) : undefined;
     } catch (error) {
-      console.error("Compilation error:", error);
-      const errMsg = "Something went wrong while attempting to run your code.\nPlease check API limits or connectivity.";
-      setOutput(errMsg);
-      setIsError(true);
-      setIsExecuting(false);
-      socketRef.current?.emit(ACTIONS.SYNC_OUTPUT, { roomId, output: errMsg, isError: true, time: undefined });
-      socketRef.current?.emit(ACTIONS.SYNC_EXECUTE, { roomId, isExecuting: false });
+      text = `Could not run the code: ${error.message}`;
+      failed = true;
     }
-  };
-
-  const pollExecutionResult = async (token) => {
-    const url = `https://judge0-ce.p.rapidapi.com/submissions/${token}?base64_encoded=true&fields=*`;
-    const options = {
-      method: "GET",
-      headers: {
-        "X-RapidAPI-Key": process.env.REACT_APP_RAPIDAPI_KEY || 'd08f949d60mshc3405a91834ca1fp1a2502jsn34e3da2dd121',
-        "X-RapidAPI-Host": "judge0-ce.p.rapidapi.com",
-      },
-    };
-
-    try {
-      const response = await fetch(url, options);
-      const data = await response.json();
-
-      if (data.status?.id === 1 || data.status?.id === 2) {
-        if ((pollExecutionResult._retries || 0) < 20) {
-          pollExecutionResult._retries = (pollExecutionResult._retries || 0) + 1;
-          setTimeout(() => pollExecutionResult(token), 2000);
-        } else {
-          pollExecutionResult._retries = 0;
-          setIsExecuting(false);
-          setOutput("Execution timed out. Please try again.");
-          setIsError(true);
-          socketRef.current?.emit(ACTIONS.SYNC_EXECUTE, { roomId, isExecuting: false });
-        }
-        return;
-      } else {
-        setIsExecuting(false);
-        socketRef.current?.emit(ACTIONS.SYNC_EXECUTE, { roomId, isExecuting: false });
-
-        const decodedOutput = data.stdout ? atob(data.stdout) : null;
-        const decodedError = data.stderr ? atob(data.stderr) : null;
-        const decodedCompileOutput = data.compile_output ? atob(data.compile_output) : null;
-
-        if (data.status?.id === 3) {
-          const finalOut = decodedOutput !== null ? decodedOutput : "Code Executed Successfully. No Output.";
-          setOutput(finalOut);
-          setIsError(false);
-          socketRef.current?.emit(ACTIONS.SYNC_OUTPUT, { roomId, output: finalOut, isError: false, time: data.time });
-        } else {
-          const finalErr = decodedError || decodedCompileOutput || data.status?.description || "Unknown Error";
-          setOutput(finalErr);
-          setIsError(true);
-          socketRef.current?.emit(ACTIONS.SYNC_OUTPUT, { roomId, output: finalErr, isError: true, time: data.time });
-        }
-        setExecTime(data.time);
-      }
-    } catch (err) {
-      console.error(err);
-      const errMsg = "Error retrieving execution output from Judge0.";
-      setOutput(errMsg);
-      setIsError(true);
-      setIsExecuting(false);
-      socketRef.current?.emit(ACTIONS.SYNC_OUTPUT, { roomId, output: errMsg, isError: true, time: undefined });
-      socketRef.current?.emit(ACTIONS.SYNC_EXECUTE, { roomId, isExecuting: false });
-    }
+    setOutput(text);
+    setIsError(failed);
+    setExecTime(time);
+    setIsExecuting(false);
+    socketRef.current?.emit(ACTIONS.SYNC_OUTPUT, { roomId, output: text, isError: failed, time });
+    socketRef.current?.emit(ACTIONS.SYNC_EXECUTE, { roomId, isExecuting: false });
   };
 
   return (
@@ -566,6 +497,7 @@ function Editor() {
           { id: "gist", label: "Export to GitHub Gist", icon: <Github size={18} />, onClick: () => setShowGistModal(true), section: "more" },
           { id: "download", label: "Download code", icon: <Download size={18} />, onClick: downloadCode, section: "more" },
           { id: "copy", label: "Copy room ID", icon: <Copy size={18} />, onClick: copyRoomId, section: "more" },
+          { id: "palette", label: "Command palette (Ctrl+K)", icon: <Zap size={18} />, onClick: () => setShowCommandPalette(true), section: "more", desktopOnly: true },
           { id: "settings", label: "Editor settings", icon: <Settings size={18} />, onClick: () => setShowSettings(true), section: "more" },
           ...(user ? [{ id: "dash", label: "Back to dashboard", icon: <LayoutDashboard size={18} />, onClick: () => reactNavigator("/dashboard"), section: "more" }] : []),
           { id: "leave", label: "Leave room", icon: <LogOut size={18} />, onClick: leaveRoom, section: "more", tone: "red" },
@@ -622,11 +554,7 @@ function Editor() {
                       <div className="ws-pane-head"><span>People</span><b>{clients.length} online</b></div>
                       <div className="ws-people">
                         {clients.map((client) => (
-                          <div key={client.socketId} className="ws-person">
-                            <Client userName={client.userName} isCompact isCurrentUser={client.userName === userName} />
-                            <b>{client.userName}</b>
-                            {client.userName === userName && <em>you</em>}
-                          </div>
+                          <Client key={client.socketId} userName={client.userName} photoURL={client.photoURL} isCurrentUser={client.socketId === socketRef.current?.id} />
                         ))}
                       </div>
                     </div>
@@ -843,6 +771,27 @@ function Editor() {
         </div>
       )}
 
+      <CommandPalette
+        isOpen={showCommandPalette}
+        onClose={() => setShowCommandPalette(false)}
+        isLightMode={isLightMode}
+        actions={[
+          { id: "run", label: "Run code", category: "Actions", shortcut: "Ctrl Enter", icon: <Terminal size={16} />, run: handleCompile },
+          { id: "share", label: "Copy editor link", category: "Collaboration", icon: <Share2 size={16} />, run: () => handleShare("editor") },
+          { id: "viewer", label: "Copy spectator link", category: "Collaboration", icon: <Users size={16} />, run: () => handleShare("viewer") },
+          { id: "call", label: isMeetingActive ? "Leave call" : "Start voice & video call", category: "Collaboration", icon: <VideoIcon size={16} />, run: () => setIsMeetingActive((v) => !v) },
+          { id: "board", label: "Open whiteboard", category: "Collaboration", icon: <PencilLine size={16} />, run: () => setShowWhiteboard(true) },
+          { id: "ai", label: "Ask AI copilot", category: "Actions", icon: <Bot size={16} />, run: () => setShowAICopilot(true) },
+          { id: "history", label: "Version history & snapshots", category: "Actions", icon: <History size={16} />, run: () => setShowDiffViewer(true) },
+          { id: "focus", label: "Focus mode", category: "Actions", shortcut: "Alt F", icon: <Zap size={16} />, run: () => setShowFocusModal(true) },
+          { id: "download", label: "Download code", category: "Actions", icon: <Download size={16} />, run: downloadCode },
+          { id: "gist", label: "Export to GitHub gist", category: "Actions", icon: <Github size={16} />, run: () => setShowGistModal(true) },
+          { id: "settings", label: "Editor settings", category: "Settings", icon: <Settings size={16} />, run: () => setShowSettings(true) },
+          { id: "theme", label: isLightMode ? "Switch to dark theme" : "Switch to light theme", category: "Settings", icon: <Settings size={16} />, run: toggleTheme },
+          { id: "leave", label: "Leave room", category: "Actions", icon: <LogOut size={16} />, run: leaveRoom },
+        ]}
+      />
+
       <AICopilotModal
         isOpen={showAICopilot}
         onClose={() => setShowAICopilot(false)}
@@ -862,6 +811,7 @@ function Editor() {
         onClose={() => setShowDiffViewer(false)}
         roomId={roomId}
         currentCode={currentCode}
+        createdBy={userName}
         onRestoreSnapshot={(snap) => {
           if (snap.code) {
             codeRef.current = snap.code;

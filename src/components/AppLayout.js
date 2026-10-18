@@ -7,6 +7,8 @@ import { getBackendUrl } from '../utils/api';
 import SearchModal from './SearchModal';
 import NotificationCenter from './NotificationCenter';
 import Shell, { useOnline, useThemeToggle } from './ux/Shell';
+import { useBackend, backendLabel } from '../context/BackendContext';
+import { Avatar } from './clients';
 import { newRoomId } from './ux/primitives';
 
 // One home for signed-in users: the workspace lives at /dashboard ("/" redirects there).
@@ -16,7 +18,12 @@ const NAV = [
     { to: '/settings', label: 'Settings', icon: SettingsIcon },
 ];
 
-const LEGAL = [['Support', '/support'], ['Status', '/status'], ['Privacy', '/privacy'], ['Terms', '/terms']];
+const COLUMNS = [
+    { title: 'Workspace', links: [['Workspace', '/dashboard'], ['Snippets', '/snippets'], ['Settings', '/settings']] },
+    { title: 'Product', links: [['Features', '/features'], ['Download', '/download'], ['Pricing', '/pricing']] },
+    { title: 'Help', links: [['Support', '/support'], ['Status', '/status'], ['Security', '/security']] },
+    { title: 'Legal', links: [['Privacy', '/privacy'], ['Terms', '/terms']] },
+];
 
 const AppLayout = ({ children }) => {
     const { user, logout } = useAuth();
@@ -28,6 +35,7 @@ const AppLayout = ({ children }) => {
     const [notifOpen, setNotifOpen] = useState(false);
     const [hasUnread, setHasUnread] = useState(false);
     const online = useOnline();
+    const backend = useBackend();
 
     const checkNotifications = useCallback(async () => {
         if (!user?.uid) return;
@@ -76,18 +84,17 @@ const AppLayout = ({ children }) => {
 
     const startRoom = () => navigate(`/editor/${newRoomId()}`, { state: { userName: user?.name || '', role: 'editor' } });
 
-    const avatar = user?.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.name || 'U')}&background=1C1C19&color=E8E6DF`;
 
     return (
         <Shell
             homeTo="/dashboard"
             links={NAV}
-            legal={LEGAL}
+            columns={COLUMNS}
             holdHeader={userMenu || notifOpen}
             stripLeft={<>
                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
-                    <span className={`u-dot${online ? '' : ' u-dot--bad'}`} />
-                    {online ? 'Connected' : 'Offline'}
+                    <span className={`u-dot${!online || backend.status === 'down' ? ' u-dot--bad' : backend.status === 'up' ? '' : ' u-dot--warn'}`} />
+                    {online ? backendLabel(backend) : 'Offline'}
                 </span>
                 <span className="u-strip-hide u-ellipsis">Signed in as {user?.email || user?.name || 'you'}</span>
             </>}
@@ -109,7 +116,7 @@ const AppLayout = ({ children }) => {
                 </button>
                 <div ref={userRef} style={{ position: 'relative' }}>
                     <button className="u-avatar" onClick={() => setUserMenu((v) => !v)} aria-label="Account menu" aria-expanded={userMenu}>
-                        <img src={avatar} alt="" />
+                        <Avatar name={user?.name || user?.email || ''} photoURL={user?.photoURL} size={34} title="" />
                     </button>
                     {userMenu && (
                         <div className="u-pop" role="menu">
@@ -134,7 +141,7 @@ const AppLayout = ({ children }) => {
                     <button className="u-btn u-btn--ghost" onClick={signOut}><LogOut size={16} /> Sign out</button>
                 </div>
             </>}
-            footerExtra={<button onClick={startRoom}>New room</button>}
+            footerCta={<button className="u-btn u-btn--solid u-btn--lg" onClick={startRoom}><Plus size={16} /> New room</button>}
             after={<SearchModal isOpen={searchOpen} onClose={closeSearch} />}
         >
             {children}

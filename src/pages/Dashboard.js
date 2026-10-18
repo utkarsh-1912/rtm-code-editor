@@ -492,7 +492,7 @@ const Dashboard = () => {
                         {TEMPLATES.map(({ id, name, desc, icon: Icon }) => (
                             <button type="button" key={id} className={`u-tile${form.type === id ? ' on' : ''}`} onClick={() => setForm({ ...form, type: id })} aria-pressed={form.type === id}>
                                 <span className="u-tile-ico"><Icon size={17} /></span>
-                                <span><b>{name}</b><span>{desc}</span></span>
+                                <span className="u-tile-copy"><b>{name}</b><span className="u-tile-desc">{desc}</span></span>
                             </button>
                         ))}
                     </div>
