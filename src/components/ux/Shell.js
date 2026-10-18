@@ -4,6 +4,7 @@ import { Menu, X, Sun, Moon } from "lucide-react";
 import Logo from "../Logo";
 import { useReveal, useClock, localCity } from "./primitives";
 import { getThemePref, resolveTheme, setThemePref } from "../../utils/theme";
+import { useBackend, backendLabel } from "../../context/BackendContext";
 import "../../styles/site.css";
 import "../../styles/app.css";
 
@@ -57,6 +58,51 @@ export function useThemeToggle() {
     return [isLight, toggle];
 }
 
+// One line of display type scaled to exactly fill its container width.
+function FitLine({ className, children }) {
+    const boxRef = useRef(null);
+    const textRef = useRef(null);
+    useEffect(() => {
+        const box = boxRef.current;
+        const text = textRef.current;
+        if (!box || !text) return undefined;
+        const fit = () => {
+            text.style.fontSize = "100px";
+            const ratio = box.clientWidth / text.scrollWidth;
+            text.style.fontSize = `${Math.max(24, Math.floor(100 * ratio * 0.995))}px`;
+        };
+        let frame = 0;
+        const schedule = () => { cancelAnimationFrame(frame); frame = requestAnimationFrame(fit); };
+        fit();
+        const ro = new ResizeObserver(schedule);
+        ro.observe(box);
+        document.fonts?.ready.then(schedule);
+        return () => { ro.disconnect(); cancelAnimationFrame(frame); };
+    }, []);
+    return (
+        <div className={className} ref={boxRef} aria-hidden="true">
+            <span ref={textRef} className="f-word-line">{children}</span>
+        </div>
+    );
+}
+
+// Dark / light / system segmented switch for footers and settings.
+export function ThemeSwitch() {
+    const [pref, setPref] = useState(getThemePref);
+    useEffect(() => {
+        const sync = () => setPref(getThemePref());
+        window.addEventListener("app-theme-change", sync);
+        return () => window.removeEventListener("app-theme-change", sync);
+    }, []);
+    return (
+        <div className="u-seg f-theme" role="radiogroup" aria-label="Theme">
+            {[["dark", "Dark"], ["light", "Light"], ["system", "Auto"]].map(([id, label]) => (
+                <button key={id} role="radio" aria-checked={pref === id} className={pref === id ? "on" : ""} onClick={() => { setThemePref(id); setPref(id); }}>{label}</button>
+            ))}
+        </div>
+    );
+}
+
 export function ThemeButton({ className = "u-icon" }) {
     const [isLight, toggle] = useThemeToggle();
     return (
@@ -68,12 +114,13 @@ export function ThemeButton({ className = "u-icon" }) {
 
 /**
  * Page chrome shared by the public site and the signed-in app:
- * mono status strip, hide-on-scroll nav, full-screen mobile menu, giant-link footer.
+ * mono status strip, hide-on-scroll nav, full-screen mobile menu, structured footer.
  */
 export default function Shell({
     homeTo = "/", links = [], stripLeft, stripRight, right, holdHeader = false,
-    sheetFoot, footerLinks = links, footerExtra, footerNote, legal = [], children, after, mainClass = "u-main",
+    sheetFoot, columns = [], footerCta, children, after, mainClass = "u-main",
 }) {
+    const backend = useBackend();
     const location = useLocation();
     const rootRef = useRef(null);
     const [sheetOpen, setSheetOpen] = useState(false);
@@ -149,17 +196,43 @@ export default function Shell({
 
             <footer className="u-foot">
                 <div className="u-foot-in">
-                    {footerNote}
-                    <nav className="u-foot-links" aria-label="Footer">
-                        {footerLinks.map(({ to, label, end }) => (
-                            <NavLink key={to} to={to} end={end} className={({ isActive }) => (isActive ? "active" : "")}>{label}</NavLink>
+                    <div className="f-top">
+                        <p className="u-lede"><b>Code together, remotely.</b> Rooms, projects and snippets in one place.</p>
+                        {footerCta && <div className="f-cta">{footerCta}</div>}
+                    </div>
+
+                    <div className="f-cols">
+                        {columns.map((col) => (
+                            <nav key={col.title} aria-label={col.title}>
+                                <span className="u-label">{col.title}</span>
+                                <ul>
+                                    {col.links.map(([label, to]) => (
+                                        <li key={to}>
+                                            {/^https?:/.test(to)
+                                                ? <a href={to} target="_blank" rel="noreferrer" className="u-ul">{label} ↗</a>
+                                                : <NavLink to={to} className={({ isActive }) => `u-ul${isActive ? " on" : ""}`}>{label}</NavLink>}
+                                        </li>
+                                    ))}
+                                </ul>
+                            </nav>
                         ))}
-                        {footerExtra}
-                    </nav>
+                        <div className="f-status">
+                            <span className="u-label">System</span>
+                            <Link to="/status" className="f-stat">
+                                <span className={`u-dot${backend.status === "up" ? "" : backend.status === "down" ? " u-dot--bad" : " u-dot--warn"}`} />
+                                {backendLabel(backend)}
+                            </Link>
+                            <span className="u-label">{backend.latency != null ? `API ${backend.latency} ms` : "Checking the API"}</span>
+                            <ThemeSwitch />
+                        </div>
+                    </div>
+
+                    <FitLine className="f-word"><span>Utkristi</span> <span className="u-faint">CoLabs</span></FitLine>
+
                     <div className="u-foot-bottom">
-                        <span>&copy; {now.getFullYear()} Utkristi CoLabs · {localCity()} {time}</span>
+                        <span>&copy; {now.getFullYear()} Utkristi CoLabs · Built by Utkristi.io</span>
                         <span style={{ display: "flex", gap: 18, flexWrap: "wrap" }}>
-                            {legal.map(([label, to]) => <Link key={to} to={to}>{label}</Link>)}
+                            <span>{localCity()} {time}</span>
                             <button onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}>Back to top ↑</button>
                         </span>
                     </div>

@@ -1,5 +1,5 @@
 import React from "react";
-import { Modal } from "./ux/primitives";
+import { Modal, Slider } from "./ux/primitives";
 
 const Seg = ({ value, options, onChange, label }) => (
     <div className="u-seg" role="radiogroup" aria-label={label} style={{ width: "100%" }}>
@@ -24,8 +24,11 @@ export default function SettingsModal({ isOpen, onClose, settings, onSettingsCha
             footer={<button type="button" className="u-btn u-btn--solid" onClick={onClose}>Done</button>}
         >
             <div className="u-field">
-                <span className="u-field-label">Font size</span>
-                <Seg label="Font size" value={settings.fontSize || 16} onChange={(v) => set("fontSize", v)} options={[12, 14, 16, 18, 20, 24].map((n) => [n, n])} />
+                <span className="u-field-label" style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+                    Font size
+                    <span className="u-mono" style={{ fontSize: settings.fontSize || 16, lineHeight: 1, color: "var(--u-ink)" }}>Aa</span>
+                </span>
+                <Slider id="font-size" label="Editor font size" min={10} max={28} value={settings.fontSize || 16} onChange={(v) => set("fontSize", v)} marks={[10, 14, 16, 20, 24, 28]} format={(v) => `${v}px`} />
             </div>
             <div className="u-field">
                 <span className="u-field-label">Tab size</span>

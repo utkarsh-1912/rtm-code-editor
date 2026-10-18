@@ -16,6 +16,8 @@ import { Toaster } from "react-hot-toast";
 import { applyTheme, getThemePref } from "./utils/theme";
 
 import { AuthProvider } from "./context/AuthContext";
+import { BackendProvider } from "./context/BackendContext";
+import ServerWake from "./components/ux/ServerWake";
 import Login from "./pages/Login";
 import SignUp from "./pages/SignUp";
 import Dashboard from "./pages/Dashboard";
@@ -31,15 +33,6 @@ import ErrorBoundary from "./components/ErrorBoundary";
 function App() {
   useEffect(() => {
     // Global Wake-up: Ping the backend to start spin-up on Render
-    const getBackendUrl = () => {
-      let url = process.env.REACT_APP_BACKEND_URL || window.location.origin;
-      if (url.endsWith("/")) url = url.slice(0, -1);
-      if (url === "https:" || url === "http:") url = window.location.origin;
-      return url;
-    };
-    const backendUrl = getBackendUrl();
-    fetch(`${backendUrl}/api/ping`).catch(() => { });
-
     applyTheme();
     // Follow the OS while the preference is "system"
     const mq = window.matchMedia ? window.matchMedia("(prefers-color-scheme: light)") : null;
@@ -50,8 +43,10 @@ function App() {
 
   return (
     <ErrorBoundary>
+      <BackendProvider>
       <AuthProvider>
         <OfflineBanner />
+        <ServerWake />
         <div>
           <Toaster
             position="top-right"
@@ -87,6 +82,7 @@ function App() {
           </Routes>
         </BrowserRouter>
       </AuthProvider>
+      </BackendProvider>
     </ErrorBoundary>
   );
 }

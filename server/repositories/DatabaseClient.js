@@ -20,6 +20,7 @@ async function initializeSchema() {
             bio TEXT DEFAULT '',
             social_links JSONB DEFAULT '{}'::jsonb,
             last_room_id VARCHAR(255),
+            photo_url TEXT,
             created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
         );
         `;
@@ -167,6 +168,12 @@ async function initializeSchema() {
         // Ensure missing columns exist for backward compatibility with existing databases
         await sql`ALTER TABLE sessions ADD COLUMN IF NOT EXISTS session_id VARCHAR(255);`;
         await sql`ALTER TABLE rooms ADD COLUMN IF NOT EXISTS name VARCHAR(255);`;
+        // users created before these columns existed (CREATE TABLE IF NOT EXISTS never adds columns)
+        await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS bio TEXT DEFAULT '';`;
+        await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS social_links JSONB DEFAULT '{}'::jsonb;`;
+        await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS last_room_id VARCHAR(255);`;
+        await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS is_unsubscribed BOOLEAN DEFAULT FALSE;`;
+        await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS photo_url TEXT;`;
 
         console.log("Database schema initialized successfully.");
     } catch (err) {

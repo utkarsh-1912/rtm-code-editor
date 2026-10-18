@@ -1,0 +1,219 @@
+{
+  "_comment": "Single source of truth for runnable languages. Used by the web app (src/utils/languages.js) and the code runner (server/runner/languages.js). judge0Id = Judge0 CE language id.",
+  "languages": [
+    {
+      "id": "javascript",
+      "label": "JavaScript",
+      "runtime": "Node.js",
+      "judge0Id": 63,
+      "file": "main.js",
+      "ext": [
+        "js",
+        "mjs",
+        "cjs",
+        "jsx"
+      ],
+      "short": "js",
+      "template": "// JavaScript (Node.js)\nconst name = require('fs').readFileSync(0, 'utf8').trim() || 'world';\nconsole.log(`Hello, ${name}!`);\n"
+    },
+    {
+      "id": "typescript",
+      "label": "TypeScript",
+      "runtime": "TypeScript",
+      "judge0Id": 74,
+      "file": "main.ts",
+      "ext": [
+        "ts",
+        "tsx"
+      ],
+      "short": "ts",
+      "template": "// TypeScript\nconst greet = (name: string): string => `Hello, ${name}!`;\nconsole.log(greet('world'));\n"
+    },
+    {
+      "id": "python",
+      "label": "Python",
+      "runtime": "Python 3",
+      "judge0Id": 71,
+      "file": "main.py",
+      "ext": [
+        "py"
+      ],
+      "short": "py",
+      "template": "# Python 3\ndef main():\n    print(\"Hello, world!\")\n\n\nif __name__ == \"__main__\":\n    main()\n"
+    },
+    {
+      "id": "java",
+      "label": "Java",
+      "runtime": "OpenJDK",
+      "judge0Id": 62,
+      "file": "Main.java",
+      "ext": [
+        "java"
+      ],
+      "short": "jv",
+      "template": "public class Main {\n    public static void main(String[] args) {\n        System.out.println(\"Hello, world!\");\n    }\n}\n"
+    },
+    {
+      "id": "c",
+      "label": "C",
+      "runtime": "GCC",
+      "judge0Id": 50,
+      "file": "main.c",
+      "ext": [
+        "c"
+      ],
+      "short": "c",
+      "template": "#include <stdio.h>\n\nint main(void) {\n    printf(\"Hello, world!\\n\");\n    return 0;\n}\n"
+    },
+    {
+      "id": "cpp",
+      "label": "C++",
+      "runtime": "GCC",
+      "judge0Id": 54,
+      "file": "main.cpp",
+      "ext": [
+        "cpp",
+        "cc",
+        "cxx",
+        "hpp",
+        "h"
+      ],
+      "short": "c++",
+      "template": "#include <iostream>\n\nint main() {\n    std::cout << \"Hello, world!\" << std::endl;\n    return 0;\n}\n"
+    },
+    {
+      "id": "csharp",
+      "label": "C#",
+      "runtime": "Mono",
+      "judge0Id": 51,
+      "file": "Main.cs",
+      "ext": [
+        "cs"
+      ],
+      "short": "c#",
+      "template": "using System;\n\nclass Program {\n    static void Main() {\n        Console.WriteLine(\"Hello, world!\");\n    }\n}\n"
+    },
+    {
+      "id": "go",
+      "label": "Go",
+      "runtime": "Go",
+      "judge0Id": 60,
+      "file": "main.go",
+      "ext": [
+        "go"
+      ],
+      "short": "go",
+      "template": "package main\n\nimport \"fmt\"\n\nfunc main() {\n\tfmt.Println(\"Hello, world!\")\n}\n"
+    },
+    {
+      "id": "rust",
+      "label": "Rust",
+      "runtime": "rustc",
+      "judge0Id": 73,
+      "file": "main.rs",
+      "ext": [
+        "rs"
+      ],
+      "short": "rs",
+      "template": "fn main() {\n    println!(\"Hello, world!\");\n}\n"
+    },
+    {
+      "id": "kotlin",
+      "label": "Kotlin",
+      "runtime": "Kotlin",
+      "judge0Id": 78,
+      "file": "Main.kt",
+      "ext": [
+        "kt",
+        "kts"
+      ],
+      "short": "kt",
+      "template": "fun main() {\n    println(\"Hello, world!\")\n}\n"
+    },
+    {
+      "id": "php",
+      "label": "PHP",
+      "runtime": "PHP",
+      "judge0Id": 68,
+      "file": "main.php",
+      "ext": [
+        "php"
+      ],
+      "short": "php",
+      "template": "<?php\necho \"Hello, world!\\n\";\n"
+    },
+    {
+      "id": "ruby",
+      "label": "Ruby",
+      "runtime": "Ruby",
+      "judge0Id": 72,
+      "file": "main.rb",
+      "ext": [
+        "rb"
+      ],
+      "short": "rb",
+      "template": "puts \"Hello, world!\"\n"
+    },
+    {
+      "id": "swift",
+      "label": "Swift",
+      "runtime": "Swift",
+      "judge0Id": 83,
+      "file": "main.swift",
+      "ext": [
+        "swift"
+      ],
+      "short": "sw",
+      "template": "print(\"Hello, world!\")\n"
+    },
+    {
+      "id": "bash",
+      "label": "Bash",
+      "runtime": "Bash",
+      "judge0Id": 46,
+      "file": "main.sh",
+      "ext": [
+        "sh",
+        "bash"
+      ],
+      "short": "sh",
+      "template": "#!/usr/bin/env bash\necho \"Hello, world!\"\n"
+    },
+    {
+      "id": "lua",
+      "label": "Lua",
+      "runtime": "Lua",
+      "judge0Id": 64,
+      "file": "main.lua",
+      "ext": [
+        "lua"
+      ],
+      "short": "lua",
+      "template": "print(\"Hello, world!\")\n"
+    },
+    {
+      "id": "r",
+      "label": "R",
+      "runtime": "R",
+      "judge0Id": 80,
+      "file": "main.r",
+      "ext": [
+        "r"
+      ],
+      "short": "r",
+      "template": "cat(\"Hello, world!\\n\")\n"
+    },
+    {
+      "id": "sql",
+      "label": "SQL",
+      "runtime": "SQLite",
+      "judge0Id": 82,
+      "file": "main.sql",
+      "ext": [
+        "sql"
+      ],
+      "short": "sql",
+      "template": "CREATE TABLE people (name TEXT, role TEXT);\nINSERT INTO people VALUES ('Ada', 'engineer'), ('Grace', 'admiral');\nSELECT name, role FROM people ORDER BY name;\n"
+    }
+  ]
+}

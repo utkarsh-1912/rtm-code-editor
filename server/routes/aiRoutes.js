@@ -3,27 +3,26 @@ const router = express.Router();
 const AICopilotService = require('../services/AICopilotService');
 const AnalyticsRepository = require('../repositories/AnalyticsRepository');
 
-// AI Copilot endpoint
+// AI copilot: the client builds the prompt; the server forwards it to its model.
 router.post('/copilot', async (req, res) => {
     try {
-        const { action, code, language, prompt, error, roomId, projectId, userId } = req.body;
-        const result = await AICopilotService.processCopilotRequest({ action, code, language, prompt, error });
+        const { action, messages, language, roomId, projectId, userId } = req.body || {};
+        const { text, model } = await AICopilotService.complete({ messages });
 
-        // Log AI action in analytics
         if (roomId || projectId) {
             AnalyticsRepository.logActivity({
                 userId,
                 roomId,
                 projectId,
                 actionType: 'AI_PROMPT',
-                metadata: { action, language }
+                metadata: { action, language, model }
             }).catch(() => { });
         }
 
-        res.json({ success: true, result });
+        res.json({ success: true, text, model });
     } catch (err) {
-        console.error("AI Copilot Error:", err);
-        res.status(500).json({ error: err.message });
+        console.error("AI Copilot Error:", err.message);
+        res.status(err.status || 500).json({ success: false, error: err.message });
     }
 });
 

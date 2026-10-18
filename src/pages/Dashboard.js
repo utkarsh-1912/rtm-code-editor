@@ -1,28 +1,23 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Plus, Search, MoreHorizontal, Pencil, Trash2, Folder, Terminal, Globe, FileCode, Coffee, Link2, ArrowUpRight, ArrowRight, Check, Sparkles, RotateCcw, Code2 } from 'lucide-react';
+import { Plus, Search, MoreHorizontal, Pencil, Trash2, Folder, Terminal, Link2, ArrowUpRight, ArrowRight, Check, Sparkles, RotateCcw, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
 import AppLayout from '../components/AppLayout';
 import SpaceLoader from '../components/SpaceLoader';
 import { getBackendUrl } from '../utils/api';
 import useWorkspace, { itemDate, mergeActivity } from '../components/ux/useWorkspace';
-import { Modal, RollingNumber, newRoomId, timeAgo, greeting, extractRoomId, pad2 } from '../components/ux/primitives';
+import { Modal, RollingNumber, newRoomId, timeAgo, greeting, extractRoomId } from '../components/ux/primitives';
+import { LANGS } from '../utils/languages';
 
+// Project templates: a web app (live preview) plus every runnable language.
 const TEMPLATES = [
-    { id: 'web', name: 'Web starter', desc: 'html · css · js', icon: Globe },
-    { id: 'cpp', name: 'C++ console', desc: 'main.cpp', icon: Terminal },
-    { id: 'python', name: 'Python script', desc: 'main.py', icon: FileCode },
-    { id: 'java', name: 'Java class', desc: 'Main.java', icon: Coffee },
+    { id: 'web', name: 'Web app', desc: 'html · css · js, live preview', short: 'web' },
+    ...LANGS.map((l) => ({ id: l.id, name: l.label, desc: l.file, short: l.short })),
 ];
 
 const DAYS = 14;
 
-const STEPS = [
-    { title: 'Create', copy: 'One click makes a private room with its own link. Nothing to install.' },
-    { title: 'Share', copy: 'Send the link. Teammates join with just a name, even before they sign up.' },
-    { title: 'Build', copy: 'Edit, talk, draw and run code in the same room, live.' },
-];
 
 // Item count per day for the last DAYS days, oldest first.
 const activityByDay = (items) => {
@@ -74,10 +69,11 @@ const Dashboard = () => {
     const [createOpen, setCreateOpen] = useState(false);
     const [form, setForm] = useState({ name: '', description: '', type: 'web' });
     const [busy, setBusy] = useState(false);
+    const [tplQuery, setTplQuery] = useState('');
     const [roomInput, setRoomInput] = useState('');
     const [snippetCount, setSnippetCount] = useState(null);
-    const [step, setStep] = useState(0);
-    const [autoStep, setAutoStep] = useState(true);
+    const [setupHidden, setSetupHidden] = useState(() => { try { return localStorage.getItem('db-setup-hidden') === '1'; } catch { return false; } });
+    const searchRef = useRef(null);
     const profiled = useRef(false);
 
     // Invite links land on /?room=…; "/" forwards here with the query intact.
@@ -96,11 +92,21 @@ const Dashboard = () => {
             .catch(() => setSnippetCount(null));
     }, [user?.uid, refreshProfile]);
 
+    // "/" jumps to search, like most enterprise tools.
     useEffect(() => {
-        if (!autoStep) return undefined;
-        const id = setTimeout(() => setStep((v) => (v + 1) % STEPS.length), 5000);
-        return () => clearTimeout(id);
-    }, [step, autoStep]);
+        const onKey = (e) => {
+            if (e.key !== '/' || e.ctrlKey || e.metaKey || ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName)) return;
+            e.preventDefault();
+            searchRef.current?.focus();
+        };
+        window.addEventListener('keydown', onKey);
+        return () => window.removeEventListener('keydown', onKey);
+    }, []);
+
+    const hideSetup = () => {
+        setSetupHidden(true);
+        try { localStorage.setItem('db-setup-hidden', '1'); } catch { /* storage blocked */ }
+    };
 
     useEffect(() => {
         if (!loading && !user) navigate('/login');
@@ -135,7 +141,6 @@ const Dashboard = () => {
 
     const bars = useMemo(() => activityByDay([...rooms, ...projects]), [rooms, projects]);
     const maxBar = Math.max(1, ...bars);
-    const latest = mergeActivity(rooms, projects)[0];
 
     const enterRoom = (id, role = 'editor') => navigate(`/editor/${id}`, { state: { userName: user?.name || '', role } });
 
@@ -153,7 +158,7 @@ const Dashboard = () => {
 
     const copyRoomLink = async (id) => {
         try {
-            await navigator.clipboard.writeText(`${window.location.origin}/?room=${id}`);
+            await navigator.clipboard.writeText(`${window.location.origin}/editor/${encodeURIComponent(id)}`);
             toast.success('Room link copied');
         } catch {
             toast.error('Could not copy link');
@@ -227,243 +232,166 @@ const Dashboard = () => {
 
     if (loading || !user) return <SpaceLoader />;
 
-    const statItems = [
-        { label: 'Projects', value: projects.length, note: 'Multi-file workspaces' },
-        { label: 'Rooms', value: stats.totalRooms || rooms.length, note: 'Rooms you have opened' },
-        { label: 'Sessions', value: stats.sessions || rooms.length, note: 'Times you joined a room' },
-        { label: 'Hours', value: stats.hours || 0, suffix: 'h', note: 'Spent coding together' },
-    ];
-
     const first = (user?.name || user?.email || 'there').split(/[\s@]/)[0];
     const today = new Date().toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' });
+    const touched = bars.reduce((a, b) => a + b, 0);
 
     const checklist = [
-        { text: 'Open your first room', done: rooms.length > 0 },
-        { text: 'Create a project', done: projects.length > 0 },
-        { text: 'Spend an hour pairing', done: (stats.hours || 0) >= 1 },
+        { text: 'Open your first room', done: rooms.length > 0, run: () => enterRoom(newRoomId()) },
+        { text: 'Create a project', done: projects.length > 0, run: () => setCreateOpen(true) },
+        { text: 'Save a snippet', done: (snippetCount || 0) > 0, run: () => navigate('/snippets') },
     ];
+    const setupLeft = checklist.filter((c) => !c.done).length;
+
+    const kpis = [
+        { label: 'Projects', value: projects.length, to: () => setView('projects') },
+        { label: 'Rooms', value: stats.totalRooms || rooms.length, to: () => setView('rooms') },
+        { label: 'Snippets', value: snippetCount ?? 0, to: () => navigate('/snippets') },
+        { label: 'Hours pairing', value: stats.hours || 0, suffix: 'h' },
+    ];
+
+    const counts = { all: rooms.length + projects.length, rooms: rooms.length, projects: projects.length };
 
     return (
         <AppLayout>
-            <div className="h-top" data-rise>
-                <span className="u-label">{greeting()} · {today}</span>
-                <span className="u-label"><span className="u-dot" /> Workspace synced</span>
-            </div>
-
-            <h1 className="u-display u-giant h-name u-lines">
-                <span><span style={{ '--d': '60ms' }}>Hello,</span></span>
-                <span><span style={{ '--d': '160ms' }}>{first}<span className="u-faint">.</span></span></span>
-            </h1>
-
-            <div className="h-grid">
-                <section className="u-pane h-pane h-start" data-rise aria-label="Start or join a room">
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
-                        <span className="u-label">Instant room</span>
-                        <span className="u-label">{pad2(step + 1)} of {pad2(STEPS.length)}</span>
-                    </div>
-                    <h2>Start a room. <span>Share the link and everyone codes together.</span></h2>
-
-                    <form className="h-join" onSubmit={joinRoom}>
-                        <input
-                            className="u-input"
-                            value={roomInput}
-                            onChange={(e) => setRoomInput(e.target.value)}
-                            placeholder="Paste a room ID or invite link"
-                            aria-label="Room ID or invite link"
-                        />
-                        <button type="submit" className="u-btn u-btn--ghost u-btn--lg">Join <ArrowRight size={16} /></button>
-                    </form>
-
-                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                        <button className="u-btn u-btn--solid u-btn--lg" onClick={() => enterRoom(newRoomId())}>
-                            <Plus size={17} /> Create a new room
-                        </button>
-                    </div>
-
-                    {user?.last_room_id && (
-                        <div className="h-resume" onClick={() => enterRoom(user.last_room_id)} role="button" tabIndex={0}
-                            onKeyDown={(e) => e.key === 'Enter' && enterRoom(user.last_room_id)}>
-                            <RotateCcw size={18} />
-                            <div style={{ flex: 1, minWidth: 0 }}>
-                                <div style={{ fontSize: 14, fontWeight: 500 }}>Continue where you left off</div>
-                                <div className="u-mono u-muted" style={{ fontSize: 12 }}>room/{user.last_room_id}</div>
-                            </div>
-                            <span className="u-circ u-circ--sm"><ArrowUpRight size={15} /></span>
-                        </div>
-                    )}
-
-                    <div className="h-start-foot">
-                        <p className="h-steps-copy" key={step}>{STEPS[step].copy}</p>
-                        <div className="u-steps" style={{ '--n': STEPS.length, '--dur': '5s' }}>
-                            {STEPS.map((s, i) => (
-                                <button
-                                    key={s.title}
-                                    className={`u-step${i === step ? ' on' : ''}${autoStep ? ' run' : ''}`}
-                                    onClick={() => { setStep(i); setAutoStep(false); }}
-                                >
-                                    <span className="u-label">{pad2(i + 1)}</span>
-                                    <b>{s.title}</b>
-                                </button>
-                            ))}
-                        </div>
-                    </div>
-                </section>
-
-                <div className="h-side">
-                    <button className="u-card h-card u-hover" data-rise style={{ '--d': '80ms' }} onClick={() => setCreateOpen(true)}>
-                        <span className="u-label"><Folder size={13} /> Project · {loadingData ? '…' : projects.length} so far</span>
-                        <div className="h-card-row">
-                            <div>
-                                <h3>New project</h3>
-                                <p>A multi-file workspace with preview, history and invites.</p>
-                            </div>
-                            <span className="u-circ"><ArrowUpRight size={17} /></span>
-                        </div>
-                    </button>
-                    <button className="u-card h-card u-hover" data-rise style={{ '--d': '160ms' }} onClick={() => navigate('/snippets')}>
-                        <span className="u-label"><Code2 size={13} /> Library · {snippetCount ?? '…'} snippets</span>
-                        <div className="h-card-row">
-                            <div>
-                                <h3>Snippets</h3>
-                                <p>Reusable code you can drop into any room.</p>
-                            </div>
-                            <span className="u-circ"><ArrowUpRight size={17} /></span>
-                        </div>
-                    </button>
+            <header className="db-head" data-rise>
+                <div>
+                    <span className="u-label">{greeting()} · {today}</span>
+                    <h1 className="db-title">Welcome back, {first}</h1>
                 </div>
-            </div>
-
-            <div className="u-section-head" data-rise style={{ marginTop: 'clamp(56px, 8vw, 96px)' }}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                    <span className="u-label">Your workspace</span>
-                    <p className="u-lede"><b>Everything you're building.</b> Rooms for quick sessions, projects that stick around.</p>
+                <div className="db-actions">
+                    <button className="u-btn u-btn--ghost" onClick={() => setCreateOpen(true)}><Folder size={16} /> New project</button>
+                    <button className="u-btn u-btn--solid" onClick={() => enterRoom(newRoomId())}><Plus size={16} /> New room</button>
                 </div>
-            </div>
+            </header>
 
-            <div className="u-stats" data-rise>
-                {statItems.map((s) => (
-                    <div className="u-stat" key={s.label}>
-                        <span className="u-label">{s.label}</span>
-                        {loadingData ? <span className="u-skel" style={{ height: 80, width: '60%' }} /> : <RollingNumber value={s.value} suffix={s.suffix} />}
-                        <p>{s.note}</p>
-                    </div>
+            <section className="u-card db-quick" data-rise aria-label="Join a room">
+                <form className="db-join" onSubmit={joinRoom}>
+                    <Link2 size={17} aria-hidden="true" />
+                    <input
+                        value={roomInput}
+                        onChange={(e) => setRoomInput(e.target.value)}
+                        placeholder="Paste a room link or ID to join"
+                        aria-label="Room link or ID"
+                    />
+                    <button type="submit" className="u-btn u-btn--solid u-btn--sm" disabled={!roomInput.trim()}>Join <ArrowRight size={14} /></button>
+                </form>
+                {user?.last_room_id && (
+                    <button className="db-resume" onClick={() => enterRoom(user.last_room_id)} title="Continue your last room">
+                        <RotateCcw size={14} /> Continue <span className="u-mono">room/{user.last_room_id}</span>
+                    </button>
+                )}
+            </section>
+
+            <div className="db-kpis" data-rise>
+                {kpis.map((k) => (
+                    <button key={k.label} className="db-kpi" onClick={k.to} disabled={!k.to}>
+                        <span className="u-label">{k.label}</span>
+                        {loadingData ? <span className="u-skel" style={{ height: 40, width: '50%' }} /> : <RollingNumber value={k.value} suffix={k.suffix} />}
+                    </button>
                 ))}
-            </div>
-
-            <section className="u-section" style={{ marginTop: 40 }} id="board">
-                <div className="u-sheetbox">
-                    <div className="d-board">
-                        <aside className="u-card d-side" aria-label="Filter">
-                            {[
-                                ['all', 'Everything', rooms.length + projects.length],
-                                ['rooms', 'Rooms', rooms.length],
-                                ['projects', 'Projects', projects.length],
-                            ].map(([id, label, count]) => (
-                                <button key={id} className={view === id && !lang ? 'on' : ''} onClick={() => { setView(id); setLang(null); }}>
-                                    {label} <em>{count}</em>
-                                </button>
-                            ))}
-                            {languages.length > 0 && <hr />}
-                            {languages.length > 0 && <span className="u-label">Room language</span>}
-                            {languages.map(([l, n]) => (
-                                <button key={l} className={lang === l ? 'on' : ''} onClick={() => { setLang(lang === l ? null : l); setView('rooms'); }}>
-                                    <span className="u-mono" style={{ fontSize: 12.5 }}>{l}</span> <em>{n}</em>
-                                </button>
-                            ))}
-                        </aside>
-
-                        <div className="u-card d-list">
-                            <div className="d-toolbar">
-                                <label className="u-search">
-                                    <Search size={15} />
-                                    <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder={`Search ${view === 'all' ? 'rooms and projects' : view}`} aria-label="Search" />
-                                </label>
-                                <div className="u-seg" role="tablist" aria-label="Sort">
-                                    <button className={sort === 'recent' ? 'on' : ''} onClick={() => setSort('recent')}>Recent</button>
-                                    <button className={sort === 'name' ? 'on' : ''} onClick={() => setSort('name')}>A–Z</button>
-                                </div>
-                            </div>
-
-                            {loadingData ? (
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: '6px 0' }}>
-                                    {[0, 1, 2, 3].map((i) => <div key={i} className="u-skel" style={{ height: 58 }} />)}
-                                </div>
-                            ) : items.length === 0 ? (
-                                <div className="u-empty">
-                                    <span className="u-display">{query ? 'No match' : 'Empty'}</span>
-                                    <p>{query ? `Nothing matches “${query}”.` : view === 'projects' ? 'No projects yet. Start one to keep files, history and teammates together.' : 'No rooms yet. Start one and share the link.'}</p>
-                                    {!query && (view === 'projects'
-                                        ? <button className="u-btn u-btn--solid" onClick={() => setCreateOpen(true)}><Plus size={16} /> New project</button>
-                                        : <button className="u-btn u-btn--solid" onClick={() => navigate(`/editor/${newRoomId()}`)}><Plus size={16} /> New room</button>)}
-                                </div>
-                            ) : (
-                                <ul className="u-rows">
-                                    {items.map((item) => {
-                                        const isProject = item.kind === 'project';
-                                        const key = `${item.kind}-${item.id}`;
-                                        const when = itemDate(item);
-                                        return (
-                                            <li key={key} className="u-row d-row" tabIndex={0} onClick={() => openItem(item)} onKeyDown={(e) => e.key === 'Enter' && openItem(item)}>
-                                                <span className="d-ico">{isProject ? <Folder size={17} /> : <Terminal size={17} />}</span>
-                                                <div className="u-row-main">
-                                                    <span className="u-row-title u-ellipsis">{item.name || item.id}</span>
-                                                    <span className="u-row-meta">
-                                                        <span className="u-chip u-chip--mono">{isProject ? (item.type || 'project') : (item.lang || 'room')}</span>
-                                                        <span className="u-mono u-ellipsis">{isProject ? (item.description || 'Multi-file project') : `room/${item.id}`}</span>
-                                                    </span>
-                                                </div>
-                                                <div className="u-row-side">
-                                                    <span className="u-row-when">{when ? timeAgo(when) : (item.lastActive || 'Just now').split(',')[0]}</span>
-                                                    <RowMenu open={menuFor === key} onToggle={(v) => setMenuFor(v ? key : null)}>
-                                                        <button onClick={() => { setMenuFor(null); openItem(item); }}><ArrowUpRight size={16} />Open</button>
-                                                        {!isProject && <button onClick={() => { setMenuFor(null); copyRoomLink(item.id); }}><Link2 size={16} />Copy invite link</button>}
-                                                        {!isProject && <button onClick={() => { setMenuFor(null); setRenameTarget(item); setNewName(item.name || ''); }}><Pencil size={16} />Rename</button>}
-                                                        <button className="danger" onClick={() => { setMenuFor(null); setDeleteTarget(item); }}><Trash2 size={16} />Delete</button>
-                                                    </RowMenu>
-                                                </div>
-                                            </li>
-                                        );
-                                    })}
-                                </ul>
-                            )}
-                        </div>
-
-                        <aside className="u-card d-read" aria-label="Summary">
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                                <h4><Sparkles size={15} /> The read</h4>
-                                {loadingData ? <span className="u-skel" style={{ height: 60 }} /> : latest ? (
-                                    <p>
-                                        You have <mark>{rooms.length} room{rooms.length === 1 ? '' : 's'}</mark> and <mark>{projects.length} project{projects.length === 1 ? '' : 's'}</mark>.
-                                        {' '}Most recent is <mark>{latest.name || latest.id}</mark>{itemDate(latest) ? `, ${timeAgo(itemDate(latest))}` : ''}.
-                                        {languages[0] && <> You mostly write <mark>{languages[0][0]}</mark>.</>}
-                                    </p>
-                                ) : <p>Nothing here yet. Start a room and it will show up in this list.</p>}
-                            </div>
-
-                            <div>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 10 }}>
-                                    <span className="u-label">Activity · {DAYS} days</span>
-                                    <span className="u-label">{bars.reduce((a, b) => a + b, 0)}</span>
-                                </div>
-                                <div className="d-bars" aria-label="Rooms and projects touched per day">
-                                    {bars.map((n, i) => (
-                                        <i key={i} className={n === 0 ? 'zero' : ''} title={`${n}`} style={{ height: `${n === 0 ? 100 : Math.max(8, (n / maxBar) * 100)}%`, '--d': `${i * 35}ms`, opacity: n === 0 ? 0.6 : 1 }} />
-                                    ))}
-                                </div>
-                                <div className="d-bars-x"><span>{DAYS}d ago</span><span>today</span></div>
-                            </div>
-
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                                <span className="u-label">Getting started</span>
-                                <ul className="d-check">
-                                    {checklist.map((c) => (
-                                        <li key={c.text} className={c.done ? 'done' : ''}><i>{c.done && <Check size={11} strokeWidth={3} />}</i>{c.text}</li>
-                                    ))}
-                                </ul>
-                            </div>
-                        </aside>
+                <div className="db-kpi db-kpi--spark" aria-label={`${touched} rooms and projects active in the last ${DAYS} days`}>
+                    <span className="u-label">Last {DAYS} days · {touched}</span>
+                    <div className="d-bars db-spark">
+                        {bars.map((n, i) => (
+                            <i key={i} className={n === 0 ? 'zero' : ''} title={`${n}`} style={{ height: `${n === 0 ? 100 : Math.max(10, (n / maxBar) * 100)}%`, '--d': `${i * 25}ms` }} />
+                        ))}
                     </div>
                 </div>
+            </div>
+
+            {setupLeft > 0 && !setupHidden && !loadingData && (
+                <div className="db-setup" data-rise>
+                    <span className="u-label"><Sparkles size={13} /> Getting started · {checklist.length - setupLeft}/{checklist.length}</span>
+                    <div className="db-setup-items">
+                        {checklist.map((c) => (
+                            <button key={c.text} className={`u-chip${c.done ? ' done' : ''}`} onClick={c.done ? undefined : c.run} disabled={c.done}>
+                                {c.done ? <Check size={12} /> : <span className="db-ring" />} {c.text}
+                            </button>
+                        ))}
+                    </div>
+                    <button className="u-icon" onClick={hideSetup} aria-label="Hide getting started"><X size={15} /></button>
+                </div>
+            )}
+
+            <section className="u-card db-table" data-rise aria-label="Rooms and projects">
+                <div className="db-toolbar">
+                    <div className="u-seg" role="tablist" aria-label="Show">
+                        {[['all', 'All'], ['rooms', 'Rooms'], ['projects', 'Projects']].map(([id, label]) => (
+                            <button key={id} role="tab" aria-selected={view === id} className={view === id ? 'on' : ''} onClick={() => { setView(id); if (id === 'projects') setLang(null); }}>
+                                {label} <em>{counts[id]}</em>
+                            </button>
+                        ))}
+                    </div>
+                    {languages.length > 1 && view !== 'projects' && (
+                        <select className="u-select db-lang" value={lang || ''} onChange={(e) => setLang(e.target.value || null)} aria-label="Room language">
+                            <option value="">Any language</option>
+                            {languages.map(([l, n]) => <option key={l} value={l}>{l} ({n})</option>)}
+                        </select>
+                    )}
+                    <label className="u-search db-search">
+                        <Search size={15} />
+                        <input ref={searchRef} value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search" aria-label="Search rooms and projects" />
+                        <kbd>/</kbd>
+                    </label>
+                    <div className="u-seg" role="tablist" aria-label="Sort">
+                        <button className={sort === 'recent' ? 'on' : ''} onClick={() => setSort('recent')}>Recent</button>
+                        <button className={sort === 'name' ? 'on' : ''} onClick={() => setSort('name')}>A–Z</button>
+                    </div>
+                </div>
+
+                <div className="db-th" aria-hidden="true">
+                    <span />
+                    <span>Name</span>
+                    <span>Type</span>
+                    <span>Last active</span>
+                    <span />
+                </div>
+
+                {loadingData ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: 14 }}>
+                        {[0, 1, 2, 3].map((i) => <div key={i} className="u-skel" style={{ height: 48 }} />)}
+                    </div>
+                ) : items.length === 0 ? (
+                    <div className="u-empty" style={{ padding: '48px 20px' }}>
+                        <p><b>{query || lang ? 'Nothing matches.' : view === 'projects' ? 'No projects yet.' : 'Nothing here yet.'}</b> {query || lang ? 'Try another search or filter.' : view === 'projects' ? 'Projects keep files, history and teammates together.' : 'Start a room and share the link.'}</p>
+                        {!query && !lang && (view === 'projects'
+                            ? <button className="u-btn u-btn--solid u-btn--sm" onClick={() => setCreateOpen(true)}><Plus size={15} /> New project</button>
+                            : <button className="u-btn u-btn--solid u-btn--sm" onClick={() => enterRoom(newRoomId())}><Plus size={15} /> New room</button>)}
+                    </div>
+                ) : (
+                    <ul className="db-rows">
+                        {items.map((item) => {
+                            const isProject = item.kind === 'project';
+                            const key = `${item.kind}-${item.id}`;
+                            const when = itemDate(item);
+                            return (
+                                <li key={key} className="db-row" tabIndex={0} onClick={() => openItem(item)} onKeyDown={(e) => e.key === 'Enter' && openItem(item)}>
+                                    <span className="d-ico">{isProject ? <Folder size={16} /> : <Terminal size={16} />}</span>
+                                    <span className="db-name">
+                                        <b className="u-ellipsis">{item.name || item.id}</b>
+                                        <span className="u-mono u-ellipsis">{isProject ? (item.description || 'Project') : `room/${item.id}`}</span>
+                                    </span>
+                                    <span className="db-type"><span className="u-chip u-chip--mono">{isProject ? (item.type || 'project') : (item.lang || 'room')}</span></span>
+                                    <span className="db-when u-mono">{when ? timeAgo(when) : (item.lastActive || 'just now').split(',')[0]}</span>
+                                    <span className="db-row-actions" onClick={(e) => e.stopPropagation()}>
+                                        {!isProject && (
+                                            <button className="u-icon" onClick={() => copyRoomLink(item.id)} title="Copy invite link" aria-label={`Copy invite link for ${item.name || item.id}`}><Link2 size={15} /></button>
+                                        )}
+                                        <RowMenu open={menuFor === key} onToggle={(v) => setMenuFor(v ? key : null)}>
+                                            <button onClick={() => { setMenuFor(null); openItem(item); }}><ArrowUpRight size={16} />Open</button>
+                                            {!isProject && <button onClick={() => { setMenuFor(null); setRenameTarget(item); setNewName(item.name || ''); }}><Pencil size={16} />Rename</button>}
+                                            <button className="danger" onClick={() => { setMenuFor(null); setDeleteTarget(item); }}><Trash2 size={16} />{isProject ? 'Delete project' : 'Remove from list'}</button>
+                                        </RowMenu>
+                                    </span>
+                                </li>
+                            );
+                        })}
+                    </ul>
+                )}
+                {!loadingData && items.length > 0 && (
+                    <div className="db-foot u-label">Showing {items.length} of {counts[view]}{lang ? ` · ${lang}` : ''}</div>
+                )}
             </section>
 
             <Modal
@@ -487,12 +415,15 @@ const Dashboard = () => {
                     <input id="np-desc" className="u-input" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="One line about what it does" />
                 </div>
                 <div className="u-field">
-                    <span className="u-field-label">Template</span>
-                    <div className="u-tiles">
-                        {TEMPLATES.map(({ id, name, desc, icon: Icon }) => (
-                            <button type="button" key={id} className={`u-tile${form.type === id ? ' on' : ''}`} onClick={() => setForm({ ...form, type: id })} aria-pressed={form.type === id}>
-                                <span className="u-tile-ico"><Icon size={17} /></span>
-                                <span><b>{name}</b><span>{desc}</span></span>
+                    <span className="u-field-label" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
+                        Template
+                        <input className="u-input db-tpl-find" value={tplQuery} onChange={(e) => setTplQuery(e.target.value)} placeholder="Find a language" aria-label="Find a template" />
+                    </span>
+                    <div className="u-tiles db-tpls" role="radiogroup" aria-label="Template">
+                        {TEMPLATES.filter((t) => !tplQuery.trim() || `${t.name} ${t.desc}`.toLowerCase().includes(tplQuery.trim().toLowerCase())).map(({ id, name, desc, short }) => (
+                            <button type="button" key={id} role="radio" className={`u-tile${form.type === id ? ' on' : ''}`} onClick={() => setForm({ ...form, type: id })} aria-checked={form.type === id}>
+                                <span className="u-tile-ico u-mono">{short}</span>
+                                <span className="u-tile-copy"><b>{name}</b><span className="u-tile-desc">{desc}</span></span>
                             </button>
                         ))}
                     </div>

@@ -9,7 +9,9 @@
     "@codemirror/lang-cpp": "^6.0.3",
     "@codemirror/lang-html": "^6.4.11",
     "@codemirror/lang-javascript": "^6.2.5",
+    "@codemirror/lang-php": "^6.0.2",
     "@codemirror/lang-python": "^6.2.1",
+    "@codemirror/legacy-modes": "^6.5.5",
     "@codemirror/lint": "^6.9.5",
     "@neondatabase/serverless": "^1.0.2",
     "@replit/codemirror-emacs": "^6.1.0",
@@ -51,7 +53,9 @@
     "eject": "react-scripts eject",
     "server:dev": "npx kill-port 5000 && nodemon server.js",
     "server:prod": "node server.js",
-    "setup-db": "node scripts/initialize.js"
+    "setup-db": "node scripts/initialize.js",
+    "runner": "node server/runner/standalone.js",
+    "desktop": "npm --prefix desktop start"
   },
   "eslintConfig": {
     "extends": [

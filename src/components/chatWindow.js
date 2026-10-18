@@ -3,6 +3,7 @@ import { Send, Smile, Edit2, Trash2, X, Check } from "lucide-react";
 import { v4 as uuidv4 } from "uuid";
 import EmojiPicker, { SuggestionMode } from "emoji-picker-react";
 import ACTIONS from "../Action";
+import { Avatar } from "./clients";
 
 export default function ChatWindow({ socketRef, roomId, userName, isLightMode, isMobile, messages = [], setMessages }) {
     const [inputMsg, setInputMsg] = useState("");
@@ -74,77 +75,54 @@ export default function ChatWindow({ socketRef, roomId, userName, isLightMode, i
     };
 
     return (
-        <div style={{ display: "flex", flexDirection: "column", height: "100%", backgroundColor: "var(--bg-dark)", borderRight: "1px solid var(--border-color)", position: "relative" }}>
-
-            <div style={{ flex: 1, overflowY: "auto", padding: "16px", display: "flex", flexDirection: "column", gap: "12px" }}>
+        <div className="cw">
+            <div className="cw-list" role="log" aria-live="polite" aria-label="Chat messages">
                 {messages.length === 0 ? (
-                    <div style={{ height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-muted)", fontSize: "14px" }}>
-                        No messages yet. Say hi!
+                    <div className="cw-empty">
+                        <span className="u-label">Room chat</span>
+                        <p>No messages yet. Say hi to everyone in the room.</p>
                     </div>
                 ) : (
                     messages.map((msg, idx) => {
                         const isMe = msg.sender === userName;
                         const isEditingThis = editingMsgId === msg.id;
-
+                        const grouped = idx > 0 && messages[idx - 1].sender === msg.sender;
                         return (
-                            <div key={msg.id || idx} style={{ display: "flex", flexDirection: "column", alignItems: isMe ? "flex-end" : "flex-start" }}>
-                                <div style={{ display: "flex", alignItems: "baseline", gap: "8px", marginBottom: "4px" }}>
-                                    <span style={{ fontSize: "12px", fontWeight: "600", color: "var(--text-main)" }}>{isMe ? "You" : msg.sender}</span>
-                                    <span style={{ fontSize: "10px", color: "var(--text-muted)" }}>{msg.timestamp}</span>
-                                </div>
-                                <div style={{ position: "relative", display: "flex", alignItems: "center", gap: "8px", flexDirection: isMe ? "row-reverse" : "row", maxWidth: "100%" }}>
-
-                                    {isEditingThis ? (
-                                        <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
-                                            <input
-                                                autoFocus
-                                                type="text"
-                                                value={editMsgText}
-                                                onChange={(e) => setEditMsgText(e.target.value)}
-                                                onKeyDown={(e) => { if (e.key === 'Enter') handleEditMessage(msg.id); if (e.key === 'Escape') setEditingMsgId(null); }}
-                                                style={{ padding: "6px 10px", borderRadius: "8px", border: "1px solid var(--primary)", outline: "none", backgroundColor: "var(--bg-dark)", color: "var(--text-main)", fontSize: "14px", width: "100%" }}
-                                            />
-                                            <button onClick={() => handleEditMessage(msg.id)} style={{ background: "none", border: "none", color: "#4ade80", cursor: "pointer", padding: "4px" }}><Check size={14} /></button>
-                                            <button onClick={() => setEditingMsgId(null)} style={{ background: "none", border: "none", color: "#f87171", cursor: "pointer", padding: "4px" }}><X size={14} /></button>
-                                        </div>
-                                    ) : (
-                                        <div style={{
-                                            padding: "8px 12px",
-                                            borderRadius: "18px",
-                                            fontSize: "14px",
-                                            maxWidth: "80%",
-                                            width: "fit-content",
-                                            wordBreak: "break-word",
-                                            overflowWrap: "anywhere",
-                                            whiteSpace: "pre-wrap",
-                                            backgroundColor: isMe ? "var(--primary)" : "var(--secondary)",
-                                            color: isMe ? "white" : "var(--text-main)",
-                                            borderBottomRightRadius: isMe ? "4px" : "18px",
-                                            borderBottomLeftRadius: isMe ? "18px" : "4px",
-                                            border: isMe ? "none" : "1px solid var(--border-color)",
-                                            boxShadow: "0 2px 4px rgba(0,0,0,0.02)"
-                                        }}>
+                            <div key={msg.id || idx} className={`cw-msg${isMe ? " me" : ""}${grouped ? " grouped" : ""}`}>
+                                {!grouped && (
+                                    <div className="cw-meta">
+                                        <Avatar name={msg.sender} size={20} />
+                                        <b>{isMe ? "You" : msg.sender}</b>
+                                        <span>{msg.timestamp}</span>
+                                    </div>
+                                )}
+                                {isEditingThis ? (
+                                    <div className="cw-edit">
+                                        <input
+                                            autoFocus
+                                            className="u-input"
+                                            value={editMsgText}
+                                            onChange={(e) => setEditMsgText(e.target.value)}
+                                            onKeyDown={(e) => { if (e.key === 'Enter') handleEditMessage(msg.id); if (e.key === 'Escape') setEditingMsgId(null); }}
+                                            aria-label="Edit message"
+                                        />
+                                        <button className="u-icon" onClick={() => handleEditMessage(msg.id)} aria-label="Save edit"><Check size={15} /></button>
+                                        <button className="u-icon" onClick={() => setEditingMsgId(null)} aria-label="Cancel edit"><X size={15} /></button>
+                                    </div>
+                                ) : (
+                                    <div className="cw-row">
+                                        <div className="cw-bubble">
                                             {msg.text}
-                                            {msg.isEdited && <span style={{ fontSize: "10px", opacity: 0.7, marginLeft: "6px", fontStyle: "italic" }}>(edited)</span>}
+                                            {msg.isEdited && <em> (edited)</em>}
                                         </div>
-                                    )}
-
-                                    {/* Action Utilities (Edit/Delete) */}
-                                    {isMe && !isEditingThis && (
-                                        <div style={{ display: "flex", alignItems: "center", gap: "4px", opacity: 0.7 }}>
-                                            <button
-                                                onClick={() => { setEditingMsgId(msg.id); setEditMsgText(msg.text); }}
-                                                title="Edit Message"
-                                                style={{ background: "none", border: "none", color: "var(--text-muted)", cursor: "pointer", padding: "2px" }}
-                                            ><Edit2 size={12} /></button>
-                                            <button
-                                                onClick={() => handleDeleteMessage(msg.id)}
-                                                title="Delete Message"
-                                                style={{ background: "none", border: "none", color: "var(--text-muted)", cursor: "pointer", padding: "2px" }}
-                                            ><Trash2 size={12} /></button>
-                                        </div>
-                                    )}
-                                </div>
+                                        {isMe && (
+                                            <div className="cw-actions">
+                                                <button className="u-icon" onClick={() => { setEditingMsgId(msg.id); setEditMsgText(msg.text); }} aria-label="Edit message" title="Edit"><Edit2 size={13} /></button>
+                                                <button className="u-icon u-icon--danger" onClick={() => handleDeleteMessage(msg.id)} aria-label="Delete message" title="Delete"><Trash2 size={13} /></button>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
                             </div>
                         );
                     })
@@ -152,11 +130,9 @@ export default function ChatWindow({ socketRef, roomId, userName, isLightMode, i
                 <div ref={messagesEndRef} />
             </div>
 
-            <div style={{ padding: "12px", backgroundColor: "var(--bg-card)", borderTop: "1px solid var(--border-color)", position: "relative" }}>
-
-                {/* Emoji Picker Popup */}
+            <div className="cw-composer">
                 {showEmojiPicker && (
-                    <div ref={emojiPickerRef} style={{ position: "absolute", bottom: "70px", left: isMobile ? "10px" : "16px", zIndex: 100 }}>
+                    <div ref={emojiPickerRef} className="cw-emoji">
                         <EmojiPicker
                             onEmojiClick={handleEmojiClick}
                             theme={isLightMode ? "light" : "dark"}
@@ -166,61 +142,20 @@ export default function ChatWindow({ socketRef, roomId, userName, isLightMode, i
                         />
                     </div>
                 )}
-
-                <div style={{ position: "relative", display: "flex", alignItems: "center" }}>
-                    <button
-                        onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-                        style={{
-                            position: "absolute",
-                            left: "12px",
-                            background: "none",
-                            border: "none",
-                            color: showEmojiPicker ? "var(--primary)" : "var(--text-muted)",
-                            cursor: "pointer",
-                            padding: "4px",
-                            display: "flex",
-                            alignItems: "center"
-                        }}
-                    >
+                <div className="cw-input">
+                    <button className={`u-icon${showEmojiPicker ? " on" : ""}`} onClick={() => setShowEmojiPicker(!showEmojiPicker)} aria-label="Insert emoji" title="Emoji">
                         <Smile size={18} />
                     </button>
-
                     <input
                         type="text"
-                        placeholder="Type a message..."
+                        placeholder="Message the room"
                         value={inputMsg}
                         onChange={(e) => setInputMsg(e.target.value)}
                         onKeyDown={handleKeyDown}
-                        style={{
-                            width: "100%",
-                            backgroundColor: "var(--bg-dark)",
-                            border: "1px solid var(--border-color)",
-                            borderRadius: "24px",
-                            padding: "10px 48px 10px 40px", /* Left padding for emoji button */
-                            outline: "none",
-                            color: "var(--text-main)",
-                            fontSize: "14px"
-                        }}
+                        aria-label="Message"
                     />
-                    <button
-                        onClick={sendMessage}
-                        disabled={!inputMsg.trim()}
-                        style={{
-                            position: "absolute",
-                            right: "6px",
-                            padding: "6px",
-                            backgroundColor: inputMsg.trim() ? "var(--primary)" : "var(--secondary)",
-                            color: inputMsg.trim() ? "white" : "var(--text-muted)",
-                            border: "none",
-                            borderRadius: "50%",
-                            cursor: inputMsg.trim() ? "pointer" : "default",
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            transition: "background 0.2s"
-                        }}
-                    >
-                        <Send size={16} />
+                    <button className="cw-send" onClick={sendMessage} disabled={!inputMsg.trim()} aria-label="Send message" title="Send (Enter)">
+                        <Send size={15} />
                     </button>
                 </div>
             </div>

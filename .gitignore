@@ -28,3 +28,6 @@ yarn-error.log*
 
 # Claude setup
 .claude*
+# Desktop app
+/desktop/node_modules
+/desktop/dist

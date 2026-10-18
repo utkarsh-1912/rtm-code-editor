@@ -25,9 +25,13 @@ import toast from "react-hot-toast";
 import ProjectEditor from "../components/ProjectEditor";
 import ProjectFileTree, { FileIcon } from "../components/ProjectFileTree";
 import WorkspaceHeader from "../components/WorkspaceHeader";
+import Client from "../components/clients";
 import Loader from "../components/ux/Loader";
 import { getBackendUrl } from "../utils/api";
 import { useAuth } from "../context/AuthContext";
+import { runCode, formatRun } from "../utils/runner";
+import { languageForFile, LANGS } from "../utils/languages";
+import { CLIENT_ID } from "../utils/clientId";
 import { resolveTheme, setThemePref } from "../utils/theme";
 import "../styles/app.css";
 import ACTIONS from "../Action";
@@ -104,6 +108,7 @@ const ProjectPage = () => {
     const [isOutputVisible, setIsOutputVisible] = useState(true);
     const [webSrcDoc, setWebSrcDoc] = useState("");
     const [outputTab, setOutputTab] = useState("preview"); // "preview" | "terminal"
+    const [programInput, setProgramInput] = useState("");
     const [activeTab, setActiveTab] = useState('code'); // 'code', 'files', 'chat', 'users', 'video'
     const [isMeetingMinimized, setIsMeetingMinimized] = useState(true); // default true for floating overlay
     const [isMeetingStarting, setIsMeetingStarting] = useState(false);
@@ -157,56 +162,11 @@ const ProjectPage = () => {
         if (isMobile) setActiveTab('code');
     }, [openFiles, isMobile]);
 
-    const pollExecutionResult = React.useCallback(async (token) => {
-        const url = `https://judge0-ce.p.rapidapi.com/submissions/${token}?base64_encoded=true&fields=*`;
-        const options = {
-            method: "GET",
-            headers: {
-                "X-RapidAPI-Key": process.env.REACT_APP_RAPIDAPI_KEY || 'd08f949d60mshc3405a91834ca1fp1a2502jsn34e3da2dd121',
-                "X-RapidAPI-Host": "judge0-ce.p.rapidapi.com",
-            },
-        };
-
-        try {
-            const response = await fetch(url, options);
-            const data = await response.json();
-
-            if (data.status?.id === 1 || data.status?.id === 2) {
-                if ((pollExecutionResult._retries || 0) < 20) {
-                    pollExecutionResult._retries = (pollExecutionResult._retries || 0) + 1;
-                    setTimeout(() => pollExecutionResult(token), 2000);
-                } else {
-                    pollExecutionResult._retries = 0;
-                    setIsExecuting(false);
-                    setOutput("Execution timed out. Please try again.");
-                }
-                return;
-            } else {
-                setIsExecuting(false);
-                // Safe UTF-8 atob decoding
-                const safeDecode = (b64) => { try { return decodeURIComponent(escape(atob(b64))); } catch { return atob(b64); } };
-                const decodedOutput = data.stdout ? safeDecode(data.stdout) : null;
-                const decodedError = data.stderr ? safeDecode(data.stderr) : null;
-                const decodedCompileOutput = data.compile_output ? safeDecode(data.compile_output) : null;
-
-                if (data.status?.id === 3) {
-                    setOutput(decodedOutput !== null ? decodedOutput : "Code Executed Successfully. No Output.");
-                } else {
-                    setOutput(decodedError || decodedCompileOutput || data.status?.description || "Unknown Error");
-                }
-            }
-        } catch (err) {
-            console.error(err);
-            setOutput("Error retrieving execution output.");
-            setIsExecuting(false);
-        }
-    }, []);
-
     const handleCompile = React.useCallback(async () => {
         const projectType = project?.type || "web";
         const fileExt = activeFile?.name?.split('.').pop()?.toLowerCase();
 
-        if (projectType === "web" || fileExt === "html" || fileExt === "css" || fileExt === "js") {
+        if (projectType === "web" || fileExt === "html" || fileExt === "css") {
             setIsOutputVisible(true);
             setOutputTab("preview");
 
@@ -257,15 +217,23 @@ const ProjectPage = () => {
             return;
         }
 
+        if (!activeFile?.name) {
+            toast.error("Open a file before running the project.");
+            return;
+        }
+
         setIsExecuting(true);
         setIsOutputVisible(true);
-        setOutput("Bundling and running...");
+        setOutputTab("terminal");
+        setOutput("Running…");
 
-        const language = activeFile?.name.split('.').pop();
-        let languageId = 63;
-        if (language === 'cpp' || language === 'h') languageId = 54;
-        else if (language === 'py') languageId = 71;
-        else if (language === 'java') languageId = 62;
+        const language = activeFile.name.split('.').pop();
+        const runtime = languageForFile(activeFile.name);
+        if (!runtime) {
+            setIsExecuting(false);
+            setOutput(`Can't run .${language} files. Open a source file (${LANGS.map((l) => '.' + l.ext[0]).join(' ')}).`);
+            return;
+        }
 
         let sourceCode = activeFile.content;
 
@@ -343,41 +311,22 @@ const ProjectPage = () => {
             sourceCode = resolvePythonImports(sourceCode);
         }
 
-            // Safe UTF-8 base64 encoding
-            const safeBase64 = (str) => { try { return btoa(unescape(encodeURIComponent(str))); } catch { return btoa(str); } };
-            const formData = {
-                language_id: languageId,
-                source_code: safeBase64(sourceCode),
-                stdin: btoa(""),
-            };
-
-        const url = "https://judge0-ce.p.rapidapi.com/submissions?base64_encoded=true&fields=*";
-        const options = {
-            method: 'POST',
-            headers: {
-                'content-type': 'application/json',
-                'X-RapidAPI-Key': process.env.REACT_APP_RAPIDAPI_KEY || 'd08f949d60mshc3405a91834ca1fp1a2502jsn34e3da2dd121',
-                'X-RapidAPI-Host': 'judge0-ce.p.rapidapi.com'
-            },
-            body: JSON.stringify(formData)
-        };
-
         try {
-            const response = await fetch(url, options);
-            const data = await response.json();
-            if (data.token) {
-                await pollExecutionResult(data.token);
-            } else {
-                throw new Error("Failed to get execution token.");
-            }
+            const result = await runCode({ language: runtime, source: sourceCode, stdin: programInput });
+            setOutput(formatRun(result) + `
+
+— ${result.status} · ${result.timeMs ?? '?'} ms · ${result.engine}`);
         } catch (error) {
-            console.error("Compilation error:", error);
-            setOutput("Something went wrong while attempting to run your code.");
+            setOutput(`Could not run the code: ${error.message}`);
+        } finally {
             setIsExecuting(false);
         }
-    }, [project, activeFile, files, pollExecutionResult]);
+    }, [project, activeFile, files, programInput]);
 
-    const renderOutputPanel = () => (
+    const isWebProject = (project?.type || 'web') === 'web';
+
+    // Web projects get a live preview + console; compiled/scripted languages get stdin + output.
+    const renderOutputPanel = () => isWebProject ? (
         <div className="ws-out">
             <div className="ws-pane-head">
                 <div className="u-seg" role="tablist" aria-label="Output">
@@ -397,7 +346,6 @@ const ProjectPage = () => {
                     <button className="u-icon" onClick={() => setIsOutputVisible(false)} title="Hide panel" aria-label="Hide panel"><X size={14} /></button>
                 </div>
             </div>
-
             <div style={{ flex: 1, position: 'relative', overflow: 'hidden', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
                 {outputTab === 'preview' ? (
                     <div className="ws-browser">
@@ -410,8 +358,32 @@ const ProjectPage = () => {
                         />
                     </div>
                 ) : (
-                    <pre className="ws-console">{output || <span className="u-caret">No output yet. Press Run</span>}</pre>
+                    <pre className="ws-console">{output || <span className="u-caret">No console output yet. Press Run</span>}</pre>
                 )}
+            </div>
+        </div>
+    ) : (
+        <div className="ws-out ws-io">
+            <div className="ws-io-col">
+                <div className="ws-pane-head"><span>Input</span><b>stdin</b></div>
+                <textarea
+                    className="ws-stdin"
+                    value={programInput}
+                    onChange={(e) => setProgramInput(e.target.value)}
+                    placeholder="Text your program reads from standard input"
+                    spellCheck={false}
+                    aria-label="Program input"
+                />
+            </div>
+            <div className="ws-io-col">
+                <div className="ws-pane-head">
+                    <span>Output</span>
+                    <div className="ws-out-actions">
+                        <button className="u-icon" onClick={() => setOutput("")} title="Clear output" aria-label="Clear output"><Trash2 size={14} /></button>
+                        <button className="u-icon" onClick={() => setIsOutputVisible(false)} title="Hide panel" aria-label="Hide panel"><X size={14} /></button>
+                    </div>
+                </div>
+                <pre className="ws-console">{isExecuting ? <span className="u-caret">Running</span> : (output || <span className="u-caret">No output yet. Press Run</span>)}</pre>
             </div>
         </div>
     );
@@ -532,10 +504,13 @@ const ProjectPage = () => {
         socketRef.current.emit(ACTIONS.PROJECT_JOIN, {
             projectId,
             userName: name,
+            photoURL: user?.photoURL || null,
+            uid: user?.uid || null,
+            clientId: CLIENT_ID,
         });
 
         hasJoinedRef.current = true;
-    }, [projectId]);
+    }, [projectId, user?.photoURL, user?.uid]);
 
     useEffect(() => {
         const handleResize = () => {
@@ -890,7 +865,7 @@ const ProjectPage = () => {
             onCodeChange={handleSaveFile}
             code={activeFile.content}
             filename={activeFile.name}
-            language={activeFile.name.split('.').pop()}
+            language={activeFile.name?.split('.').pop() || 'javascript'}
             settings={settings}
             userName={me}
             isLightMode={isLightMode}
@@ -908,11 +883,7 @@ const ProjectPage = () => {
             {clients.map((client, i) => {
                 const name = client.userName || client.name || 'Guest';
                 return (
-                    <div key={client.socketId || i} className="ws-person">
-                        <span className="ws-person-av" style={{ background: avatarColor(name) }}>{name.slice(0, 2).toUpperCase()}</span>
-                        <b>{name}</b>
-                        {name === me && <em>you</em>}
-                    </div>
+                    <Client key={client.socketId || i} userName={name} photoURL={client.photoURL} isCurrentUser={client.socketId ? client.socketId === socketRef.current?.id : name === me} />
                 );
             })}
         </div>
@@ -1124,7 +1095,7 @@ const ProjectPage = () => {
                 isOpen={showAICopilot}
                 onClose={() => setShowAICopilot(false)}
                 code={activeFile?.content || ""}
-                language={activeFile?.name?.endsWith('.py') ? 'python' : activeFile?.name?.endsWith('.cpp') ? 'cpp' : 'javascript'}
+                language={languageForFile(activeFile?.name) || 'javascript'}
                 projectId={projectId}
                 userId={user?.uid}
                 onApplyCode={(newCode) => {
@@ -1137,6 +1108,8 @@ const ProjectPage = () => {
                 onClose={() => setShowDiffViewer(false)}
                 projectId={projectId}
                 currentCode={activeFile?.content || ""}
+                files={files.map((f) => ({ path: f.path, name: f.name, content: f.content }))}
+                createdBy={me}
                 onRestoreSnapshot={(snap) => {
                     if (snap.code) handleSaveFile(snap.code);
                 }}
@@ -1191,13 +1164,6 @@ const ProjectPage = () => {
             )}
         </div>
     );
-};
-
-const AVATAR_COLORS = ["#5B8DEF", "#8B5CF6", "#EC4899", "#F59E0B", "#10B981", "#06B6D4", "#F43F5E", "#6366F1"];
-const avatarColor = (name = "") => {
-    let hash = 0;
-    for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
-    return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
 };
 
 export default ProjectPage;

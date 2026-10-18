@@ -18,6 +18,8 @@ const systemRoutes = require("./server/routes/systemRoutes");
 const aiRoutes = require("./server/routes/aiRoutes");
 const snapshotRoutes = require("./server/routes/snapshotRoutes");
 const analyticsRoutes = require("./server/routes/analyticsRoutes");
+const { createRunnerRouter } = require("./server/runner/router");
+const health = require("./server/health");
 
 const server = http.createServer(app);
 const io = new Server(server, {
@@ -29,7 +31,9 @@ const io = new Server(server, {
 
 // Middleware
 app.use(cors());
-app.use(express.json());
+// Bulk file imports parse their own (larger) bodies; everything else gets 2 MB.
+const jsonBody = express.json({ limit: '2mb' });
+app.use((req, res, next) => (req.path.endsWith('/files/bulk') ? next() : jsonBody(req, res, next)));
 
 // Request Logging Middleware
 app.use((req, res, next) => {
@@ -45,6 +49,11 @@ app.use((err, req, res, next) => {
   }
   next();
 });
+
+// Health first so it answers even while the database is still starting
+app.get('/api/ping', (req, res) => res.json({ success: true, message: 'pong', db: health.db, uptime: Math.round(process.uptime()) }));
+// Code runner has no database dependency
+app.use('/api', createRunnerRouter());
 
 // Router Tier Gateway Mounting
 app.use('/api', authRoutes);
@@ -68,20 +77,24 @@ if (process.env.NODE_ENV === 'production') {
 // Initialize WebSockets Tier
 initializeSockets(io);
 
-// Server Entry Point
-const startServer = async () => {
+// Server Entry Point: listen right away (so health checks, the runner and sockets work
+// on a cold start) and bring the database up in the background with retries.
+const PORT = process.env.PORT || 5000;
+server.listen(PORT, () => {
+  console.log(`Utkristi CoLabs API listening on port ${PORT}`);
+});
+
+const initDatabase = async (attempt = 1) => {
+  health.db = "starting";
   try {
     await initializeSchema();
-    const PORT = process.env.PORT || 5000;
-    server.listen(PORT, () => {
-      console.log(`===========================================`);
-      console.log(`Utkristi Colabs Enterprise Node Running on port ${PORT}`);
-      console.log(`===========================================`);
-    });
+    health.db = "ready";
+    console.log("Database ready");
   } catch (err) {
-    console.error("CRITICAL Initialization Error:", err);
-    process.exit(1);
+    health.db = "error";
+    const wait = Math.min(30000, 2000 * attempt);
+    console.error(`Database init failed (attempt ${attempt}), retrying in ${wait / 1000}s:`, err.message);
+    setTimeout(() => initDatabase(attempt + 1), wait);
   }
 };
-
-startServer();
+initDatabase();

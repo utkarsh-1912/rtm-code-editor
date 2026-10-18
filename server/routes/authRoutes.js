@@ -16,12 +16,27 @@ router.get('/user/profile', async (req, res) => {
     }
 });
 
+// Create or refresh the signed-in user's record (name, email, avatar) after sign-in.
+router.post('/user/sync', async (req, res) => {
+    try {
+        const { uid, email, name, photoURL } = req.body || {};
+        if (!uid) return res.status(400).json({ error: "Missing uid" });
+        const user = await UserRepository.findOrCreateUser({ uid, email, name, photoURL });
+        res.json(user);
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
 // Update profile details
 router.put('/user/profile', async (req, res) => {
     try {
-        const { userId, name, bio, social_links } = req.body;
+        // Accept both { name, bio, social_links } and { profileData: { … } } (the Settings page).
+        const { userId } = req.body || {};
+        const data = req.body.profileData || req.body;
         if (!userId) return res.status(400).json({ error: "Missing userId" });
-        const updated = await UserRepository.updateProfile(userId, { name, bio, social_links });
+        const updated = await UserRepository.updateProfile(userId, { name: data.name, bio: data.bio, social_links: data.social_links });
         res.json(updated);
     } catch (err) {
         console.error(err);

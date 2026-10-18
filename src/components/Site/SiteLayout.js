@@ -12,8 +12,12 @@ const LINKS = [
     { to: "/support", label: "Support" },
 ];
 
-const FOOTER = [...LINKS, { to: "/security", label: "Security" }];
-const LEGAL = [["Status", "/status"], ["Privacy", "/privacy"], ["Terms", "/terms"]];
+const COLUMNS = [
+    { title: "Product", links: [["Features", "/features"], ["Pricing", "/pricing"], ["Download", "/download"]] },
+    { title: "Company", links: [["About", "/about"], ["Security", "/security"], ["Support", "/support"]] },
+    { title: "Resources", links: [["Status", "/status"], ["Source code", "https://github.com/utkarsh-1912/rtm-code-editor"]] },
+    { title: "Legal", links: [["Privacy", "/privacy"], ["Terms", "/terms"]] },
+];
 
 // Chrome for the public site; shares header, menu and footer with the signed-in app.
 export default function SiteLayout({ children }) {
@@ -24,8 +28,10 @@ export default function SiteLayout({ children }) {
     return (
         <Shell
             links={LINKS}
-            footerLinks={FOOTER}
-            legal={LEGAL}
+            columns={COLUMNS}
+            footerCta={user
+                ? <button className="u-btn u-btn--solid u-btn--lg" onClick={() => navigate("/dashboard")}>Open workspace <ArrowUpRight size={15} /></button>
+                : <Link to="/signup" className="u-btn u-btn--solid u-btn--lg">Try it free <ArrowUpRight size={15} /></Link>}
             mainClass="u-main u-main--site"
             stripLeft={<>
                 <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}><span className="u-dot" /> Rooms are free</span>
