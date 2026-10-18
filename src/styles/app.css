@@ -1905,3 +1905,14 @@ html.light-theme .rl { background: #E7EBF2; }
 .ec-bar .ec-tools { margin-left: auto; }
 .pb-seg { height: auto; padding: 2px; }
 .pb-seg button { height: 24px; border-radius: 999px; }
+
+/* Header call-to-action: shorter label and a compact size on phones. */
+.u-show-sm { display: none; }
+@media (max-width: 700px) {
+  .u-show-sm { display: inline; }
+  .u-nav-right .u-nav-cta { height: 36px; padding: 0 14px; gap: 6px; font-size: 13.5px; }
+}
+@media (max-width: 360px) {
+  .u-nav-right .u-nav-cta { padding: 0 12px; }
+  .u-nav-right .u-nav-cta svg { display: none; }
+}

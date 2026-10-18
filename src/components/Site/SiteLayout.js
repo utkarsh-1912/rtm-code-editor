@@ -41,11 +41,14 @@ export default function SiteLayout({ children }) {
             right={<>
                 <ThemeButton className="u-icon u-icon--hide" />
                 {user ? (
-                    <button className="u-btn u-btn--solid" onClick={() => navigate("/dashboard")}>Open workspace <ArrowUpRight size={15} /></button>
+                    <button className="u-btn u-btn--solid u-nav-cta" onClick={() => navigate("/dashboard")} aria-label="Open workspace">
+                        <span className="u-hide-sm">Open workspace</span><span className="u-show-sm">Workspace</span>
+                        <ArrowUpRight size={15} />
+                    </button>
                 ) : (
                     <>
                         <Link to="/login" className="u-btn u-hide-sm">Sign in</Link>
-                        <Link to="/signup" className="u-btn u-btn--solid">Try it free</Link>
+                        <Link to="/signup" className="u-btn u-btn--solid u-nav-cta">Try it free</Link>
                     </>
                 )}
             </>}
