@@ -117,6 +117,48 @@ const getEmailTemplate = ({ title, message, ctaText, ctaUrl, inviterName, invite
   `;
 };
 
+const OneSignal = require('./OneSignalService');
+
+const BREVO_URL = "https://api.brevo.com/v3/smtp/email";
+
+/**
+ * Transactional email with fallback: Brevo first, then OneSignal email, then Resend.
+ * Never throws; returns { success, provider, attempts } so callers can log or report it.
+ */
+async function deliver({ to, subject, html }) {
+    const recipients = (Array.isArray(to) ? to : [to]).filter(Boolean);
+    const attempts = [];
+    const record = (provider, ok, detail) => { attempts.push({ provider, ok, ...(ok ? {} : { detail }) }); return ok; };
+
+    if (process.env.BREVO_API_KEY) {
+        try {
+            const r = await fetchRelay(BREVO_URL, {
+                sender: { name: "Utkristi Colabs", email: process.env.BREVO_FROM_EMAIL || "noreply@rtm-edit.com" },
+                to: recipients.map((email) => ({ email })),
+                subject,
+                htmlContent: html
+            }, process.env.BREVO_API_KEY);
+            if (record("brevo", r.status >= 200 && r.status < 300, `${r.status} ${r.body}`.slice(0, 200))) return { success: true, provider: "brevo", attempts };
+        } catch (err) { record("brevo", false, err.message); }
+    }
+
+    if (OneSignal.configured()) {
+        const r = await OneSignal.sendEmail({ to: recipients, subject, html });
+        if (record("onesignal", r.ok, r.reason)) return { success: true, provider: "onesignal", attempts };
+    }
+
+    if (process.env.RESEND_API_KEY) {
+        try {
+            const r = await sendMail({ to: recipients, subject, html });
+            if (record("resend", r.status >= 200 && r.status < 300, r.body)) return { success: true, provider: "resend", attempts };
+        } catch (err) { record("resend", false, err.message); }
+    }
+
+    if (!attempts.length) attempts.push({ provider: "none", ok: false, detail: "No email provider configured" });
+    console.warn("Email not delivered:", JSON.stringify(attempts));
+    return { success: false, provider: null, attempts };
+}
+
 async function sendMail({ to, subject, html, apiKey }) {
     const resendKey = apiKey || process.env.RESEND_API_KEY;
     if (!resendKey) {
@@ -136,6 +178,7 @@ async function sendMail({ to, subject, html, apiKey }) {
 
 module.exports = {
     getEmailTemplate,
+    deliver,
     sendMail,
     fetchRelay
 };

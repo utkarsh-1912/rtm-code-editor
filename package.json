@@ -55,7 +55,8 @@
     "server:prod": "node server.js",
     "setup-db": "node scripts/initialize.js",
     "runner": "node server/runner/standalone.js",
-    "desktop": "npm --prefix desktop start"
+    "desktop": "npm --prefix desktop start",
+    "release": "node scripts/release.js"
   },
   "eslintConfig": {
     "extends": [

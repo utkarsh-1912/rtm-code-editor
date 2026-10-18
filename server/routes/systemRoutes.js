@@ -20,7 +20,7 @@ router.get('/test-email', async (req, res) => {
             recipientEmail: to
         });
 
-        const result = await MailService.sendMail({ to, subject: "Utkristi Colabs Diagnostic Test", html });
+        const result = await MailService.deliver({ to, subject: "Utkristi Colabs Diagnostic Test", html });
         res.json({ success: true, result });
     } catch (err) {
         console.error(err);
@@ -107,12 +107,39 @@ router.post('/support', async (req, res) => {
         if (!to) return res.status(503).json({ error: "Support inbox is not configured yet" });
 
         const html = `<p><strong>${escapeHtml(name)}</strong> &lt;${escapeHtml(email)}&gt;</p><p style="white-space:pre-wrap">${escapeHtml(message)}</p>`;
-        const result = await MailService.sendMail({ to, subject: `Support request from ${String(name).slice(0, 80)}`, html });
-        if (result && result.success === false) return res.status(503).json({ error: "Email delivery is not configured" });
+        const result = await MailService.deliver({ to, subject: `Support request from ${String(name).slice(0, 80)}`, html });
+        if (!result.success) return res.status(503).json({ error: "Email delivery is not configured" });
         res.json({ success: true });
     } catch (err) {
         console.error(err);
         res.status(500).json({ error: "Could not send message" });
+    }
+});
+
+// Latest desktop release, cached server-side so the download page never hits GitHub's
+// anonymous rate limit. Set GITHUB_TOKEN to raise that limit further.
+const RELEASE_REPO = process.env.GITHUB_REPO || 'utkarsh-1912/rtm-code-editor';
+let releaseCache = { at: 0, data: null };
+router.get('/release/latest', async (req, res) => {
+    try {
+        if (releaseCache.data && Date.now() - releaseCache.at < 10 * 60 * 1000) return res.json(releaseCache.data);
+        const r = await fetch(`https://api.github.com/repos/${RELEASE_REPO}/releases/latest`, {
+            headers: { Accept: 'application/vnd.github+json', 'User-Agent': 'utkristi-colabs', ...(process.env.GITHUB_TOKEN ? { Authorization: `Bearer ${process.env.GITHUB_TOKEN}` } : {}) },
+        });
+        if (!r.ok) return res.status(r.status === 404 ? 404 : 502).json(releaseCache.data || { error: 'No release published yet' });
+        const d = await r.json();
+        releaseCache = {
+            at: Date.now(),
+            data: {
+                tag: d.tag_name,
+                date: d.published_at,
+                url: d.html_url,
+                assets: (d.assets || []).map((a) => ({ name: a.name, size: a.size, url: a.browser_download_url })),
+            },
+        };
+        res.json(releaseCache.data);
+    } catch (err) {
+        res.status(releaseCache.data ? 200 : 502).json(releaseCache.data || { error: 'Release lookup failed' });
     }
 });
 

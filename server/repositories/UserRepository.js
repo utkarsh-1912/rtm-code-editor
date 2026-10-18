@@ -8,6 +8,11 @@ async function getUser(userId) {
     return users[0] || null;
 }
 
+async function getUserByEmail(email) {
+    const users = await sql`SELECT * FROM users WHERE lower(email) = lower(${email})`;
+    return users[0] || null;
+}
+
 /**
  * Create the user or refresh their identity. Fixes rows auto-created by a session
  * call (placeholder email, name "Developer") once the real profile arrives.
@@ -149,6 +154,7 @@ async function deleteAccount(userId) {
 
 module.exports = {
     getUser,
+    getUserByEmail,
     findOrCreateUser,
     unsubscribeUser,
     isUserUnsubscribed,

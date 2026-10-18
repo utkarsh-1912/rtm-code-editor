@@ -1,10 +1,65 @@
 import React from "react";
 import { ReflexContainer, ReflexSplitter, ReflexElement } from "react-reflex";
 import "react-reflex/styles.css";
+import { Upload, Table2, Trash2, Eye } from "lucide-react";
+import toast from "react-hot-toast";
+import { parseDataFile, MAX_FILE_BYTES } from "../utils/sqlData";
+
+// SQL rooms: imported tables (CSV / TSV / JSON) available to every query in the room.
+function TablesPanel({ tables, setTables }) {
+    const fileRef = React.useRef(null);
+    const [preview, setPreview] = React.useState(null);
+
+    const onFiles = async (e) => {
+        const files = Array.from(e.target.files || []);
+        e.target.value = "";
+        for (const file of files) {
+            if (file.size > MAX_FILE_BYTES) { toast.error(`${file.name} is over ${MAX_FILE_BYTES / 1024} KB`); continue; }
+            try {
+                const t = parseDataFile(file.name, await file.text());
+                setTables((prev) => [...prev.filter((x) => x.name !== t.name), t]);
+                toast.success(`Imported ${t.name} · ${t.rows.length} rows${t.truncated ? " (truncated)" : ""}`);
+            } catch (err) {
+                toast.error(`${file.name}: ${err.message}`);
+            }
+        }
+    };
+
+    return (
+        <div className="ws-io-col">
+            <div className="ws-pane-head">
+                <span>Tables</span>
+                <b>
+                    <button type="button" className="ws-tbl-btn" onClick={() => fileRef.current?.click()}><Upload size={12} /> Import</button>
+                </b>
+            </div>
+            <input ref={fileRef} type="file" accept=".csv,.tsv,.json,.txt" multiple hidden onChange={onFiles} />
+            <div className="ws-tbl-list">
+                {!tables.length && <p className="ws-tbl-empty">Import a CSV, TSV or JSON file and query it by name, e.g. <code>SELECT * FROM data;</code></p>}
+                {tables.map((t) => (
+                    <div key={t.name} className="ws-tbl">
+                        <div className="ws-tbl-row">
+                            <Table2 size={13} /> <b>{t.name}</b> <span>{t.rows.length} rows</span>
+                            <button type="button" title="Preview" onClick={() => setPreview(preview === t.name ? null : t.name)}><Eye size={13} /></button>
+                            <button type="button" title="Remove" onClick={() => setTables((prev) => prev.filter((x) => x.name !== t.name))}><Trash2 size={13} /></button>
+                        </div>
+                        <div className="ws-tbl-cols">{t.columns.map((c) => <i key={c.name}>{c.name}<em>{c.type.toLowerCase()}</em></i>)}</div>
+                        {preview === t.name && (
+                            <div className="ws-tbl-prev"><table>
+                                <thead><tr>{t.columns.map((c) => <th key={c.name}>{c.name}</th>)}</tr></thead>
+                                <tbody>{t.rows.slice(0, 8).map((r, i) => <tr key={i}>{r.map((v, j) => <td key={j}>{v}</td>)}</tr>)}</tbody>
+                            </table></div>
+                        )}
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
+}
 
 // Room I/O: what the program reads (stdin) beside what it printed.
-export default function OutputWindow({ output, isError, time, isMobile, stdin, setStdin }) {
-    const input = (
+export default function OutputWindow({ output, isError, time, isMobile, stdin, setStdin, language, tables, setTables }) {
+    const input = language === "sql" && setTables ? <TablesPanel tables={tables || []} setTables={setTables} /> : (
         <div className="ws-io-col">
             <div className="ws-pane-head"><span>Input</span><b>stdin</b></div>
             <textarea

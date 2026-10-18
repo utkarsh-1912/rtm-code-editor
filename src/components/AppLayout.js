@@ -42,7 +42,16 @@ const AppLayout = ({ children }) => {
         try {
             const res = await fetch(`${getBackendUrl()}/api/notifications?userId=${user.uid}`);
             const list = await res.json();
-            setHasUnread(Array.isArray(list) && list.some((n) => !n.is_read));
+            const unread = Array.isArray(list) ? list.filter((n) => !n.read) : [];
+            setHasUnread(unread.length > 0);
+            // Installed app: surface new alerts natively (web push is browser-only).
+            if (window.colabsDesktop?.notify) {
+                const seen = Number(sessionStorage.getItem('notif-seen') || 0);
+                const fresh = unread.filter((n) => Number(n.id) > seen);
+                if (seen && fresh.length) window.colabsDesktop.notify({ title: 'Utkristi CoLabs', body: fresh[0].message }).catch(() => { });
+                const top = Math.max(0, ...list.map((n) => Number(n.id) || 0));
+                sessionStorage.setItem('notif-seen', String(top));
+            }
         } catch (err) {
             /* offline: leave badge as is */
         }

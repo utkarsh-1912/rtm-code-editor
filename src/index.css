@@ -4,8 +4,8 @@
   --primary: #3b82f6;
   --primary-hover: #2563eb;
   --secondary: #1e293b;
-  --bg-dark: #0f172a;
-  --bg-dark-rgb: 15, 23, 42;
+  --bg-dark: #0B0B0A;
+  --bg-dark-rgb: 11, 11, 10;
   --bg-card: rgba(30, 41, 59, 0.7);
   --bg-floating: rgba(15, 23, 42, 0.85);
   --text-main: #f8fafc;
@@ -20,8 +20,7 @@
   --glass-blur: 16px;
   --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.4);
   
-  --bg-image: radial-gradient(circle at 15% 50%, rgba(59, 130, 246, 0.15), transparent 25%),
-    radial-gradient(circle at 85% 30%, rgba(139, 92, 246, 0.15), transparent 25%);
+  --bg-image: none;
 
   /* Layout and UI 2.0 Tokens */
   --radius-card: 20px;
@@ -36,8 +35,8 @@
   --primary: #1d4ed8;
   --primary-hover: #1e40af;
   --secondary: #f1f5f9;
-  --bg-dark: #f8fafc;
-  --bg-dark-rgb: 248, 250, 252;
+  --bg-dark: #F5F7FB;
+  --bg-dark-rgb: 245, 247, 251;
   --bg-card: #ffffff;
   --bg-floating: rgba(255, 255, 255, 0.95);
   --text-main: #0f172a;
@@ -52,8 +51,7 @@
   --glass-blur: 12px;
   --glass-shadow: 0 8px 32px 0 rgba(148, 163, 184, 0.15);
   
-  --bg-image: radial-gradient(circle at 15% 50%, rgba(59, 130, 246, 0.08), transparent 25%),
-    radial-gradient(circle at 85% 30%, rgba(139, 92, 246, 0.08), transparent 25%);
+  --bg-image: none;
 
   /* Layout and UI 2.0 Tokens - Light Mode */
   --radius-card: 20px;
@@ -211,4 +209,4 @@ body {
 }
 .glow-effect:hover::after {
   left: 125%;
-}
+}

@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { X } from "lucide-react";
+import { createPortal } from "react-dom";
 
 const REVEAL = "[data-rise]:not(.is-in), .u-clip:not(.is-in), .u-roll:not(.is-in), .u-lines:not(.is-in), .d-bars:not(.is-in)";
 
@@ -84,7 +85,9 @@ export function Modal({ open, onClose, label, title, description, children, foot
     }, [open, onClose]);
     if (!open) return null;
     const Body = onSubmit ? "form" : "div";
-    return (
+    // Portal to <body> so the dialog escapes page stacking contexts (navbar) and keeps the .ux tokens.
+    return createPortal(
+        <div className="ux u-portal">
         <div className="u-modal-back" onMouseDown={(e) => e.target === e.currentTarget && onClose?.()}>
             <Body className={`u-modal${wide ? " u-modal--wide" : ""}`} role="dialog" aria-modal="true" aria-label={title} ref={ref}
                 onSubmit={onSubmit ? (e) => { e.preventDefault(); onSubmit(e); } : undefined}>
@@ -100,6 +103,8 @@ export function Modal({ open, onClose, label, title, description, children, foot
                 {footer && <div className="u-modal-foot">{footer}</div>}
             </Body>
         </div>
+        </div>,
+        document.body
     );
 }
 

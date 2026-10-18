@@ -18,7 +18,7 @@ function rateLimit(req, res, next) {
 function createRunnerRouter() {
     const router = express.Router();
     router.get("/runner", (req, res) => res.json({ success: true, ...info() }));
-    router.post("/run", express.json({ limit: "256kb" }), rateLimit, async (req, res) => {
+    router.post("/run", express.json({ limit: "1mb" }), rateLimit, async (req, res) => {
         try {
             const { language, source, stdin } = req.body || {};
             const result = await runCode({ language, source, stdin });

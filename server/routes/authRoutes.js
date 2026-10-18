@@ -115,9 +115,6 @@ router.get('/welcome-new-user', async (req, res) => {
         const { email, name } = req.query;
         if (!email) return res.status(400).json({ error: "Missing email query parameter" });
 
-        const BREVO_KEY = process.env.BREVO_API_KEY;
-        if (!BREVO_KEY) return res.status(500).json({ error: "BREVO_API_KEY not configured" });
-
         const html = MailService.getEmailTemplate({
             title: `Welcome to the Studio, ${name || 'Engineer'}`,
             message: "We're thrilled to have you here. Utkristi Colabs is designed to be the fastest, most immersive workspace for your technical team. Start by creating a project or joining a team vault.",
@@ -128,14 +125,9 @@ router.get('/welcome-new-user', async (req, res) => {
             isWelcome: true
         });
 
-        const result = await MailService.fetchRelay("https://api.brevo.com/v3/smtp/email", {
-            sender: { name: "Utkristi Colabs", email: process.env.BREVO_FROM_EMAIL || "noreply@rtm-edit.com" },
-            to: [{ email }],
-            subject: "Welcome to Utkristi Colabs - Let's build together",
-            htmlContent: html
-        }, BREVO_KEY);
-
-        res.json({ success: true, message: "Welcome email dispatched", status: result.status });
+        const result = await MailService.deliver({ to: email, subject: "Welcome to Utkristi Colabs - Let's build together", html });
+        if (!result.success) return res.status(502).json({ error: "No email provider could deliver the message", attempts: result.attempts });
+        res.json({ success: true, message: "Welcome email dispatched", provider: result.provider });
     } catch (err) {
         console.error(err);
         res.status(500).json({ error: err.message });

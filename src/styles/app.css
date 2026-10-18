@@ -1338,6 +1338,7 @@ html { scrollbar-width: thin; scrollbar-color: var(--u-line-2, rgba(127,127,127,
   .db-head { align-items: flex-start; }
   .db-actions { width: 100%; }
   .db-actions .u-btn { flex: 1; }
+  .db-actions .db-open { display: none; }
   .db-th { display: none; }
   .db-row { grid-template-columns: 34px minmax(0, 1fr) auto; padding: 8px 12px; }
   .db-type { display: none; }
@@ -1365,3 +1366,29 @@ html { scrollbar-width: thin; scrollbar-color: var(--u-line-2, rgba(127,127,127,
 .db-tpls .u-tile-ico { width: 34px; height: 34px; font-size: 10.5px; text-transform: lowercase; }
 .db-tpl-find { width: 170px; height: 32px; font-size: 13px; border-radius: 999px; }
 @media (max-width: 700px) { .db-tpls { grid-template-columns: repeat(2, minmax(0, 1fr)); } .db-tpl-find { width: 130px; } }
+
+/* Modal portal: sits above the navbar, opaque panel, no page layout of its own */
+.u-portal { min-height: 0; display: block; position: static; background: transparent; }
+.u-portal .u-modal-back { z-index: 5000; background: rgba(5, 5, 4, .72); }
+.light-theme .u-portal .u-modal-back { background: rgba(14, 26, 51, .45); }
+.u-portal .u-modal { background: var(--u-bg-2); }
+
+/* SQL tables panel */
+.ws-tbl-btn { display: inline-flex; align-items: center; gap: 5px; border: 1px solid var(--u-line-2); background: none; color: var(--u-ink); border-radius: 999px; padding: 2px 10px; font: inherit; cursor: pointer; }
+.ws-tbl-btn:hover { background: var(--u-tint); }
+.ws-tbl-list { flex: 1; overflow: auto; padding: 10px 14px; display: flex; flex-direction: column; gap: 10px; }
+.ws-tbl-empty { margin: 0; color: var(--u-ink-3); font-size: 12.5px; line-height: 1.6; }
+.ws-tbl-empty code { font-family: var(--u-mono); color: var(--u-ink-2); }
+.ws-tbl-row { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.ws-tbl-row b { font-family: var(--u-mono); font-weight: 500; }
+.ws-tbl-row span { color: var(--u-ink-3); font-size: 12px; margin-right: auto; }
+.ws-tbl-row button { border: 0; background: none; color: var(--u-ink-3); cursor: pointer; padding: 2px; }
+.ws-tbl-row button:hover { color: var(--u-ink); }
+.ws-tbl-cols { display: flex; flex-wrap: wrap; gap: 4px 10px; margin-top: 4px; font-family: var(--u-mono); font-size: 11.5px; color: var(--u-ink-2); }
+.ws-tbl-cols em { margin-left: 4px; color: var(--u-ink-3); font-style: normal; }
+.ws-tbl-prev { overflow: auto; margin-top: 6px; border: 1px solid var(--u-line); border-radius: 8px; }
+.ws-tbl-prev table { border-collapse: collapse; font-family: var(--u-mono); font-size: 11.5px; width: 100%; }
+.ws-tbl-prev th, .ws-tbl-prev td { padding: 4px 8px; text-align: left; white-space: nowrap; border-bottom: 1px solid var(--u-line); }
+.ws-tbl-prev th { color: var(--u-ink-3); font-weight: 500; }
+
+.u-link { border: 0; background: none; padding: 0; font: inherit; color: var(--u-accent); cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }

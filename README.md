@@ -53,6 +53,9 @@ Create a `.env` in the project root:
 DATABASE_URL=postgres://…            # Neon or any Postgres
 BREVO_API_KEY=…                      # optional, for invite / support emails
 BREVO_FROM_EMAIL=noreply@yourdomain.com
+ONESIGNAL_APP_ID=…                   # optional: push + email fallback
+ONESIGNAL_REST_API_KEY=…
+REACT_APP_ONESIGNAL_APP_ID=…         # same app id, for the web build
 SUPPORT_EMAIL=you@yourdomain.com
 APP_URL=http://localhost:3000
 
@@ -128,8 +131,11 @@ The [`desktop/`](desktop) folder is an Electron shell around the web app for Win
 - It runs code on a **local Judge0** (`http://localhost:2358`) first and only uses the server if that fails.
 - It sends copilot requests to a **local model** (`http://localhost:11434/v1`, `qwen2.5-coder:1.5b`) first, then the server.
 - Sign-in popups stay in the app, and other links open in your browser.
+- **Open Folder / Open Files** (File menu, `Ctrl+Shift+O` / `Ctrl+O`, or the dashboard buttons) turn a folder on disk into a project, VS Code style. It skips `.git`, `node_modules`, build output and binary files, and imports at most 500 text files (1 MB each, 20 MB in total). The project type is `web` if there's an `index.html`, otherwise the most common language. In a project, **Save to disk** writes the files back to that folder, and **Add files from disk** adds more. The web app can do the same imports in a browser but can't save back.
+- **Terminal** (`` Ctrl+` `` or the project header) opens a separate terminal window in the project's folder. Each line runs in your shell (`cmd.exe` on Windows, `$SHELL` elsewhere, or `COLABS_SHELL`). `cd`, `clear` and `exit` are built in, typing while a program runs goes to its stdin, and `Ctrl+C` stops it. It's line-based rather than a full PTY, so full-screen programs like `vim` won't work.
+- The web page never gets raw file access. It can only read what you pick in a native dialog, write inside folders you picked, and open a terminal; commands can only be typed in the terminal window itself.
 
-Override the defaults with `COLABS_APP_URL`, `COLABS_JUDGE0_URL`, `COLABS_LLM_URL` and `COLABS_LLM_MODEL`.
+Override the defaults with `COLABS_APP_URL`, `COLABS_JUDGE0_URL`, `COLABS_LLM_URL`, `COLABS_LLM_MODEL` and `COLABS_SHELL`.
 
 ```bash
 cd desktop
@@ -139,7 +145,9 @@ npm start -- --url=http://localhost:3000   # run against your local dev server
 npm run dist              # build installers for the current OS into desktop/dist
 ```
 
-**Releases:** pushing a tag like `v1.0.0` runs [`.github/workflows/desktop.yml`](.github/workflows/desktop.yml), which builds `Utkristi-CoLabs-win-x64.exe`, `Utkristi-CoLabs-mac-universal.dmg`, `Utkristi-CoLabs-linux-x64.AppImage` and `.deb`, and attaches them to the GitHub release. The [download page](https://utkristi-colabs.onrender.com/download) reads that release and links straight to the right file for your OS. The builds are unsigned until signing certificates are added as repository secrets, so SmartScreen and Gatekeeper ask once before the first launch.
+**Releases:** `npm run release -- 1.2.0` bumps the web and desktop versions, commits and tags `v1.2.0`; `git push --follow-tags` then runs [`.github/workflows/release.yml`](.github/workflows/release.yml): it checks the server and builds the web app, builds `Utkristi-CoLabs-win-x64.exe`, `Utkristi-CoLabs-mac-universal.dmg`, `Utkristi-CoLabs-linux-x64.AppImage` and `.deb`, publishes one GitHub release with `SHA256SUMS.txt`, and (if the `RENDER_DEPLOY_HOOK` secret is set) redeploys the site. The [download page](https://utkristi-colabs.onrender.com/download) reads the latest release through `/api/release/latest` (cached, with a direct GitHub fallback) and links to the right file for your OS. Builds are unsigned until signing certificates are added as repository secrets, so SmartScreen and Gatekeeper ask once before the first launch.
+
+**Notifications and email fallback:** set `ONESIGNAL_APP_ID` and `ONESIGNAL_REST_API_KEY` (server) plus `REACT_APP_ONESIGNAL_APP_ID` (web build) to enable push. Users are linked by their Firebase uid, and Settings > Notifications has the opt-in switch and a test button. The installed desktop app shows native notifications instead. Email goes Brevo first, then OneSignal email (`ONESIGNAL_FROM_EMAIL`, `ONESIGNAL_FROM_NAME`; the sender domain must be verified in OneSignal), then Resend if `RESEND_API_KEY` is set.
 
 ## Deploying
 

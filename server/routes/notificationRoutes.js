@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const NotificationRepository = require('../repositories/NotificationRepository');
+const OneSignal = require('../services/OneSignalService');
 
 // Get notifications
 router.get('/notifications', async (req, res) => {
@@ -45,6 +46,21 @@ router.delete('/notifications', async (req, res) => {
 router.delete('/notifications/:id', async (req, res) => {
     try {
         await NotificationRepository.deleteNotification(req.params.id);
+        res.json({ success: true });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// Send a test push to the signed-in user (Settings > Notifications).
+router.post('/notifications/test', async (req, res) => {
+    try {
+        const { userId } = req.body || {};
+        if (!userId) return res.status(400).json({ error: "Missing userId" });
+        if (!OneSignal.configured()) return res.status(503).json({ error: "Push is not configured on the server" });
+        const r = await OneSignal.pushToUser(userId, { message: "Push notifications are working.", url: process.env.APP_URL });
+        if (!r.ok) return res.status(502).json({ error: r.reason || "Push was not delivered (is this device subscribed?)" });
         res.json({ success: true });
     } catch (err) {
         console.error(err);

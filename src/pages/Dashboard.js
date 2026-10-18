@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Plus, Search, MoreHorizontal, Pencil, Trash2, Folder, Terminal, Link2, ArrowUpRight, ArrowRight, Check, Sparkles, RotateCcw, X } from 'lucide-react';
+import { Plus, Search, MoreHorizontal, Pencil, Trash2, Folder, FolderOpen, FileUp, Terminal, Link2, ArrowUpRight, ArrowRight, Check, Sparkles, RotateCcw, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
 import AppLayout from '../components/AppLayout';
@@ -9,6 +9,7 @@ import { getBackendUrl } from '../utils/api';
 import useWorkspace, { itemDate, mergeActivity } from '../components/ux/useWorkspace';
 import { Modal, RollingNumber, newRoomId, timeAgo, greeting, extractRoomId } from '../components/ux/primitives';
 import { LANGS } from '../utils/languages';
+import { pickFolder, pickFiles, importProject, describeSkipped } from '../utils/localFiles';
 
 // Project templates: a web app (live preview) plus every runnable language.
 const TEMPLATES = [
@@ -208,6 +209,43 @@ const Dashboard = () => {
         }
     };
 
+    // Open a folder or files from disk as a new project (VS Code style).
+    const importFromDisk = async (kind) => {
+        if (busy) return;
+        let picked;
+        try {
+            picked = kind === 'files' ? await pickFiles() : await pickFolder();
+        } catch (err) {
+            return toast.error(err.message || 'Could not open that');
+        }
+        if (!picked) return;
+        if (!picked.files.length) return toast.error(`Nothing to import. ${describeSkipped(picked.skipped)}`.trim());
+        const id = toast.loading(`Importing ${picked.files.length} file${picked.files.length === 1 ? '' : 's'}…`);
+        setBusy(true);
+        try {
+            const project = await importProject({
+                userId: user.uid,
+                picked,
+                onProgress: (done, total) => toast.loading(`Importing ${done}/${total} files…`, { id }),
+            });
+            toast.success(`Opened ${picked.name}. ${describeSkipped(picked.skipped)}`.trim(), { id });
+            navigate(`/project/${project.id}`);
+        } catch (err) {
+            toast.error(err.message || 'Import failed', { id });
+        } finally {
+            setBusy(false);
+        }
+    };
+
+    // Desktop menu: File > Open Folder / Open Files lands here with ?import=folder|files.
+    const importParam = new URLSearchParams(location.search).get('import');
+    useEffect(() => {
+        if (!user || !importParam || !window.colabsDesktop) return;
+        window.history.replaceState({}, document.title, window.location.pathname);
+        importFromDisk(importParam === 'files' ? 'files' : 'folder');
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [user?.uid, importParam]);
+
     const handleCreateProject = async () => {
         if (!form.name.trim()) return toast.error('Give your project a name.');
         setBusy(true);
@@ -260,6 +298,8 @@ const Dashboard = () => {
                     <h1 className="db-title">Welcome back, {first}</h1>
                 </div>
                 <div className="db-actions">
+                    <button className="u-btn u-btn--ghost db-open" onClick={() => importFromDisk('folder')} disabled={busy} title="Open a folder from your computer as a project (Ctrl+Shift+O in the desktop app)"><FolderOpen size={16} /> Open folder</button>
+                    <button className="u-btn u-btn--ghost db-open" onClick={() => importFromDisk('files')} disabled={busy} title="Open files from your computer as a project"><FileUp size={16} /> Open files</button>
                     <button className="u-btn u-btn--ghost" onClick={() => setCreateOpen(true)}><Folder size={16} /> New project</button>
                     <button className="u-btn u-btn--solid" onClick={() => enterRoom(newRoomId())}><Plus size={16} /> New room</button>
                 </div>

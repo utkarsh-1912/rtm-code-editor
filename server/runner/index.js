@@ -6,7 +6,7 @@ const judge0 = require("./engines/judge0");
 const local = require("./engines/local");
 
 const ENGINES = { judge0, local };
-const MAX_SOURCE = 100 * 1024;
+const MAX_SOURCE = 600 * 1024  // SQL runs carry imported tables as INSERTs;
 const MAX_STDIN = 32 * 1024;
 
 const order = () => (process.env.RUNNER_ENGINES || "judge0,local").split(",").map((s) => s.trim()).filter((n) => ENGINES[n]);

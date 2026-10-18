@@ -30,11 +30,23 @@
       "main.js",
       "preload.js",
       "local.js",
+      "fsAccess.js",
+      "terminal.js",
+      "terminal-preload.js",
+      "terminal.html",
+      "terminal-ui.js",
       "splash.html",
       "build/icon.png"
     ],
     "win": {
-      "target": [{ "target": "nsis", "arch": ["x64"] }],
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
       "artifactName": "Utkristi-CoLabs-win-x64.${ext}"
     },
     "nsis": {
@@ -43,14 +55,31 @@
       "shortcutName": "Utkristi CoLabs"
     },
     "mac": {
-      "target": [{ "target": "dmg", "arch": ["universal"] }],
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "universal"
+          ]
+        }
+      ],
       "category": "public.app-category.developer-tools",
       "artifactName": "Utkristi-CoLabs-mac-universal.${ext}"
     },
     "linux": {
       "target": [
-        { "target": "AppImage", "arch": ["x64"] },
-        { "target": "deb", "arch": ["x64"] }
+        {
+          "target": "AppImage",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "deb",
+          "arch": [
+            "x64"
+          ]
+        }
       ],
       "category": "Development",
       "maintainer": "Utkristi.io",

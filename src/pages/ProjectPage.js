@@ -53,8 +53,13 @@ import {
     User,
     Bot,
     History,
-    Activity
+    Activity,
+    SquareTerminal,
+    HardDriveDownload,
+    FileUp,
+    FolderOpen
 } from "lucide-react";
+import { pickFiles, pickFolder, uploadFiles, describeSkipped, saveToDisk, openTerminal, rootFor, linkRoot, canWriteToDisk, canOpenTerminal } from "../utils/localFiles";
 
 const ProjectPage = () => {
     const { projectId } = useParams();
@@ -823,6 +828,61 @@ const ProjectPage = () => {
         reader.readAsText(file);
     };
 
+    // ---- Disk (desktop app: open/save to a folder, terminal; browser: add files) ----
+    const handleAddFromDisk = async (kind) => {
+        let picked;
+        try {
+            picked = kind === 'folder' ? await pickFolder() : await pickFiles();
+        } catch (err) {
+            return toast.error(err.message || 'Could not open that');
+        }
+        if (!picked) return;
+        if (!picked.files.length) return toast.error(`Nothing to add. ${describeSkipped(picked.skipped)}`.trim());
+        const id = toast.loading(`Adding ${picked.files.length} file${picked.files.length === 1 ? '' : 's'}…`);
+        try {
+            const saved = await uploadFiles(projectId, picked.files, (done, total) => toast.loading(`Adding ${done}/${total} files…`, { id }));
+            setFiles((prev) => {
+                const byPath = new Map(prev.map((f) => [f.path, f]));
+                saved.forEach((f) => byPath.set(f.path, f));
+                return [...byPath.values()];
+            });
+            if (kind === 'folder' && picked.root && !rootFor(projectId)) linkRoot(projectId, picked.root);
+            toast.success(`Added ${saved.length} file${saved.length === 1 ? '' : 's'}. ${describeSkipped(picked.skipped)}`.trim(), { id });
+        } catch (err) {
+            toast.error(err.message || 'Could not add files', { id });
+        }
+    };
+
+    const handleSaveToDisk = async (chooseFolder = false) => {
+        try {
+            const r = await saveToDisk(projectId, filesRef.current, { chooseFolder });
+            if (r) toast.success(`Saved ${r.written} file${r.written === 1 ? '' : 's'} to ${r.root}`);
+        } catch (err) {
+            // The folder may have been moved or never opened here: ask for one.
+            if (!chooseFolder && /not opened|ENOENT/i.test(err.message || '')) return handleSaveToDisk(true);
+            toast.error(err.message || 'Save failed');
+        }
+    };
+
+    const handleOpenTerminal = async () => {
+        try {
+            await openTerminal(projectId, project?.name);
+            if (!rootFor(projectId)) toast('Terminal opened in your home folder. Use "Save to disk" to give this project a folder.', { icon: '›' });
+        } catch (err) {
+            toast.error(err.message || 'Could not open a terminal');
+        }
+    };
+
+    const diskActions = [
+        ...(canOpenTerminal() ? [{ id: 'terminal', label: 'Open terminal (Ctrl+`)', icon: <SquareTerminal size={18} />, onClick: handleOpenTerminal, pin: !isMobile }] : []),
+        ...(canWriteToDisk() ? [
+            { id: 'save-disk', label: rootFor(projectId) ? 'Save to disk' : 'Save to disk…', icon: <HardDriveDownload size={18} />, onClick: () => handleSaveToDisk(false), section: 'more' },
+            ...(rootFor(projectId) ? [{ id: 'save-disk-as', label: 'Save to another folder…', icon: <HardDriveDownload size={18} />, onClick: () => handleSaveToDisk(true), section: 'more' }] : []),
+        ] : []),
+        { id: 'add-files', label: 'Add files from disk', icon: <FileUp size={18} />, onClick: () => handleAddFromDisk('files'), section: 'more' },
+        { id: 'add-folder', label: 'Add folder from disk', icon: <FolderOpen size={18} />, onClick: () => handleAddFromDisk('folder'), section: 'more' },
+    ];
+
 
 
     if (loading) {
@@ -933,6 +993,7 @@ const ProjectPage = () => {
                         { id: 'board', label: 'Whiteboard', icon: <Layout size={18} />, onClick: () => setShowWhiteboard(true) },
                         { id: 'ai', label: 'AI Copilot', icon: <Bot size={18} />, onClick: () => setShowAICopilot(true) },
                         { id: 'invite', label: 'Invite team', icon: <Plus size={18} />, onClick: () => setShowInviteModal(true) },
+                        ...diskActions,
                         { id: 'search', label: 'Command palette (Ctrl+K)', icon: <Search size={18} />, onClick: () => setShowCommandPalette(true), section: 'more' },
                         { id: 'focus', label: 'Focus mode (Alt+F)', icon: <Zap size={18} />, onClick: () => setShowFocusModal(true), section: 'more' },
                         { id: 'history', label: 'Version history', icon: <History size={18} />, onClick: () => setShowDiffViewer(true), section: 'more' },

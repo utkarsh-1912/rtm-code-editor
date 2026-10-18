@@ -4,6 +4,7 @@ import { Globe, Smartphone, Monitor, Apple, ArrowUpRight, Download as DownloadIc
 import SiteLayout, { PageHead } from "../components/Site/SiteLayout";
 import CtaBand from "../components/Site/CtaBand";
 import { pad2 } from "../components/ux/primitives";
+import { getBackendUrl } from "../utils/api";
 
 const REPO = "utkarsh-1912/rtm-code-editor";
 const RELEASES = `https://github.com/${REPO}/releases`;
@@ -43,9 +44,13 @@ export default function Download() {
 
     useEffect(() => {
         let alive = true;
-        fetch(`https://api.github.com/repos/${REPO}/releases/latest`, { headers: { Accept: "application/vnd.github+json" } })
+        // Our server caches the GitHub lookup; fall back to GitHub directly if it is asleep.
+        const fromServer = () => fetch(`${getBackendUrl()}/api/release/latest`).then((r) => (r.ok ? r.json() : Promise.reject(r.status)));
+        const fromGitHub = () => fetch(`https://api.github.com/repos/${REPO}/releases/latest`, { headers: { Accept: "application/vnd.github+json" } })
             .then((r) => (r.ok ? r.json() : Promise.reject(r.status)))
-            .then((d) => alive && setRelease({ state: "ok", tag: d.tag_name, date: d.published_at, url: d.html_url, assets: d.assets || [] }))
+            .then((d) => ({ tag: d.tag_name, date: d.published_at, url: d.html_url, assets: (d.assets || []).map((a) => ({ name: a.name, size: a.size, url: a.browser_download_url })) }));
+        fromServer().catch(fromGitHub)
+            .then((d) => alive && setRelease({ state: "ok", ...d }))
             .catch(() => alive && setRelease({ state: "none" }));
         return () => { alive = false; };
     }, []);
@@ -64,7 +69,7 @@ export default function Download() {
                 {os === "mobile" || !primary ? (
                     <Link to="/" className="u-btn u-btn--solid u-btn--lg">Open in the browser <ArrowUpRight size={16} /></Link>
                 ) : primaryAsset ? (
-                    <a href={primaryAsset.browser_download_url} className="u-btn u-btn--solid u-btn--lg"><DownloadIcon size={16} /> Download for {primary.name} · {mb(primaryAsset.size)}</a>
+                    <a href={primaryAsset.url} className="u-btn u-btn--solid u-btn--lg"><DownloadIcon size={16} /> Download for {primary.name} · {mb(primaryAsset.size)}</a>
                 ) : (
                     <a href={RELEASES} target="_blank" rel="noreferrer" className="u-btn u-btn--solid u-btn--lg"><DownloadIcon size={16} /> {primary.name} build · see releases</a>
                 )}
@@ -93,8 +98,8 @@ export default function Download() {
                                     <div className="u-row-side">
                                         {asset ? (
                                             <>
-                                                {alt && <a href={alt.browser_download_url} className="u-btn u-btn--ghost u-btn--sm">.deb</a>}
-                                                <a href={asset.browser_download_url} className="u-btn u-btn--solid u-btn--sm"><DownloadIcon size={14} /> {asset.name.split(".").pop()} · {mb(asset.size)}</a>
+                                                {alt && <a href={alt.url} className="u-btn u-btn--ghost u-btn--sm">.deb</a>}
+                                                <a href={asset.url} className="u-btn u-btn--solid u-btn--sm"><DownloadIcon size={14} /> {asset.name.split(".").pop()} · {mb(asset.size)}</a>
                                             </>
                                         ) : release.state === "loading" ? (
                                             <span className="u-skel" style={{ width: 120, height: 32 }} />

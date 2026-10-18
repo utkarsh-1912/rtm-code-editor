@@ -35,6 +35,7 @@ import Client from "../components/clients";
 import { LANGUAGES, THEMES } from "../config";
 import { useAuth } from "../context/AuthContext";
 import { runCode, formatRun } from "../utils/runner";
+import { buildSqlPrelude } from "../utils/sqlData";
 import { isTemplate, templateFor } from "../utils/languages";
 import { CLIENT_ID } from "../utils/clientId";
 import { resolveTheme, setThemePref } from "../utils/theme";
@@ -98,6 +99,7 @@ function Editor() {
   const [unreadChatCount, setUnreadChatCount] = useState(0);
 
   const [stdin, setStdin] = useState("");
+  const [sqlTables, setSqlTables] = useState([]); // imported CSV/JSON tables for SQL rooms
 
   // Role comes from in-app navigation or a shared link (?role=viewer).
   const [role] = useState(location.state?.role || new URLSearchParams(location.search).get("role") || "editor");
@@ -480,7 +482,8 @@ function Editor() {
     let failed;
     let time;
     try {
-      const result = await runCode({ language, source: codeRef.current, stdin });
+      const source = language === "sql" ? buildSqlPrelude(sqlTables) + codeRef.current : codeRef.current;
+      const result = await runCode({ language, source, stdin });
       text = formatRun(result);
       failed = !result.ok;
       time = result.timeMs != null ? (result.timeMs / 1000).toFixed(3) : undefined;
@@ -562,7 +565,7 @@ function Editor() {
                     />
                   )}
                   {activeTab === "output" && (
-                    <OutputWindow output={output} isError={isError} time={execTime} isMobile={isMobile} stdin={stdin} setStdin={setStdin} isLightMode={isLightMode} />
+                    <OutputWindow output={output} isError={isError} time={execTime} isMobile={isMobile} stdin={stdin} setStdin={setStdin} isLightMode={isLightMode} language={language} tables={sqlTables} setTables={setSqlTables} />
                   )}
                   {activeTab === "chat" && (
                     <ChatWindow
@@ -675,6 +678,9 @@ function Editor() {
                             stdin={stdin}
                             setStdin={setStdin}
                             isLightMode={isLightMode}
+                            language={language}
+                            tables={sqlTables}
+                            setTables={setSqlTables}
                           />
                         </div>
                       </ReflexElement>

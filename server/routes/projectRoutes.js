@@ -2,6 +2,8 @@ const express = require('express');
 const router = express.Router();
 const ProjectRepository = require('../repositories/ProjectRepository');
 const MailService = require('../services/MailService');
+const UserRepository = require('../repositories/UserRepository');
+const NotificationRepository = require('../repositories/NotificationRepository');
 
 // Get all projects for a user
 router.get('/projects', async (req, res) => {
@@ -90,7 +92,8 @@ router.post('/projects/:id/files/bulk', express.json({ limit: '10mb' }), async (
             if (!path || path.includes('..') || path.length > 400) return res.status(400).json({ error: `Bad path: ${f.path}` });
             const content = String(f.content ?? '');
             if (Buffer.byteLength(content) > MAX_FILE_BYTES) return res.status(413).json({ error: `${path} is larger than 1 MB` });
-            clean.push({ name: path, path, content });
+            // Same convention as files created in the editor: name = relative path, path = "/" + it.
+            clean.push({ name: path, path: `/${path}`, content });
         }
         const saved = await ProjectRepository.upsertProjectFiles(req.params.id, clean);
         res.json({ success: true, count: saved.length, files: saved });
@@ -132,17 +135,20 @@ router.post('/projects/:id/invite', async (req, res) => {
             recipientEmail: email
         });
 
-        const BREVO_KEY = process.env.BREVO_API_KEY;
-        if (BREVO_KEY) {
-            await MailService.fetchRelay("https://api.brevo.com/v3/smtp/email", {
-                sender: { name: "Utkristi Colabs", email: process.env.BREVO_FROM_EMAIL || "noreply@rtm-edit.com" },
-                to: [{ email }],
-                subject: `Invitation to collaborate on ${projectTitle}`,
-                htmlContent: html
-            }, BREVO_KEY);
+        const mail = await MailService.deliver({ to: email, subject: `Invitation to collaborate on ${projectTitle}`, html });
+
+        // If the invitee already has an account, also notify them in-app and by push.
+        const invitee = await UserRepository.getUserByEmail(email).catch(() => null);
+        if (invitee) {
+            await NotificationRepository.notifyUser(invitee.auth_provider_id, {
+                type: 'invite',
+                message: `${inviterName || 'A teammate'} invited you to "${projectTitle}"`,
+                url: `${process.env.APP_URL || 'http://localhost:5000'}/project/${req.params.id}`,
+                data: { projectId: req.params.id },
+            }).catch(() => { });
         }
 
-        res.json({ success: true, message: "Invitation sent successfully" });
+        res.json({ success: true, emailed: mail.success, provider: mail.provider, message: mail.success ? "Invitation sent successfully" : "Invitation saved, but no email provider could deliver it" });
     } catch (err) {
         console.error(err);
         res.status(500).json({ error: err.message });

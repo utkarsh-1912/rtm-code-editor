@@ -6,6 +6,7 @@ import { useAuth } from '../context/AuthContext';
 import { getBackendUrl } from '../utils/api';
 import { getThemePref, setThemePref } from '../utils/theme';
 import { Modal, pad2, timeAgo } from '../components/ux/primitives';
+import { pushConfigured, pushStatus, enablePush, disablePush } from '../utils/push';
 
 const SECTIONS = [
     { id: 'profile', title: 'Profile' },
@@ -46,6 +47,18 @@ const Settings = () => {
     const [profile, setProfile] = useState({ name: user?.name || '', bio: '', socials: { twitter: '', github: '' } });
     const [theme, setTheme] = useState(getThemePref);
     const [notifs, setNotifs] = useState(loadNotifPrefs);
+    const [push, setPush] = useState({ supported: false, enabled: false });
+    useEffect(() => { if (pushConfigured()) pushStatus().then(setPush).catch(() => { }); }, []);
+    const togglePush = async () => {
+        try {
+            setPush(push.enabled ? await disablePush() : await enablePush());
+        } catch (err) { toast.error(err.message || 'Could not change push settings'); }
+    };
+    const testPush = async () => {
+        const res = await fetch(`${getBackendUrl()}/api/notifications/test`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId: user.uid }) });
+        const data = await res.json().catch(() => ({}));
+        if (res.ok) toast.success('Test sent. It should arrive in a moment.'); else toast.error(data.error || 'Test failed');
+    };
     const [sessions, setSessions] = useState([]);
     const [sessionsLoading, setSessionsLoading] = useState(false);
     const [deleteOpen, setDeleteOpen] = useState(false);
@@ -241,6 +254,19 @@ const Settings = () => {
                                     </li>
                                 ))}
                             </ul>
+                            {push.supported && (
+                                <ul className="g-rules">
+                                    <li>
+                                        <span>{pad2(NOTIFS.length + 1)}</span>
+                                        <div>
+                                            <h5>Push notifications</h5>
+                                            <p>Invites and mentions on this device, even when the tab is closed.</p>
+                                            <div className="g-cap">{push.enabled ? 'on' : 'off'}{push.enabled && <> · <button type="button" className="u-link" onClick={testPush}>send a test</button></>}</div>
+                                        </div>
+                                        <button className="u-switch" role="switch" aria-checked={!!push.enabled} aria-label="Push notifications" onClick={togglePush} />
+                                    </li>
+                                </ul>
+                            )}
                         </div>
                     )}
 
