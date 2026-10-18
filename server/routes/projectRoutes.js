@@ -86,7 +86,7 @@ router.post('/projects/:id/files/bulk', express.json({ limit: '10mb' }), async (
         if (files.length > MAX_FILES) return res.status(413).json({ error: `At most ${MAX_FILES} files per request` });
         const clean = [];
         for (const f of files) {
-            const path = String(f.path || '').replace(/\/g, '/').replace(/^\/+/, '');
+            const path = String(f.path || '').replace(/\\/g, '/').replace(/^\/+/, '');
             if (!path || path.includes('..') || path.length > 400) return res.status(400).json({ error: `Bad path: ${f.path}` });
             const content = String(f.content ?? '');
             if (Buffer.byteLength(content) > MAX_FILE_BYTES) return res.status(413).json({ error: `${path} is larger than 1 MB` });
