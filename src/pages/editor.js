@@ -36,6 +36,7 @@ import { LANGUAGES, THEMES } from "../config";
 import { useAuth } from "../context/AuthContext";
 import { runCode, formatRun } from "../utils/runner";
 import { buildSqlPrelude } from "../utils/sqlData";
+import { track } from "../utils/track";
 import { isTemplate, templateFor } from "../utils/languages";
 import { CLIENT_ID } from "../utils/clientId";
 import { resolveTheme, setThemePref } from "../utils/theme";
@@ -53,6 +54,7 @@ import VideoChat from "../components/VideoChat";
 import WorkspaceHeader from "../components/WorkspaceHeader";
 import CommandPalette from "../components/CommandPalette";
 import ShareModal from "../components/ShareModal";
+import { getBackendUrl, publicOrigin } from "../utils/api";
 
 function Editor() {
   const socketRef = useRef(null);
@@ -149,11 +151,12 @@ function Editor() {
       }
       if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
         e.preventDefault();
+        e.stopPropagation(); // CodeMirror's Mod-Enter would insert a blank line
         runShortcutRef.current?.();
       }
     };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    window.addEventListener('keydown', handleKeyDown, true);
+    return () => window.removeEventListener('keydown', handleKeyDown, true);
   }, []);
 
   useEffect(() => {
@@ -250,14 +253,6 @@ function Editor() {
   useEffect(() => {
     if (authLoading || !userName) return;
     const init = async () => {
-      // Helper to get sanitized backend URL
-      const getBackendUrl = () => {
-        let url = process.env.REACT_APP_BACKEND_URL || window.location.origin;
-        if (url.endsWith("/")) url = url.slice(0, -1);
-        // Ensure it doesn't just result in "https:" or similar malformed strings
-        if (url === "https:" || url === "http:") url = window.location.origin;
-        return url;
-      };
 
       const backendUrl = getBackendUrl();
 
@@ -457,7 +452,7 @@ function Editor() {
   };
 
   const handleShare = async (shareRole = "editor") => {
-    const shareUrl = `${window.location.origin}/editor/${encodeURIComponent(roomId)}${shareRole === "viewer" ? "?role=viewer" : ""}`;
+    const shareUrl = `${publicOrigin()}/editor/${encodeURIComponent(roomId)}${shareRole === "viewer" ? "?role=viewer" : ""}`;
     try {
       await navigator.clipboard.writeText(shareUrl);
       toast.success(shareRole === "viewer" ? "Spectator link copied!" : "Editor link copied!");
@@ -474,28 +469,33 @@ function Editor() {
       toast.error("Spectators cannot execute code.");
       return;
     }
+    if (isExecuting) return;
     setIsExecuting(true);
-    socketRef.current?.emit(ACTIONS.SYNC_EXECUTE, { roomId, isExecuting: true });
+    socketRef.current?.emit(ACTIONS.SYNC_EXECUTE, { roomId, isExecuting: true, by: userName });
     if (isMobile) setActiveTab("output");
 
     let text;
     let failed;
     let time;
+    let meta = { by: userName, at: Date.now() };
     try {
       const source = language === "sql" ? buildSqlPrelude(sqlTables) + codeRef.current : codeRef.current;
       const result = await runCode({ language, source, stdin });
       text = formatRun(result);
       failed = !result.ok;
       time = result.timeMs != null ? (result.timeMs / 1000).toFixed(3) : undefined;
+      track("CODE_RUN", { userId: user?.uid, roomId, language, ok: !failed, engine: result.engine });
+      meta = { ...meta, status: result.status, engine: result.engine, exitCode: result.exitCode ?? null };
     } catch (error) {
       text = `Could not run the code: ${error.message}`;
       failed = true;
+      meta = { ...meta, status: "Runner unavailable" };
     }
     setOutput(text);
     setIsError(failed);
     setExecTime(time);
     setIsExecuting(false);
-    socketRef.current?.emit(ACTIONS.SYNC_OUTPUT, { roomId, output: text, isError: failed, time });
+    socketRef.current?.emit(ACTIONS.SYNC_OUTPUT, { roomId, output: text, isError: failed, time, meta });
     socketRef.current?.emit(ACTIONS.SYNC_EXECUTE, { roomId, isExecuting: false });
   };
 

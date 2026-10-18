@@ -13,6 +13,20 @@ function setupWhiteboardSocket(io, socket, safeSocket, context) {
         socket.in(roomId).emit(ACTIONS.WHITEBOARD_DRAW, data);
     }));
 
+    // Live cursors on the board (board coordinates). Volatile: a dropped frame doesn't matter.
+    socket.on(ACTIONS.WHITEBOARD_CURSOR, safeSocket((data) => {
+        const roomId = data?.roomId;
+        if (!roomId || !socket.rooms.has(roomId)) return;
+        const x = Number(data.x), y = Number(data.y);
+        if (!data.gone && (!Number.isFinite(x) || !Number.isFinite(y))) return;
+        socket.volatile.to(roomId).emit(ACTIONS.WHITEBOARD_CURSOR, {
+            socketId: socket.id,
+            x, y,
+            gone: !!data.gone,
+            userName: String(data.userName || 'Guest').slice(0, 40),
+        });
+    }));
+
     socket.on(ACTIONS.WHITEBOARD_SYNC_REQUEST, safeSocket(({ roomId }) => {
         socket.emit(ACTIONS.WHITEBOARD_SYNC, { elements: roomWhiteboardState[roomId] || [] });
     }));

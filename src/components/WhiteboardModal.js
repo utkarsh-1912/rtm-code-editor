@@ -5,8 +5,23 @@ import {
 } from "lucide-react";
 import toast from "react-hot-toast";
 import ACTIONS from "../Action";
+import { resolveTheme } from "../utils/theme";
 
-const generateId = () => Math.random().toString(36).substr(2, 9);
+const generateId = () => Math.random().toString(36).slice(2, 11);
+
+// Shortcut keys match common whiteboard apps.
+const TOOLS = [
+    { id: "hand", key: "h", label: "Pan", Icon: Hand },
+    { id: "pencil", key: "p", label: "Pen", Icon: Pencil },
+    { id: "eraser", key: "e", label: "Eraser", Icon: Eraser },
+    { id: "text", key: "t", label: "Text", Icon: Type },
+    { id: "square", key: "r", label: "Rectangle", Icon: Square },
+    { id: "circle", key: "o", label: "Ellipse", Icon: Circle },
+    { id: "line", key: "l", label: "Line", Icon: Minus },
+];
+// "ink" is drawn in each viewer's own text colour, so it reads on dark and light boards.
+const PALETTE = ["ink", "#F05252", "#F5B544", "#4ADE80", "#38BDF8", "#7AA2FF", "#A78BFA", "#F472B6"];
+const inkColor = () => (resolveTheme() === "light" ? "#1B1A17" : "#F2F1EC");
 
 const WhiteboardModal = ({ isOpen, onClose, socketRef, roomId }) => {
     const canvasRef = useRef(null);
@@ -17,8 +32,8 @@ const WhiteboardModal = ({ isOpen, onClose, socketRef, roomId }) => {
     const historyIndexRef = useRef(0);
 
     const [tool, setTool] = useState("pencil");
-    const [color, setColor] = useState("#3b82f6");
-    const [brushSize, setBrushSize] = useState(3);
+    const [color, setColor] = useState("ink");
+    const [brushSize, setBrushSize] = useState(4);
 
     const [pan, setPan] = useState({ x: 0, y: 0 });
     const [zoom, setZoom] = useState(1);
@@ -27,6 +42,7 @@ const WhiteboardModal = ({ isOpen, onClose, socketRef, roomId }) => {
     const [isPanning, setIsPanning] = useState(false);
     const [currentElement, setCurrentElement] = useState(null);
     const lastMousePos = useRef({ x: 0, y: 0 });
+    const lastCursorSent = useRef(0);
 
     const [cursors, setCursors] = useState({});
     const [remoteStreams, setRemoteStreams] = useState({});
@@ -34,6 +50,14 @@ const WhiteboardModal = ({ isOpen, onClose, socketRef, roomId }) => {
     // Text tool state
     const [textInput, setTextInput] = useState({ active: false, x: 0, y: 0, value: "" });
     const textInputRef = useRef(null);
+
+    // "ink" strokes follow the theme, so redraw when it changes.
+    const [themeTick, setThemeTick] = useState(0);
+    useEffect(() => {
+        const bump = () => setThemeTick((t) => t + 1);
+        window.addEventListener("app-theme-change", bump);
+        return () => window.removeEventListener("app-theme-change", bump);
+    }, []);
 
     const [isMobileUI, setIsMobileUI] = useState(window.innerWidth < 768);
     useEffect(() => {
@@ -99,9 +123,20 @@ const WhiteboardModal = ({ isOpen, onClose, socketRef, roomId }) => {
             }
         };
 
-        const onCursor = ({ x, y, userName, socketId }) => {
-            setCursors(prev => ({ ...prev, [socketId]: { x, y, userName } }));
+        const onCursor = ({ x, y, userName, socketId, gone }) => {
+            setCursors(prev => {
+                const next = { ...prev };
+                if (gone) delete next[socketId];
+                else next[socketId] = { x, y, userName, ts: Date.now() };
+                return next;
+            });
         };
+        // Drop cursors that stopped moving (closed the board, went idle).
+        const prune = setInterval(() => setCursors(prev => {
+            const now = Date.now();
+            const live = Object.fromEntries(Object.entries(prev).filter(([, c]) => now - c.ts < 15000));
+            return Object.keys(live).length === Object.keys(prev).length ? prev : live;
+        }), 3000);
 
         const onDisconnected = ({ socketId }) => {
             setCursors(prev => { const next = { ...prev }; delete next[socketId]; return next; });
@@ -114,6 +149,8 @@ const WhiteboardModal = ({ isOpen, onClose, socketRef, roomId }) => {
         socket.on(ACTIONS.DISCONNECTED, onDisconnected);
 
         return () => {
+            clearInterval(prune);
+            socket.emit(ACTIONS.WHITEBOARD_CURSOR, { roomId, gone: true });
             socket.off(ACTIONS.WHITEBOARD_SYNC, onSync);
             socket.off(ACTIONS.WHITEBOARD_DRAW, onDraw);
             socket.off(ACTIONS.WHITEBOARD_CURSOR, onCursor);
@@ -155,13 +192,14 @@ const WhiteboardModal = ({ isOpen, onClose, socketRef, roomId }) => {
     // --- Rendering ---
     const drawElement = (ctx, el) => {
         ctx.globalCompositeOperation = el.type === 'eraser' ? 'destination-out' : 'source-over';
+        const paint = el.color === 'ink' ? inkColor() : el.color;
         if (el.type === 'text') {
-            ctx.fillStyle = el.color;
+            ctx.fillStyle = paint;
             ctx.font = `${el.size * 4 + 8}px Inter, sans-serif`;
             ctx.fillText(el.text, el.x1, el.y1);
             return;
         }
-        ctx.strokeStyle = el.color;
+        ctx.strokeStyle = el.type === 'eraser' ? '#000' : paint;
         ctx.lineWidth = el.size;
         ctx.lineCap = "round";
         ctx.lineJoin = "round";
@@ -191,21 +229,11 @@ const WhiteboardModal = ({ isOpen, onClose, socketRef, roomId }) => {
         ctx.translate(pan.x * window.devicePixelRatio, pan.y * window.devicePixelRatio);
         ctx.scale(zoom * window.devicePixelRatio, zoom * window.devicePixelRatio);
 
-        const gridSize = 40;
-        const startX = -pan.x / zoom, startY = -pan.y / zoom;
-        const endX = startX + canvas.width / (zoom * window.devicePixelRatio), endY = startY + canvas.height / (zoom * window.devicePixelRatio);
-        ctx.strokeStyle = "var(--u-tint)";
-        ctx.lineWidth = 1 / zoom;
-        ctx.beginPath();
-        for (let x = Math.floor(startX / gridSize) * gridSize; x < endX; x += gridSize) { ctx.moveTo(x, startY); ctx.lineTo(x, endY); }
-        for (let y = Math.floor(startY / gridSize) * gridSize; y < endY; y += gridSize) { ctx.moveTo(startX, y); ctx.lineTo(endX, y); }
-        ctx.stroke();
-
         elements.forEach(el => drawElement(ctx, el));
         Object.values(remoteStreams).forEach(el => drawElement(ctx, el));
         if (currentElement) drawElement(ctx, currentElement);
         ctx.restore();
-    }, [elements, remoteStreams, currentElement, pan, zoom]); // eslint-disable-line
+    }, [elements, remoteStreams, currentElement, pan, zoom, themeTick]); // eslint-disable-line
 
     useEffect(() => { renderCanvas(); }, [renderCanvas]);
 
@@ -238,8 +266,7 @@ const WhiteboardModal = ({ isOpen, onClose, socketRef, roomId }) => {
         return {
             x: (clientX - rect.left - pan.x) / zoom,
             y: (clientY - rect.top - pan.y) / zoom,
-            rawX: clientX, rawY: clientY
-        };
+                    };
     };
 
     const handlePointerDown = (e) => {
@@ -261,7 +288,7 @@ const WhiteboardModal = ({ isOpen, onClose, socketRef, roomId }) => {
         setIsDrawing(true);
         const newElement = {
             id: generateId(), type: tool,
-            color: tool === 'eraser' ? 'rgba(255,255,255,1)' : color,
+            color: tool === 'eraser' ? '#000' : color,
             size: tool === 'eraser' ? brushSize * 3 : brushSize,
             points: [{ x, y }], x1: x, y1: y, x2: x, y2: y,
             socketId: socketRef.current?.id
@@ -283,8 +310,13 @@ const WhiteboardModal = ({ isOpen, onClose, socketRef, roomId }) => {
     };
 
     const handlePointerMove = (e) => {
-        const { x, y, rawX, rawY } = getPos(e);
-        socketRef.current?.emit(ACTIONS.WHITEBOARD_CURSOR, { roomId, x: rawX, y: rawY, userName: socketRef.current.userName || "Guest", socketId: socketRef.current.id });
+        const { x, y } = getPos(e);
+        // Board coordinates, so each viewer places the cursor with their own pan and zoom.
+        const now = performance.now();
+        if (now - lastCursorSent.current > 40) {
+            lastCursorSent.current = now;
+            socketRef.current?.emit(ACTIONS.WHITEBOARD_CURSOR, { roomId, x, y, userName: socketRef.current.userName || "Guest", socketId: socketRef.current.id });
+        }
         if (isPanning) {
             const cx = e.clientX || e.touches?.[0]?.clientX;
             const cy = e.clientY || e.touches?.[0]?.clientY;
@@ -318,194 +350,194 @@ const WhiteboardModal = ({ isOpen, onClose, socketRef, roomId }) => {
         setCurrentElement(null);
     };
 
-    const handleWheel = (e) => {
-        e.preventDefault();
-        if (e.ctrlKey) setZoom(prev => Math.min(Math.max(0.1, prev * (e.deltaY > 0 ? 0.9 : 1.1)), 5));
-        else setPan(prev => ({ x: prev.x - e.deltaX, y: prev.y - e.deltaY }));
+    // Wheel: pan, Ctrl/pinch zooms around the pointer. Native listener so preventDefault works.
+    const areaRef = useRef(null);
+    useEffect(() => {
+        const el = areaRef.current;
+        if (!isOpen || !el) return undefined;
+        const onWheel = (e) => {
+            e.preventDefault();
+            if (e.ctrlKey || e.metaKey) {
+                const r = el.getBoundingClientRect();
+                const px = e.clientX - r.left, py = e.clientY - r.top;
+                setZoom((z) => {
+                    const next = Math.min(Math.max(0.1, z * (e.deltaY > 0 ? 0.9 : 1.1)), 5);
+                    setPan((p) => ({ x: px - ((px - p.x) / z) * next, y: py - ((py - p.y) / z) * next }));
+                    return next;
+                });
+            } else {
+                setPan((p) => ({ x: p.x - e.deltaX, y: p.y - e.deltaY }));
+            }
+        };
+        el.addEventListener('wheel', onWheel, { passive: false });
+        return () => el.removeEventListener('wheel', onWheel);
+    }, [isOpen]);
+
+    const zoomBy = (factor) => {
+        const el = areaRef.current;
+        const cx = (el?.clientWidth || 0) / 2, cy = (el?.clientHeight || 0) / 2;
+        setZoom((z) => {
+            const next = Math.min(Math.max(0.1, z * factor), 5);
+            setPan((p) => ({ x: cx - ((cx - p.x) / z) * next, y: cy - ((cy - p.y) / z) * next }));
+            return next;
+        });
+    };
+    const resetView = () => { setZoom(1); setPan({ x: 0, y: 0 }); };
+
+    const [confirmClear, setConfirmClear] = useState(false);
+    const clearCanvas = () => {
+        commitAction([]);
+        socketRef.current?.emit(ACTIONS.WHITEBOARD_DRAW, { roomId, action: 'CLEAR' });
+        setConfirmClear(false);
     };
 
-    const clearCanvas = () => { commitAction([]); socketRef.current?.emit(ACTIONS.WHITEBOARD_DRAW, { roomId, action: 'CLEAR' }); };
-    const downloadImage = () => { const l = document.createElement("a"); l.download = "rtm-whiteboard.png"; l.href = canvasRef.current.toDataURL("image/png"); l.click(); toast.success("Exported!"); };
+    // Export on the board's own background so the PNG isn't transparent.
+    const downloadImage = () => {
+        const src = canvasRef.current;
+        const out = document.createElement('canvas');
+        out.width = src.width; out.height = src.height;
+        const ctx = out.getContext('2d');
+        ctx.fillStyle = getComputedStyle(areaRef.current).backgroundColor || '#111';
+        ctx.fillRect(0, 0, out.width, out.height);
+        ctx.drawImage(src, 0, 0);
+        const l = document.createElement('a');
+        l.download = `whiteboard-${roomId}.png`;
+        l.href = out.toDataURL('image/png');
+        l.click();
+        toast.success('Exported as PNG');
+    };
+
+    // Shortcuts (ignored while typing text on the board).
+    useEffect(() => {
+        if (!isOpen) return undefined;
+        const onKey = (e) => {
+            if (textInput.active || /input|textarea|select/i.test(e.target.tagName)) return;
+            const k = e.key.toLowerCase();
+            if ((e.ctrlKey || e.metaKey) && k === 'z') { e.preventDefault(); if (e.shiftKey) handleRedo(); else handleUndo(); return; }
+            if ((e.ctrlKey || e.metaKey) && k === 'y') { e.preventDefault(); handleRedo(); return; }
+            if (e.ctrlKey || e.metaKey || e.altKey) return;
+            if (k === 'escape') { onClose(); return; }
+            const t = TOOLS.find((x) => x.key === k);
+            if (t) setTool(t.id);
+            if (k === '0') resetView();
+            if (k === '=' || k === '+') zoomBy(1.2);
+            if (k === '-') zoomBy(1 / 1.2);
+        };
+        window.addEventListener('keydown', onKey);
+        return () => window.removeEventListener('keydown', onKey);
+    });
 
     if (!isOpen) return null;
 
-    const COLORS = ["#ffffff", "#94a3b8", "var(--u-bad)", "#f59e0b", "#10b981", "#3b82f6", "#8b5cf6", "#ec4899"];
-
-    const ToolBtn = ({ id, icon, label }) => (
-        <button
-            onClick={() => { setTool(id); if (textInput.active) commitTextInput(); }}
-            title={label}
-            style={{
-                padding: isMobileUI ? "8px" : "10px",
-                borderRadius: "10px", border: "none",
-                backgroundColor: tool === id ? "rgba(59,130,246,0.25)" : "transparent",
-                color: tool === id ? "#3b82f6" : "var(--text-muted)",
-                cursor: "pointer", transition: "all 0.15s",
-                display: "flex", alignItems: "center", justifyContent: "center",
-                flexShrink: 0
-            }}
-        >
-            {icon}
-        </button>
-    );
-
-    const size = isMobileUI ? 18 : 20;
+    const people = Object.keys(cursors).length + 1;
+    const cursorColor = (id) => PALETTE[1 + (Math.abs([...String(id)].reduce((h, c) => h * 31 + c.charCodeAt(0), 7)) % (PALETTE.length - 1))];
+    const grid = 24 * zoom;
 
     return (
-        <div style={{
-            position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
-            backgroundColor: "rgba(0,0,0,0.88)", zIndex: 2000,
-            display: "flex", alignItems: "center", justifyContent: "center",
-            backdropFilter: "blur(12px)"
-        }}>
-            <div style={{
-                width: isMobileUI ? "100vw" : "95vw",
-                height: isMobileUI ? "100dvh" : "90vh",
-                backgroundColor: "var(--bg-dark)",
-                borderRadius: isMobileUI ? 0 : "24px",
-                border: isMobileUI ? "none" : "1px solid var(--u-line)",
-                display: "flex", flexDirection: "column", overflow: "hidden",
-                boxShadow: "0 35px 60px -15px rgba(0, 0, 0, 0.7)"
-            }}>
+        <div className="wb" role="dialog" aria-modal="true" aria-label="Whiteboard">
+            <header className="wb-top">
+                <strong>Whiteboard</strong>
+                <span className="wb-meta">{people} {people === 1 ? 'person' : 'people'} · room {roomId}</span>
+                <span className="wb-top-actions">
+                    <button onClick={handleUndo} disabled={historyIndex === 0} title="Undo (Ctrl+Z)" aria-label="Undo"><Undo2 size={16} /></button>
+                    <button onClick={handleRedo} disabled={historyIndex === history.length - 1} title="Redo (Ctrl+Shift+Z)" aria-label="Redo"><Redo2 size={16} /></button>
+                    <span className="wb-sep" />
+                    {confirmClear ? (
+                        <span className="wb-confirm">
+                            Clear for everyone?
+                            <button className="wb-danger" onClick={clearCanvas}>Clear</button>
+                            <button onClick={() => setConfirmClear(false)}>Cancel</button>
+                        </span>
+                    ) : (
+                        <button onClick={() => setConfirmClear(true)} disabled={!elements.length} title="Clear the board" aria-label="Clear the board"><Trash2 size={16} /></button>
+                    )}
+                    <button onClick={downloadImage} title="Export PNG" aria-label="Export PNG"><Download size={16} /></button>
+                    <button className="wb-close" onClick={onClose} title="Close (Esc)" aria-label="Close whiteboard"><X size={18} /></button>
+                </span>
+            </header>
 
-                {/* ── Header / Toolbar ── */}
-                <div style={{
-                    backgroundColor: "var(--u-bg-2)",
-                    borderBottom: "1px solid var(--u-line)",
-                    flexShrink: 0
-                }}>
-                    {/* Row 1: Title + zoom + close */}
-                    <div style={{ padding: isMobileUI ? "10px 12px" : "12px 20px", display: "flex", alignItems: "center", gap: "8px" }}>
-                        <span style={{ fontSize: "13px", fontWeight: "800", color: "var(--text-main)", letterSpacing: "0.06em", flex: 1 }}>WHITEBOARD</span>
-                        <button onClick={handleUndo} disabled={historyIndex === 0} style={{ padding: "6px", borderRadius: "8px", border: "none", background: "var(--u-tint)", color: historyIndex === 0 ? "var(--u-ink-3)" : "var(--text-main)", cursor: historyIndex === 0 ? "not-allowed" : "pointer", display: "flex" }}>
-                            <Undo2 size={16} />
-                        </button>
-                        <button onClick={handleRedo} disabled={historyIndex === history.length - 1} style={{ padding: "6px", borderRadius: "8px", border: "none", background: "var(--u-tint)", color: historyIndex === history.length - 1 ? "var(--u-ink-3)" : "var(--text-main)", cursor: historyIndex === history.length - 1 ? "not-allowed" : "pointer", display: "flex" }}>
-                            <Redo2 size={16} />
-                        </button>
-                        <div style={{ display: "flex", alignItems: "center", gap: "4px", backgroundColor: "var(--u-tint)", borderRadius: "8px", padding: "4px 8px" }}>
-                            <ZoomOut size={13} style={{ cursor: "pointer", color: "var(--text-muted)" }} onClick={() => setZoom(z => Math.max(z / 1.2, 0.1))} />
-                            <span style={{ fontSize: "11px", fontWeight: "700", color: "var(--text-muted)", minWidth: "32px", textAlign: "center" }}>{Math.round(zoom * 100)}%</span>
-                            <ZoomIn size={13} style={{ cursor: "pointer", color: "var(--text-muted)" }} onClick={() => setZoom(z => Math.min(z * 1.2, 5))} />
-                        </div>
-                        <button onClick={clearCanvas} title="Clear" style={{ padding: "6px 10px", borderRadius: "8px", border: "1px solid rgba(239,68,68,0.3)", backgroundColor: "rgba(239,68,68,0.08)", color: "var(--u-bad)", cursor: "pointer", display: "flex" }}>
-                            <Trash2 size={14} />
-                        </button>
-                        <button onClick={downloadImage} title="Export" style={{ padding: "6px 10px", borderRadius: "8px", border: "1px solid var(--u-line)", background: "var(--u-tint)", color: "var(--text-main)", cursor: "pointer", display: "flex" }}>
-                            <Download size={14} />
-                        </button>
-                        <button onClick={onClose} style={{ padding: "6px", background: "transparent", border: "none", color: "var(--text-muted)", cursor: "pointer", display: "flex", marginLeft: "4px" }}>
-                            <X size={20} />
-                        </button>
-                    </div>
+            <div
+                ref={areaRef}
+                className={`wb-area wb-tool-${tool}${isPanning ? ' is-panning' : ''}`}
+                style={{ backgroundSize: `${grid}px ${grid}px`, backgroundPosition: `${pan.x}px ${pan.y}px` }}
+            >
+                <canvas
+                    ref={canvasRef}
+                    onPointerDown={handlePointerDown}
+                    onPointerMove={handlePointerMove}
+                    onPointerUp={handlePointerUp}
+                    onPointerLeave={handlePointerUp}
+                />
 
-                    {/* Row 2: Tools + colors + brush size */}
-                    <div style={{
-                        padding: isMobileUI ? "6px 10px 10px" : "0 20px 12px",
-                        display: "flex", alignItems: "center", gap: "6px",
-                        overflowX: "auto", flexWrap: "nowrap",
-                        scrollbarWidth: "none"
-                    }}>
-                        {/* Tool group */}
-                        <div style={{ display: "flex", backgroundColor: "var(--u-tint)", borderRadius: "12px", padding: "3px", gap: "2px", flexShrink: 0 }}>
-                            <ToolBtn id="hand"   icon={<Hand   size={size} />} label="Pan" />
-                            <ToolBtn id="pencil" icon={<Pencil size={size} />} label="Pencil" />
-                            <ToolBtn id="eraser" icon={<Eraser size={size} />} label="Eraser" />
-                            <ToolBtn id="text"   icon={<Type   size={size} />} label="Text" />
-                        </div>
-                        <div style={{ width: "1px", height: "28px", backgroundColor: "var(--u-line)", flexShrink: 0 }} />
-                        <div style={{ display: "flex", backgroundColor: "var(--u-tint)", borderRadius: "12px", padding: "3px", gap: "2px", flexShrink: 0 }}>
-                            <ToolBtn id="square" icon={<Square size={size} />} label="Rectangle" />
-                            <ToolBtn id="circle" icon={<Circle size={size} />} label="Circle" />
-                            <ToolBtn id="line"   icon={<Minus  size={size} />} label="Line" />
-                        </div>
-                        <div style={{ width: "1px", height: "28px", backgroundColor: "var(--u-line)", flexShrink: 0 }} />
-                        {/* Colors */}
-                        <div style={{ display: "flex", gap: "5px", alignItems: "center", flexShrink: 0 }}>
-                            {COLORS.map(c => (
-                                <button key={c} onClick={() => setColor(c)} style={{
-                                    width: isMobileUI ? "18px" : "20px", height: isMobileUI ? "18px" : "20px",
-                                    borderRadius: "50%", backgroundColor: c, cursor: "pointer",
-                                    border: color === c ? "2px solid white" : "2px solid transparent",
-                                    transform: color === c ? "scale(1.25)" : "scale(1)", transition: "all 0.15s",
-                                    flexShrink: 0
-                                }} />
-                            ))}
-                            {/* Custom color picker */}
-                            <input type="color" value={color} onChange={e => setColor(e.target.value)}
-                                style={{ width: isMobileUI ? "18px" : "22px", height: isMobileUI ? "18px" : "22px", border: "none", borderRadius: "50%", cursor: "pointer", padding: 0, backgroundColor: "transparent", flexShrink: 0 }}
-                                title="Custom color"
-                            />
-                        </div>
-                        <div style={{ width: "1px", height: "28px", backgroundColor: "var(--u-line)", flexShrink: 0 }} />
-                        {/* Brush size */}
-                        <div style={{ display: "flex", alignItems: "center", gap: "6px", flexShrink: 0 }}>
-                            <div style={{ width: `${Math.max(4, brushSize * 2)}px`, height: `${Math.max(4, brushSize * 2)}px`, borderRadius: "50%", backgroundColor: color, border: "1px solid var(--u-ink-3)", transition: "all 0.15s", flexShrink: 0 }} />
-                            <input type="range" min="1" max="25" value={brushSize}
-                                onChange={e => setBrushSize(parseInt(e.target.value))}
-                                style={{ width: isMobileUI ? "60px" : "80px", accentColor: "var(--primary)", cursor: "pointer" }}
-                            />
-                        </div>
-                    </div>
-                </div>
-
-                {/* ── Canvas Area ── */}
-                <div style={{ flex: 1, position: "relative", cursor: tool === "hand" || isPanning ? "grab" : tool === "text" ? "text" : "crosshair", overflow: "hidden", touchAction: "none" }}>
-                    <canvas
-                        ref={canvasRef}
-                        onPointerDown={handlePointerDown}
-                        onPointerMove={handlePointerMove}
-                        onPointerUp={handlePointerUp}
-                        onPointerLeave={handlePointerUp}
-                        onWheel={handleWheel}
-                        style={{ position: "absolute", top: 0, left: 0, touchAction: "none" }}
+                {textInput.active && (
+                    <input
+                        ref={textInputRef}
+                        className="wb-text"
+                        value={textInput.value}
+                        onChange={(e) => setTextInput((prev) => ({ ...prev, value: e.target.value }))}
+                        onKeyDown={(e) => { if (e.key === 'Enter') commitTextInput(); if (e.key === 'Escape') setTextInput({ active: false, x: 0, y: 0, value: '' }); }}
+                        style={{ left: textInput.x * zoom + pan.x, top: textInput.y * zoom + pan.y - (brushSize * 4 + 8) * zoom, color, fontSize: (brushSize * 4 + 8) * zoom, borderColor: color }}
+                        placeholder="Type, then Enter"
                     />
+                )}
 
-                    {/* Text input overlay */}
-                    {textInput.active && (() => {
-                        const rect = canvasRef.current?.getBoundingClientRect();
-                        const screenX = rect ? textInput.x * zoom + pan.x + rect.left : textInput.x;
-                        const screenY = rect ? textInput.y * zoom + pan.y + rect.top : textInput.y;
-                        return (
-                            <input
-                                ref={textInputRef}
-                                value={textInput.value}
-                                onChange={e => setTextInput(prev => ({ ...prev, value: e.target.value }))}
-                                onKeyDown={e => { if (e.key === "Enter") commitTextInput(); if (e.key === "Escape") setTextInput({ active: false, x: 0, y: 0, value: "" }); }}
-                                style={{
-                                    position: "fixed",
-                                    left: `${screenX}px`, top: `${screenY}px`,
-                                    background: "rgba(0,0,0,0.5)",
-                                    border: `1px dashed ${color}`,
-                                    color: color, outline: "none",
-                                    fontSize: `${brushSize * 4 + 8}px`,
-                                    fontFamily: "Inter, sans-serif",
-                                    padding: "2px 6px", borderRadius: "4px",
-                                    minWidth: "80px", zIndex: 20,
-                                    pointerEvents: "all"
-                                }}
-                                placeholder="Type then Enter…"
-                            />
-                        );
-                    })()}
+                {Object.entries(cursors).map(([id, cur]) => (
+                    <div key={id} className="wb-cursor" style={{ left: cur.x * zoom + pan.x, top: cur.y * zoom + pan.y, '--c': cursorColor(id) }}>
+                        <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M1 1l5.5 13 2-5.5L14 6.5z" fill="var(--c)" stroke="#fff" strokeWidth="1.2" strokeLinejoin="round" /></svg>
+                        <span>{cur.userName || 'Guest'}</span>
+                    </div>
+                ))}
 
-                    {/* Remote Cursors */}
-                    {Object.entries(cursors).map(([id, cur]) => (
-                        <div key={id} style={{ position: "absolute", left: cur.x, top: cur.y, pointerEvents: "none", zIndex: 10, transition: "top 0.08s, left 0.08s" }}>
-                            <div style={{ border: "2px solid white", backgroundColor: "var(--primary)", borderRadius: "50%", width: "10px", height: "10px" }} />
-                            <div style={{ backgroundColor: "var(--primary)", color: "white", padding: "2px 6px", borderRadius: "5px", fontSize: "10px", fontWeight: "700", marginTop: "3px", whiteSpace: "nowrap" }}>
-                                {cur.userName || "Guest"}
-                            </div>
-                        </div>
+                {!elements.length && !currentElement && (
+                    <div className="wb-empty">Draw, sketch an idea or circle a bug. Everyone in the room sees it live.</div>
+                )}
+
+                {/* Tools */}
+                <div className="wb-dock" role="toolbar" aria-label="Tools">
+                    {TOOLS.map((t, i) => (
+                        <React.Fragment key={t.id}>
+                            {(i === 1 || i === 4) && <span className="wb-sep" />}
+                            <button
+                                className={tool === t.id ? 'on' : ''}
+                                onClick={() => { setTool(t.id); if (textInput.active) commitTextInput(); }}
+                                title={`${t.label} (${t.key.toUpperCase()})`}
+                                aria-label={t.label}
+                                aria-pressed={tool === t.id}
+                            >
+                                <t.Icon size={18} />
+                                {!isMobileUI && <kbd>{t.key.toUpperCase()}</kbd>}
+                            </button>
+                        </React.Fragment>
                     ))}
                 </div>
 
-                {/* ── Mobile hint ── */}
-                {isMobileUI && (
-                    <div style={{ padding: "6px 12px 10px", fontSize: "10px", color: "var(--u-ink-3)", textAlign: "center" }}>
-                        Pinch to zoom · Two fingers to pan · Press Esc to cancel text
+                {/* Style */}
+                {tool !== 'hand' && (
+                    <div className="wb-style" aria-label="Style">
+                        <div className="wb-swatches">
+                            {PALETTE.map((c, i) => (
+                                <button key={c} className={color === c ? 'on' : ''} style={{ '--sw': i === 0 ? 'var(--wb-ink)' : c }} onClick={() => setColor(c)} aria-label={`Colour ${i === 0 ? 'ink' : c}`} disabled={tool === 'eraser'} />
+                            ))}
+                            <label className="wb-custom" title="Custom colour">
+                                <input type="color" value={color.startsWith('#') ? color : '#7AA2FF'} onChange={(e) => setColor(e.target.value)} disabled={tool === 'eraser'} />
+                            </label>
+                        </div>
+                        <div className="wb-size">
+                            {[2, 4, 8, 14].map((s) => (
+                                <button key={s} className={brushSize === s ? 'on' : ''} onClick={() => setBrushSize(s)} aria-label={`Size ${s}`} title={tool === 'text' ? `Text ${s * 4 + 8}px` : `${s}px`}>
+                                    <i style={{ width: Math.min(16, s + 2), height: Math.min(16, s + 2) }} />
+                                </button>
+                            ))}
+                        </div>
                     </div>
                 )}
+
+                {/* Zoom */}
+                <div className="wb-zoom">
+                    <button onClick={() => zoomBy(1 / 1.2)} aria-label="Zoom out" title="Zoom out (-)"><ZoomOut size={15} /></button>
+                    <button className="wb-pct" onClick={resetView} title="Reset view (0)">{Math.round(zoom * 100)}%</button>
+                    <button onClick={() => zoomBy(1.2)} aria-label="Zoom in" title="Zoom in (+)"><ZoomIn size={15} /></button>
+                </div>
             </div>
         </div>
     );

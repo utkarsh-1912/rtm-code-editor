@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { Check, Copy, Share2, Pencil, Eye } from "lucide-react";
 import toast from "react-hot-toast";
 import { Modal } from "./ux/primitives";
+import { publicOrigin } from "../utils/api";
 
 function LinkRow({ icon: Icon, title, note, value }) {
     const [copied, setCopied] = useState(false);
@@ -33,7 +34,7 @@ function LinkRow({ icon: Icon, title, note, value }) {
 
 // Share a room: editor and spectator links, room ID, and the OS share sheet when available.
 export default function ShareModal({ open, onClose, roomId, peopleOnline = 0 }) {
-    const base = `${window.location.origin}/editor/${encodeURIComponent(roomId)}`;
+    const base = `${publicOrigin()}/editor/${encodeURIComponent(roomId)}`;
     const editorLink = base;
     const viewerLink = `${base}?role=viewer`;
     const canShare = typeof navigator !== "undefined" && !!navigator.share;

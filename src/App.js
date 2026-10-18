@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import "./App.css";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, useNavigate, useLocation } from "react-router-dom";
 import HomePage from "./pages/main";
 import Editor from "./pages/editor";
 import About from "./pages/About";
@@ -29,6 +29,33 @@ import Unsubscribe from "./pages/Unsubscribe";
 import NotFound from "./pages/NotFound";
 import OfflineBanner from "./components/OfflineBanner";
 import ErrorBoundary from "./components/ErrorBoundary";
+import DesktopStart from "./pages/DesktopStart";
+import { IS_DESKTOP, desktop, openOnWebsite } from "./utils/desktop";
+
+if (IS_DESKTOP) document.documentElement.classList.add("is-desktop");
+
+// Desktop app: website pages open in the browser instead of inside the app.
+function OnWebsite() {
+  const { pathname, search } = useLocation();
+  const navigate = useNavigate();
+  useEffect(() => {
+    openOnWebsite(pathname + search);
+    if (window.history.length > 1) navigate(-1);
+    else navigate("/", { replace: true });
+  }, [pathname, search, navigate]);
+  return null;
+}
+
+// Desktop app: native menu items (Go > Workspace, File > Open Folder…) navigate in place.
+function DesktopBridge() {
+  const navigate = useNavigate();
+  useEffect(() => desktop()?.onNavigate?.((to) => {
+    if (typeof to === "string" && to.startsWith("/")) navigate(to);
+  }), [navigate]);
+  return null;
+}
+
+const page = (el) => (IS_DESKTOP ? <OnWebsite /> : el);
 
 function App() {
   useEffect(() => {
@@ -58,18 +85,19 @@ function App() {
           ></Toaster>
         </div>
         <BrowserRouter>
+          {IS_DESKTOP && <DesktopBridge />}
           <Routes>
-            <Route path="/" element={<HomePage />} />
+            <Route path="/" element={IS_DESKTOP ? <DesktopStart /> : <HomePage />} />
             <Route path="/editor/:roomId" element={<Editor />} />
-            <Route path="/about" element={<About />} />
-            <Route path="/privacy" element={<Privacy />} />
-            <Route path="/terms" element={<Terms />} />
-            <Route path="/features" element={<Features />} />
-            <Route path="/pricing" element={<Pricing />} />
-            <Route path="/download" element={<Download />} />
-            <Route path="/status" element={<Status />} />
-            <Route path="/security" element={<Security />} />
-            <Route path="/support" element={<Support />} />
+            <Route path="/about" element={page(<About />)} />
+            <Route path="/privacy" element={page(<Privacy />)} />
+            <Route path="/terms" element={page(<Terms />)} />
+            <Route path="/features" element={page(<Features />)} />
+            <Route path="/pricing" element={page(<Pricing />)} />
+            <Route path="/download" element={page(<Download />)} />
+            <Route path="/status" element={page(<Status />)} />
+            <Route path="/security" element={page(<Security />)} />
+            <Route path="/support" element={page(<Support />)} />
             <Route path="/login" element={<Login />} />
             <Route path="/signup" element={<SignUp />} />
             <Route path="/dashboard" element={<Dashboard />} />

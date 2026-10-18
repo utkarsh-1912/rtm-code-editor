@@ -136,6 +136,8 @@ function createFsAccess(getWin) {
         for (const f of files.slice(0, MAX_FILES)) {
             const target = path.resolve(base, String(f.path || "").replace(/^[\\/]+/, ""));
             if (!inside(base, target) || target === base) throw new Error(`Refusing to write outside the folder: ${f.path}`);
+            // Never into VCS metadata (e.g. .git/hooks would run code on the next commit).
+            if (path.relative(base, target).split(path.sep).some((seg) => /^\.(git|hg|svn)$/i.test(seg))) continue;
             const content = String(f.content ?? "");
             if (Buffer.byteLength(content) > MAX_FILE_BYTES) throw new Error(`${f.path} is larger than 1 MB`);
             await fsp.mkdir(path.dirname(target), { recursive: true });

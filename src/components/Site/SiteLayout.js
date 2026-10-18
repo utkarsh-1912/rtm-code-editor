@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { ArrowUpRight } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
@@ -67,6 +67,7 @@ export default function SiteLayout({ children }) {
 // Label, giant condensed title and two-tone lede used at the top of public pages.
 export function PageHead({ label, title, lede, children }) {
     const words = Array.isArray(title) ? title : [title];
+    useEffect(() => { if (label) document.title = `${label} | Utkristi CoLabs`; }, [label]);
     return (
         <header className="p-head">
             <span className="u-label" data-rise>{label}</span>

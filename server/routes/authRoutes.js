@@ -57,39 +57,75 @@ router.delete('/user', async (req, res) => {
     }
 });
 
-// Get user active sessions
+// Signed-in devices. sessionKey (the caller's own key) marks "This device".
 router.get('/sessions', async (req, res) => {
     try {
-        const { userId } = req.query;
+        const { userId, sessionKey } = req.query;
         if (!userId) return res.status(400).json({ error: "Missing userId" });
-        const sessions = await UserRepository.getSessions(userId);
-        res.json(sessions);
+        res.json(await UserRepository.getSessions(userId, sessionKey || null));
     } catch (err) {
         console.error(err);
         res.status(500).json({ error: err.message });
     }
 });
 
-// Register session
+// Device check-in. Returns { id, revoked }; a revoked device should sign out.
 router.post('/sessions', async (req, res) => {
     try {
-        const { userId, device, ip, userAgent, sessionId } = req.body;
-        if (!userId) return res.status(400).json({ error: "Missing userId" });
-        const session = await UserRepository.createSession(userId, { device, ip, userAgent, sessionId });
+        const { userId, device, userAgent, sessionId } = req.body;
+        if (!userId || !sessionId) return res.status(400).json({ error: "Missing userId or sessionId" });
+        const ip = String(req.headers['x-forwarded-for'] || req.socket.remoteAddress || '').split(',')[0].trim().replace(/^::ffff:/, '').slice(0, 64);
+        const session = await UserRepository.createSession(userId, {
+            device: String(device || 'Unknown device').slice(0, 120),
+            ip,
+            userAgent: String(userAgent || '').slice(0, 400),
+            sessionId,
+        });
         res.json(session);
     } catch (err) {
         console.error(err);
+        res.status(err.message === 'Invalid session key' ? 400 : 500).json({ error: err.message });
+    }
+});
+
+// Sign out every other device. Accepts query or JSON body.
+router.delete('/sessions/others', async (req, res) => {
+    try {
+        const userId = req.body?.userId || req.query.userId;
+        const currentSessionId = req.body?.currentSessionId || req.query.currentSessionId;
+        if (!userId || !currentSessionId) return res.status(400).json({ error: "Missing required fields" });
+        const revoked = await UserRepository.deleteOtherSessions(userId, currentSessionId);
+        res.json({ success: true, count: revoked.length });
+    } catch (err) {
+        console.error(err);
         res.status(500).json({ error: err.message });
     }
 });
 
-// Delete other sessions
-router.delete('/sessions/others', async (req, res) => {
+// Rename one device.
+router.patch('/sessions/:id', async (req, res) => {
     try {
-        const { userId, currentSessionId } = req.body;
-        if (!userId || !currentSessionId) return res.status(400).json({ error: "Missing required fields" });
-        const deleted = await UserRepository.deleteOtherSessions(userId, currentSessionId);
-        res.json({ success: true, count: deleted.length });
+        const { userId, name } = req.body || {};
+        const id = Number(req.params.id);
+        if (!userId || !Number.isInteger(id)) return res.status(400).json({ error: "Missing userId or id" });
+        const row = await UserRepository.renameSession(userId, id, name);
+        if (!row) return res.status(404).json({ error: "Device not found" });
+        res.json(row);
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// Sign out one device.
+router.delete('/sessions/:id', async (req, res) => {
+    try {
+        const userId = req.body?.userId || req.query.userId;
+        const id = Number(req.params.id);
+        if (!userId || !Number.isInteger(id)) return res.status(400).json({ error: "Missing userId or id" });
+        const ok = await UserRepository.revokeSession(userId, id);
+        if (!ok) return res.status(404).json({ error: "Device not found" });
+        res.json({ success: true });
     } catch (err) {
         console.error(err);
         res.status(500).json({ error: err.message });

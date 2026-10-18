@@ -1,18 +1,26 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { Save, Check, Monitor, Laptop, Smartphone, Tablet, LogOut, Trash2 } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Save, Check, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { useNavigate } from 'react-router-dom';
 import AppLayout from '../components/AppLayout';
 import { useAuth } from '../context/AuthContext';
 import { getBackendUrl } from '../utils/api';
 import { getThemePref, setThemePref } from '../utils/theme';
-import { Modal, pad2, timeAgo } from '../components/ux/primitives';
+import { Modal, pad2 } from '../components/ux/primitives';
 import { pushConfigured, pushStatus, enablePush, disablePush } from '../utils/push';
+import { usePlan, openPortal } from '../utils/billing';
+import { useSearchParams } from 'react-router-dom';
+import DesktopPanel from '../components/DesktopPanel';
+import DeviceList from '../components/DeviceList';
+import { IS_DESKTOP } from '../utils/desktop';
 
 const SECTIONS = [
     { id: 'profile', title: 'Profile' },
     { id: 'appearance', title: 'Appearance' },
+    { id: 'billing', title: 'Plan & billing' },
     { id: 'notifications', title: 'Notifications' },
     { id: 'security', title: 'Security' },
+    ...(IS_DESKTOP ? [{ id: 'desktop', title: 'Desktop app' }] : []),
 ];
 
 const NOTIFS = [
@@ -32,17 +40,29 @@ const loadNotifPrefs = () => {
     try { return { ...base, ...JSON.parse(localStorage.getItem('notif-prefs') || '{}') }; } catch { return base; }
 };
 
-const deviceIcon = (device) => {
-    const d = (device || '').toLowerCase();
-    if (d.includes('iphone') || d.includes('android')) return <Smartphone size={17} />;
-    if (d.includes('tablet') || d.includes('ipad')) return <Tablet size={17} />;
-    if (d.includes('mac')) return <Laptop size={17} />;
-    return <Monitor size={17} />;
-};
-
 const Settings = () => {
-    const { user } = useAuth();
-    const [active, setActive] = useState('profile');
+    const { user, logout } = useAuth();
+    const navigate = useNavigate();
+    const signOutHere = async () => {
+        await logout();
+        toast.success('Signed out');
+        navigate('/');
+    };
+    const [params] = useSearchParams();
+    const [active, setActive] = useState(() => (SECTIONS.some((x) => x.id === params.get('section')) ? params.get('section') : 'profile'));
+    const { plan, error: planError, reload: reloadPlan } = usePlan(user);
+    const [busyBilling, setBusyBilling] = useState(false);
+    const manageBilling = async () => {
+        setBusyBilling(true);
+        try { await openPortal(); } catch (err) { toast.error(err.message); setBusyBilling(false); }
+    };
+    useEffect(() => {
+        // Back from Stripe Checkout: the webhook may land a moment after the redirect.
+        if (params.get('billing') !== 'success') return undefined;
+        toast.success('Thanks! Your plan is being activated.');
+        const timers = [2500, 6000, 12000].map((ms) => setTimeout(reloadPlan, ms));
+        return () => timers.forEach(clearTimeout);
+    }, [params, reloadPlan]);
     const [saving, setSaving] = useState(false);
     const [profile, setProfile] = useState({ name: user?.name || '', bio: '', socials: { twitter: '', github: '' } });
     const [theme, setTheme] = useState(getThemePref);
@@ -59,8 +79,6 @@ const Settings = () => {
         const data = await res.json().catch(() => ({}));
         if (res.ok) toast.success('Test sent. It should arrive in a moment.'); else toast.error(data.error || 'Test failed');
     };
-    const [sessions, setSessions] = useState([]);
-    const [sessionsLoading, setSessionsLoading] = useState(false);
     const [deleteOpen, setDeleteOpen] = useState(false);
     const [confirmText, setConfirmText] = useState('');
 
@@ -83,21 +101,6 @@ const Settings = () => {
         })();
     }, [user]);
 
-    const fetchSessions = useCallback(async () => {
-        if (!user) return;
-        setSessionsLoading(true);
-        try {
-            const res = await fetch(`${getBackendUrl()}/api/sessions?userId=${user.uid}`);
-            const data = await res.json();
-            setSessions(Array.isArray(data) ? data : []);
-        } catch (error) {
-            console.error('Failed to fetch sessions:', error);
-        } finally {
-            setSessionsLoading(false);
-        }
-    }, [user]);
-
-    useEffect(() => { if (active === 'security') fetchSessions(); }, [active, fetchSessions]);
 
     const saveProfile = async (e) => {
         e.preventDefault();
@@ -128,16 +131,6 @@ const Settings = () => {
         try { localStorage.setItem('notif-prefs', JSON.stringify(next)); } catch { /* storage blocked */ }
     };
 
-    const signOutOthers = async () => {
-        const currentId = localStorage.getItem('rtm_db_session_id');
-        try {
-            await fetch(`${getBackendUrl()}/api/sessions/others?userId=${user.uid}&currentSessionId=${currentId || -1}`, { method: 'DELETE' });
-            toast.success('Signed out other devices');
-            fetchSessions();
-        } catch {
-            toast.error('Failed to sign out other devices');
-        }
-    };
 
     const deleteAccount = async () => {
         try {
@@ -154,7 +147,6 @@ const Settings = () => {
     };
 
     const avatar = user?.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.name || 'U')}&background=1C1C19&color=E8E6DF`;
-    const currentSessionId = localStorage.getItem('rtm_db_session_id');
     const idx = SECTIONS.findIndex((s) => s.id === active);
 
     return (
@@ -238,6 +230,57 @@ const Settings = () => {
                         </div>
                     )}
 
+                    {active === 'desktop' && <DesktopPanel />}
+
+                    {active === 'billing' && (
+                        <div className="u-card u-enter">
+                            <div className="g-panel-head"><strong>Your plan</strong><span className="u-label">{plan ? (plan.plan === 'free' ? 'Free' : 'Team') : 'Loading'}</span></div>
+                            {!plan && <p className="u-muted" style={{ margin: 0 }}>{planError || 'Loading your plan…'}</p>}
+                            {plan && (
+                                <>
+                                    <ul className="g-rules">
+                                        <li>
+                                            <span>01</span>
+                                            <div>
+                                                <h5>{plan.plan === 'free' ? 'Free' : 'Team'}{plan.status === 'trialing' ? ' · trial' : ''}{plan.status === 'past_due' ? ' · payment failed' : ''}</h5>
+                                                <p>
+                                                    {plan.plan === 'free' && `Includes ${plan.limits.projects} projects and ${plan.limits.aiPerDay} AI prompts a day.`}
+                                                    {plan.plan !== 'free' && plan.status === 'trialing' && plan.trialEndsAt && `Your trial ends ${new Date(plan.trialEndsAt).toLocaleDateString()}, then it renews${plan.interval === 'year' ? ' yearly' : ' monthly'}.`}
+                                                    {plan.plan !== 'free' && plan.status !== 'trialing' && plan.cancelAtPeriodEnd && plan.renewsAt && `Ends on ${new Date(plan.renewsAt).toLocaleDateString()}. You will move to Free after that.`}
+                                                    {plan.plan !== 'free' && plan.status !== 'trialing' && !plan.cancelAtPeriodEnd && plan.renewsAt && `Renews on ${new Date(plan.renewsAt).toLocaleDateString()}.`}
+                                                </p>
+                                                {plan.plan !== 'free' && plan.cancelAtPeriodEnd && <div className="g-cap">cancellation scheduled</div>}
+                                            </div>
+                                        </li>
+                                        <li>
+                                            <span>02</span>
+                                            <div>
+                                                <h5>Projects</h5>
+                                                <p>{plan.usage.projects}{plan.limits.projects != null ? ` of ${plan.limits.projects}` : ''} used{plan.limits.projects == null ? ' · unlimited' : ''}</p>
+                                                {plan.limits.projects != null && <div className="up-meter"><i style={{ width: `${Math.min(100, (plan.usage.projects / plan.limits.projects) * 100)}%` }} /></div>}
+                                            </div>
+                                        </li>
+                                        <li>
+                                            <span>03</span>
+                                            <div>
+                                                <h5>AI prompts today</h5>
+                                                <p>{plan.usage.aiToday}{plan.limits.aiPerDay != null ? ` of ${plan.limits.aiPerDay}` : ''} used{plan.limits.aiPerDay == null ? ' · unlimited' : ''}</p>
+                                                {plan.limits.aiPerDay != null && <div className="up-meter"><i style={{ width: `${Math.min(100, (plan.usage.aiToday / plan.limits.aiPerDay) * 100)}%` }} /></div>}
+                                            </div>
+                                        </li>
+                                    </ul>
+                                    <div className="g-actions">
+                                        {plan.plan === 'free'
+                                            ? <button className="u-btn u-btn--solid" onClick={() => navigate('/pricing')}>See Team plans</button>
+                                            : <button className="u-btn u-btn--solid" onClick={manageBilling} disabled={busyBilling}>Manage billing</button>}
+                                        {plan.hasCustomer && plan.plan === 'free' && <button className="u-btn u-btn--ghost" onClick={manageBilling} disabled={busyBilling}>Invoices and payment methods</button>}
+                                    </div>
+                                    {!plan.billingEnabled && <p className="u-label" style={{ marginTop: 12 }}>Online billing is not enabled on this server.</p>}
+                                </>
+                            )}
+                        </div>
+                    )}
+
                     {active === 'notifications' && (
                         <div className="u-card u-enter">
                             <div className="g-panel-head"><strong>Alerts</strong><span className="u-label">Saved on this device</span></div>
@@ -272,37 +315,7 @@ const Settings = () => {
 
                     {active === 'security' && (
                         <>
-                            <div className="u-card u-enter">
-                                <div className="g-panel-head">
-                                    <div>
-                                        <strong>Active sessions</strong>
-                                        <div className="u-small u-muted">Devices signed in to your account.</div>
-                                    </div>
-                                    <button className="u-btn u-btn--ghost u-btn--sm" onClick={signOutOthers} disabled={sessions.length <= 1}><LogOut size={14} /> Sign out others</button>
-                                </div>
-                                {sessionsLoading && sessions.length === 0 ? (
-                                    <div style={{ padding: 18, display: 'flex', flexDirection: 'column', gap: 10 }}>
-                                        {[0, 1].map((i) => <div key={i} className="u-skel" style={{ height: 44 }} />)}
-                                    </div>
-                                ) : sessions.length === 0 ? (
-                                    <p className="u-muted u-small" style={{ padding: 18, margin: 0 }}>No sessions found.</p>
-                                ) : sessions.map((s) => {
-                                    const isCurrent = String(s.id) === String(currentSessionId);
-                                    return (
-                                        <div key={s.id} className="g-session">
-                                            <span className="d-ico" style={isCurrent ? { background: 'var(--u-solid)', color: 'var(--u-on-solid)' } : undefined}>{deviceIcon(s.device)}</span>
-                                            <div style={{ minWidth: 0 }}>
-                                                <div style={{ fontSize: 14.5, fontWeight: 500, display: 'flex', gap: 8, alignItems: 'center' }}>
-                                                    <span className="u-ellipsis">{s.device || 'Unknown device'}</span>
-                                                    {isCurrent && <span className="u-chip u-chip--mono u-chip--accent">This device</span>}
-                                                </div>
-                                                <div className="u-mono u-faint" style={{ fontSize: 11.5 }}>{s.ip} · {s.last_active ? timeAgo(s.last_active) : '—'}</div>
-                                            </div>
-                                            {isCurrent && <span className="u-dot" />}
-                                        </div>
-                                    );
-                                })}
-                            </div>
+                            <DeviceList user={user} onSignOutHere={signOutHere} />
 
                             <div className="u-card g-danger u-enter" style={{ '--d': '80ms' }}>
                                 <ul className="g-rules">

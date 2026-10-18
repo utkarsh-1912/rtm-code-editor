@@ -75,68 +75,96 @@ async function updateProfile(userId, { name, bio, social_links }) {
 /**
  * Active session tracking
  */
-async function getSessions(userId) {
-    const user = await sql`SELECT id FROM users WHERE auth_provider_id = ${userId}`;
-    if (!user.length) return [];
-    return await sql`
-        SELECT * FROM sessions 
-        WHERE user_id = ${user[0].id}
+const internalIdFor = async (userId) => (await sql`SELECT id FROM users WHERE auth_provider_id = ${userId}`)[0]?.id || null;
+
+// Signed-in devices, newest first. currentKey marks the caller's own device; session keys
+// of other devices are never returned. Revoked and long-idle (90 days) devices are hidden.
+async function getSessions(userId, currentKey = null) {
+    const uid = await internalIdFor(userId);
+    if (!uid) return [];
+    const rows = await sql`
+        SELECT id, device, name, ip, user_agent, created_at, last_active, session_id
+        FROM sessions
+        WHERE user_id = ${String(uid)} AND revoked_at IS NULL
+          AND last_active > CURRENT_TIMESTAMP - INTERVAL '90 days'
         ORDER BY last_active DESC
     `;
+    return rows.map(({ session_id: key, ...row }) => ({ ...row, current: !!currentKey && key === currentKey }));
 }
 
+// Check-in from a device (sign-in, app start, focus). The device keeps a random key; the
+// first check-in creates its row, later ones refresh it. A revoked key reports revoked so
+// that device signs out.
 async function createSession(userId, { device, ip, userAgent, sessionId }) {
-    let user = await sql`SELECT id FROM users WHERE auth_provider_id = ${userId}`;
-    let internalUserId;
-    if (!user.length) {
+    let uid = await internalIdFor(userId);
+    if (!uid) {
         // Auto-provision user record if not present
-        const newUser = await sql`
+        await sql`
             INSERT INTO users (email, name, auth_provider_id)
             VALUES (${userId + '@user.local'}, 'Developer', ${userId})
             ON CONFLICT (auth_provider_id) DO NOTHING
-            RETURNING id
         `;
-        if (newUser.length) {
-            internalUserId = newUser[0].id;
-        } else {
-            const fetched = await sql`SELECT id FROM users WHERE auth_provider_id = ${userId}`;
-            internalUserId = fetched[0]?.id;
-        }
-    } else {
-        internalUserId = user[0].id;
+        uid = await internalIdFor(userId);
     }
+    if (!uid) throw new Error("User record unavailable");
 
-    if (!internalUserId) throw new Error("User record unavailable");
+    const key = typeof sessionId === 'string' && /^[A-Za-z0-9_-]{16,64}$/.test(sessionId) ? sessionId : null;
+    if (!key) throw new Error("Invalid session key");
 
-    if (sessionId) {
-        const existing = await sql`
-            UPDATE sessions 
+    const existing = await sql`SELECT id, user_id, revoked_at FROM sessions WHERE session_id = ${key}`;
+    if (existing.length) {
+        const row = existing[0];
+        if (String(row.user_id) !== String(uid) || row.revoked_at) return { id: row.id, revoked: true };
+        const updated = await sql`
+            UPDATE sessions
             SET last_active = CURRENT_TIMESTAMP, ip = ${ip}, device = ${device}, user_agent = ${userAgent}
-            WHERE session_id = ${sessionId}
-            RETURNING *
+            WHERE id = ${row.id}
+            RETURNING id, device, name, ip, last_active
         `;
-        if (existing.length > 0) return existing;
+        return { ...updated[0], revoked: false };
     }
-
-    const newSessionId = (sessionId && typeof sessionId === 'string' && sessionId.length > 5) 
-        ? sessionId 
-        : Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
-
-    return await sql`
+    const created = await sql`
         INSERT INTO sessions (user_id, device, ip, user_agent, session_id)
-        VALUES (${internalUserId}, ${device}, ${ip}, ${userAgent}, ${newSessionId})
-        RETURNING *
+        VALUES (${String(uid)}, ${device}, ${ip}, ${userAgent}, ${key})
+        RETURNING id, device, name, ip, last_active
     `;
+    return { ...created[0], revoked: false };
 }
 
-async function deleteOtherSessions(userId, currentSessionId) {
-    if (!currentSessionId) return [];
-    const user = await sql`SELECT id FROM users WHERE auth_provider_id = ${userId}`;
-    if (!user.length) return [];
+// Rename one of the user's devices. Empty name = back to the detected device name.
+async function renameSession(userId, id, name) {
+    const uid = await internalIdFor(userId);
+    if (!uid) return null;
+    const clean = String(name || '').replace(/\s+/g, ' ').trim().slice(0, 80) || null;
+    const rows = await sql`
+        UPDATE sessions SET name = ${clean}
+        WHERE id = ${id} AND user_id = ${String(uid)} AND revoked_at IS NULL
+        RETURNING id, device, name, ip, last_active
+    `;
+    return rows[0] || null;
+}
+
+// Sign out one device (it signs itself out on its next check-in).
+async function revokeSession(userId, id) {
+    const uid = await internalIdFor(userId);
+    if (!uid) return false;
+    const rows = await sql`
+        UPDATE sessions SET revoked_at = CURRENT_TIMESTAMP
+        WHERE id = ${id} AND user_id = ${String(uid)} AND revoked_at IS NULL
+        RETURNING id
+    `;
+    return rows.length > 0;
+}
+
+// Sign out every device except the caller's.
+async function deleteOtherSessions(userId, currentKey) {
+    if (!currentKey) return [];
+    const uid = await internalIdFor(userId);
+    if (!uid) return [];
     return await sql`
-        DELETE FROM sessions 
-        WHERE user_id = ${user[0].id} AND session_id != ${currentSessionId}
-        RETURNING *
+        UPDATE sessions SET revoked_at = CURRENT_TIMESTAMP
+        WHERE user_id = ${String(uid)} AND session_id IS DISTINCT FROM ${currentKey} AND revoked_at IS NULL
+        RETURNING id
     `;
 }
 
@@ -162,5 +190,7 @@ module.exports = {
     getSessions,
     createSession,
     deleteOtherSessions,
+    renameSession,
+    revokeSession,
     deleteAccount
 };

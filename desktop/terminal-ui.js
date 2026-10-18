@@ -116,7 +116,6 @@
         } else if (e.key === "c" && e.ctrlKey && running && !String(window.getSelection())) {
             e.preventDefault();
             window.term.interrupt();
-            line("^C", "note");
         } else if (e.key === "l" && e.ctrlKey) {
             e.preventDefault();
             screen.textContent = "";
@@ -145,7 +144,8 @@
         cwdEl.textContent = short(cwd);
         cwdEl.title = cwd;
         document.title = `Terminal — ${base(cwd)}`;
-        if (code) line(`exit ${code}`, "exit-bad");
+        if (code === 130) line("stopped", "note");
+        else if (code) line(`exit ${code}`, "exit-bad");
         setRunning(false);
         input.focus();
     });

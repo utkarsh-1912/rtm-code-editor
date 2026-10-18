@@ -57,18 +57,28 @@ function run(session, line, send) {
     const trimmed = line.trim();
     if (!trimmed) return send("term:exit", { code: 0, cwd: session.cwd });
 
-    const [cmd] = trimmed.split(/\s+/);
-    const lower = cmd.toLowerCase();
-    if (lower === "cd" || (isWin && lower === "chdir") || (isWin && /^cd[\\/.]/.test(lower))) {
-        const arg = lower === "cd" || lower === "chdir" ? trimmed.slice(cmd.length).trim() : trimmed.slice(2).trim();
+    // Built-ins only for a bare command; "cd src && npm test" goes to the shell as a whole.
+    const plain = !/[&|;<>]/.test(trimmed);
+    // cd, cd dir, cd /d D:\dir (cmd), cd.. (cmd), cd -
+    const cd = plain && trimmed.match(/^(?:cd|chdir)(?:\s+(?:\/d\s+)?(.*)|(\.\..*))?$/i);
+    if (cd) {
         try {
-            session.cwd = changeDir(session.cwd, arg);
+            const arg = (cd[1] ?? cd[2] ?? "").trim();
+            if (!arg && isWin) {
+                // cmd.exe: a bare "cd" prints the current directory.
+                send("term:data", { stream: "stdout", text: session.cwd + String.fromCharCode(10) });
+                return send("term:exit", { code: 0, cwd: session.cwd });
+            }
+            const next = arg === "-" ? session.prevCwd || session.cwd : changeDir(session.cwd, arg);
+            session.prevCwd = session.cwd;
+            session.cwd = next;
             return send("term:exit", { code: 0, cwd: session.cwd });
         } catch (err) {
             send("term:data", { stream: "stderr", text: `${err.message}\n` });
             return send("term:exit", { code: 1, cwd: session.cwd });
         }
     }
+    const lower = plain ? trimmed.toLowerCase() : "";
     if (lower === "clear" || lower === "cls") return send("term:clear", { cwd: session.cwd });
     if (lower === "exit") return session.win.close();
 
@@ -86,7 +96,9 @@ function run(session, line, send) {
     child.on("error", (err) => send("term:data", { stream: "stderr", text: `${err.message}\n` }));
     child.on("close", (code, signal) => {
         if (session.child === child) session.child = null;
-        send("term:exit", { code: code ?? (signal ? 130 : 1), cwd: session.cwd });
+        // 130 = stopped by the user (taskkill on Windows reports 1).
+        const stopped = child.stoppedByUser || (!code && signal);
+        send("term:exit", { code: stopped ? 130 : code ?? 1, cwd: session.cwd });
     });
 }
 
@@ -112,7 +124,10 @@ function registerIpc() {
     });
     ipcMain.on("term:interrupt", (event) => {
         const s = from(event);
-        if (s?.child) kill(s.child);
+        if (s?.child) {
+            s.child.stoppedByUser = true;
+            kill(s.child);
+        }
     });
 }
 

@@ -2,6 +2,10 @@ const ACTIONS = require('../../src/Action');
 const RoomRepository = require('../repositories/RoomRepository');
 const UserRepository = require('../repositories/UserRepository');
 const ProjectRepository = require('../repositories/ProjectRepository');
+const AnalyticsRepository = require('../repositories/AnalyticsRepository');
+
+// Rooms whose "second person joined" step is already logged (once per room per server run).
+const pairedRooms = new Set();
 
 function setupEditorSocket(io, socket, safeSocket, context) {
     const { userSocketMap, userPhotoMap, roomChatHistory, getAllClients, claimSeat } = context;
@@ -20,6 +24,11 @@ function setupEditorSocket(io, socket, safeSocket, context) {
         io.in(roomId).emit(ACTIONS.JOINED, { clients: getAllClients(roomId), userName: finalUserName, socketId: socket.id });
         if (roomChatHistory[roomId]?.length > 0) socket.emit(ACTIONS.SYNC_CHAT, { messages: roomChatHistory[roomId] });
 
+        if (getAllClients(roomId).length >= 2 && !pairedRooms.has(roomId)) {
+            pairedRooms.add(roomId);
+            AnalyticsRepository.logActivity({ userId: userProfile?.uid || null, roomId, actionType: 'SECOND_USER_JOINED' }).catch(() => { });
+        }
+
         try {
             const dbRoom = await RoomRepository.getRoom(roomId);
             if (dbRoom) {
@@ -32,6 +41,7 @@ function setupEditorSocket(io, socket, safeSocket, context) {
                 if (dbRoom.language) socket.emit(ACTIONS.SYNC_LANGUAGE, { language: dbRoom.language });
             } else {
                 await RoomRepository.saveRoom(roomId, "", "javascript", []);
+                AnalyticsRepository.logActivity({ userId: userProfile?.uid || null, roomId, actionType: 'ROOM_STARTED' }).catch(() => { });
             }
             if (userProfile?.uid) {
                 await UserRepository.findOrCreateUser(userProfile);
@@ -74,6 +84,29 @@ function setupEditorSocket(io, socket, safeSocket, context) {
     socket.on(ACTIONS.SYNC_LANGUAGE, safeSocket(({ roomId, language }) => {
         socket.in(roomId).emit(ACTIONS.SYNC_LANGUAGE, { language });
         RoomRepository.updateRoomLanguage(roomId, language);
+    }));
+
+    // Shared runs: everyone in the room sees "running" and the same result.
+    socket.on(ACTIONS.SYNC_EXECUTE, safeSocket(({ roomId, isExecuting, by } = {}) => {
+        if (!roomId || !socket.rooms.has(roomId)) return;
+        socket.to(roomId).emit(ACTIONS.SYNC_EXECUTE, { isExecuting: !!isExecuting, by: String(by || '').slice(0, 40) });
+    }));
+
+    socket.on(ACTIONS.SYNC_OUTPUT, safeSocket(({ roomId, output, isError, time, meta } = {}) => {
+        if (!roomId || !socket.rooms.has(roomId)) return;
+        const m = meta && typeof meta === 'object' ? meta : {};
+        socket.to(roomId).emit(ACTIONS.SYNC_OUTPUT, {
+            output: String(output ?? '').slice(0, 64 * 1024),
+            isError: !!isError,
+            time: time ?? null,
+            meta: {
+                status: String(m.status || '').slice(0, 60),
+                engine: String(m.engine || '').slice(0, 60),
+                exitCode: Number.isFinite(m.exitCode) ? m.exitCode : null,
+                by: String(m.by || '').slice(0, 40),
+                at: Number(m.at) || Date.now(),
+            },
+        });
     }));
 
     socket.on(ACTIONS.CURSOR_MOVE, safeSocket(({ roomId, cursor, userName }) => {

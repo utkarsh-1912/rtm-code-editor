@@ -31,3 +31,4 @@ yarn-error.log*
 # Desktop app
 /desktop/node_modules
 /desktop/dist
+/desktop/web

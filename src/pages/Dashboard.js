@@ -5,11 +5,13 @@ import toast from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
 import AppLayout from '../components/AppLayout';
 import SpaceLoader from '../components/SpaceLoader';
-import { getBackendUrl } from '../utils/api';
+import { getBackendUrl, publicOrigin } from '../utils/api';
 import useWorkspace, { itemDate, mergeActivity } from '../components/ux/useWorkspace';
 import { Modal, RollingNumber, newRoomId, timeAgo, greeting, extractRoomId } from '../components/ux/primitives';
 import { LANGS } from '../utils/languages';
 import { pickFolder, pickFiles, importProject, describeSkipped } from '../utils/localFiles';
+import { usePlan, isPlanLimit, showUpgradeToast, catalogue } from '../utils/billing';
+import { track } from '../utils/track';
 
 // Project templates: a web app (live preview) plus every runnable language.
 const TEMPLATES = [
@@ -58,6 +60,7 @@ const Dashboard = () => {
     const navigate = useNavigate();
     const location = useLocation();
     const { rooms, projects, stats, loading: loadingData, error, reload } = useWorkspace(user);
+    const { plan: planInfo, reload: reloadPlan } = usePlan(user);
 
     const [view, setView] = useState('all'); // all | rooms | projects
     const [lang, setLang] = useState(null);
@@ -110,7 +113,7 @@ const Dashboard = () => {
     };
 
     useEffect(() => {
-        if (!loading && !user) navigate('/login');
+        if (!loading && !user) navigate('/login', { replace: true, state: { from: location.pathname + location.search } });
         if (location.state?.openCreateProject) {
             setCreateOpen(true);
             setView('projects');
@@ -159,7 +162,7 @@ const Dashboard = () => {
 
     const copyRoomLink = async (id) => {
         try {
-            await navigator.clipboard.writeText(`${window.location.origin}/editor/${encodeURIComponent(id)}`);
+            await navigator.clipboard.writeText(`${publicOrigin()}/editor/${encodeURIComponent(id)}`);
             toast.success('Room link copied');
         } catch {
             toast.error('Could not copy link');
@@ -241,7 +244,7 @@ const Dashboard = () => {
     const importParam = new URLSearchParams(location.search).get('import');
     useEffect(() => {
         if (!user || !importParam || !window.colabsDesktop) return;
-        window.history.replaceState({}, document.title, window.location.pathname);
+        navigate(location.pathname, { replace: true }); // clear ?import so the menu can trigger it again
         importFromDisk(importParam === 'files' ? 'files' : 'folder');
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [user?.uid, importParam]);
@@ -255,8 +258,13 @@ const Dashboard = () => {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ userId: user.uid, name: form.name, description: form.description, type: form.type }),
             });
-            if (!res.ok) throw new Error('create failed');
+            if (!res.ok) {
+                const data = await res.json().catch(() => ({}));
+                if (isPlanLimit(res, data)) { setCreateOpen(false); showUpgradeToast(data.error); return; }
+                throw new Error('create failed');
+            }
             const project = await res.json();
+            reloadPlan();
             toast.success('Project created');
             setCreateOpen(false);
             setForm({ name: '', description: '', type: 'web' });
@@ -304,6 +312,17 @@ const Dashboard = () => {
                     <button className="u-btn u-btn--solid" onClick={() => enterRoom(newRoomId())}><Plus size={16} /> New room</button>
                 </div>
             </header>
+
+            {planInfo && planInfo.plan === 'free' && planInfo.billingEnabled && (
+                <aside className="u-card db-plan" data-rise aria-label="Your plan">
+                    <div className="db-plan-meters">
+                        <span className="u-label">Free plan</span>
+                        <span><b>{planInfo.usage.projects}</b> of {planInfo.limits.projects} projects</span>
+                        <span><b>{planInfo.usage.aiToday}</b> of {planInfo.limits.aiPerDay} AI prompts today</span>
+                    </div>
+                    <button className="u-btn u-btn--solid u-btn--sm" onClick={() => { track('UPGRADE_CLICKED', { userId: user.uid, source: 'dashboard' }); navigate('/pricing'); }}>Try Team free for {catalogue.trialDays} days <ArrowUpRight size={14} /></button>
+                </aside>
+            )}
 
             <section className="u-card db-quick" data-rise aria-label="Join a room">
                 <form className="db-join" onSubmit={joinRoom}>

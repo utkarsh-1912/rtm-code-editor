@@ -59,6 +59,7 @@ import {
     FileUp,
     FolderOpen
 } from "lucide-react";
+import { bundleWebProject } from "../utils/webBundle";
 import { pickFiles, pickFolder, uploadFiles, describeSkipped, saveToDisk, openTerminal, rootFor, linkRoot, canWriteToDisk, canOpenTerminal } from "../utils/localFiles";
 
 const ProjectPage = () => {
@@ -125,6 +126,8 @@ const ProjectPage = () => {
     const filesRef = useRef([]);
     const openFilesRef = useRef([]);
     const saveTimeoutRef = useRef(null);
+    const compileRef = useRef(null);
+    const saveDiskRef = useRef(null);
 
     const isLightMode = theme === "light";
 
@@ -167,6 +170,20 @@ const ProjectPage = () => {
         if (isMobile) setActiveTab('code');
     }, [openFiles, isMobile]);
 
+    // Live preview for web projects: rebuild shortly after any file changes (yours or a
+    // teammate's), no Run needed. Run still forces a fresh reload.
+    const isWebType = (project?.type || 'web') === 'web';
+    const activeHtml = /\.html?$/i.test(activeFile?.name || '') ? activeFile.path || activeFile.name : null;
+    useEffect(() => {
+        if (!project || !isWebType || !files.length) return undefined;
+        const t = setTimeout(() => {
+            const html = activeHtml ? files.find((f) => (f.path || f.name) === activeHtml) : null;
+            setOutput(''); // the console shows the current page's logs, not every rebuild's
+            setWebSrcDoc(bundleWebProject(files, { activeFile: html }));
+        }, 350);
+        return () => clearTimeout(t);
+    }, [project, isWebType, files, activeHtml]);
+
     const handleCompile = React.useCallback(async () => {
         const projectType = project?.type || "web";
         const fileExt = activeFile?.name?.split('.').pop()?.toLowerCase();
@@ -175,47 +192,8 @@ const ProjectPage = () => {
             setIsOutputVisible(true);
             setOutputTab("preview");
 
-            const htmlFile = files.find(f => f.name === 'index.html' || f.name.endsWith('.html'))?.content 
-                || (fileExt === 'html' ? activeFile.content : '<!DOCTYPE html><html><head><meta charset="utf-8"/><title>Web App</title></head><body><h1>Web App Preview</h1></body></html>');
-            const cssFile = files.find(f => f.name === 'style.css' || f.name.endsWith('.css'))?.content || '';
-            const jsFile = files.find(f => f.name === 'script.js' || f.name.endsWith('.js'))?.content || '';
-
-            const consoleInterceptor = `
-            <script>
-              (function() {
-                const _log = console.log, _error = console.error, _warn = console.warn;
-                console.log = function(...args) {
-                  _log.apply(console, args);
-                  window.parent.postMessage({ type: 'CONSOLE_LOG', log: args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(' ') }, '*');
-                };
-                console.error = function(...args) {
-                  _error.apply(console, args);
-                  window.parent.postMessage({ type: 'CONSOLE_ERROR', log: args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(' ') }, '*');
-                };
-                console.warn = function(...args) {
-                  _warn.apply(console, args);
-                  window.parent.postMessage({ type: 'CONSOLE_WARN', log: args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(' ') }, '*');
-                };
-                window.onerror = function(msg, url, line) {
-                  window.parent.postMessage({ type: 'CONSOLE_ERROR', log: 'Uncaught Error: ' + msg + ' (Line ' + line + ')' }, '*');
-                };
-              })();
-            </script>
-            `;
-
-            let src = htmlFile;
-            if (src.includes('</head>')) {
-                src = src.replace('</head>', `${consoleInterceptor}<style>\n${cssFile}\n</style></head>`);
-            } else {
-                src = `${consoleInterceptor}<style>\n${cssFile}\n</style>${src}`;
-            }
-
-            if (src.includes('</body>')) {
-                src = src.replace('</body>', `<script>\n${jsFile}\n</script></body>`);
-            } else {
-                src = `${src}\n<script>\n${jsFile}\n</script>`;
-            }
-
+            // Same doc twice would not reload the frame; the comment makes it unique.
+            const src = bundleWebProject(files, { activeFile }) + `<!-- run ${Date.now()} -->`;
             setWebSrcDoc(src);
             const timeStr = new Date().toLocaleTimeString();
             setOutput(prev => prev ? `${prev}\n--- Web App Reloaded [${timeStr}] ---` : `--- Web App Reloaded [${timeStr}] ---`);
@@ -356,14 +334,13 @@ const ProjectPage = () => {
                     <div className="ws-browser">
                         <div className="ws-browser-bar"><i /><i /><i /><span>{(project?.name || 'app').toLowerCase().replace(/\s+/g, '-')}.preview</span></div>
                         <iframe
-                            key={webSrcDoc}
-                            srcDoc={webSrcDoc || '<!DOCTYPE html><html><body style="margin:0;height:100vh;display:flex;align-items:center;justify-content:center;font-family:system-ui,sans-serif;color:#8E8C85;background:#fff">Press Run to build the preview.</body></html>'}
+                            srcDoc={webSrcDoc || '<!DOCTYPE html><html><body style="margin:0;height:100vh;display:flex;align-items:center;justify-content:center;font-family:system-ui,sans-serif;color:#8E8C85;background:#fff">Building preview…</body></html>'}
                             title="Web Preview"
-                            sandbox="allow-scripts allow-modals allow-forms allow-same-origin"
+                            sandbox="allow-scripts allow-modals allow-forms allow-popups"
                         />
                     </div>
                 ) : (
-                    <pre className="ws-console">{output || <span className="u-caret">No console output yet. Press Run</span>}</pre>
+                    <pre className="ws-console">{output || <span className="u-caret">No console output yet.</span>}</pre>
                 )}
             </div>
         </div>
@@ -495,9 +472,21 @@ const ProjectPage = () => {
                 e.preventDefault();
                 setShowCommandPalette(prev => !prev);
             }
+            if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+                e.preventDefault();
+                e.stopPropagation();
+                compileRef.current?.();
+            }
+            // Desktop app: Ctrl+S writes the project to its folder on disk.
+            if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === 's' && canWriteToDisk()) {
+                e.preventDefault();
+                e.stopPropagation();
+                saveDiskRef.current?.();
+            }
         };
-        window.addEventListener('keydown', handleGlobalKeydown);
-        return () => window.removeEventListener('keydown', handleGlobalKeydown);
+        // Capture phase so Ctrl+Enter / Ctrl+S never reach the editor (no stray newline).
+        window.addEventListener('keydown', handleGlobalKeydown, true);
+        return () => window.removeEventListener('keydown', handleGlobalKeydown, true);
     }, [isZenMode]);
 
 
@@ -539,9 +528,16 @@ const ProjectPage = () => {
                 const filesData = await filesRes.json();
                 setFiles(filesData);
 
-                if (filesData.length > 0) {
-                    setActiveFile(filesData[0]);
-                    setOpenFiles([filesData[0]]);
+                // Open the entry file: index.html for web, the language's main file, else a main.*.
+                const base = (f) => (f.path || f.name || '').replace(/^[/]+/, '');
+                const entry = filesData.find((f) => projData.type === 'web' && /^index\.html?$/i.test(base(f)))
+                    || filesData.find((f) => base(f) === LANGS.find((l) => l.id === projData.type)?.file)
+                    || filesData.find((f) => /^(main|index|app)\.[a-z]+$/i.test(base(f)) && languageForFile(base(f)))
+                    || filesData.find((f) => !/^readme/i.test(base(f)) && !f.is_directory)
+                    || filesData[0];
+                if (entry) {
+                    setActiveFile(entry);
+                    setOpenFiles([entry]);
                 }
 
                 socketRef.current = await initSocket();
@@ -874,7 +870,7 @@ const ProjectPage = () => {
     };
 
     const diskActions = [
-        ...(canOpenTerminal() ? [{ id: 'terminal', label: 'Open terminal (Ctrl+`)', icon: <SquareTerminal size={18} />, onClick: handleOpenTerminal, pin: !isMobile }] : []),
+        ...(canOpenTerminal() ? [{ id: 'terminal', label: 'Open terminal', icon: <SquareTerminal size={18} />, onClick: handleOpenTerminal, pin: !isMobile }] : []),
         ...(canWriteToDisk() ? [
             { id: 'save-disk', label: rootFor(projectId) ? 'Save to disk' : 'Save to disk…', icon: <HardDriveDownload size={18} />, onClick: () => handleSaveToDisk(false), section: 'more' },
             ...(rootFor(projectId) ? [{ id: 'save-disk-as', label: 'Save to another folder…', icon: <HardDriveDownload size={18} />, onClick: () => handleSaveToDisk(true), section: 'more' }] : []),
@@ -882,6 +878,8 @@ const ProjectPage = () => {
         { id: 'add-files', label: 'Add files from disk', icon: <FileUp size={18} />, onClick: () => handleAddFromDisk('files'), section: 'more' },
         { id: 'add-folder', label: 'Add folder from disk', icon: <FolderOpen size={18} />, onClick: () => handleAddFromDisk('folder'), section: 'more' },
     ];
+    compileRef.current = handleCompile;
+    saveDiskRef.current = () => handleSaveToDisk(false);
 
 
 

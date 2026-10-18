@@ -53,6 +53,8 @@ Create a `.env` in the project root:
 DATABASE_URL=postgres://…            # Neon or any Postgres
 BREVO_API_KEY=…                      # optional, for invite / support emails
 BREVO_FROM_EMAIL=noreply@yourdomain.com
+STRIPE_SECRET_KEY=sk_…               # optional: paid plans
+STRIPE_WEBHOOK_SECRET=whsec_…
 ONESIGNAL_APP_ID=…                   # optional: push + email fallback
 ONESIGNAL_REST_API_KEY=…
 REACT_APP_ONESIGNAL_APP_ID=…         # same app id, for the web build
@@ -127,7 +129,9 @@ To use a fine-tuned model, load your GGUF into Ollama with a `Modelfile` (`FROM 
 
 The [`desktop/`](desktop) folder is an Electron shell around the web app for Windows, macOS and Linux:
 
-- It shows a splash screen until the server is awake, then opens the app.
+- **It opens instantly.** The installers ship a copy of the web UI, served from `http://localhost:47821` inside the app (the next free port up to 47830 if it's taken), so the app doesn't wait for the server to wake up. Data, live sessions and sign-in still go to the hosted server, and the page shows its usual notice while that server starts. The port stays the same between runs so you stay signed in; Firebase allows `localhost` by default. The local server only answers requests addressed to that port, and invite links still point at the public site.
+- It's an app, not the website. `/` goes to your workspace, or to a small launcher when you're signed out (sign in, or join or start a room as a guest, plus local Judge0 and AI status). Marketing pages aren't in the app, and help, legal and status links open in your browser. The website footer is replaced by a slim status bar, **Settings › Desktop app** shows what runs locally, and the menus add **Go** (`Ctrl+1/2/3` for Workspace, Snippets and Settings), **File › New Room** (`Ctrl+N`) and **Help**. Menu navigation happens in place, so calls and connections stay up.
+- The bundled UI is the version that shipped with the installer, so update the app to get web UI changes. Keep server API changes backward compatible, because installed apps keep using the UI they shipped with. Installers built without a UI bundle open the hosted site and show a splash until it wakes, as does `COLABS_REMOTE_UI=1`, `--url=` or `COLABS_APP_URL`.
 - It runs code on a **local Judge0** (`http://localhost:2358`) first and only uses the server if that fails.
 - It sends copilot requests to a **local model** (`http://localhost:11434/v1`, `qwen2.5-coder:1.5b`) first, then the server.
 - Sign-in popups stay in the app, and other links open in your browser.
@@ -135,17 +139,20 @@ The [`desktop/`](desktop) folder is an Electron shell around the web app for Win
 - **Terminal** (`` Ctrl+` `` or the project header) opens a separate terminal window in the project's folder. Each line runs in your shell (`cmd.exe` on Windows, `$SHELL` elsewhere, or `COLABS_SHELL`). `cd`, `clear` and `exit` are built in, typing while a program runs goes to its stdin, and `Ctrl+C` stops it. It's line-based rather than a full PTY, so full-screen programs like `vim` won't work.
 - The web page never gets raw file access. It can only read what you pick in a native dialog, write inside folders you picked, and open a terminal; commands can only be typed in the terminal window itself.
 
-Override the defaults with `COLABS_APP_URL`, `COLABS_JUDGE0_URL`, `COLABS_LLM_URL`, `COLABS_LLM_MODEL` and `COLABS_SHELL`.
+Override the defaults with `COLABS_APP_URL`, `COLABS_REMOTE_UI`, `COLABS_UI_PORT`, `COLABS_JUDGE0_URL`, `COLABS_LLM_URL`, `COLABS_LLM_MODEL` and `COLABS_SHELL`.
 
 ```bash
 cd desktop
 npm install
-npm start                 # run against the hosted app
+npm start                 # bundled UI if desktop/web exists, else the hosted app
 npm start -- --url=http://localhost:3000   # run against your local dev server
-npm run dist              # build installers for the current OS into desktop/dist
+npm run bundle-web        # copy ../build (from "npm run build" at the root) into desktop/web
+npm run dist              # bundle-web + installers for the current OS into desktop/dist
 ```
 
-**Releases:** `npm run release -- 1.2.0` bumps the web and desktop versions, commits and tags `v1.2.0`; `git push --follow-tags` then runs [`.github/workflows/release.yml`](.github/workflows/release.yml): it checks the server and builds the web app, builds `Utkristi-CoLabs-win-x64.exe`, `Utkristi-CoLabs-mac-universal.dmg`, `Utkristi-CoLabs-linux-x64.AppImage` and `.deb`, publishes one GitHub release with `SHA256SUMS.txt`, and (if the `RENDER_DEPLOY_HOOK` secret is set) redeploys the site. The [download page](https://utkristi-colabs.onrender.com/download) reads the latest release through `/api/release/latest` (cached, with a direct GitHub fallback) and links to the right file for your OS. Builds are unsigned until signing certificates are added as repository secrets, so SmartScreen and Gatekeeper ask once before the first launch.
+**Releases:** `npm run release -- 1.2.0` bumps the web and desktop versions, commits and tags `v1.2.0`; `git push --follow-tags` then runs [`.github/workflows/release.yml`](.github/workflows/release.yml): it checks the server, builds the web app (with the `REACT_APP_FIREBASE_*`, `REACT_APP_TURN_*` and `REACT_APP_RUNNER_URL` repository secrets or variables) and bundles it into the installers, builds `Utkristi-CoLabs-win-x64.exe`, `Utkristi-CoLabs-mac-universal.dmg`, `Utkristi-CoLabs-linux-x64.AppImage` and `.deb`, publishes one GitHub release with `SHA256SUMS.txt`, and (if the `RENDER_DEPLOY_HOOK` secret is set) redeploys the site. The [download page](https://utkristi-colabs.onrender.com/download) reads the latest release through `/api/release/latest` (cached, with a direct GitHub fallback) and links to the right file for your OS. Without the Firebase settings the installers skip the bundled UI and open the hosted site instead. Builds are unsigned until signing certificates are added as repository secrets, so SmartScreen and Gatekeeper ask once before the first launch.
+
+**Plans and billing:** prices and limits live in [`src/shared/plans.json`](src/shared/plans.json), used by both the server and the pricing page. Upgrades use Stripe Checkout (14-day trial), changes and cancellations use the Stripe customer portal, and the webhook is the only thing that writes a user's plan. Set `STRIPE_SECRET_KEY` and `STRIPE_WEBHOOK_SECRET` on the server, `APP_URL` to the public site URL, and point a Stripe webhook at `/api/billing/webhook` for `checkout.session.completed` and `customer.subscription.created|updated|deleted`. Prices are created inline, so there are no Stripe products to set up. Billing endpoints verify the caller's Firebase ID token with `FIREBASE_API_KEY` (falls back to `REACT_APP_FIREBASE_API_KEY`). Without Stripe keys the app runs normally and checkout answers "Billing is not configured". The go-to-market plan is in [`docs/MARKETING_PLAN.md`](docs/MARKETING_PLAN.md).
 
 **Notifications and email fallback:** set `ONESIGNAL_APP_ID` and `ONESIGNAL_REST_API_KEY` (server) plus `REACT_APP_ONESIGNAL_APP_ID` (web build) to enable push. Users are linked by their Firebase uid, and Settings > Notifications has the opt-in switch and a test button. The installed desktop app shows native notifications instead. Email goes Brevo first, then OneSignal email (`ONESIGNAL_FROM_EMAIL`, `ONESIGNAL_FROM_NAME`; the sender domain must be verified in OneSignal), then Resend if `RESEND_API_KEY` is set.
 

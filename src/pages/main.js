@@ -21,19 +21,21 @@ const TOTAL = CODE.reduce((n, r) => n + plain(r).length + 1, 0);
 const STEPS = [
     { title: "Create a room", copy: "One click makes a private room with its own link. No setup, no install.", kicker: "room/k3f9a2x1" },
     { title: "Send the link", copy: "Teammates join with just a display name, even before they register.", kicker: "3 people joined" },
-    { title: "Build together", copy: "Edit, talk, draw and run code in the same space. Everyone sees the same output.", kicker: "Total: 42.50" },
+    { title: "Build together", copy: "Edit, talk, draw, query and run code in the same space. Everyone sees the same output.", kicker: "Total: 42.50" },
 ];
 
 const FEATURES = [
     ["Multiplayer editing", "Everyone types in the same file with live cursors and conflict-free sync."],
     ["Voice & video", "Calls live inside the room, with screen sharing and annotations."],
     ["Whiteboard", "Sketch an architecture or circle a bug, from a laptop or a phone."],
-    ["Run together", "Execute code in several languages and share the output instantly."],
+    ["Run 17 languages", "Execute code together and share the output instantly, from Python to Rust."],
+    ["SQL with your data", "Import a CSV, TSV or JSON file and query it right in the room."],
+    ["Desktop apps", "Windows, macOS and Linux. Runs code and AI on your own machine when it can."],
     ["Room chat", "Talk beside the code you are discussing, with emoji and edits."],
     ["Projects & snippets", "Keep multi-file work, history and reusable code between sessions."],
 ];
 
-const CAPABILITIES = ["Live cursors", "Voice & video", "Whiteboard", "Run code", "Room chat", "Snapshots", "AI copilot", "JavaScript", "Python", "C++", "Java"];
+const CAPABILITIES = ["Live cursors", "Voice & video", "Whiteboard", "17 languages", "SQL + CSV", "Desktop app", "Local AI", "Push alerts", "Room chat", "Snapshots", "AI copilot"];
 
 // Code that types itself out, then starts over.
 function TypingCode() {
@@ -126,7 +128,7 @@ function HomePage() {
                     <span><span style={{ "--d": "140ms" }}>remotely<span className="u-faint">.</span></span></span>
                 </h1>
                 <p className="u-lede" data-rise style={{ "--d": "220ms" }}>
-                    <b>Blazing-fast sync, voice and video, drawing and chat in one room.</b> Made for pair programming, interviews and quick debugging.
+                    <b>Live sync, voice and video, drawing, chat and 17 runnable languages in one room.</b> On the web or as a desktop app, for pairing, interviews and quick debugging.
                 </p>
 
                 <div className="l-stage" data-rise style={{ "--d": "260ms" }}>
@@ -178,7 +180,7 @@ function HomePage() {
                         <ol className="l-list">
                             <li><i>01</i>No account needed to join</li>
                             <li><i>02</i>Code, chat, voice, video and whiteboard</li>
-                            <li><i>03</i>Run code and share the output</li>
+                            <li><i>03</i>Run 17 languages, or query a CSV with SQL</li>
                         </ol>
                         <Link to="/signup" className="u-btn u-btn--solid" style={{ alignSelf: "flex-start" }}>Create a room <ArrowUpRight size={15} /></Link>
                     </article>
@@ -189,7 +191,7 @@ function HomePage() {
                         <ol className="l-list">
                             <li><i>01</i>File tree, tabs and live preview</li>
                             <li><i>02</i>Snapshots, history and diffs</li>
-                            <li><i>03</i>Invite teammates and manage access</li>
+                            <li><i>03</i>Invite teammates by email, with push alerts</li>
                         </ol>
                         <Link to="/signup" className="u-btn l-btn-on-mark" style={{ alignSelf: "flex-start" }}>Start a project <ArrowUpRight size={15} /></Link>
                     </article>

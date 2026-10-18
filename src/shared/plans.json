@@ -1,0 +1,49 @@
+{
+  "currency": "USD",
+  "trialDays": 14,
+  "yearlyDiscount": 0.17,
+  "plans": {
+    "free": {
+      "name": "Free",
+      "tagline": "For solo devs and trying things out",
+      "monthly": 0,
+      "limits": { "projects": 3, "aiPerDay": 10 },
+      "features": [
+        "Unlimited rooms, guests join free",
+        "Live sync, chat, voice, video and whiteboard",
+        "17 languages, SQL with CSV import",
+        "Desktop apps for every OS",
+        "3 projects",
+        "10 AI copilot prompts a day",
+        "Snippets library"
+      ]
+    },
+    "team": {
+      "name": "Team",
+      "tagline": "For people who build together every week",
+      "monthly": 12,
+      "limits": { "projects": null, "aiPerDay": null },
+      "features": [
+        "Everything in Free",
+        "Unlimited projects and snapshots",
+        "Unlimited AI copilot",
+        "Organizations and email invites",
+        "Push and email notifications",
+        "Priority support"
+      ]
+    },
+    "enterprise": {
+      "name": "Enterprise",
+      "tagline": "For larger organizations",
+      "monthly": null,
+      "limits": { "projects": null, "aiPerDay": null },
+      "features": [
+        "Everything in Team",
+        "Self-hosted runner and Judge0",
+        "SSO and advanced access",
+        "Dedicated support and SLA",
+        "Custom agreements and invoicing"
+      ]
+    }
+  }
+}

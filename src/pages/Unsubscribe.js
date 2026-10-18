@@ -3,6 +3,7 @@ import { useSearchParams, Link } from 'react-router-dom';
 import { XCircle, Mail, Loader2, ShieldCheck, Bell, BellOff } from 'lucide-react';
 import toast from 'react-hot-toast';
 import ContentLayout from '../components/ContentLayout';
+import { getBackendUrl } from '../utils/api';
 
 const Unsubscribe = () => {
     const [searchParams] = useSearchParams();
@@ -11,13 +12,6 @@ const Unsubscribe = () => {
     const [isUnsubscribed, setIsUnsubscribed] = useState(false);
     const [processing, setProcessing] = useState(false);
 
-    // Robust Backend URL Resolution
-    const getBackendUrl = () => {
-        if (process.env.REACT_APP_BACKEND_URL) return process.env.REACT_APP_BACKEND_URL;
-        const origin = window.location.origin;
-        if (origin.includes('localhost:3000')) return 'http://localhost:5000';
-        return origin;
-    };
     const backendUrl = getBackendUrl();
 
     useEffect(() => {

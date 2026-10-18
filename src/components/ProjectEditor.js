@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import CodeMirror from "@uiw/react-codemirror";
-import { dracula } from "@uiw/codemirror-theme-dracula";
+import { colabsDark, colabsLight, editorChrome } from "../utils/editorTheme";
 import { EditorView, Decoration, ViewPlugin, WidgetType } from "@codemirror/view";
 import { vim } from "@replit/codemirror-vim";
 import { emacs } from "@replit/codemirror-emacs";
@@ -136,7 +136,7 @@ function ProjectEditor({
             <CodeMirror
                 value={editorCode}
                 height="100%"
-                theme={isLightMode ? "light" : dracula}
+                theme={isLightMode ? colabsLight : colabsDark}
                 onChange={handleEditorChange}
                 basicSetup={{
                     lineNumbers: true,
@@ -148,6 +148,7 @@ function ProjectEditor({
                 }}
                 extensions={[
                     getLanguageExtension(language),
+                    editorChrome,
                     ...(settings?.wordWrap ? [EditorView.lineWrapping] : []),
                     ...(settings?.keybinding === "vim" ? [vim()] : []),
                     ...(settings?.keybinding === "emacs" ? [emacs()] : []),

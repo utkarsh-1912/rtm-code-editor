@@ -3,7 +3,7 @@ import ContentLayout from "../components/ContentLayout";
 
 export default function Privacy() {
     return (
-        <ContentLayout title="Privacy Policy" updated="March 7, 2026">
+        <ContentLayout title="Privacy Policy" updated="October 19, 2026">
 
             <h2>1. Information We Collect</h2>
             <p>
@@ -25,10 +25,25 @@ export default function Privacy() {
 
             <h2>3. Third-Party Services</h2>
             <p>
-                We use <strong>Judge0</strong> for code execution and <strong>Neon DB (PostgreSQL)</strong> for data persistence. Authentication is handled via <strong>Firebase Auth</strong>. Please refer to their respective policies for further details.
+                We use <strong>Judge0</strong> for code execution, <strong>Neon (PostgreSQL)</strong> for data persistence and <strong>Firebase Auth</strong> for sign-in. Notifications are delivered with <strong>OneSignal</strong> (push and email fallback) and transactional email with <strong>Brevo</strong>. For push, your account ID is registered with OneSignal as your identifier, and your email address is shared with it when email delivery is needed. Please refer to their policies for further details.
             </p>
 
-            <h2>4. Security</h2>
+            <h2>4. Desktop App and Local Processing</h2>
+            <p>
+                The desktop app can run your code on a Judge0 instance on your own machine and send AI requests to a local model. Those requests stay on your computer. If neither is running, the app falls back to our server, exactly like the web version.
+            </p>
+
+            <h2>5. Imported Data (SQL)</h2>
+            <p>
+                CSV, TSV and JSON files you import into a SQL room are read in your browser. Their contents are sent to the code runner as part of the query when you press Run, and are not stored on our servers by the runner.
+            </p>
+
+            <h2>6. Notifications</h2>
+            <p>
+                Push notifications are optional and need your permission. You can switch them off at any time in Settings, and every marketing email includes an unsubscribe link.
+            </p>
+
+            <h2>7. Security</h2>
             <p>
                 We provide a dedicated <strong>Security</strong> dashboard where you can see all devices currently logged into your account and remotely terminate any unrecognized sessions.
             </p>

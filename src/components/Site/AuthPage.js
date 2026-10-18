@@ -1,13 +1,19 @@
 import React, { useEffect } from "react";
 import Logo from "../Logo";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Github, Mail, ArrowLeft, ArrowRight } from "lucide-react";
 import toast from "react-hot-toast";
 import { useAuth } from "../../context/AuthContext";
 import { ThemeButton } from "../ux/Shell";
-import { useClock, localCity } from "../ux/primitives";
+import { useClock, localCity, newRoomId } from "../ux/primitives";
 import "../../styles/site.css";
 import "../../styles/app.css";
+import { IS_DESKTOP, openOnWebsite } from "../../utils/desktop";
+
+// Desktop app: legal pages live on the website, so open them in the browser.
+const LegalLink = ({ to, children }) => (IS_DESKTOP
+    ? <button type="button" className="u-ul" onClick={() => openOnWebsite(to)}>{children}</button>
+    : <Link to={to} className="u-ul">{children}</Link>);
 
 const POINTS = [
     "Real-time sync with live cursors",
@@ -19,12 +25,24 @@ const POINTS = [
 export default function AuthPage({ mode }) {
     const { loginWithGoogle, loginWithGitHub, user, loading } = useAuth();
     const navigate = useNavigate();
+    const location = useLocation();
     const now = useClock();
     const isSignup = mode === "signup";
 
+    // Where to go afterwards: the page that sent you here (state.from or ?next=), same site only.
+    const raw = location.state?.from || new URLSearchParams(location.search).get("next") || "";
+    const next = /^\/(?!\/)/.test(raw) && !/^\/(login|signup)/.test(raw) ? raw : "";
+
     useEffect(() => {
-        if (user) navigate("/dashboard");
-    }, [user, navigate]);
+        if (user) navigate(next || "/dashboard", { replace: true });
+    }, [user, navigate, next]);
+
+    // Guests can't have a workspace, so go back to the room they came from or open a new one;
+    // the room asks for a display name.
+    const continueAsGuest = () => {
+        const room = next.startsWith("/editor/") ? next : `/editor/${newRoomId()}`;
+        navigate(room, { state: { role: "editor" } });
+    };
 
     const handleLogin = async (provider) => {
         try {
@@ -77,7 +95,7 @@ export default function AuthPage({ mode }) {
 
                     <div className="au-or"><span>or</span></div>
 
-                    <button className="u-btn u-btn--solid u-btn--lg u-btn--block" onClick={() => navigate("/")}>
+                    <button className="u-btn u-btn--solid u-btn--lg u-btn--block" onClick={continueAsGuest}>
                         Continue as guest <ArrowRight size={16} />
                     </button>
 
@@ -89,7 +107,7 @@ export default function AuthPage({ mode }) {
                     </p>
                 </div>
 
-                <p className="u-label au-legal">By continuing you agree to the <Link to="/terms" className="u-ul">terms</Link> and <Link to="/privacy" className="u-ul">privacy policy</Link>.</p>
+                <p className="u-label au-legal">By continuing you agree to the <LegalLink to="/terms">terms</LegalLink> and <LegalLink to="/privacy">privacy policy</LegalLink>.</p>
             </main>
         </div>
     );

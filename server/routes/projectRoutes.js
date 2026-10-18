@@ -4,6 +4,7 @@ const ProjectRepository = require('../repositories/ProjectRepository');
 const MailService = require('../services/MailService');
 const UserRepository = require('../repositories/UserRepository');
 const NotificationRepository = require('../repositories/NotificationRepository');
+const PlanRepository = require('../repositories/PlanRepository');
 
 // Get all projects for a user
 router.get('/projects', async (req, res) => {
@@ -23,6 +24,13 @@ router.post('/projects', async (req, res) => {
     try {
         const { userId, name, description, type, empty } = req.body;
         if (!userId || !name) return res.status(400).json({ error: "Missing required parameters" });
+        const { limits } = await PlanRepository.getPlan(userId);
+        if (limits.projects != null) {
+            const { projects } = await PlanRepository.getUsage(userId);
+            if (projects >= limits.projects) {
+                return res.status(402).json({ error: `The Free plan includes ${limits.projects} projects. Upgrade to Team for unlimited projects.`, code: 'PLAN_LIMIT', limit: 'projects' });
+            }
+        }
         const project = await ProjectRepository.createProject(userId, name, description, type, { empty: !!empty });
         res.json(project);
     } catch (err) {
@@ -89,7 +97,9 @@ router.post('/projects/:id/files/bulk', express.json({ limit: '10mb' }), async (
         const clean = [];
         for (const f of files) {
             const path = String(f.path || '').replace(/\\/g, '/').replace(/^\/+/, '');
-            if (!path || path.includes('..') || path.length > 400) return res.status(400).json({ error: `Bad path: ${f.path}` });
+            const segments = path.split('/');
+            const bad = !path || path.length > 400 || /^[a-zA-Z]:/.test(path) || path.includes(String.fromCharCode(0)) || segments.some((seg) => !seg || seg === '.' || seg === '..');
+            if (bad) return res.status(400).json({ error: `Bad path: ${f.path}` });
             const content = String(f.content ?? '');
             if (Buffer.byteLength(content) > MAX_FILE_BYTES) return res.status(413).json({ error: `${path} is larger than 1 MB` });
             // Same convention as files created in the editor: name = relative path, path = "/" + it.

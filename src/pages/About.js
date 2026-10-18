@@ -9,13 +9,14 @@ const PILLARS = [
     { icon: Video, title: "Talk while you code", text: "Voice, video and screen sharing live inside the editor, so pairing never means switching tabs." },
     { icon: Layers, title: "Focus by design", text: "A command palette (Ctrl+K) and focus mode (Alt+F) keep every action one keystroke away and everything else out of sight." },
     { icon: Folder, title: "Rooms and projects", text: "Spin up a throwaway room in seconds, or keep a persistent multi-file project for your team." },
-    { icon: Cpu, title: "Real-time by default", text: "Sync keeps everyone on the same page, with live cursors and shared output." },
+    { icon: Cpu, title: "Runs where you are", text: "Seventeen languages, SQL over your own CSV files, and desktop apps that use your machine's runner and local AI before the server." },
 ];
 
 const PRINCIPLES = [
     ["Fast to start", "A link is all it takes. Guests join without an account."],
     ["Calm to use", "A quiet interface with one accent, and nothing fighting for attention."],
     ["Yours to keep", "Projects, snippets and history persist across devices."],
+    ["Close to you", "The desktop app runs code and AI locally when it can, and only falls back to the server when it can't."],
 ];
 
 export default function About() {
@@ -24,7 +25,7 @@ export default function About() {
             <PageHead
                 label="About"
                 title={["Pairing,", "without the", "distance."]}
-                lede={<><b>Utkristi CoLabs is a collaborative IDE for teams that work remotely.</b> Live code editing, voice, video, drawing and chat, so remote pairing feels like sitting side by side.</>}
+                lede={<><b>Utkristi CoLabs is a collaborative IDE for teams that work remotely.</b> Live code editing, voice, video, drawing, chat and code execution in 17 languages, on the web and on Windows, macOS and Linux, so remote pairing feels like sitting side by side.</>}
             />
 
             <div className="a-bento">

@@ -167,6 +167,12 @@ async function initializeSchema() {
 
         // Ensure missing columns exist for backward compatibility with existing databases
         await sql`ALTER TABLE sessions ADD COLUMN IF NOT EXISTS session_id VARCHAR(255);`;
+        // Device list: a custom name per device, and soft revocation so a removed device
+        // signs itself out the next time it checks in.
+        await sql`ALTER TABLE sessions ADD COLUMN IF NOT EXISTS created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP;`;
+        await sql`ALTER TABLE sessions ADD COLUMN IF NOT EXISTS last_active TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP;`;
+        await sql`ALTER TABLE sessions ADD COLUMN IF NOT EXISTS name VARCHAR(80);`;
+        await sql`ALTER TABLE sessions ADD COLUMN IF NOT EXISTS revoked_at TIMESTAMP WITH TIME ZONE;`;
         await sql`ALTER TABLE rooms ADD COLUMN IF NOT EXISTS name VARCHAR(255);`;
         // users created before these columns existed (CREATE TABLE IF NOT EXISTS never adds columns)
         await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS bio TEXT DEFAULT '';`;
@@ -174,6 +180,15 @@ async function initializeSchema() {
         await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS last_room_id VARCHAR(255);`;
         await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS is_unsubscribed BOOLEAN DEFAULT FALSE;`;
         await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS photo_url TEXT;`;
+        // Billing: plan state is written only by the Stripe webhook.
+        await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS plan VARCHAR(20) DEFAULT 'free';`;
+        await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS plan_status VARCHAR(30);`;
+        await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS plan_interval VARCHAR(10);`;
+        await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS plan_renews_at TIMESTAMP WITH TIME ZONE;`;
+        await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS plan_cancel_at_period_end BOOLEAN DEFAULT FALSE;`;
+        await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS trial_ends_at TIMESTAMP WITH TIME ZONE;`;
+        await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS stripe_customer_id VARCHAR(80);`;
+        await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS stripe_subscription_id VARCHAR(80);`;
 
         console.log("Database schema initialized successfully.");
     } catch (err) {

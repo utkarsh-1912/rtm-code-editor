@@ -5,6 +5,7 @@ import Logo from "../Logo";
 import { useReveal, useClock, localCity } from "./primitives";
 import { getThemePref, resolveTheme, setThemePref } from "../../utils/theme";
 import { useBackend, backendLabel } from "../../context/BackendContext";
+import { IS_DESKTOP, isWebOnly, openOnWebsite } from "../../utils/desktop";
 import "../../styles/site.css";
 import "../../styles/app.css";
 
@@ -194,50 +195,69 @@ export default function Shell({
 
             <main className={mainClass}>{children}</main>
 
-            <footer className="u-foot">
-                <div className="u-foot-in">
-                    <div className="f-top">
-                        <p className="u-lede"><b>Code together, remotely.</b> Rooms, projects and snippets in one place.</p>
-                        {footerCta && <div className="f-cta">{footerCta}</div>}
+            {IS_DESKTOP ? (
+                <footer className="u-foot u-foot--app">
+                    <div className="u-foot-in">
+                        <Link to="/status" onClick={(e) => { e.preventDefault(); openOnWebsite("/status"); }} className="f-stat">
+                            <span className={`u-dot${backend.status === "up" ? "" : backend.status === "down" ? " u-dot--bad" : " u-dot--warn"}`} />
+                            {backendLabel(backend)}{backend.latency != null && <span className="u-faint"> · {backend.latency} ms</span>}
+                        </Link>
+                        <span className="f-app-links">
+                            <button className="u-ul" onClick={() => openOnWebsite("/support")}>Help ↗</button>
+                            <button className="u-ul" onClick={() => openOnWebsite("/privacy")}>Privacy ↗</button>
+                            <button className="u-ul" onClick={() => openOnWebsite("/")}>Website ↗</button>
+                        </span>
+                        <ThemeSwitch />
                     </div>
+                </footer>
+            ) : (
+                <footer className="u-foot">
+                    <div className="u-foot-in">
+                        <div className="f-top">
+                            <p className="u-lede"><b>Code together, remotely.</b> Rooms, projects and snippets in one place.</p>
+                            {footerCta && <div className="f-cta">{footerCta}</div>}
+                        </div>
 
-                    <div className="f-cols">
-                        {columns.map((col) => (
-                            <nav key={col.title} aria-label={col.title}>
-                                <span className="u-label">{col.title}</span>
-                                <ul>
-                                    {col.links.map(([label, to]) => (
-                                        <li key={to}>
-                                            {/^https?:/.test(to)
-                                                ? <a href={to} target="_blank" rel="noreferrer" className="u-ul">{label} ↗</a>
-                                                : <NavLink to={to} className={({ isActive }) => `u-ul${isActive ? " on" : ""}`}>{label}</NavLink>}
-                                        </li>
-                                    ))}
-                                </ul>
-                            </nav>
-                        ))}
-                        <div className="f-status">
-                            <span className="u-label">System</span>
-                            <Link to="/status" className="f-stat">
-                                <span className={`u-dot${backend.status === "up" ? "" : backend.status === "down" ? " u-dot--bad" : " u-dot--warn"}`} />
-                                {backendLabel(backend)}
-                            </Link>
-                            <span className="u-label">{backend.latency != null ? `API ${backend.latency} ms` : "Checking the API"}</span>
-                            <ThemeSwitch />
+                        <div className="f-cols">
+                            {columns.map((col) => (
+                                <nav key={col.title} aria-label={col.title}>
+                                    <span className="u-label">{col.title}</span>
+                                    <ul>
+                                        {col.links.map(([label, to]) => (
+                                            <li key={to}>
+                                                {/^https?:/.test(to)
+                                                    ? <a href={to} target="_blank" rel="noreferrer" className="u-ul">{label} ↗</a>
+                                                    : IS_DESKTOP && isWebOnly(to)
+                                                    ? <button className="u-ul" onClick={() => openOnWebsite(to)}>{label} ↗</button>
+                                                    : <NavLink to={to} className={({ isActive }) => `u-ul${isActive ? " on" : ""}`}>{label}</NavLink>}
+                                            </li>
+                                        ))}
+                                    </ul>
+                                </nav>
+                            ))}
+                            <div className="f-status">
+                                <span className="u-label">System</span>
+                                <Link to="/status" className="f-stat">
+                                    <span className={`u-dot${backend.status === "up" ? "" : backend.status === "down" ? " u-dot--bad" : " u-dot--warn"}`} />
+                                    {backendLabel(backend)}
+                                </Link>
+                                <span className="u-label">{backend.latency != null ? `API ${backend.latency} ms` : "Checking the API"}</span>
+                                <ThemeSwitch />
+                            </div>
+                        </div>
+
+                        <FitLine className="f-word"><span>Utkristi</span> <span className="u-faint">CoLabs</span></FitLine>
+
+                        <div className="u-foot-bottom">
+                            <span>&copy; {now.getFullYear()} Utkristi CoLabs · Built by Utkristi.io</span>
+                            <span style={{ display: "flex", gap: 18, flexWrap: "wrap" }}>
+                                <span>{localCity()} {time}</span>
+                                <button onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}>Back to top ↑</button>
+                            </span>
                         </div>
                     </div>
-
-                    <FitLine className="f-word"><span>Utkristi</span> <span className="u-faint">CoLabs</span></FitLine>
-
-                    <div className="u-foot-bottom">
-                        <span>&copy; {now.getFullYear()} Utkristi CoLabs · Built by Utkristi.io</span>
-                        <span style={{ display: "flex", gap: 18, flexWrap: "wrap" }}>
-                            <span>{localCity()} {time}</span>
-                            <button onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}>Back to top ↑</button>
-                        </span>
-                    </div>
-                </div>
-            </footer>
+                </footer>
+            )}
 
             {after}
         </div>

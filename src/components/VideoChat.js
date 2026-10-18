@@ -1,8 +1,10 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import {
-    Video, VideoOff, Mic, MicOff, Maximize2, Minimize2,
-    ScreenShare, ScreenShareOff, LogOut, Pencil, Expand, Shrink
+    Video, VideoOff, Mic, MicOff, Maximize2, Maximize, Minimize, Minus,
+    ScreenShare, ScreenShareOff, PhoneOff, Pencil, Eraser, Expand, Shrink,
+    Pin, PinOff, LayoutGrid, PanelTop, GripHorizontal
 } from 'lucide-react';
+import { Avatar } from './clients';
 import CallAnnotations from './CallAnnotations';
 import toast from 'react-hot-toast';
 import ACTIONS from '../Action';
@@ -49,12 +51,15 @@ const VideoChat = ({
     const [isDrawing, setIsDrawing] = useState(false);
     const [isLarge, setIsLarge] = useState(false);
 
-    const [pipPosition, setPipPosition] = useState({ x: window.innerWidth - 240, y: window.innerHeight - 200 });
+    const [pipPosition, setPipPosition] = useState(() => {
+        try {
+            const saved = JSON.parse(localStorage.getItem('call-pos'));
+            if (saved && Number.isFinite(saved.x) && Number.isFinite(saved.y)) return saved;
+        } catch { /* storage blocked */ }
+        return { x: window.innerWidth - 540, y: window.innerHeight - 420 };
+    });
     const [isDragging, setIsDragging] = useState(false);
     const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
-    const [isHoveringMini, setIsHoveringMini] = useState(false);
-    const page = 0;
-    const pageSize = 6;
 
     // --- Refs for WebRTC & Audio ---
     const peersRef = useRef({}); // { socketId: RTCPeerConnection }
@@ -187,8 +192,12 @@ const VideoChat = ({
         }
     }, []);
 
-    const handleJoinCall = useCallback(async () => {
+    const [joinError, setJoinError] = useState(null);
+
+    // noDevices: join with no camera or mic (permission denied, no hardware, or by choice).
+    const handleJoinCall = useCallback(async ({ noDevices = false } = {}) => {
         if (!socketRef.current || inCall) return;
+        setJoinError(null);
 
         try {
             if (user?.isGuest) {
@@ -204,7 +213,11 @@ const VideoChat = ({
             }
 
             let stream;
-            if (!initialVideoState && !initialAudioState) {
+            if (noDevices) {
+                stream = new MediaStream();
+                setIsMuted(true);
+                setIsVideoOff(true);
+            } else if (!initialVideoState && !initialAudioState) {
                 // If both are false, avoid getUserMedia throwing an error. Create an empty stream.
                 stream = new MediaStream();
             } else {
@@ -218,7 +231,7 @@ const VideoChat = ({
             setInCall(true);
             onCallStateChange(true);
 
-            if (initialAudioState) {
+            if (initialAudioState && !noDevices) {
                 setupAudioAnalysis(stream, 'local');
             }
 
@@ -230,11 +243,17 @@ const VideoChat = ({
             });
 
             // Immediate broadcast of current state
-            broadcastMediaState({ isMuted, isVideoOff });
+            broadcastMediaState(noDevices ? { isMuted: true, isVideoOff: true } : { isMuted, isVideoOff });
 
         } catch (err) {
             console.error("Camera access denied", err);
-            toast.error("Please enable camera & microphone to join.");
+            const name = err?.name || '';
+            setJoinError(
+                name === 'NotAllowedError' || name === 'SecurityError' ? 'Camera and microphone are blocked for this site.'
+                    : name === 'NotFoundError' ? 'No camera or microphone was found.'
+                        : name === 'NotReadableError' ? 'Your camera or microphone is in use by another app.'
+                            : 'Could not start your camera or microphone.'
+            );
         }
     }, [projectId, socketRef, user, setupAudioAnalysis, initialAudioState, initialVideoState, onCallStateChange, inCall, broadcastMediaState, isMuted, isVideoOff]);
 
@@ -364,6 +383,17 @@ const VideoChat = ({
                 await peer.setLocalDescription(offer);
                 socketRef.current.emit('video-offer', { to: targetSocketId, offer });
             } catch (e) { /* the peer will be re-created when they rejoin */ }
+        };
+
+        // Tracks added after the first handshake (camera or mic turned on later) need a new
+        // offer. The first offer/answer is sent explicitly, so only renegotiate after it.
+        peer.onnegotiationneeded = async () => {
+            if (!peer.__negotiated || peer.signalingState !== 'stable' || !socketRef.current) return;
+            try {
+                const offer = await peer.createOffer();
+                await peer.setLocalDescription(offer);
+                socketRef.current.emit('video-offer', { to: targetSocketId, offer });
+            } catch (e) { /* next change retries */ }
         };
 
         // Bug 2: Initialize candidate queue for this peer
@@ -502,6 +532,7 @@ const VideoChat = ({
                 const answer = await peer.createAnswer();
                 await peer.setLocalDescription(answer);
                 socket.emit('video-answer', { to: from, answer });
+                peer.__negotiated = true;
 
                 // Bug 2: Drain buffered ICE candidates now that remote description is set
                 const pending = pendingCandidatesRef.current[from] || [];
@@ -523,6 +554,7 @@ const VideoChat = ({
             if (peer) {
                 try {
                     await peer.setRemoteDescription(new RTCSessionDescription(answer));
+                    peer.__negotiated = true;
                     // Bug 2: Drain buffered ICE candidates now that remote description is set
                     const pending = pendingCandidatesRef.current[from] || [];
                     for (const candidate of pending) {
@@ -642,371 +674,294 @@ const VideoChat = ({
         return () => clearInterval(interval);
     }, [inCall, activeSpeaker, isMuted, remoteUsers]);
 
-    // --- PiP Drag Logic ---
+    // --- Window: drag by the title bar, position remembered per browser ---
+    const rootRef = useRef(null);
+    const [viewport, setViewport] = useState({ w: window.innerWidth, h: window.innerHeight });
     useEffect(() => {
-        if (!isDragging) return;
+        const onResize = () => setViewport({ w: window.innerWidth, h: window.innerHeight });
+        window.addEventListener('resize', onResize);
+        return () => window.removeEventListener('resize', onResize);
+    }, []);
 
-        const handleMouseMove = (e) => {
-            setPipPosition({
-                x: e.clientX - dragOffset.x,
-                y: e.clientY - dragOffset.y
+    useEffect(() => {
+        if (!isDragging) return undefined;
+        const move = (e) => setPipPosition({ x: e.clientX - dragOffset.x, y: e.clientY - dragOffset.y });
+        const up = () => {
+            setIsDragging(false);
+            setPipPosition((p) => {
+                try { localStorage.setItem('call-pos', JSON.stringify(p)); } catch { /* storage blocked */ }
+                return p;
             });
         };
-
-        const handleMouseUp = () => setIsDragging(false);
-
-        window.addEventListener('mousemove', handleMouseMove);
-        window.addEventListener('mouseup', handleMouseUp);
+        window.addEventListener('pointermove', move);
+        window.addEventListener('pointerup', up);
         return () => {
-            window.removeEventListener('mousemove', handleMouseMove);
-            window.removeEventListener('mouseup', handleMouseUp);
+            window.removeEventListener('pointermove', move);
+            window.removeEventListener('pointerup', up);
         };
     }, [isDragging, dragOffset]);
 
     const startDragging = (e) => {
+        if (isMobile || e.button !== 0 || e.target.closest('button')) return;
+        e.preventDefault();
         setIsDragging(true);
-        setDragOffset({
-            x: e.clientX - pipPosition.x,
-            y: e.clientY - pipPosition.y
-        });
+        setDragOffset({ x: e.clientX - pipPosition.x, y: e.clientY - pipPosition.y });
     };
 
+    // --- Call clock ---
+    const [elapsed, setElapsed] = useState(0);
+    useEffect(() => {
+        if (!inCall) { setElapsed(0); return undefined; }
+        const started = Date.now();
+        const id = setInterval(() => setElapsed(Math.floor((Date.now() - started) / 1000)), 1000);
+        return () => clearInterval(id);
+    }, [inCall]);
+    const clock = `${Math.floor(elapsed / 60)}:${String(elapsed % 60).padStart(2, '0')}`;
 
-    // --- UI Render Helpers ---
+    // --- Layout ---
+    const [layout, setLayout] = useState('grid'); // 'grid' | 'speaker'
+    const [pinned, setPinned] = useState(null);
+    const [fitStage, setFitStage] = useState(true); // contain (true) or fill the stage
+    const [clearKey, setClearKey] = useState(0);
+    const togglePin = (id) => {
+        setPinned((cur) => (cur === id ? null : id));
+        setLayout((l) => (pinned === id ? l : 'speaker'));
+    };
+    const toggleFullscreen = () => {
+        const el = rootRef.current;
+        if (!el) return;
+        if (document.fullscreenElement) document.exitFullscreen().catch(() => { });
+        else el.requestFullscreen?.().catch(() => { });
+    };
+
+    const spectator = !!(user?.isGuest || user?.isSpectator);
+    const myName = user?.name || socketRef.current?.userName || 'You';
+    const photoFor = (id) => (id === 'local' ? user?.photoURL : clients.find((c) => c.socketId === id)?.photoURL) || null;
+    const nameFor = (p) => (p.isLocal ? myName : p.name || clients.find((c) => c.socketId === p.id)?.userName || 'Participant');
+
     const allParticipants = [
-        ...(!user?.isSpectator ? [{ id: 'local', isLocal: true }] : []),
-        ...Object.entries(remoteUsers).map(([id, data]) => ({ id, ...data }))
+        ...(!spectator ? [{ id: 'local', isLocal: true }] : []),
+        ...Object.entries(remoteUsers).map(([id, data]) => ({ id, ...data })),
     ];
+    const count = allParticipants.length;
 
-    const paginatedParticipants = allParticipants.slice(page * pageSize, (page + 1) * pageSize);
-
-    // Pop-style stage: when someone shares their screen it takes the main area
+    // Stage: a shared screen always wins; otherwise the pinned person, then whoever is talking.
     const sharer = allParticipants.find((p) => (p.isLocal ? isScreenSharing : p.isScreenSharing));
-    const others = sharer ? allParticipants.filter((p) => p.id !== sharer.id) : [];
+    const spotlight = sharer
+        || (layout === 'speaker' && count > 1
+            ? allParticipants.find((p) => p.id === pinned) || allParticipants.find((p) => p.id === activeSpeaker && !p.isLocal) || allParticipants.find((p) => !p.isLocal)
+            : null);
+    const strip = spotlight ? allParticipants.filter((p) => p.id !== spotlight.id) : [];
 
-    const renderTile = (p, { fit = 'cover', small = false, stage = false } = {}) => (
-        <div key={p.id} style={{ position: 'relative', borderRadius: '10px', overflow: 'hidden', backgroundColor: '#1f2937', outline: activeSpeaker === p.id ? '2px solid #22c55e' : 'none', minWidth: 0, minHeight: 0, flex: small ? '0 0 120px' : 1 }}>
-            {p.isLocal ? (
-                isVideoOff && !isScreenSharing ? (
-                    <div style={avatarCenterStyle}>
-                        <div style={avatarCircle(small ? 28 : 40)}>
-                            {(user?.name || socketRef.current?.userName || 'U')[0].toUpperCase()}
-                        </div>
-                    </div>
-                ) : (
-                    <video ref={(el) => { if (el && el.srcObject !== localStream) el.srcObject = localStream; }} autoPlay muted playsInline style={{ width: '100%', height: '100%', objectFit: fit, transform: isScreenSharing ? 'none' : 'scaleX(-1)' }} />
-                )
-            ) : (
-                <RemoteVideo user={p} isMini fit={fit} />
-            )}
-            <div style={{
-                position: 'absolute', bottom: '6px', left: '6px',
-                display: 'flex', alignItems: 'center', gap: '4px',
-                backgroundColor: 'rgba(0,0,0,0.65)', padding: '3px 8px',
-                borderRadius: '999px', fontSize: '10px', color: 'white',
-                border: '1px solid rgba(255,255,255,0.08)', zIndex: 10
-            }}>
-                {(p.isLocal ? isMuted : p.isMuted) ? <MicOff size={10} color="#ef4444" /> : <Mic size={10} color="#10b981" />}
-                <span style={{ fontWeight: '600' }}>{p.isLocal ? (stage ? 'Your screen' : 'You') : (stage ? `${p.name || 'Participant'}'s screen` : (p.name || 'Participant'))}</span>
-            </div>
-            {stage && <CallAnnotations socketRef={socketRef} projectId={projectId} drawing={isDrawing} userName={user?.name} />}
-        </div>
-    );
+    const mutedOf = (p) => (p.isLocal ? isMuted : !!p.isMuted);
+    const cameraOn = (p) => (p.isLocal ? (!isVideoOff || isScreenSharing) && !!localStream : (!p.isVideoOff || p.isScreenSharing) && !!p.stream);
 
-    const renderExpanded = () => {
-        if (sharer) {
-            return (
-                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '6px', padding: '6px', backgroundColor: '#000', height: '100%', minHeight: 0 }}>
-                    {renderTile(sharer, { fit: 'contain', stage: true })}
-                    {others.length > 0 && (
-                        <div style={{ display: 'flex', gap: '6px', height: '84px', flex: '0 0 84px', overflowX: 'auto' }}>
-                            {others.map((p) => renderTile(p, { small: true }))}
-                        </div>
-                    )}
-                </div>
-            );
-        }
+    const renderTile = (p, variant) => {
+        const stage = variant === 'stage';
+        const presenting = stage && p.id === sharer?.id;
+        const name = nameFor(p);
+        const label = presenting ? (p.isLocal ? 'Your screen' : `${name}'s screen`) : p.isLocal ? `${name} (you)` : name;
+        const avatarSize = variant === 'strip' || variant === 'mini' ? 34 : stage ? 84 : count > 4 ? 44 : 64;
         return (
-            <div style={{
-                flex: 1,
-                display: 'grid',
-                gridTemplateColumns: paginatedParticipants.length <= 1 ? '1fr' : paginatedParticipants.length <= 4 ? '1fr 1fr' : '1fr 1fr 1fr',
-                gridAutoRows: '1fr',
-                gap: '6px', padding: '6px', backgroundColor: '#000', overflow: 'hidden', height: '100%'
-            }}>
-                {paginatedParticipants.map((p) => renderTile(p))}
+            <div
+                key={`${variant}-${p.id}`}
+                className={`vc-tile vc-tile--${variant}${activeSpeaker === p.id && !mutedOf(p) ? ' is-speaking' : ''}${pinned === p.id ? ' is-pinned' : ''}`}
+                onDoubleClick={() => !presenting && togglePin(p.id)}
+            >
+                {cameraOn(p) ? (
+                    <StreamVideo
+                        stream={p.isLocal ? localStream : p.stream}
+                        muted={p.isLocal}
+                        mirror={p.isLocal && !isScreenSharing}
+                        fit={presenting ? (fitStage ? 'contain' : 'cover') : 'cover'}
+                    />
+                ) : (
+                    <div className="vc-off">
+                        <Avatar name={name} photoURL={photoFor(p.id)} size={avatarSize} />
+                        {!p.isLocal && !p.stream && p.isVideoOff === undefined && variant !== 'strip' && <span className="vc-sub">Connecting…</span>}
+                    </div>
+                )}
+                <div className="vc-tag">
+                    {mutedOf(p) ? <MicOff size={12} className="vc-red" /> : <Mic size={12} />}
+                    <span>{label}</span>
+                </div>
+                {variant === 'grid' && count > 1 && (
+                    <button className="vc-pin" onClick={() => togglePin(p.id)} title={pinned === p.id ? 'Unpin' : 'Pin to spotlight'} aria-label={pinned === p.id ? `Unpin ${name}` : `Pin ${name}`}>
+                        {pinned === p.id ? <PinOff size={13} /> : <Pin size={13} />}
+                    </button>
+                )}
+                {presenting && (
+                    <CallAnnotations socketRef={socketRef} projectId={projectId} drawing={isDrawing} userName={user?.name} clearKey={clearKey} />
+                )}
             </div>
         );
     };
 
+    const renderBody = () => {
+        if (isMinimized) {
+            const p = allParticipants.find((x) => x.id === (sharer?.id || activeSpeaker)) || allParticipants.find((x) => !x.isLocal) || allParticipants[0];
+            return <div className="vc-body vc-body--mini">{p && renderTile(p, 'mini')}</div>;
+        }
+        if (spotlight) {
+            const presenting = spotlight.id === sharer?.id;
+            return (
+                <div className="vc-body vc-body--stage">
+                    <div className="vc-stage">
+                        {presenting && (
+                            <div className="vc-banner">
+                                <span className="vc-live-dot" />
+                                <span>{spotlight.isLocal ? "You're presenting" : `${nameFor(spotlight)} is presenting`}</span>
+                                <span className="vc-banner-actions">
+                                    <button className={isDrawing ? 'on' : ''} onClick={() => setIsDrawing((d) => !d)} title="Draw on the shared screen. Everyone sees it; strokes fade.">
+                                        <Pencil size={13} /> {isDrawing ? 'Drawing' : 'Draw'}
+                                    </button>
+                                    {isDrawing && <button onClick={() => setClearKey((k) => k + 1)} title="Clear drawings for everyone"><Eraser size={13} /> Clear</button>}
+                                    <button onClick={() => setFitStage((f) => !f)} title={fitStage ? 'Fill the stage' : 'Fit the whole screen'}>
+                                        {fitStage ? <Maximize size={13} /> : <Minimize size={13} />} {fitStage ? 'Fill' : 'Fit'}
+                                    </button>
+                                    {spotlight.isLocal && <button className="vc-stop" onClick={toggleScreenShare}><ScreenShareOff size={13} /> Stop presenting</button>}
+                                </span>
+                            </div>
+                        )}
+                        {renderTile(spotlight, 'stage')}
+                    </div>
+                    {strip.length > 0 && <div className="vc-strip">{strip.map((p) => renderTile(p, 'strip'))}</div>}
+                </div>
+            );
+        }
+        const cols = count <= 1 ? 1 : count <= 4 ? 2 : count <= 9 ? 3 : 4;
+        return (
+            <div className="vc-body vc-body--grid" style={{ '--cols': cols }}>
+                {allParticipants.map((p) => renderTile(p, 'grid'))}
+                {count === 1 && !spectator && (
+                    <div className="vc-alone">Waiting for others to join. They join from the call button in this room.</div>
+                )}
+            </div>
+        );
+    };
 
+    // --- Joining ---
     if (!inCall) {
         return (
-            <div
-                className="glass-panel"
-                style={isMobile ? {
-                    width: '100%',
-                    height: '100%',
-                    position: 'relative',
-                    left: 0,
-                    top: 0,
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    backgroundColor: 'var(--bg-card)',
-                    border: 'none',
-                    borderRadius: 0
-                } : {
-                    ...minimizedOverlayStyle,
-                    left: `${pipPosition.x}px`,
-                    top: `${pipPosition.y}px`,
-                    bottom: 'auto',
-                    right: 'auto',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    backgroundColor: 'var(--bg-card)',
-                    border: '1px solid var(--primary)',
-                    borderRadius: '12px',
-                    width: '240px',
-                    height: '140px'
-                }}
-            >
-                <div style={{ color: 'var(--primary)', fontSize: '11px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <div style={{
-                        width: '12px', height: '12px',
-                        border: '2px solid var(--primary)',
-                        borderTopColor: 'transparent',
-                        borderRadius: '50%',
-                        animation: 'spin 1s linear infinite'
-                    }} />
-                    Connecting Call...
-                </div>
-                <style>{`
-                    @keyframes spin {
-                        0% { transform: rotate(0deg); }
-                        100% { transform: rotate(360deg); }
-                    }
-                `}</style>
+            <div className={`vc vc--joining${isMobile ? ' vc--mobile' : ''}`} style={isMobile ? undefined : { left: Math.max(8, Math.min(pipPosition.x, viewport.w - 300)), top: Math.max(8, Math.min(pipPosition.y, viewport.h - 190)) }}>
+                {joinError ? (
+                    <div className="vc-joining">
+                        <VideoOff size={22} className="vc-red" aria-hidden="true" />
+                        <strong>Can't use your camera</strong>
+                        <span className="vc-sub">{joinError} You can still join, listen and watch, and turn devices on later.</span>
+                        <div className="vc-join-actions">
+                            <button className="vc-btn vc-btn--ghost vc-btn--primary" onClick={() => handleJoinCall({ noDevices: true })}>Join without camera or mic</button>
+                            <button className="vc-btn vc-btn--ghost" onClick={() => handleJoinCall()}>Try again</button>
+                            <button className="vc-btn vc-btn--ghost" onClick={() => onCallStateChange(false)}>Cancel</button>
+                        </div>
+                    </div>
+                ) : (
+                    <div className="vc-joining">
+                        <span className="vc-spinner" aria-hidden="true" />
+                        <strong>Joining the call</strong>
+                        <span className="vc-sub">Allow camera and microphone if your browser asks.</span>
+                        <button className="vc-btn vc-btn--ghost" onClick={() => onCallStateChange(false)}>Cancel</button>
+                    </div>
+                )}
             </div>
         );
     }
 
-    const maxW = window.innerWidth - 32;
-    const maxH = window.innerHeight - 96;
-    const width = Math.min(maxW, isMinimized ? 240 : isLarge ? 960 : sharer ? 720 : 480);
-    const height = Math.min(maxH, isMinimized ? 160 : isLarge ? 600 : sharer ? 460 : 320);
-    const posLeft = Math.max(8, Math.min(pipPosition.x, window.innerWidth - width - 8));
-    const posTop = Math.max(8, Math.min(pipPosition.y, window.innerHeight - height - 8));
+    // --- Window size ---
+    const size = isMinimized ? { w: 280, h: 176 }
+        : isLarge ? { w: 1040, h: 680 }
+            : spotlight ? { w: 800, h: 520 }
+                : count > 4 ? { w: 640, h: 440 } : { w: 520, h: 380 };
+    const width = Math.min(viewport.w - 16, size.w);
+    const height = Math.min(viewport.h - 16, size.h);
+    const left = Math.max(8, Math.min(pipPosition.x, viewport.w - width - 8));
+    const top = Math.max(8, Math.min(pipPosition.y, viewport.h - height - 8));
+
 
     return (
         <div
-            className="glass-panel"
-            style={isMobile ? {
-                width: '100%',
-                height: '100%',
-                position: 'relative',
-                left: 0,
-                top: 0,
-                display: 'flex',
-                flexDirection: 'column',
-                backgroundColor: '#000',
-                border: 'none',
-                borderRadius: 0,
-                overflow: 'hidden'
-            } : {
-                ...minimizedOverlayStyle,
-                width: `${width}px`,
-                height: `${height}px`,
-                left: `${posLeft}px`,
-                top: `${posTop}px`,
-                bottom: 'auto',
-                right: 'auto',
-                border: isDragging ? '2px solid var(--primary)' : '1px solid rgba(255,255,255,0.1)',
-                scale: isDragging ? '1.02' : '1',
-                transition: isDragging ? 'none' : 'scale 0.2s, border 0.2s, width 0.3s, height 0.3s'
-            }}
-            onMouseDown={isMobile ? undefined : startDragging}
-            onMouseEnter={isMobile ? undefined : () => setIsHoveringMini(true)}
-            onMouseLeave={isMobile ? undefined : () => setIsHoveringMini(false)}
+            ref={rootRef}
+            className={`vc${isMinimized ? ' vc--mini' : ''}${isMobile ? ' vc--mobile' : ''}${isDragging ? ' is-dragging' : ''}`}
+            style={isMobile ? undefined : { width, height, left, top }}
+            role="region"
+            aria-label="Call"
         >
-            {isMinimized ? (
-                // Minimized: Show active speaker
-                <div style={minifiedGridStyle}>
-                    {activeSpeaker === 'local' || !activeSpeaker ? (
-                        isVideoOff ? (
-                            <div style={avatarCenterStyle}>
-                                <div style={avatarCircle(48)}>
-                                    {(user?.name || socketRef.current?.userName || 'U')[0].toUpperCase()}
-                                </div>
-                            </div>
-                        ) : (
-                            <video ref={(el) => { if (el) el.srcObject = localStream }} autoPlay muted playsInline style={miniVideoElement} />
-                        )
-                    ) : (
-                        <RemoteVideo user={remoteUsers[activeSpeaker]} isMini />
-                    )}
-                </div>
-            ) : (
-                renderExpanded()
+            {!isMinimized && (
+                <header className="vc-head" onPointerDown={startDragging}>
+                    {!isMobile && <GripHorizontal size={14} className="vc-grip" aria-hidden="true" />}
+                    <span className="vc-live-dot" />
+                    <strong>Call</strong>
+                    <span className="vc-meta">{count} {count === 1 ? 'person' : 'people'} · {clock}</span>
+                    <span className="vc-head-actions">
+                        {count > 1 && !sharer && (
+                            <button onClick={() => { setLayout((l) => (l === 'grid' ? 'speaker' : 'grid')); setPinned(null); }} title={layout === 'grid' ? 'Spotlight view' : 'Grid view'} aria-label={layout === 'grid' ? 'Spotlight view' : 'Grid view'}>
+                                {layout === 'grid' ? <PanelTop size={15} /> : <LayoutGrid size={15} />}
+                            </button>
+                        )}
+                        {!isMobile && (
+                            <button onClick={() => setIsLarge((l) => !l)} title={isLarge ? 'Smaller' : 'Larger'} aria-label={isLarge ? 'Smaller window' : 'Larger window'}>
+                                {isLarge ? <Shrink size={15} /> : <Expand size={15} />}
+                            </button>
+                        )}
+                        <button onClick={toggleFullscreen} title="Full screen" aria-label="Full screen"><Maximize2 size={15} /></button>
+                        {!isMobile && (
+                            <button onClick={() => onMinimizeToggle(true)} title="Minimise" aria-label="Minimise call"><Minus size={15} /></button>
+                        )}
+                    </span>
+                </header>
             )}
 
-            {/* Hover Controls Overlay */}
-            <div
-                onMouseDown={(e) => e.stopPropagation()} // Prevent dragging when clicking controls!
-                style={{
-                    ...miniControls,
-                    opacity: !isMinimized || isHoveringMini || isDragging ? 1 : 0,
-                    transform: !isMinimized || isHoveringMini || isDragging ? 'translate(-50%, 0) scale(1)' : 'translate(-50%, 12px) scale(0.92)',
-                    transition: 'all 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
-                    pointerEvents: !isMinimized || isHoveringMini ? 'auto' : 'none'
-                }}
-            >
-                <button
-                    style={{ ...miniBtn, color: isMuted ? '#ef4444' : 'white' }}
-                    onClick={handleToggleAudio}
-                    title={isMuted ? "Unmute Mic" : "Mute Mic"}
-                >
-                    {isMuted ? <MicOff size={13} /> : <Mic size={13} />}
-                </button>
-                <button
-                    style={{ ...miniBtn, color: isVideoOff ? '#ef4444' : 'white' }}
-                    onClick={handleToggleVideo}
-                    title={isVideoOff ? "Turn Camera On" : "Turn Camera Off"}
-                >
-                    {isVideoOff ? <VideoOff size={13} /> : <Video size={13} />}
-                </button>
-                {!user?.isSpectator && (
-                    <button
-                        style={{ ...miniBtn, color: isScreenSharing ? '#10b981' : 'white' }}
-                        onClick={toggleScreenShare}
-                        title={isScreenSharing ? "Stop Sharing" : "Share Screen"}
-                    >
-                        {isScreenSharing ? <ScreenShareOff size={13} /> : <ScreenShare size={13} />}
-                    </button>
-                )}
-                {sharer && !isMinimized && (
-                    <button
-                        style={{ ...miniBtn, color: isDrawing ? '#3b82f6' : 'white', backgroundColor: isDrawing ? 'rgba(59,130,246,0.25)' : miniBtn.backgroundColor }}
-                        onClick={() => setIsDrawing(d => !d)}
-                        title={isDrawing ? "Stop drawing" : "Draw on shared screen"}
-                    >
-                        <Pencil size={13} />
-                    </button>
-                )}
-                {!isMinimized && !isMobile && (
-                    <button style={miniBtn} onClick={() => setIsLarge(l => !l)} title={isLarge ? "Smaller window" : "Larger window"}>
-                        {isLarge ? <Shrink size={13} /> : <Expand size={13} />}
-                    </button>
-                )}
-                <button
-                    style={miniBtn}
-                    onClick={(e) => { e.stopPropagation(); onMinimizeToggle(!isMinimized); }}
-                    title={isMinimized ? "Grid View" : "Minimize View"}
-                >
-                    {isMinimized ? <Maximize2 size={13} /> : <Minimize2 size={13} />}
-                </button>
-                <button
-                    style={{ ...miniBtn, backgroundColor: '#ef4444', color: 'white' }}
-                    onClick={(e) => { e.stopPropagation(); handleLeaveCall(); }}
-                    title="Leave Call"
-                >
-                    <LogOut size={13} />
-                </button>
-            </div>
-        </div>);
-}
+            {renderBody()}
 
-const RemoteVideo = ({ user, isMini, fit = 'cover' }) => {
-    const videoRef = useRef();
-    useEffect(() => {
-        if (videoRef.current && user?.stream) {
-            videoRef.current.srcObject = user.stream;
-        }
-    }, [user?.stream]);
-
-    if (!user) return null;
-
-    return (
-        <>
-            {user.isVideoOff && !user.isScreenSharing ? (
-                <div style={avatarCenterStyle}>
-                    <div style={avatarCircle(isMini ? 32 : 64)}>
-                        {(user.userName || user.name || 'U')[0].toUpperCase()}
-                    </div>
+            {isMinimized && (
+                <div className="vc-mini-top" onPointerDown={startDragging}>
+                    <span className="vc-live-dot" /> <span>{clock}</span>
+                    <button onClick={() => onMinimizeToggle(false)} title="Expand" aria-label="Expand call"><Maximize2 size={13} /></button>
                 </div>
-            ) : (
-                <video ref={videoRef} autoPlay playsInline style={{ ...(isMini ? miniVideoElement : videoElementStyle), objectFit: fit }} />
             )}
-            {!isMini ? (
-                <div style={tileOverlayStyle}>
-                    <div style={nameTagStyle(user.isMuted)}>
-                        {user.isMuted ? <MicOff size={14} color="#ef4444" /> : <Mic size={14} color="#10b981" />}
-                        <span>{user.name || "Participant"}</span>
-                    </div>
-                </div>
-            ) : (
-                user.isMuted && (
-                    <div style={miniMuteIcon}>
-                        <MicOff size={10} color="white" />
-                    </div>
-                )
-            )}
-        </>
+
+            <footer className="vc-bar">
+                {spectator ? (
+                    <span className="vc-watching">Watching as a guest</span>
+                ) : (
+                    <>
+                        <Btn compact={isMinimized} on={!isMuted} warn={isMuted} onClick={handleToggleAudio} label={isMuted ? 'Unmute' : 'Mute'}>{isMuted ? <MicOff size={17} /> : <Mic size={17} />}</Btn>
+                        <Btn compact={isMinimized} on={!isVideoOff} warn={isVideoOff} onClick={handleToggleVideo} label={isVideoOff ? 'Start video' : 'Stop video'}>{isVideoOff ? <VideoOff size={17} /> : <Video size={17} />}</Btn>
+                        {!isMobile && (
+                            <Btn compact={isMinimized} on={isScreenSharing} onClick={toggleScreenShare} label={isScreenSharing ? 'Stop presenting' : 'Present'}>{isScreenSharing ? <ScreenShareOff size={17} /> : <ScreenShare size={17} />}</Btn>
+                        )}
+                        {sharer && !isMinimized && (
+                            <Btn compact={isMinimized} on={isDrawing} onClick={() => setIsDrawing((d) => !d)} label="Draw">{<Pencil size={17} />}</Btn>
+                        )}
+                    </>
+                )}
+                <Btn compact={isMinimized} danger wide onClick={handleLeaveCall} label="Leave"><PhoneOff size={17} /></Btn>
+            </footer>
+        </div>
     );
 };
 
-// --- Styles ---
+// Call control button: icon plus a short label (hidden in the mini window).
+const Btn = ({ on, danger, warn, onClick, label, children, wide, compact }) => (
+    <button
+        className={`vc-btn${on ? ' on' : ''}${danger ? ' vc-btn--danger' : ''}${warn ? ' vc-btn--warn' : ''}${wide ? ' vc-btn--wide' : ''}`}
+        onClick={(e) => { e.stopPropagation(); onClick(); }}
+        title={label}
+        aria-label={label}
+        aria-pressed={on === undefined ? undefined : !!on}
+    >
+        {children}
+        {!compact && <span className="vc-btn-label">{label}</span>}
+    </button>
+);
 
-
-const minimizedOverlayStyle = {
-    position: 'fixed', bottom: '80px', right: '24px', width: '240px', height: '160px',
-    borderRadius: '20px', zIndex: 9999, overflow: 'hidden', display: 'flex', flexDirection: 'column',
-    boxShadow: '0 20px 50px rgba(0,0,0,0.6)', cursor: 'move', userSelect: 'none',
-    border: '2px solid rgba(255,255,255,0.1)', backdropFilter: 'blur(20px)'
+// Plays a MediaStream; keeps the element when the stream object changes.
+const StreamVideo = ({ stream, muted, mirror, fit }) => {
+    const ref = useRef(null);
+    useEffect(() => {
+        if (ref.current && ref.current.srcObject !== stream) ref.current.srcObject = stream || null;
+    }, [stream]);
+    return <video ref={ref} autoPlay playsInline muted={muted} className={`vc-video${mirror ? ' is-mirror' : ''}`} style={{ objectFit: fit }} />;
 };
-
-const minifiedGridStyle = { flex: 1, backgroundColor: '#000', position: 'relative' };
-const miniVideoElement = { width: '100%', height: '100%', objectFit: 'cover', pointerEvents: 'none' };
-const miniControls = {
-    position: 'absolute', bottom: '12px', left: '50%', transform: 'translateX(-50%)',
-    display: 'flex', gap: '8px', padding: '8px', borderRadius: '14px',
-    backgroundColor: 'rgba(15, 23, 42, 0.7)', backdropFilter: 'blur(12px)',
-    border: '1px solid rgba(255,255,255,0.15)', zIndex: 2
-};
-const miniBtn = { width: '28px', height: '28px', borderRadius: '8px', border: 'none', backgroundColor: 'rgba(255,255,255,0.1)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: 'background 0.2s' };
-
-
-
-const avatarCircle = (size) => ({
-    width: `${size}px`,
-    height: `${size}px`,
-    borderRadius: size > 40 ? '24%' : '10px',
-    background: 'linear-gradient(135deg, var(--primary) 0%, #4f46e5 100%)',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    fontSize: `${size / 2.5}px`,
-    fontWeight: '800',
-    color: 'white',
-    boxShadow: '0 4px 12px rgba(59, 130, 246, 0.3)'
-});
-
-
-
-const videoElementStyle = { width: "100%", height: "100%", objectFit: "cover" };
-const avatarCenterStyle = { width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#0f172a' };
-const tileOverlayStyle = { position: "absolute", bottom: "18px", left: "18px", pointerEvents: "none", zIndex: 5 };
-const nameTagStyle = (muted) => ({
-    display: 'flex', alignItems: 'center', gap: '8px',
-    backgroundColor: "rgba(15, 23, 42, 0.75)", backdropFilter: "blur(12px)",
-    color: "#fff", fontSize: "12px", fontWeight: "700", padding: "8px 16px",
-    borderRadius: "12px", border: muted ? "1px solid rgba(239, 68, 68, 0.4)" : "1px solid rgba(255,255,255,0.12)"
-});
-
-
-const miniMuteIcon = { position: 'absolute', top: '10px', right: '10px', backgroundColor: 'rgba(239, 68, 68, 0.9)', padding: '5px', borderRadius: '50%', zIndex: 10, boxShadow: '0 4px 8px rgba(0,0,0,0.3)' };
-
 
 export default VideoChat;

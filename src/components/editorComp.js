@@ -1,15 +1,15 @@
-import React, { useEffect, useMemo } from "react";
-import { Download, FileCode2 } from "lucide-react";
+import React, { useEffect, useMemo, useState } from "react";
+import { Download, Copy, Check, Sparkles } from "lucide-react";
 import CodeMirror from "@uiw/react-codemirror";
 import { esLint } from "@codemirror/lang-javascript";
-import { dracula } from "@uiw/codemirror-theme-dracula";
 import { EditorView, Decoration, ViewPlugin, WidgetType } from "@codemirror/view";
 import { vim } from "@replit/codemirror-vim";
 import { emacs } from "@replit/codemirror-emacs";
 import { linter, lintGutter } from "@codemirror/lint";
-import { editorLanguage, fileNameFor } from "../utils/languages";
+import { editorLanguage, fileNameFor, templateFor, LANG_BY_ID } from "../utils/languages";
+import { colabsDark, colabsLight, editorChrome } from "../utils/editorTheme";
+import LangPicker from "./LangPicker";
 import ACTIONS from "../Action";
-import { LANGUAGES } from "../config";
 
 export const roomFileName = (language) => fileNameFor(language);
 
@@ -223,9 +223,41 @@ function EditorComp({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [settings?.enableLinting, language]);
 
+  // Cursor position / selection for the footer (only re-renders when they change).
+  const [pos, setPos] = useState({ line: 1, col: 1, sel: 0, lines: 1 });
+  const positionListener = useMemo(() => EditorView.updateListener.of((u) => {
+    if (!u.selectionSet && !u.docChanged) return;
+    const { state } = u;
+    const sel = state.selection.main;
+    const line = state.doc.lineAt(sel.head);
+    const next = { line: line.number, col: sel.head - line.from + 1, sel: Math.abs(sel.to - sel.from), lines: state.doc.lines };
+    setPos((p) => (p.line === next.line && p.col === next.col && p.sel === next.sel && p.lines === next.lines ? p : next));
+  }), []);
+
+  // Empty file: offer the language's starter template (synced like a normal edit).
+  const insertTemplate = () => {
+    const tpl = templateFor(language);
+    if (!tpl) return;
+    setEditorCode(tpl);
+    onCodeChange(tpl);
+    try { localStorage.setItem(`code-${roomId}`, tpl); } catch { /* storage blocked */ }
+    if (!fileId) socketRef.current?.emit(ACTIONS.CODE_CHANGE, { roomId, code: tpl });
+  };
+
+  const [copied, setCopied] = useState(false);
+  const copyCode = async () => {
+    try {
+      await navigator.clipboard.writeText(editorCode || "");
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1400);
+    } catch { /* clipboard blocked */ }
+  };
+
   // Memoize the entire extensions array to prevent CodeMirror reconfiguration on every keystroke
   const editorExtensions = useMemo(() => [
     getLanguageExtension(language),
+    editorChrome,
+    positionListener,
     ...(settings?.wordWrap ? [EditorView.lineWrapping] : []),
     ...(settings?.keybinding === "vim" ? [vim()] : []),
     ...(settings?.keybinding === "emacs" ? [emacs()] : []),
@@ -237,37 +269,41 @@ function EditorComp({
 
   const fileName = filename || roomFileName(language);
 
+  const lang = LANG_BY_ID[language];
+  const editing = Object.values(remoteCursors).map((c) => c.userName).filter(Boolean);
+  const isEmpty = !String(editorCode || "").trim();
+
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100%", backgroundColor: "var(--bg-dark)" }}>
-      {/* Single file strip: the tab name always follows the chosen language. */}
-      <div className="ws-tabs ec-bar">
-        <div className="ws-tab on" title={fileName}>
-          <FileCode2 size={13} />
-          <span>{fileName}</span>
+    <div className="ec">
+      {/* File bar: the tab name always follows the chosen language. */}
+      <div className="ec-bar">
+        <div className="ec-file" title={fileName}>
+          <span className="lp-badge">{lang?.short || language}</span>
+          <span className="ec-name">{fileName}</span>
           {isReadOnly && <em className="ec-ro">read only</em>}
         </div>
         <div className="ec-tools">
-          {isMobile && onDownload && (
-            <button className="u-icon" onClick={onDownload} title="Download code" aria-label="Download code"><Download size={15} /></button>
+          <button className="ec-icon" onClick={copyCode} title="Copy code" aria-label="Copy code" disabled={isEmpty}>
+            {copied ? <Check size={15} /> : <Copy size={15} />}
+          </button>
+          {onDownload && (
+            <button className="ec-icon" onClick={onDownload} title={`Download ${fileName}`} aria-label="Download code"><Download size={15} /></button>
           )}
-          {!lockLanguage && (
-            <select className="u-select ec-lang" value={language} onChange={(e) => onLanguageChange(e.target.value)} aria-label="Language">
-              {LANGUAGES.map((l) => <option key={l.value} value={l.value}>{l.name}</option>)}
-            </select>
-          )}
+          {!lockLanguage && <LangPicker value={language} onChange={onLanguageChange} disabled={isReadOnly} />}
         </div>
       </div>
 
-      <div style={{ flex: 1, overflow: "auto", fontSize: settings?.fontSize ? `${settings.fontSize}px` : "16px" }}>
+      <div className="ec-body" style={{ fontSize: settings?.fontSize ? `${settings.fontSize}px` : "15px" }}>
         <CodeMirror
           value={editorCode}
           height="100%"
-          theme={isLightMode ? "light" : dracula}
+          theme={isLightMode ? colabsLight : colabsDark}
           readOnly={isReadOnly}
           editable={!isReadOnly}
           onChange={handleEditorChange}
           basicSetup={{
             lineNumbers: true,
+            foldGutter: true,
             indentOnInput: true,
             bracketMatching: true,
             closeBrackets: true,
@@ -275,13 +311,33 @@ function EditorComp({
             rectangularSelection: true,
             crosshairCursor: true,
             highlightActiveLine: true,
+            highlightActiveLineGutter: true,
             highlightSelectionMatches: true,
             tabSize: settings?.tabSize || 4,
           }}
           style={{ height: "100%" }}
           extensions={editorExtensions}
         />
+        {isEmpty && !isReadOnly && templateFor(language) && (
+          <div className="ec-empty">
+            <span>{fileName} is empty.</span>
+            <button onClick={insertTemplate}><Sparkles size={13} /> Insert {lang?.label || language} starter</button>
+          </div>
+        )}
       </div>
+
+      {!isMobile && (
+        <div className="ec-foot" aria-label="Editor status">
+          <span>Ln {pos.line}, Col {pos.col}</span>
+          {pos.sel > 0 && <span>{pos.sel} selected</span>}
+          <span>{pos.lines} {pos.lines === 1 ? "line" : "lines"}</span>
+          <span>Spaces: {settings?.tabSize || 4}</span>
+          {settings?.keybinding && settings.keybinding !== "default" && <span>{settings.keybinding}</span>}
+          {editing.length > 0 && (
+            <span className="ec-typing"><i />{editing.length === 1 ? `${editing[0]} is here` : `${editing.length} others here`}</span>
+          )}
+        </div>
+      )}
     </div>
   );
 }

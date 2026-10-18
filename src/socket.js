@@ -1,4 +1,5 @@
 import { io } from "socket.io-client";
+import { getBackendUrl } from "./utils/api";
 
 export const initSocket = async () => {
   const options = {
@@ -9,6 +10,5 @@ export const initSocket = async () => {
     timeout: 10000,
     transports: ["websocket", "polling"],
   };
-  const backendUrl = process.env.REACT_APP_BACKEND_URL || window.location.origin;
-  return io(backendUrl, options);
+  return io(getBackendUrl(), options);
 };

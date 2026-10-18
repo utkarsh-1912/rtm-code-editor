@@ -140,7 +140,10 @@ export async function importProject({ userId, picked, onProgress }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ userId, name: picked.name || "Imported project", description: picked.root ? `Opened from ${picked.root}` : "Imported from disk", type, empty: true }),
     });
-    if (!res.ok) throw new Error("Could not create the project");
+    if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(res.status === 402 && data.error ? data.error : "Could not create the project");
+    }
     const project = await res.json();
     await uploadFiles(project.id, picked.files, onProgress);
     if (picked.root) linkRoot(project.id, picked.root);

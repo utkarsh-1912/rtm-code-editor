@@ -1,0 +1,9 @@
+User-agent: *
+Allow: /
+Disallow: /dashboard
+Disallow: /settings
+Disallow: /editor/
+Disallow: /project/
+Disallow: /api/
+
+Sitemap: https://utkristi-colabs.onrender.com/sitemap.xml

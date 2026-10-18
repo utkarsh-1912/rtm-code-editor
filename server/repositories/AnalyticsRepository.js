@@ -43,7 +43,23 @@ async function getWorkspaceAnalytics({ roomId = null, projectId = null }) {
     };
 }
 
+// Funnel counts for the marketing dashboard: distinct rooms or people per step.
+async function getFunnel(days = 30) {
+    const rows = await sql`
+        SELECT action_type,
+               COUNT(*)::int AS events,
+               COUNT(DISTINCT room_id)::int AS rooms,
+               COUNT(DISTINCT user_id)::int AS people
+        FROM analytics_logs
+        WHERE action_type IN ('ROOM_STARTED', 'SECOND_USER_JOINED', 'CODE_RUN', 'UPGRADE_CLICKED', 'TRIAL_STARTED')
+          AND created_at >= now() - (${days}::int * interval '1 day')
+        GROUP BY action_type
+    `;
+    return Object.fromEntries(rows.map((r) => [r.action_type, { events: r.events, rooms: r.rooms, people: r.people }]));
+}
+
 module.exports = {
+    getFunnel,
     logActivity,
     getWorkspaceAnalytics
 };

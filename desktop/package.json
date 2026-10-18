@@ -10,10 +10,11 @@
   "private": true,
   "scripts": {
     "start": "electron .",
-    "dist": "electron-builder --publish never",
-    "dist:win": "electron-builder --win --publish never",
-    "dist:mac": "electron-builder --mac --publish never",
-    "dist:linux": "electron-builder --linux --publish never"
+    "dist": "npm run bundle-web && electron-builder --publish never",
+    "dist:win": "npm run bundle-web && electron-builder --win --publish never",
+    "dist:mac": "npm run bundle-web && electron-builder --mac --publish never",
+    "dist:linux": "npm run bundle-web && electron-builder --linux --publish never",
+    "bundle-web": "node scripts/bundle-web.js"
   },
   "devDependencies": {
     "electron": "^33.2.1",
@@ -35,8 +36,10 @@
       "terminal-preload.js",
       "terminal.html",
       "terminal-ui.js",
+      "localUi.js",
       "splash.html",
-      "build/icon.png"
+      "build/icon.png",
+      "web/**/*"
     ],
     "win": {
       "target": [

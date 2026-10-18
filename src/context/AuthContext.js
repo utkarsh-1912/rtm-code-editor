@@ -1,4 +1,5 @@
-import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
+import toast from 'react-hot-toast';
 import {
     browserLocalPersistence,
     indexedDBLocalPersistence,
@@ -9,6 +10,7 @@ import {
 } from 'firebase/auth';
 import { auth, googleProvider, githubProvider } from '../firebase';
 import { pushLogin, pushLogout } from '../utils/push';
+import { checkIn, forgetDevice, revokeThisDevice } from '../utils/deviceSession';
 
 const AuthContext = createContext();
 
@@ -24,12 +26,11 @@ const writeCache = (u) => { try { localStorage.setItem(CACHE_KEY, JSON.stringify
 
 // The hosted backend can be cold; retry quietly instead of giving up after one failure.
 const withRetry = async (fn, tries = 6) => {
-    let delay = 1500;
     for (let i = 0; i < tries; i++) {
         try { return await fn(); } catch (e) {
             if (i === tries - 1) throw e;
-            await new Promise((r) => setTimeout(r, delay));
-            delay = Math.min(delay * 1.6, 10000);
+            const wait = Math.min(1500 * 1.6 ** i, 10000);
+            await new Promise((r) => setTimeout(r, wait));
         }
     }
     return null;
@@ -62,6 +63,20 @@ export const AuthProvider = ({ children }) => {
         }
     }, []);
 
+
+    // This device in Settings > Devices. If it was removed from another device, sign out here.
+    const lastCheckIn = useRef(0);
+    const deviceCheckIn = async (uid) => {
+        lastCheckIn.current = Date.now();
+        const s = await checkIn(uid).catch(() => null);
+        if (s?.revoked && auth.currentUser?.uid === uid) {
+            toast('This device was signed out from another device.', { icon: '🔒' });
+            forgetDevice();
+            localStorage.removeItem(CACHE_KEY);
+            pushLogout();
+            await signOut(auth);
+        }
+    };
 
     // Profile + session bookkeeping; never blocks the UI.
     const syncWithBackend = async (identity) => {
@@ -99,22 +114,7 @@ export const AuthProvider = ({ children }) => {
                 }
             }
 
-            const response = await fetch(`${getBackendUrl()}/api/sessions`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    userId: uid,
-                    device: navigator.platform,
-                    ip: 'Auto',
-                    userAgent: navigator.userAgent,
-                    sessionId: localStorage.getItem('rtm_db_session_id')
-                })
-            });
-            if (response.ok) {
-                const sessionData = await response.json();
-                const id = sessionData?.[0]?.id ?? sessionData?.id;
-                if (id) localStorage.setItem('rtm_db_session_id', id);
-            }
+            await deviceCheckIn(uid);
         } catch (e) {
             console.warn("Backend sync deferred:", e.message);
         }
@@ -148,7 +148,23 @@ export const AuthProvider = ({ children }) => {
         });
 
         return () => unsubscribe();
+        // Subscribe once; syncWithBackend only uses setters and module-level helpers.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
+
+    // Keep "last active" fresh and notice remote sign-outs: every 5 minutes and when the
+    // window comes back into focus (at most once a minute).
+    const uid = user?.uid;
+    useEffect(() => {
+        if (!uid) return undefined;
+        const tick = () => { if (Date.now() - lastCheckIn.current > 60000) deviceCheckIn(uid); };
+        const onVisible = () => document.visibilityState === 'visible' && tick();
+        const id = setInterval(tick, 5 * 60000);
+        document.addEventListener('visibilitychange', onVisible);
+        window.addEventListener('focus', tick);
+        return () => { clearInterval(id); document.removeEventListener('visibilitychange', onVisible); window.removeEventListener('focus', tick); };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [uid]);
 
     const loginWithGoogle = async () => {
         try {
@@ -170,6 +186,8 @@ export const AuthProvider = ({ children }) => {
 
     const logout = async () => {
         try {
+            await revokeThisDevice(auth.currentUser?.uid);
+            forgetDevice();
             localStorage.removeItem(CACHE_KEY);
             pushLogout();
             await signOut(auth);

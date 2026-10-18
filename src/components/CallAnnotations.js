@@ -11,7 +11,7 @@ const colorFor = (id = "") => {
 
 // Transparent layer over a shared screen: everyone can draw (strokes fade out, like Pop)
 // and see each other's labelled pointers. Coordinates are normalised to 0..1.
-export default function CallAnnotations({ socketRef, projectId, drawing, userName }) {
+export default function CallAnnotations({ socketRef, projectId, drawing, userName, clearKey = 0 }) {
     const canvasRef = useRef(null);
     const segsRef = useRef([]);       // { a:[x,y], b:[x,y], color, ts }
     const ptrsRef = useRef({});       // userId -> { x, y, name, ts }
@@ -73,6 +73,13 @@ export default function CallAnnotations({ socketRef, projectId, drawing, userNam
         raf = requestAnimationFrame(draw);
         return () => cancelAnimationFrame(raf);
     }, []);
+
+    // "Clear" in the call: wipe strokes here and for everyone else.
+    useEffect(() => {
+        if (!clearKey) return;
+        segsRef.current = [];
+        socketRef.current?.emit("call-annotate", { projectId, event: { t: "clear" } });
+    }, [clearKey, socketRef, projectId]);
 
     const norm = (e) => {
         const r = canvasRef.current.getBoundingClientRect();

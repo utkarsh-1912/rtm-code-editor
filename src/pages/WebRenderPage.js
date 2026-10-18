@@ -20,6 +20,7 @@ import { resolveTheme, setThemePref } from '../utils/theme';
 import '../styles/app.css';
 import ACTIONS from '../Action';
 import { initSocket } from '../socket';
+import { bundleWebProject } from '../utils/webBundle';
 
 export default function WebRenderPage() {
     const { projectId } = useParams();
@@ -124,50 +125,7 @@ export default function WebRenderPage() {
     }, []);
 
     // 4. Bundle HTML, CSS, JS into srcDoc
-    const bundleWebApp = (filesList) => {
-        const htmlFile = filesList.find(f => f.name === 'index.html' || f.name.endsWith('.html'))?.content 
-            || '<!DOCTYPE html><html><head><meta charset="utf-8"/><title>Web App</title></head><body><h1>Web Application Preview</h1></body></html>';
-        const cssFile = filesList.find(f => f.name === 'style.css' || f.name.endsWith('.css'))?.content || '';
-        const jsFile = filesList.find(f => f.name === 'script.js' || f.name.endsWith('.js'))?.content || '';
-
-        const consoleInterceptor = `
-        <script>
-          (function() {
-            const _log = console.log, _error = console.error, _warn = console.warn;
-            console.log = function(...args) {
-              _log.apply(console, args);
-              window.parent.postMessage({ type: 'CONSOLE_LOG', log: args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(' ') }, '*');
-            };
-            console.error = function(...args) {
-              _error.apply(console, args);
-              window.parent.postMessage({ type: 'CONSOLE_ERROR', log: args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(' ') }, '*');
-            };
-            console.warn = function(...args) {
-              _warn.apply(console, args);
-              window.parent.postMessage({ type: 'CONSOLE_WARN', log: args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(' ') }, '*');
-            };
-            window.onerror = function(msg, url, line) {
-              window.parent.postMessage({ type: 'CONSOLE_ERROR', log: 'Uncaught Error: ' + msg + ' (Line ' + line + ')' }, '*');
-            };
-          })();
-        </script>
-        `;
-
-        let bundled = htmlFile;
-        if (bundled.includes('</head>')) {
-            bundled = bundled.replace('</head>', `${consoleInterceptor}<style>\n${cssFile}\n</style></head>`);
-        } else {
-            bundled = `${consoleInterceptor}<style>\n${cssFile}\n</style>${bundled}`;
-        }
-
-        if (bundled.includes('</body>')) {
-            bundled = bundled.replace('</body>', `<script>\n${jsFile}\n</script></body>`);
-        } else {
-            bundled = `${bundled}\n<script>\n${jsFile}\n</script>`;
-        }
-
-        setWebSrcDoc(bundled);
-    };
+    const bundleWebApp = (filesList) => setWebSrcDoc(bundleWebProject(filesList));
 
     const copyShareUrl = async () => {
         try {
@@ -256,7 +214,7 @@ export default function WebRenderPage() {
                         srcDoc={webSrcDoc}
                         title="Standalone Web App Preview"
                         style={{ width: '100%', height: viewport === 'desktop' ? '100%' : 'calc(100% - 30px)', border: 'none', background: '#fff', display: 'block' }}
-                        sandbox="allow-scripts allow-modals allow-forms allow-same-origin"
+                        sandbox="allow-scripts allow-modals allow-forms allow-popups"
                     />
                 </div>
             </div>

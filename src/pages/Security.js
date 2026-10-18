@@ -1,6 +1,6 @@
 import React from "react";
 import { Link } from "react-router-dom";
-import { Lock, Radio, UserCheck, EyeOff, ArrowUpRight } from "lucide-react";
+import { Lock, Radio, UserCheck, EyeOff, Cpu, Monitor, ArrowUpRight } from "lucide-react";
 import SiteLayout, { PageHead } from "../components/Site/SiteLayout";
 import { pad2 } from "../components/ux/primitives";
 
@@ -8,7 +8,9 @@ const ITEMS = [
     { icon: Radio, title: "Peer-to-peer media", text: "Voice and video travel directly between participants over WebRTC, which is encrypted in transit.", cap: "webrtc · dtls-srtp" },
     { icon: Lock, title: "Encrypted connections", text: "Traffic between your browser and our servers should use HTTPS and secure WebSockets.", cap: "https · wss" },
     { icon: UserCheck, title: "Managed authentication", text: "Sign-in is handled by Firebase Authentication with Google or GitHub.", cap: "firebase auth" },
-    { icon: EyeOff, title: "Private by link", text: "Rooms are identified by random IDs. Only people you share the link with can join.", cap: "random room ids" },
+    { icon: EyeOff, title: "Private by link", text: "Rooms are identified by random IDs. Spectator links are read-only, so you can share a room without handing over the keyboard.", cap: "random ids · viewer role" },
+    { icon: Cpu, title: "Isolated code execution", text: "Server runs go through Judge0 sandboxes with time and output limits. In the desktop app, code runs on your own machine and never reaches our server.", cap: "judge0 · local first" },
+    { icon: Monitor, title: "A narrow desktop bridge", text: "The desktop app exposes only calls to local services to the page, with context isolation and the Chromium sandbox on, and opens outside links in your browser.", cap: "context isolation · sandbox" },
 ];
 
 export default function Security() {

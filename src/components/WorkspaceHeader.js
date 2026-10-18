@@ -10,10 +10,11 @@ const GROUP_OF = {
     call: "Collaborate", board: "Collaborate", invite: "Collaborate", share: "Collaborate", viewer: "Collaborate", copy: "Collaborate",
     ai: "Tools", history: "Tools", analytics: "Tools", focus: "Tools", search: "Tools", palette: "Tools",
     snippet: "Code", gist: "Code", download: "Code",
+    terminal: "Files", "save-disk": "Files", "save-disk-as": "Files", "add-files": "Files", "add-folder": "Files",
     settings: "Workspace", theme: "Workspace", dash: "Workspace", leave: "Workspace",
 };
-const GROUP_ORDER = ["Collaborate", "Tools", "Code", "Workspace", "More"];
-const SHORTCUT = { palette: "Ctrl K", search: "Ctrl K", focus: "Alt F" };
+const GROUP_ORDER = ["Collaborate", "Tools", "Code", "Files", "Workspace", "More"];
+const SHORTCUT = { palette: "Ctrl K", search: "Ctrl K", focus: "Alt F", terminal: "Ctrl `", "save-disk": "Ctrl S" };
 // Shown as icons on large screens (unless an action sets pin explicitly); phones keep everything in ⋯.
 const PINNED = new Set(["call", "board", "ai", "share", "invite"]);
 

@@ -91,14 +91,27 @@ async function deleteProject(projectId) {
     return await sql`DELETE FROM projects WHERE id = ${projectId}`;
 }
 
-// Insert or update many files at once (folder import). Returns the stored rows.
+// Insert or update many files in one statement (folder import). Files are matched to
+// existing rows with or without a leading "/" (starter files are stored without one), so
+// re-importing a file updates it instead of adding a duplicate. Returns the stored rows.
 async function upsertProjectFiles(projectId, files) {
-    const out = [];
+    const existing = await sql`SELECT path FROM project_files WHERE project_id = ${projectId}`;
+    const actual = new Map(existing.map((r) => [r.path.replace(/^[/]+/, ''), r.path]));
+    const byPath = new Map();
     for (const f of files) {
-        const rows = await upsertProjectFile(projectId, f.name, f.path, f.content, false);
-        out.push(rows[0] || rows);
+        const path = actual.get(f.path.replace(/^[/]+/, '')) || f.path;
+        byPath.set(path, { ...f, path }); // last one wins within a batch
     }
-    return out;
+    const rows = [...byPath.values()];
+    if (!rows.length) return [];
+    return await sql`
+        INSERT INTO project_files (project_id, name, path, content, is_directory, updated_at)
+        SELECT ${projectId}, n, p, c, false, CURRENT_TIMESTAMP
+        FROM unnest(${rows.map((r) => r.name)}::text[], ${rows.map((r) => r.path)}::text[], ${rows.map((r) => r.content)}::text[]) AS t(n, p, c)
+        ON CONFLICT (project_id, path)
+        DO UPDATE SET content = EXCLUDED.content, name = EXCLUDED.name, updated_at = CURRENT_TIMESTAMP
+        RETURNING *;
+    `;
 }
 
 module.exports = {

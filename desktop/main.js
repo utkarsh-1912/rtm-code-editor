@@ -1,15 +1,23 @@
 // Utkristi CoLabs desktop shell (Windows, macOS, Linux).
-// Opens the hosted app, shows a splash while a cold server starts, and lets the page
-// use local Judge0 / a local model through preload.js before falling back to the server.
-const { app, BrowserWindow, ipcMain, shell, nativeTheme, Menu, Notification } = require("electron");
+// Opens the web UI bundled with the app (served from localhost, so it starts instantly) and
+// talks to the hosted server for data. Without a bundle, or with --url= / COLABS_APP_URL /
+// COLABS_REMOTE_UI=1, it opens the hosted site instead and shows a splash while it wakes.
+// The page can use local Judge0 / a local model through preload.js before the server.
+const { app, BrowserWindow, ipcMain, shell, nativeTheme, Menu, Notification, dialog } = require("electron");
 const path = require("path");
 const { runLocal, llmLocal, localStatus } = require("./local");
 const { createFsAccess } = require("./fsAccess");
 const { openTerminal } = require("./terminal");
+const { startLocalUi } = require("./localUi");
 
 const argUrl = process.argv.find((a) => a.startsWith("--url="));
 const APP_URL = (argUrl ? argUrl.slice(6) : process.env.COLABS_APP_URL || "https://utkristi-colabs.onrender.com").replace(/\/$/, "");
 const APP_ORIGIN = new URL(APP_URL).origin;
+// The bundled UI is used unless a server URL was given explicitly (dev / self-hosting).
+const WANT_BUNDLED = !argUrl && !process.env.COLABS_APP_URL && process.env.COLABS_REMOTE_UI !== "1";
+let UI_URL = APP_URL; // where the window loads the interface from
+let UI_ORIGIN = APP_ORIGIN;
+let bundled = false;
 const AUTH_HOSTS = [/\.firebaseapp\.com$/, /^accounts\.google\.com$/, /^github\.com$/, /\.googleusercontent\.com$/];
 
 // Google blocks OAuth in browsers that identify as Electron, so present as plain Chrome.
@@ -18,6 +26,17 @@ app.userAgentFallback = app.userAgentFallback.replace(/\s?(Electron|utkristi-col
 let win;
 let lastRoot = null; // folder most recently opened, for "New Terminal"
 const files = createFsAccess(() => win);
+
+// Exact origin match ("startsWith" would also accept https://app.example.com.evil.com).
+function isAppUrl(url) {
+    try {
+        const { origin } = new URL(url);
+        return origin === APP_ORIGIN || origin === UI_ORIGIN;
+    } catch {
+        return false;
+    }
+}
+const SPLASH_URL = require("url").pathToFileURL(path.join(__dirname, "splash.html")).href;
 
 function isAuthUrl(url) {
     try {
@@ -63,27 +82,40 @@ function createWindow() {
     // Same-origin pages and sign-in popups stay in the app; everything else opens in the browser.
     win.webContents.setWindowOpenHandler(({ url }) => {
         if (isAuthUrl(url)) return { action: "allow", overrideBrowserWindowOptions: { width: 520, height: 680, autoHideMenuBar: true } };
-        if (url.startsWith(APP_ORIGIN)) return { action: "allow" };
+        if (isAppUrl(url)) return { action: "allow" };
         shell.openExternal(url);
         return { action: "deny" };
     });
     win.webContents.on("will-navigate", (event, url) => {
-        if (url.startsWith(APP_ORIGIN) || url.startsWith("file:") || isAuthUrl(url)) return;
+        if (isAppUrl(url) || url.startsWith(SPLASH_URL) || isAuthUrl(url)) return;
         event.preventDefault();
         shell.openExternal(url);
     });
 
+    if (bundled) {
+        // The interface is local; the page shows its own notice while the server wakes.
+        win.loadURL(UI_URL);
+        return;
+    }
     win.loadFile(path.join(__dirname, "splash.html"), { query: { url: APP_URL } });
     waitForServer().then(() => {
         if (win && !win.isDestroyed()) win.loadURL(APP_URL);
     });
 }
 
+// Only the top frame of our own pages (the app or the splash), never an embedded frame.
+const trusted = (frame) => !!frame && !frame.parent && (isAppUrl(frame.url) || frame.url.startsWith(SPLASH_URL));
+
 const handle = (channel, fn) => ipcMain.handle(channel, async (event, payload) => {
-    // Only our own window may use the bridge.
-    const origin = new URL(event.senderFrame.url).origin;
-    if (origin !== APP_ORIGIN && !event.senderFrame.url.startsWith("file:")) throw new Error("Not allowed");
+    if (!trusted(event.senderFrame)) throw new Error("Not allowed");
     return fn(payload || {});
+});
+
+// Read synchronously by preload.js so the page knows its server before any code runs.
+ipcMain.on("colabs:config", (event) => {
+    event.returnValue = trusted(event.senderFrame)
+        ? { backendUrl: bundled ? APP_URL : null, publicUrl: APP_URL, bundled }
+        : null;
 });
 
 handle("colabs:runLocal", runLocal);
@@ -97,7 +129,7 @@ handle("colabs:notify", async ({ title, body }) => {
     n.show();
     return true;
 });
-handle("colabs:info", async () => ({ version: app.getVersion(), platform: process.platform, appUrl: APP_URL, features: ["files", "terminal"] }));
+handle("colabs:info", async () => ({ version: app.getVersion(), platform: process.platform, appUrl: APP_URL, uiUrl: UI_URL, bundled, features: ["files", "terminal"] }));
 
 // Files and terminal. Reading needs a native dialog the user answers; writing and terminals
 // are limited to folders picked that way (see fsAccess.js).
@@ -111,32 +143,96 @@ handle("colabs:pickSaveFolder", async () => remember(await files.pickSaveFolder(
 handle("colabs:writeFiles", async (p) => remember(await files.writeFiles(p)));
 handle("colabs:openTerminal", async ({ cwd, title }) => openTerminal({ cwd: files.resolveCwd(cwd || lastRoot), title }));
 
-// Opens the dashboard importer (works from any page of the app).
-function importFrom(kind) {
+// Website pages (help, legal, status) and other links open in the default browser.
+handle("colabs:openExternal", async ({ url }) => {
+    const u = new URL(String(url || ""));
+    if (u.protocol !== "https:" && u.protocol !== "http:") throw new Error("Only web links can be opened");
+    await shell.openExternal(u.href);
+    return true;
+});
+
+// Navigate inside the app. When the app UI is showing, the page routes in place (no reload,
+// calls and sockets stay connected); otherwise (splash, error page) load the URL.
+function goTo(route) {
     if (!win || win.isDestroyed()) return;
-    win.loadURL(`${APP_URL}/dashboard?import=${kind}`);
+    if (isAppUrl(win.webContents.getURL())) win.webContents.send("colabs:navigate", route);
+    else win.loadURL(`${UI_URL}${route}`);
+    if (win.isMinimized()) win.restore();
     win.focus();
 }
 
+const importFrom = (kind) => goTo(`/dashboard?import=${kind}`);
+const newRoomId = () => Math.random().toString(36).slice(2, 10);
+
 function buildMenu() {
     const isMac = process.platform === "darwin";
+    const site = (route) => () => shell.openExternal(`${APP_URL}${route}`);
     const fileMenu = {
         label: "File",
         submenu: [
+            { label: "New Room", accelerator: "CmdOrCtrl+N", click: () => goTo(`/editor/${newRoomId()}`) },
+            { type: "separator" },
             { label: "Open Folder…", accelerator: "CmdOrCtrl+Shift+O", click: () => importFrom("folder") },
             { label: "Open Files…", accelerator: "CmdOrCtrl+O", click: () => importFrom("files") },
             { type: "separator" },
             { label: "New Terminal", accelerator: "CmdOrCtrl+`", click: () => openTerminal({ cwd: files.resolveCwd(lastRoot) }) },
             { type: "separator" },
+            ...(isMac ? [] : [{ label: "Settings", accelerator: "Ctrl+,", click: () => goTo("/settings") }, { type: "separator" }]),
             isMac ? { role: "close" } : { role: "quit" },
+        ],
+    };
+    const goMenu = {
+        label: "Go",
+        submenu: [
+            { label: "Workspace", accelerator: "CmdOrCtrl+1", click: () => goTo("/dashboard") },
+            { label: "Snippets", accelerator: "CmdOrCtrl+2", click: () => goTo("/snippets") },
+            { label: "Settings", accelerator: "CmdOrCtrl+3", click: () => goTo("/settings") },
+            { type: "separator" },
+            { label: "Back", accelerator: isMac ? "Cmd+[" : "Alt+Left", click: () => win?.webContents.navigationHistory?.canGoBack() && win.webContents.navigationHistory.goBack() },
+            { label: "Forward", accelerator: isMac ? "Cmd+]" : "Alt+Right", click: () => win?.webContents.navigationHistory?.canGoForward() && win.webContents.navigationHistory.goForward() },
+        ],
+    };
+    const viewMenu = {
+        label: "View",
+        submenu: [
+            { role: "reload" },
+            ...(app.isPackaged ? [] : [{ role: "toggleDevTools" }]),
+            { type: "separator" },
+            { role: "resetZoom" }, { role: "zoomIn" }, { role: "zoomOut" },
+            { type: "separator" },
+            { role: "togglefullscreen" },
+        ],
+    };
+    const helpMenu = {
+        role: "help",
+        submenu: [
+            { label: "Help and Support", click: site("/support") },
+            { label: "Service Status", click: site("/status") },
+            { label: "Check for Updates", click: site("/download") },
+            { label: "Report an Issue", click: () => shell.openExternal("https://github.com/utkarsh-1912/rtm-code-editor/issues") },
+            { type: "separator" },
+            { label: "Open Website", click: site("/") },
+            ...(isMac ? [] : [{ type: "separator" }, {
+                label: "About Utkristi CoLabs",
+                click: () => dialog.showMessageBox(win, {
+                    type: "info",
+                    title: "About",
+                    message: `Utkristi CoLabs ${app.getVersion()}`,
+                    detail: `Interface: ${bundled ? "bundled with this install" : UI_URL}
+Server: ${APP_URL}
+Electron ${process.versions.electron} · ${process.platform}-${process.arch}`,
+                }),
+            }]),
         ],
     };
     Menu.setApplicationMenu(Menu.buildFromTemplate([
         ...(isMac ? [{ role: "appMenu" }] : []),
         fileMenu,
         { role: "editMenu" },
-        { role: "viewMenu" },
+        viewMenu,
+        goMenu,
         { role: "windowMenu" },
+        helpMenu,
     ]));
 }
 
@@ -150,7 +246,19 @@ if (!app.requestSingleInstanceLock()) {
         }
     });
 
-    app.whenReady().then(() => {
+    app.whenReady().then(async () => {
+        if (WANT_BUNDLED) {
+            try {
+                const local = await startLocalUi();
+                if (local) {
+                    UI_URL = local.url;
+                    UI_ORIGIN = new URL(local.url).origin;
+                    bundled = true;
+                }
+            } catch (err) {
+                console.error("Bundled UI unavailable, using the hosted site:", err.message);
+            }
+        }
         buildMenu();
         createWindow();
         app.on("activate", () => {
