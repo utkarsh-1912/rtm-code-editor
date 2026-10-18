@@ -51,16 +51,23 @@ import {
     Search, 
     Layout,
     User,
-    Bot,
     History,
     Activity,
+    PanelLeftClose,
     SquareTerminal,
     HardDriveDownload,
     FileUp,
     FolderOpen
 } from "lucide-react";
 import { bundleWebProject } from "../utils/webBundle";
+import AiIcon from "../components/AiIcon";
 import { pickFiles, pickFolder, uploadFiles, describeSkipped, saveToDisk, openTerminal, rootFor, linkRoot, canWriteToDisk, canOpenTerminal } from "../utils/localFiles";
+
+const SIDE_TABS = [
+    { id: 'files', label: 'Files', Icon: Folder },
+    { id: 'chat', label: 'Chat', Icon: MessageSquare },
+    { id: 'users', label: 'People', Icon: Users },
+];
 
 const ProjectPage = () => {
     const { projectId } = useParams();
@@ -902,6 +909,21 @@ const ProjectPage = () => {
 
     const me = user?.name || guestName;
 
+    // Sidebar switch (Files / Chat / People), at the top of the sidebar itself.
+    const renderSideTabs = () => (
+        <div className="ws-side-tabs">
+            <div className="u-seg" role="tablist" aria-label="Sidebar">
+                {SIDE_TABS.map((t) => (
+                    <button key={t.id} role="tab" aria-selected={sidebarTab === t.id} className={sidebarTab === t.id ? 'on' : ''} onClick={() => setSidebarTab(t.id)}>
+                        <t.Icon size={13} /> {t.label}
+                        {t.id === 'chat' && messages.length > 0 && sidebarTab !== 'chat' && <i className="ws-rail-dot" />}
+                    </button>
+                ))}
+            </div>
+            <button className="ws-side-close" onClick={() => setIsSidebarOpen(false)} title="Hide sidebar" aria-label="Hide sidebar"><PanelLeftClose size={15} /></button>
+        </div>
+    );
+
     const renderTabs = () => (
         <div className="ws-tabs" role="tablist" aria-label="Open files">
             {openFiles.map(file => (
@@ -981,15 +1003,10 @@ const ProjectPage = () => {
                     onRun={handleCompile}
                     isExecuting={isExecuting}
                     onToggleTheme={toggleTheme}
-                    tabs={[
-                        { id: 'files', label: 'Files', icon: <Folder size={14} />, active: isSidebarOpen && sidebarTab === 'files', onClick: () => toggleSidebarTab('files') },
-                        { id: 'chat', label: 'Chat', icon: <MessageSquare size={14} />, active: isSidebarOpen && sidebarTab === 'chat', badge: messages.length > 0, onClick: () => toggleSidebarTab('chat') },
-                        { id: 'users', label: 'People', icon: <Users size={14} />, active: isSidebarOpen && sidebarTab === 'users', onClick: () => toggleSidebarTab('users') },
-                    ]}
                     actions={[
                         { id: 'call', label: isMeetingActive ? 'Leave call' : 'Start voice & video call', icon: <Video size={18} />, onClick: () => setIsMeetingActive(!isMeetingActive), active: isMeetingActive, tone: 'green' },
                         { id: 'board', label: 'Whiteboard', icon: <Layout size={18} />, onClick: () => setShowWhiteboard(true) },
-                        { id: 'ai', label: 'AI Copilot', icon: <Bot size={18} />, onClick: () => setShowAICopilot(true) },
+                        { id: 'ai', label: 'AI Copilot', icon: <AiIcon size={18} />, onClick: () => setShowAICopilot(true) },
                         { id: 'invite', label: 'Invite team', icon: <Plus size={18} />, onClick: () => setShowInviteModal(true) },
                         ...diskActions,
                         { id: 'search', label: 'Command palette (Ctrl+K)', icon: <Search size={18} />, onClick: () => setShowCommandPalette(true), section: 'more' },
@@ -1044,12 +1061,7 @@ const ProjectPage = () => {
                     <ReflexContainer orientation="vertical" style={{ flex: 1, height: '100%', minHeight: 0 }}>
                         {!isZenMode && isSidebarOpen && ['files', 'chat', 'users'].includes(sidebarTab) && (
                             <ReflexElement flex={0.2} minSize={240} style={{ height: '100%', minHeight: 0, background: 'var(--u-bg-2)', display: 'flex', flexDirection: 'column' }}>
-                                {sidebarTab !== 'files' && (
-                                    <div className="ws-pane-head">
-                                        <span>{sidebarTab === 'chat' ? 'Messages' : 'People'}</span>
-                                        <b>{clients.length} online</b>
-                                    </div>
-                                )}
+                                {renderSideTabs()}
                                 <div style={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
                                     {sidebarTab === 'files' && <ProjectFileTree files={files} activeFile={activeFile} project={project} onSelect={handleFileClick} onCreate={handleAddFile} onDelete={handleDeleteFile} onImport={handleImportFile} />}
                                     {sidebarTab === 'chat' && <ChatWindow socketRef={socketRef} roomId={`project-${projectId}`} userName={me} isLightMode={isLightMode} isMobile={isMobile} messages={messages} setMessages={setMessages} />}
@@ -1060,8 +1072,20 @@ const ProjectPage = () => {
 
                         {!isZenMode && isSidebarOpen && ['files', 'chat', 'users'].includes(sidebarTab) && <ReflexSplitter />}
 
-                        <ReflexElement flex={1} style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-                            {renderWorkArea(0.36)}
+                        <ReflexElement flex={1} style={{ height: '100%', display: 'flex', flexDirection: 'row' }}>
+                            {!isZenMode && !isSidebarOpen && (
+                                <nav className="ws-rail" aria-label="Sidebar">
+                                    {SIDE_TABS.map((t) => (
+                                        <button key={t.id} onClick={() => toggleSidebarTab(t.id)} title={t.label} aria-label={`Show ${t.label}`}>
+                                            <t.Icon size={16} />
+                                            {t.id === 'chat' && messages.length > 0 && <i className="ws-rail-dot" />}
+                                        </button>
+                                    ))}
+                                </nav>
+                            )}
+                            <div style={{ flex: 1, minWidth: 0, height: '100%', display: 'flex', flexDirection: 'column' }}>
+                                {renderWorkArea(0.36)}
+                            </div>
                         </ReflexElement>
                     </ReflexContainer>
                 )}

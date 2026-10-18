@@ -77,7 +77,6 @@ export default function LangPicker({ value, onChange, disabled }) {
                         ))}
                         {!list.length && <li className="lp-none">No language matches “{q}”</li>}
                     </ul>
-                    <div className="lp-foot">Switching to an empty file inserts a starter template.</div>
                 </div>
             )}
         </div>

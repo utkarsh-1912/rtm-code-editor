@@ -2,6 +2,7 @@ const ACTIONS = require('../../src/Action');
 const RoomRepository = require('../repositories/RoomRepository');
 const setupEditorSocket = require('./EditorSocket');
 const setupWhiteboardSocket = require('./WhiteboardSocket');
+const setupProblemSocket = require('./ProblemSocket');
 const setupMediaSocket = require('./MediaSocket');
 
 const userSocketMap = {};
@@ -11,6 +12,7 @@ const userPhotoMap = {};
 const socketMeta = {};
 const roomChatHistory = {};
 const roomWhiteboardState = {};
+const roomProblemState = {}; // roomId -> { text, by, at }
 
 function safeSocket(handler) {
     return async (...args) => {
@@ -49,12 +51,14 @@ function initializeSockets(io) {
         userPhotoMap,
         roomChatHistory,
         roomWhiteboardState,
+        roomProblemState,
         getAllClients
     };
 
     io.on("connection", (socket) => {
         setupEditorSocket(io, socket, safeSocket, context);
         setupWhiteboardSocket(io, socket, safeSocket, context);
+        setupProblemSocket(io, socket, safeSocket, context);
         setupMediaSocket(io, socket, safeSocket, context);
 
         socket.on("disconnecting", safeSocket(() => {

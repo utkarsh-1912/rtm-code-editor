@@ -9,8 +9,6 @@ import {
   Download,
   Copy,
   LogOut,
-  ChevronLeft,
-  ChevronRight,
   MessageSquare,
   Terminal,
   Code,
@@ -20,7 +18,6 @@ import {
   LayoutDashboard,
   Zap
 } from "lucide-react";
-import { ReflexContainer, ReflexSplitter, ReflexElement } from "react-reflex";
 import "react-reflex/styles.css";
 
 import ACTIONS from "../Action";
@@ -37,7 +34,7 @@ import { useAuth } from "../context/AuthContext";
 import { runCode, formatRun } from "../utils/runner";
 import { buildSqlPrelude } from "../utils/sqlData";
 import { track } from "../utils/track";
-import { isTemplate, templateFor } from "../utils/languages";
+import { isTemplate } from "../utils/languages";
 import { CLIENT_ID } from "../utils/clientId";
 import { resolveTheme, setThemePref } from "../utils/theme";
 import "../styles/app.css";
@@ -49,7 +46,11 @@ import AICopilotModal from "../components/AICopilotModal";
 import DiffViewerModal from "../components/DiffViewerModal";
 import AnalyticsDashboardModal from "../components/AnalyticsDashboardModal";
 import FocusModeModal from "../components/FocusModeModal";
-import { Bot, History, Activity, Video as VideoIcon } from "lucide-react";
+import { History, Activity, Video as VideoIcon, LayoutTemplate, FileText } from "lucide-react";
+import RoomLayout, { useRoomLayout, LayoutMenu } from "../components/RoomLayout";
+import ProblemPane from "../components/ProblemPane";
+import { rememberRoom } from "../utils/recentRooms";
+import AiIcon from "../components/AiIcon";
 import VideoChat from "../components/VideoChat";
 import WorkspaceHeader from "../components/WorkspaceHeader";
 import CommandPalette from "../components/CommandPalette";
@@ -84,10 +85,15 @@ function Editor() {
   const [output, setOutput] = useState("");
   const [isError, setIsError] = useState(false);
   const [execTime, setExecTime] = useState(undefined);
+  const [statusEl, setStatusEl] = useState(null); // status-bar slot for the editor's cursor info
   const [isExecuting, setIsExecuting] = useState(false);
   const [socketConnected, setSocketConnected] = useState(false);
   const [showLoading, setShowLoading] = useState(false);
-  const [isChatCollapsed, setIsChatCollapsed] = useState(false);
+  // Desktop workspace layout (cards). Chat is one of its panels.
+  const roomLayout = useRoomLayout();
+  const [showLayoutMenu, setShowLayoutMenu] = useState(false);
+  const isChatCollapsed = !roomLayout.has("chat");
+  const setIsChatCollapsed = (collapsed) => { if (collapsed === roomLayout.has("chat")) roomLayout.toggle("chat"); };
   const [isLightMode, setIsLightMode] = useState(() => resolveTheme() === "light");
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const [activeTab, setActiveTab] = useState("code"); // "code" | "output" | "chat"
@@ -185,16 +191,16 @@ function Editor() {
     setIsLightMode(setThemePref(isLightMode ? "dark" : "light"));
   };
 
-  // Switch language; drop in that language's starter code if the editor is empty or
-  // still holds another language's starter (never overwrites real work).
+  // Switch language. Nothing is inserted automatically: an untouched starter from the old
+  // language is cleared (real work is never touched) and the editor's notch offers the new one.
   const changeLanguage = (newLang) => {
     setLanguage(newLang);
     socketRef.current?.emit(ACTIONS.SYNC_LANGUAGE, { roomId, language: newLang });
-    if (!isReadOnly && isTemplate(codeRef.current)) {
-      const starter = templateFor(newLang);
-      codeRef.current = starter;
-      setCurrentCode(starter);
-      socketRef.current?.emit(ACTIONS.CODE_CHANGE, { roomId, code: starter });
+    const code = codeRef.current || "";
+    if (!isReadOnly && code.trim() && isTemplate(code)) {
+      codeRef.current = "";
+      setCurrentCode("");
+      socketRef.current?.emit(ACTIONS.CODE_CHANGE, { roomId, code: "" });
     }
   };
 
@@ -324,6 +330,7 @@ function Editor() {
         userProfile: userRef.current,
         clientId: CLIENT_ID,
       });
+      rememberRoom(roomId, languageRef.current);
 
       socketRef.current.on(
         ACTIONS.JOINED,
@@ -499,6 +506,64 @@ function Editor() {
     socketRef.current?.emit(ACTIONS.SYNC_EXECUTE, { roomId, isExecuting: false });
   };
 
+  // One card of the desktop layout. `handle` is the drag grip for cards that show it inline.
+  const renderRoomPanel = (id, handle) => {
+    if (id === "problem") return <ProblemPane socketRef={socketRef} roomId={roomId} userName={userName} isReadOnly={isReadOnly} />;
+    if (id === "code") {
+      return (
+          <EditorComp
+            dragHandle={handle}
+                      statusTarget={statusEl}
+                            socketRef={socketRef}
+                            roomId={roomId}
+                            onCodeChange={(code) => {
+                              codeRef.current = code;
+                              setCurrentCode(code);
+                            }}
+                            language={language}
+                            onLanguageChange={changeLanguage}
+                            theme={theme}
+                            code={currentCode}
+                            onRunCode={handleCompile}
+                            isExecuting={isExecuting}
+                            isLightMode={isLightMode}
+                            settings={settings}
+                            isReadOnly={isReadOnly}
+                            userName={userName}
+                          />
+      );
+    }
+    if (id === "io") {
+      return (
+          <OutputWindow
+                            output={output}
+                            isError={isError}
+                            time={execTime}
+                            isMobile={isMobile}
+                            stdin={stdin}
+                            setStdin={setStdin}
+                            isLightMode={isLightMode}
+                            language={language}
+                            tables={sqlTables}
+                            setTables={setSqlTables}
+                          />
+      );
+    }
+    if (id === "chat") {
+      return (
+        <ChatWindow
+          socketRef={socketRef}
+          roomId={roomId}
+          userName={userName}
+          isLightMode={isLightMode}
+          messages={messages}
+          setMessages={setMessages}
+        />
+      );
+    }
+    return null;
+  };
+
   return (
     <div className="ws">
 
@@ -517,7 +582,7 @@ function Editor() {
         actions={[
           { id: "call", label: isMeetingActive ? "Leave call" : "Start voice & video call", icon: <VideoIcon size={18} />, onClick: () => setIsMeetingActive((v) => !v), active: isMeetingActive, tone: "green" },
           { id: "board", label: "Whiteboard", icon: <PencilLine size={18} />, onClick: () => setShowWhiteboard(true) },
-          { id: "ai", label: "AI Copilot", icon: <Bot size={18} />, onClick: () => setShowAICopilot(true) },
+          { id: "ai", label: "AI Copilot", icon: <AiIcon size={18} />, onClick: () => setShowAICopilot(true) },
           { id: "share", label: "Invite people", icon: <Share2 size={18} />, onClick: () => setShowShare(true) },
           { id: "history", label: "Version history", icon: <History size={18} />, onClick: () => setShowDiffViewer(true), section: "more" },
           { id: "analytics", label: "Analytics", icon: <Activity size={18} />, onClick: () => setShowAnalytics(true), section: "more" },
@@ -542,8 +607,12 @@ function Editor() {
             {isMobile ? (
               <div style={{ height: "100%", display: "flex", flexDirection: "column" }}>
                 <div style={{ flex: 1, overflow: "hidden" }}>
+                  {activeTab === "problem" && (
+                    <ProblemPane socketRef={socketRef} roomId={roomId} userName={userName} isReadOnly={isReadOnly} />
+                  )}
                   {activeTab === "code" && (
                     <EditorComp
+                      statusTarget={statusEl}
                       socketRef={socketRef}
                       roomId={roomId}
                       onCodeChange={(code) => {
@@ -593,6 +662,7 @@ function Editor() {
                 {/* MOBILE BOTTOM NAV */}
                 <nav className="ws-tabbar" aria-label="Room">
                   {[
+                    { id: "problem", icon: <FileText size={19} />, label: "Problem" },
                     { id: "code", icon: <Code size={19} />, label: "Code" },
                     { id: "output", icon: <Terminal size={19} />, label: "I/O" },
                     { id: "chat", icon: <MessageSquare size={19} />, label: "Chat" },
@@ -610,83 +680,7 @@ function Editor() {
               </div>
             ) : (
               <div style={{ height: "100%", width: "100%", position: "relative" }}>
-                {/* Toggle Notch for Chat Pane */}
-                <button className="ws-notch" onClick={() => setIsChatCollapsed(!isChatCollapsed)} aria-label={isChatCollapsed ? "Show chat" : "Hide chat"} title={isChatCollapsed ? "Show chat" : "Hide chat"}>
-                  {isChatCollapsed ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
-                  {isChatCollapsed && unreadChatCount > 0 && <span className="u-count">{unreadChatCount}</span>}
-                </button>
-
-                <ReflexContainer orientation="vertical">
-                  {!isChatCollapsed && (
-                    <ReflexElement key="chat-pane" className="left-pane" flex={0.25} minSize={250}>
-                      <div style={{ height: "100%", width: "100%", overflow: "hidden", display: "flex", flexDirection: "column" }}>
-                        <div className="ws-pane-head"><span>Room chat</span><b>{clients.length} online</b></div>
-                        <div style={{ flex: 1, minHeight: 0 }}>
-                          <ChatWindow
-                            socketRef={socketRef}
-                            roomId={roomId}
-                            userName={userName}
-                            isLightMode={isLightMode}
-                            messages={messages}
-                            setMessages={setMessages}
-                          />
-                        </div>
-                      </div>
-                    </ReflexElement>
-                  )}
-
-                  {!isChatCollapsed && (
-                    <ReflexSplitter key="chat-splitter" />
-                  )}
-
-                  <ReflexElement key="main-pane" className="right-pane" flex={isChatCollapsed ? 1 : 0.75}>
-                    <ReflexContainer orientation="horizontal">
-                      <ReflexElement className="editor-pane" flex={0.65} minSize={200}>
-                        <div style={{ height: "100%", width: "100%", overflow: "hidden", display: "flex", flexDirection: "column" }}>
-                          <div style={{ flex: 1, overflow: "hidden" }}>
-                            <EditorComp
-                            socketRef={socketRef}
-                            roomId={roomId}
-                            onCodeChange={(code) => {
-                              codeRef.current = code;
-                              setCurrentCode(code);
-                            }}
-                            language={language}
-                            onLanguageChange={changeLanguage}
-                            theme={theme}
-                            code={currentCode}
-                            onRunCode={handleCompile}
-                            isExecuting={isExecuting}
-                            isLightMode={isLightMode}
-                            settings={settings}
-                            isReadOnly={isReadOnly}
-                            userName={userName}
-                          />
-                          </div>
-                        </div>
-                      </ReflexElement>
-
-                      <ReflexSplitter />
-
-                      <ReflexElement className="terminal-pane" flex={0.35} minSize={100}>
-                        <div style={{ height: "100%", width: "100%", overflow: "hidden" }}>
-                          <OutputWindow
-                            output={output}
-                            isError={isError}
-                            time={execTime}
-                            isMobile={isMobile}
-                            stdin={stdin}
-                            setStdin={setStdin}
-                            isLightMode={isLightMode}
-                            language={language}
-                            tables={sqlTables}
-                            setTables={setSqlTables}
-                          />
-                        </div>
-                      </ReflexElement>
-                    </ReflexContainer>
-                  </ReflexElement>
-                </ReflexContainer>
+                <RoomLayout state={roomLayout} renderPanel={renderRoomPanel} />
               </div>
             )}
           </>
@@ -705,8 +699,18 @@ function Editor() {
             {isReadOnly && <span>spectator</span>}
           </div>
           <div>
+            <span className="ws-status-ed" ref={setStatusEl} />
             <span>{(LANGUAGES.find((l) => l.value === language)?.name || language).toLowerCase()}</span>
             <span>{clients.length} online</span>
+            <span className="rl-anchor">
+              <button className={showLayoutMenu ? "on" : ""} onClick={() => setShowLayoutMenu((v) => !v)} aria-expanded={showLayoutMenu}>
+                <LayoutTemplate size={12} /> layout
+              </button>
+              {showLayoutMenu && <LayoutMenu state={roomLayout} onClose={() => setShowLayoutMenu(false)} />}
+            </span>
+            <button className={roomLayout.has("problem") ? "on" : ""} onClick={() => roomLayout.toggle("problem")}>
+              <FileText size={12} /> problem
+            </button>
             <button className={!isChatCollapsed ? "on" : ""} onClick={() => setIsChatCollapsed(!isChatCollapsed)}>
               <MessageSquare size={12} /> chat{isChatCollapsed && unreadChatCount > 0 ? ` (${unreadChatCount})` : ""}
             </button>
@@ -812,7 +816,7 @@ function Editor() {
           { id: "viewer", label: "Copy spectator link", category: "Collaboration", icon: <Users size={16} />, run: () => handleShare("viewer") },
           { id: "call", label: isMeetingActive ? "Leave call" : "Start voice & video call", category: "Collaboration", icon: <VideoIcon size={16} />, run: () => setIsMeetingActive((v) => !v) },
           { id: "board", label: "Open whiteboard", category: "Collaboration", icon: <PencilLine size={16} />, run: () => setShowWhiteboard(true) },
-          { id: "ai", label: "Ask AI copilot", category: "Actions", icon: <Bot size={16} />, run: () => setShowAICopilot(true) },
+          { id: "ai", label: "Ask AI copilot", category: "Actions", icon: <AiIcon size={16} />, run: () => setShowAICopilot(true) },
           { id: "history", label: "Version history & snapshots", category: "Actions", icon: <History size={16} />, run: () => setShowDiffViewer(true) },
           { id: "focus", label: "Focus mode", category: "Actions", shortcut: "Alt F", icon: <Zap size={16} />, run: () => setShowFocusModal(true) },
           { id: "download", label: "Download code", category: "Actions", icon: <Download size={16} />, run: downloadCode },

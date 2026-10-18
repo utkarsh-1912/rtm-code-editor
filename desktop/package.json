@@ -14,7 +14,8 @@
     "dist:win": "npm run bundle-web && electron-builder --win --publish never",
     "dist:mac": "npm run bundle-web && electron-builder --mac --publish never",
     "dist:linux": "npm run bundle-web && electron-builder --linux --publish never",
-    "bundle-web": "node scripts/bundle-web.js"
+    "bundle-web": "node scripts/bundle-web.js",
+    "installer-art": "python scripts/make-installer-art.py"
   },
   "devDependencies": {
     "electron": "^33.2.1",
@@ -50,12 +51,24 @@
           ]
         }
       ],
-      "artifactName": "Utkristi-CoLabs-win-x64.${ext}"
+      "artifactName": "Utkristi-CoLabs-win-x64.${ext}",
+      "icon": "build/icon.ico"
     },
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
-      "shortcutName": "Utkristi CoLabs"
+      "perMachine": false,
+      "shortcutName": "Utkristi CoLabs",
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "runAfterFinish": true,
+      "installerIcon": "build/icon.ico",
+      "uninstallerIcon": "build/icon.ico",
+      "installerHeader": "build/installerHeader.bmp",
+      "installerSidebar": "build/installerSidebar.bmp",
+      "uninstallerSidebar": "build/installerSidebar.bmp",
+      "uninstallDisplayName": "Utkristi CoLabs",
+      "deleteAppDataOnUninstall": false
     },
     "mac": {
       "target": [

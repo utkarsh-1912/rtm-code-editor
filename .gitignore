@@ -30,5 +30,12 @@ yarn-error.log*
 .claude*
 # Desktop app
 /desktop/node_modules
-/desktop/dist
+# installer output (dist, dist-retry, dist-installer, ...)
+/desktop/dist*/
+# web build copied in by scripts/bundle-web.js
 /desktop/web
+# desktop/build holds the icon and installer artwork: keep it tracked
+
+# Python caches (desktop/scripts)
+__pycache__/
+*.pyc

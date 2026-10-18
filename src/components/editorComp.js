@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Download, Copy, Check, Sparkles } from "lucide-react";
+import { createPortal } from "react-dom";
+import { Download, Copy, Check, Sparkles, X } from "lucide-react";
 import CodeMirror from "@uiw/react-codemirror";
 import { esLint } from "@codemirror/lang-javascript";
 import { EditorView, Decoration, ViewPlugin, WidgetType } from "@codemirror/view";
@@ -96,6 +97,8 @@ function EditorComp({
   isReadOnly,
   filename,
   lockLanguage,
+  statusTarget, // element in the page's status bar that shows cursor info
+  dragHandle, // layout grip, shown at the start of the file bar
   fileId // Added fileId prop
 }) {
   const [editorCode, setEditorCode] = React.useState(code || "");
@@ -244,6 +247,7 @@ function EditorComp({
     if (!fileId) socketRef.current?.emit(ACTIONS.CODE_CHANGE, { roomId, code: tpl });
   };
 
+  const [notchOff, setNotchOff] = useState(null); // language whose starter notch was dismissed
   const [copied, setCopied] = useState(false);
   const copyCode = async () => {
     try {
@@ -277,6 +281,7 @@ function EditorComp({
     <div className="ec">
       {/* File bar: the tab name always follows the chosen language. */}
       <div className="ec-bar">
+        {dragHandle}
         <div className="ec-file" title={fileName}>
           <span className="lp-badge">{lang?.short || language}</span>
           <span className="ec-name">{fileName}</span>
@@ -318,25 +323,27 @@ function EditorComp({
           style={{ height: "100%" }}
           extensions={editorExtensions}
         />
-        {isEmpty && !isReadOnly && templateFor(language) && (
-          <div className="ec-empty">
-            <span>{fileName} is empty.</span>
-            <button onClick={insertTemplate}><Sparkles size={13} /> Insert {lang?.label || language} starter</button>
+        {isEmpty && !isReadOnly && templateFor(language) && notchOff !== language && (
+          <div className="ec-notch" role="note">
+            <button className="ec-notch-main" onClick={insertTemplate} title={`Insert a ${lang?.label || language} starter into ${fileName}`}>
+              <Sparkles size={12} /> Insert {lang?.label || language} starter
+            </button>
+            <button className="ec-notch-x" onClick={() => setNotchOff(language)} aria-label="Hide" title="Hide"><X size={12} /></button>
           </div>
         )}
       </div>
 
-      {!isMobile && (
-        <div className="ec-foot" aria-label="Editor status">
+      {statusTarget && createPortal(
+        <>
           <span>Ln {pos.line}, Col {pos.col}</span>
           {pos.sel > 0 && <span>{pos.sel} selected</span>}
           <span>{pos.lines} {pos.lines === 1 ? "line" : "lines"}</span>
           <span>Spaces: {settings?.tabSize || 4}</span>
-          {settings?.keybinding && settings.keybinding !== "default" && <span>{settings.keybinding}</span>}
           {editing.length > 0 && (
             <span className="ec-typing"><i />{editing.length === 1 ? `${editing[0]} is here` : `${editing.length} others here`}</span>
           )}
-        </div>
+        </>,
+        statusTarget
       )}
     </div>
   );
