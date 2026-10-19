@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from "react";
 
 const FADE_MS = 4500;
-const PTR_TTL = 3000;
+const PTR_TTL = 4000;
 
 const colorFor = (id = "") => {
     let h = 0;
@@ -54,19 +54,36 @@ export default function CallAnnotations({ socketRef, projectId, drawing, userNam
                     ctx.stroke();
                 }
                 ctx.globalAlpha = 1;
-                ctx.font = "600 11px Inter, sans-serif";
+                ctx.font = "600 10.5px Archivo, Inter, system-ui, sans-serif";
+                ctx.textBaseline = "middle";
                 for (const [id, p] of Object.entries(ptrsRef.current)) {
-                    if (now - p.ts > PTR_TTL) { delete ptrsRef.current[id]; continue; }
+                    const age = now - p.ts;
+                    if (age > PTR_TTL) { delete ptrsRef.current[id]; continue; }
                     const x = p.x * w, y = p.y * h, c = colorFor(id);
-                    ctx.fillStyle = c;
+                    // Pointer fades out over its last second instead of vanishing.
+                    const life = Math.min(1, (PTR_TTL - age) / 1000);
+                    // The name tag fades faster (after ~2s still), like editor cursor tags.
+                    const tagAlpha = life * (age < 2200 ? 1 : Math.max(0.18, 1 - (age - 2200) / 800));
+                    ctx.globalAlpha = life;
                     ctx.beginPath();
-                    ctx.moveTo(x, y); ctx.lineTo(x + 12, y + 4); ctx.lineTo(x + 4, y + 12); ctx.closePath();
+                    ctx.moveTo(x, y); ctx.lineTo(x + 3.5, y + 13); ctx.lineTo(x + 6.5, y + 8); ctx.lineTo(x + 12, y + 7.5); ctx.closePath();
+                    ctx.fillStyle = c;
+                    ctx.strokeStyle = "#fff";
+                    ctx.lineWidth = 1.2;
+                    ctx.lineJoin = "round";
                     ctx.fill();
+                    ctx.stroke();
+                    ctx.globalAlpha = tagAlpha;
                     const tw = ctx.measureText(p.name).width + 12;
-                    ctx.fillRect(x + 10, y + 12, tw, 18);
+                    const tx = x + 11, ty = y + 12, th = 17;
+                    ctx.beginPath();
+                    if (ctx.roundRect) ctx.roundRect(tx, ty, tw, th, [0, 4, 4, 4]); else ctx.rect(tx, ty, tw, th);
+                    ctx.fillStyle = c;
+                    ctx.fill();
                     ctx.fillStyle = "#fff";
-                    ctx.fillText(p.name, x + 16, y + 25);
+                    ctx.fillText(p.name, tx + 6, ty + th / 2 + 0.5);
                 }
+                ctx.globalAlpha = 1;
             }
             raf = requestAnimationFrame(draw);
         };

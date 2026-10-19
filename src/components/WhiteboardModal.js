@@ -484,7 +484,8 @@ const WhiteboardModal = ({ isOpen, onClose, socketRef, roomId }) => {
                 {Object.entries(cursors).map(([id, cur]) => (
                     <div key={id} className="wb-cursor" style={{ left: cur.x * zoom + pan.x, top: cur.y * zoom + pan.y, '--c': cursorColor(id) }}>
                         <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M1 1l5.5 13 2-5.5L14 6.5z" fill="var(--c)" stroke="#fff" strokeWidth="1.2" strokeLinejoin="round" /></svg>
-                        <span>{cur.userName || 'Guest'}</span>
+                        {/* Re-mounted on every move (key), so the fade restarts while they draw. */}
+                        <span key={cur.ts} className="wb-cursor-tag">{cur.userName || 'Guest'}</span>
                     </div>
                 ))}
 

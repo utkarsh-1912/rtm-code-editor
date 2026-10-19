@@ -1617,7 +1617,9 @@ html.light-theme .wb {
 
 /* Remote cursors */
 .wb-cursor { position: absolute; z-index: 10; pointer-events: none; transition: left .09s linear, top .09s linear; }
-.wb-cursor span { position: absolute; left: 14px; top: 14px; padding: 2px 7px; border-radius: 6px; background: var(--c); color: #fff; font-size: 11px; font-weight: 600; white-space: nowrap; }
+/* Same tag as editor cursors: the person's colour, fades when they stop moving. */
+.wb-cursor-tag { position: absolute; left: 13px; top: 13px; padding: 1px 6px; border-radius: 0 4px 4px 4px; background: var(--c); color: #fff; font: 600 10.5px/1.45 Archivo, Inter, system-ui, sans-serif; white-space: nowrap; box-shadow: 0 2px 6px rgba(0,0,0,.25); animation: rc-fade 3.2s ease forwards; }
+@media (prefers-reduced-motion: reduce) { .wb-cursor-tag { animation: none; } }
 
 /* Floating panels */
 .wb-dock, .wb-style, .wb-zoom { position: absolute; z-index: 15; display: flex; align-items: center; gap: 2px; padding: 4px; border: 1px solid var(--wb-line); border-radius: 14px; background: var(--wb-panel); box-shadow: 0 10px 30px rgba(0,0,0,.25); }
