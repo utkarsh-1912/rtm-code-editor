@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Bell, Sun, Moon, LogOut, Settings as SettingsIcon, LayoutGrid, Code2, Plus, Keyboard } from 'lucide-react';
+import { Search, Bell, Sun, Moon, LogOut, Settings as SettingsIcon, LayoutGrid, Code2, Plus, UserRound, ShieldCheck, CreditCard } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
 import { getBackendUrl } from '../utils/api';
 import SearchModal from './SearchModal';
+import Announcements from './ux/Announcements';
 import NotificationCenter from './NotificationCenter';
 import Shell, { useOnline, useThemeToggle } from './ux/Shell';
 import { useBackend, backendLabel } from '../context/BackendContext';
@@ -105,7 +106,7 @@ const AppLayout = ({ children }) => {
                     <span className={`u-dot${!online || backend.status === 'down' ? ' u-dot--bad' : backend.status === 'up' ? '' : ' u-dot--warn'}`} />
                     {online ? backendLabel(backend) : 'Offline'}
                 </span>
-                <span className="u-strip-hide u-ellipsis">Signed in as {user?.email || user?.name || 'you'}</span>
+                <span className="u-strip-hide u-ellipsis"><Announcements audience="app" /></span>
             </>}
             stripRight={<button onClick={() => setSearchOpen(true)}>Search <kbd style={{ font: 'inherit' }}>Ctrl K</kbd></button>}
             right={<>
@@ -133,11 +134,14 @@ const AppLayout = ({ children }) => {
                                 <strong>{user?.name || 'User'}</strong>
                                 <span className="u-ellipsis">{user?.email}</span>
                             </div>
-                            {NAV.map(({ to, label, icon: Icon }) => (
-                                <button key={to} role="menuitem" onClick={() => { setUserMenu(false); navigate(to); }}><Icon size={16} />{label}</button>
-                            ))}
-                            <button role="menuitem" onClick={() => { setUserMenu(false); setSearchOpen(true); }}><Keyboard size={16} />Search <kbd>Ctrl K</kbd></button>
-                            <button role="menuitem" onClick={() => { setUserMenu(false); toggleTheme(); }}>{isLight ? <Moon size={16} /> : <Sun size={16} />}{isLight ? 'Dark' : 'Light'} theme</button>
+                            {/* Account only: pages, search and theme are already in the header. */}
+                            <button role="menuitem" onClick={() => { setUserMenu(false); navigate('/settings?section=profile'); }}><UserRound size={16} />Profile</button>
+                            <button role="menuitem" onClick={() => { setUserMenu(false); navigate('/settings?section=security'); }}><ShieldCheck size={16} />Devices &amp; security</button>
+                            <button role="menuitem" onClick={() => { setUserMenu(false); navigate('/settings?section=billing'); }}><CreditCard size={16} />Plan &amp; billing</button>
+                            {/* Phones hide the header's search and theme icons, so offer them here. */}
+                            <button role="menuitem" className="u-pop-sm" onClick={() => { setUserMenu(false); setSearchOpen(true); }}><Search size={16} />Search</button>
+                            <button role="menuitem" className="u-pop-sm" onClick={() => { setUserMenu(false); toggleTheme(); }}>{isLight ? <Moon size={16} /> : <Sun size={16} />}{isLight ? 'Dark' : 'Light'} theme</button>
+                            <div className="u-pop-sep" role="separator" />
                             <button role="menuitem" className="danger" onClick={signOut}><LogOut size={16} />Sign out</button>
                         </div>
                     )}

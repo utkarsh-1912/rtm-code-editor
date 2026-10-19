@@ -5,14 +5,17 @@ const MailService = require('../services/MailService');
 const UserRepository = require('../repositories/UserRepository');
 const NotificationRepository = require('../repositories/NotificationRepository');
 const PlanRepository = require('../repositories/PlanRepository');
+const { paging } = require('../utils/paging');
 
 // Get all projects for a user
 router.get('/projects', async (req, res) => {
     try {
         const { userId } = req.query;
         if (!userId) return res.status(400).json({ error: "Missing userId" });
-        const projects = await ProjectRepository.getProjects(userId);
-        res.json(projects);
+        // ?limit=&offset= -> { items, total }; without them, the full list (older callers).
+        const page = paging(req.query, { max: 100, fallback: 50 });
+        if (page) return res.json(await ProjectRepository.getProjectsPage(userId, page));
+        res.json(await ProjectRepository.getProjects(userId));
     } catch (err) {
         console.error(err);
         res.status(500).json({ error: err.message });
@@ -78,8 +81,13 @@ router.post('/projects/:id/files', async (req, res) => {
     try {
         const { name, path, content, isDirectory } = req.body;
         if (!name || !path) return res.status(400).json({ error: "Missing file details" });
-        const file = await ProjectRepository.upsertProjectFile(req.params.id, name, path, content || "", isDirectory || false);
-        res.json(file);
+        const clean = String(path).replace(/\\/g, '/');
+        const segments = clean.replace(/^[/]+/, '').split('/');
+        if (clean.length > 400 || segments.some((seg) => !seg || seg === '.' || seg === '..')) {
+            return res.status(400).json({ error: `Bad path: ${path}` });
+        }
+        const rows = await ProjectRepository.upsertProjectFile(req.params.id, String(name).slice(0, 400), `/${segments.join('/')}`, content || "", !!isDirectory);
+        res.json(rows[0] || null);
     } catch (err) {
         console.error(err);
         res.status(500).json({ error: err.message });
@@ -113,13 +121,26 @@ router.post('/projects/:id/files/bulk', express.json({ limit: '10mb' }), async (
     }
 });
 
+// Rename a project (name only).
+router.patch('/projects/:id', async (req, res) => {
+    try {
+        const project = await ProjectRepository.renameProject(req.params.id, req.body?.name);
+        if (!project) return res.status(404).json({ error: "Project not found" });
+        req.app.get('io')?.to(`project-${req.params.id}`).emit('project-renamed', { name: project.name });
+        res.json(project);
+    } catch (err) {
+        res.status(err.message === "Name is required" ? 400 : 500).json({ error: err.message });
+    }
+});
+
 // Delete project file
 router.delete('/projects/:id/files', async (req, res) => {
     try {
         const filePath = req.query.path || req.body?.path;
         if (!filePath) return res.status(400).json({ error: "Missing path parameter" });
-        await ProjectRepository.deleteProjectFile(req.params.id, filePath);
-        res.json({ success: true });
+        const recursive = req.query.recursive === '1' || req.body?.recursive === true;
+        const deleted = await ProjectRepository.deleteProjectFile(req.params.id, filePath, { recursive });
+        res.json({ success: true, count: deleted.length });
     } catch (err) {
         console.error(err);
         res.status(500).json({ error: err.message });

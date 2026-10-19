@@ -1,0 +1,9 @@
+{
+  "_comment": "Header announcements. audience: site (public pages), app (signed-in), or all. Optional: href (link), cta (link text), tone (info|new|warn), from/until (ISO dates). Override without a deploy with the ANNOUNCEMENTS_JSON env var (same shape: an array).",
+  "announcements": [
+    { "id": "rooms-free", "text": "Rooms are free", "href": "/pricing", "cta": "See plans", "tone": "info", "audience": "site" },
+    { "id": "desktop-app", "text": "New: the desktop app opens folders, runs code locally and has a terminal", "href": "/download", "cta": "Download", "tone": "new", "audience": "all" },
+    { "id": "problem-panel", "text": "Paste the problem you're solving into a room and arrange panels like LeetCode", "href": "/features", "cta": "How it works", "tone": "new", "audience": "all" },
+    { "id": "team-trial", "text": "Team plan from $10/mo with a 14-day trial", "href": "/pricing", "cta": "Compare plans", "tone": "info", "audience": "site" }
+  ]
+}

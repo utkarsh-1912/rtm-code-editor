@@ -27,8 +27,13 @@ const io = new Server(server, {
   cors: {
     origin: "*",
     methods: ["GET", "POST"]
-  }
+  },
+  // Notice dead connections (closed laptop, lost Wi-Fi) within ~18s instead of ~45s,
+  // so they leave the people list promptly.
+  pingInterval: 10000,
+  pingTimeout: 8000,
 });
+app.set('io', io); // routes can notify rooms (e.g. a rename)
 
 // Middleware
 app.use(cors());
@@ -79,6 +84,8 @@ if (process.env.NODE_ENV === 'production') {
 
 // Initialize WebSockets Tier
 initializeSockets(io);
+// Hourly housekeeping: idle guest rooms (after GUEST_ROOM_TTL_HOURS, default 6), old sessions.
+require("./server/jobs/cleanup").startCleanupJob(io, require("./server/sockets/SocketManager").roomState);
 
 // Server Entry Point: listen right away (so health checks, the runner and sockets work
 // on a cold start) and bring the database up in the background with retries.

@@ -19,6 +19,14 @@ function setupMediaSocket(io, socket, safeSocket, context) {
         socket.to(roomId).emit('user-joined-video', { userId: socket.id, name: name || "Guest", isSpectator });
     }));
 
+    // After a reconnect (e.g. server restart) a socket that is still in a call re-enters the
+    // call room quietly: existing peer connections keep running, and people who join later
+    // are told about it and connect to it. No announcement, so nobody duplicates a peer.
+    socket.on('rejoin-video-chat', safeSocket(({ projectId } = {}) => {
+        if (!projectId) return;
+        socket.join(callRoom(projectId));
+    }));
+
     socket.on('request-streams', safeSocket(({ to }) => io.to(to).emit('request-streams', { from: socket.id })));
     socket.on('video-offer', safeSocket(({ to, offer }) => io.to(to).emit('video-offer', { from: socket.id, offer })));
     socket.on('video-answer', safeSocket(({ to, answer }) => io.to(to).emit('video-answer', { from: socket.id, answer })));

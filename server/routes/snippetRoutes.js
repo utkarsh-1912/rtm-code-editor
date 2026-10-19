@@ -1,14 +1,17 @@
 const express = require('express');
 const router = express.Router();
 const SnippetRepository = require('../repositories/SnippetRepository');
+const { paging } = require('../utils/paging');
 
 // Get snippets for user
 router.get('/snippets', async (req, res) => {
     try {
         const { userId } = req.query;
         if (!userId) return res.status(400).json({ error: "Missing userId" });
-        const snippets = await SnippetRepository.getSnippets(userId);
-        res.json(snippets);
+        // ?limit=&offset= -> { items, total }; without them, the full list (older callers).
+        const page = paging(req.query, { max: 100, fallback: 60 });
+        if (page) return res.json(await SnippetRepository.getSnippetsPage(userId, page));
+        res.json(await SnippetRepository.getSnippets(userId));
     } catch (err) {
         console.error(err);
         res.status(500).json({ error: err.message });

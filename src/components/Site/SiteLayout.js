@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { ArrowUpRight } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import Shell, { ThemeButton, useThemeToggle } from "../ux/Shell";
+import Announcements from "../ux/Announcements";
 
 const LINKS = [
     { to: "/features", label: "Features" },
@@ -33,10 +34,7 @@ export default function SiteLayout({ children }) {
                 ? <button className="u-btn u-btn--solid u-btn--lg" onClick={() => navigate("/dashboard")}>Open workspace <ArrowUpRight size={15} /></button>
                 : <Link to="/signup" className="u-btn u-btn--solid u-btn--lg">Try it free <ArrowUpRight size={15} /></Link>}
             mainClass="u-main u-main--site"
-            stripLeft={<>
-                <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}><span className="u-dot" /> Rooms are free</span>
-                <span className="u-strip-hide">No install · join from any browser</span>
-            </>}
+            stripLeft={<Announcements audience="site" />}
             stripRight={<Link to="/status">Status</Link>}
             right={<>
                 <ThemeButton className="u-icon u-icon--hide" />

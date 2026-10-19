@@ -1,40 +1,14 @@
 import React, { useEffect, useRef, useState } from "react";
 import CodeMirror from "@uiw/react-codemirror";
 import { colabsDark, colabsLight, editorChrome } from "../utils/editorTheme";
-import { EditorView, Decoration, ViewPlugin, WidgetType } from "@codemirror/view";
+import { EditorView } from "@codemirror/view";
+import { remoteCursorPlugin } from "./remoteCursor";
 import { vim } from "@replit/codemirror-vim";
 import { emacs } from "@replit/codemirror-emacs";
 import { editorLanguage } from "../utils/languages";
 import ACTIONS from "../Action";
 
 // --- Remote Cursor Branding ---
-class CursorWidget extends WidgetType {
-    constructor(name, color) { super(); this.name = name; this.color = color; }
-    toDOM() {
-        const wrap = document.createElement("span");
-        wrap.className = "remote-cursor";
-        wrap.style.cssText = `border-left: 2px solid ${this.color}; position: relative; height: 1.2em; display: inline-block; vertical-align: middle; margin: 0 -1px; pointer-events: none;`;
-        const label = document.createElement("div");
-        label.textContent = this.name;
-        label.style.cssText = `position: absolute; bottom: 100%; left: 0; white-space: nowrap; background-color: ${this.color}; color: white; font-size: 10px; padding: 1px 4px; border-radius: 2px; z-index: 10; margin-bottom: 2px;`;
-        wrap.appendChild(label);
-        return wrap;
-    }
-}
-
-const cursorPlugin = (remoteCursors) => ViewPlugin.fromClass(class {
-    constructor(view) { this.decorations = this.getDecorations(view); }
-    update(update) { if (update.docChanged || update.selectionSet || update.viewportChanged) this.decorations = this.getDecorations(update.view); }
-    getDecorations(view) {
-        const widgets = [];
-        for (const [, data] of Object.entries(remoteCursors)) {
-            if (data.pos !== undefined && data.pos <= view.state.doc.length) {
-                widgets.push(Decoration.widget({ widget: new CursorWidget(data.userName, data.color), side: 1 }).range(data.pos));
-            }
-        }
-        return Decoration.set(widgets.sort((a, b) => a.from - b.from));
-    }
-}, { decorations: v => v.decorations });
 
 // --- Project Specific Editor ---
 function ProjectEditor({
@@ -152,7 +126,7 @@ function ProjectEditor({
                     ...(settings?.wordWrap ? [EditorView.lineWrapping] : []),
                     ...(settings?.keybinding === "vim" ? [vim()] : []),
                     ...(settings?.keybinding === "emacs" ? [emacs()] : []),
-                    cursorPlugin(remoteCursors),
+                    remoteCursorPlugin(remoteCursors),
                 ]}
                 style={{ height: "100%" }}
             />

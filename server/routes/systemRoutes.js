@@ -4,6 +4,45 @@ const DashboardRepository = require('../repositories/DashboardRepository');
 const UserRepository = require('../repositories/UserRepository');
 const RoomRepository = require('../repositories/RoomRepository');
 const MailService = require('../services/MailService');
+const { paging } = require('../utils/paging');
+
+// Header announcements: server/config/announcements.json, or the ANNOUNCEMENTS_JSON env var
+// (an array) to change them without a deploy. ?audience=site|app; only entries within their
+// from/until window are returned.
+function loadAnnouncements() {
+    try {
+        if (process.env.ANNOUNCEMENTS_JSON) {
+            const list = JSON.parse(process.env.ANNOUNCEMENTS_JSON);
+            if (Array.isArray(list)) return list;
+        }
+    } catch (err) {
+        console.error("ANNOUNCEMENTS_JSON is not valid JSON:", err.message);
+    }
+    try {
+        delete require.cache[require.resolve('../config/announcements.json')];
+        return require('../config/announcements.json').announcements || [];
+    } catch {
+        return [];
+    }
+}
+
+router.get('/announcements', (req, res) => {
+    const audience = req.query.audience === 'app' ? 'app' : 'site';
+    const now = Date.now();
+    const items = loadAnnouncements()
+        .filter((a) => a && a.id && a.text)
+        .filter((a) => !a.audience || a.audience === 'all' || a.audience === audience)
+        .filter((a) => (!a.from || Date.parse(a.from) <= now) && (!a.until || Date.parse(a.until) > now))
+        .map(({ id, text, href, cta, tone }) => ({
+            id: String(id).slice(0, 60),
+            text: String(text).slice(0, 160),
+            href: typeof href === 'string' && /^(\/|https:\/\/)/.test(href) ? href : null,
+            cta: cta ? String(cta).slice(0, 30) : null,
+            tone: ['info', 'new', 'warn'].includes(tone) ? tone : 'info',
+        }));
+    res.set('Cache-Control', 'public, max-age=300');
+    res.json(items);
+});
 
 // Test Email Dispatch Endpoint
 router.get('/test-email', async (req, res) => {
@@ -54,13 +93,29 @@ router.get('/user-subscription', async (req, res) => {
     }
 });
 
+// A user's rooms, paged: /api/rooms?userId=…&limit=50&offset=0 -> { items, total }
+router.get('/rooms', async (req, res) => {
+    try {
+        const { userId } = req.query;
+        if (!userId) return res.status(400).json({ error: "Missing userId" });
+        const page = paging(req.query, { max: 100, fallback: 50 }) || { limit: 50, offset: 0 };
+        res.json(await RoomRepository.getUserRoomsPage(userId, page));
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
 // Rename workspace room
 router.put('/rename-room', async (req, res) => {
     try {
         const { roomId, newName } = req.body;
-        if (!roomId || !newName) return res.status(400).json({ error: "Missing parameters" });
+        if (!roomId) return res.status(400).json({ error: "Missing roomId" });
         const updated = await RoomRepository.updateRoomName(roomId, newName);
-        res.json(updated);
+        if (!updated) return res.status(404).json({ error: "Room not found" });
+        // People in the room see the new name right away.
+        req.app.get('io')?.to(roomId).emit('room-meta', { name: updated.name });
+        res.json({ id: updated.room_id, name: updated.name || updated.room_id, customName: !!updated.name });
     } catch (err) {
         console.error(err);
         res.status(500).json({ error: err.message });

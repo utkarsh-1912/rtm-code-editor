@@ -1,9 +1,9 @@
 const ACTIONS = require('../../src/Action');
-const RoomRepository = require('../repositories/RoomRepository');
 const setupEditorSocket = require('./EditorSocket');
 const setupWhiteboardSocket = require('./WhiteboardSocket');
 const setupProblemSocket = require('./ProblemSocket');
 const setupMediaSocket = require('./MediaSocket');
+const { createPairingTracker } = require('./pairingTracker');
 
 const userSocketMap = {};
 // socketId -> avatar URL for signed-in people (names stay in userSocketMap)
@@ -45,7 +45,11 @@ function initializeSockets(io) {
         }
     }
 
+    const pairing = createPairingTracker(io, socketMeta);
+
     const context = {
+        io,
+        pairing,
         claimSeat,
         userSocketMap,
         userPhotoMap,
@@ -62,8 +66,10 @@ function initializeSockets(io) {
         setupMediaSocket(io, socket, safeSocket, context);
 
         socket.on("disconnecting", safeSocket(() => {
+            pairing.close(socket.id);
             [...socket.rooms].forEach(roomId => {
                 if (roomId === socket.id) return;
+                pairing.recompute(roomId, socket.id);
                 socket.in(roomId).emit(ACTIONS.DISCONNECTED, { socketId: socket.id, userName: userSocketMap[socket.id] || "Guest", replaced: !!socketMeta[socket.id]?.replaced });
                 if (roomId.startsWith('call:')) {
                     socket.in(roomId).emit('user-left-video', { userId: socket.id });
@@ -71,12 +77,10 @@ function initializeSockets(io) {
                 }
 
                 const remaining = getAllClients(roomId);
-                if (remaining.length <= 1) {
-                    delete roomChatHistory[roomId];
-                    RoomRepository.isRoomGuest(roomId).then(isGuest => {
-                        if (isGuest && !roomId.startsWith('project-')) RoomRepository.deleteRoomPermanently(roomId);
-                    }).catch(() => { });
-                }
+                // Last person out: free the in-memory chat (it's in the database). Guest rooms
+                // are not deleted here; a refresh would wipe them. jobs/cleanup.js removes
+                // unused guest rooms after GUEST_ROOM_TTL_HOURS.
+                if (remaining.length <= 1) delete roomChatHistory[roomId];
             });
             delete userSocketMap[socket.id];
             delete userPhotoMap[socket.id];
@@ -86,5 +90,6 @@ function initializeSockets(io) {
 }
 
 module.exports = {
-    initializeSockets
+    initializeSockets,
+    roomState: { roomChatHistory, roomWhiteboardState, roomProblemState },
 };

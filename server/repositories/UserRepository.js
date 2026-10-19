@@ -180,7 +180,13 @@ async function deleteAccount(userId) {
     return true;
 }
 
+// Add time spent in a room with at least one other person.
+async function addPairingSeconds(userId, seconds) {
+    await sql`UPDATE users SET pairing_seconds = COALESCE(pairing_seconds, 0) + ${seconds} WHERE auth_provider_id = ${userId}`;
+}
+
 module.exports = {
+    addPairingSeconds,
     getUser,
     getUserByEmail,
     findOrCreateUser,

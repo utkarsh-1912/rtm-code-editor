@@ -83,8 +83,21 @@ async function upsertProjectFile(projectId, name, path, content, isDirectory = f
     `;
 }
 
-async function deleteProjectFile(projectId, path) {
-    return await sql`DELETE FROM project_files WHERE project_id = ${projectId} AND path = ${path}`;
+// Delete one file, or (recursive) a folder with everything under it. Paths are compared
+// without a leading "/" because starter files were stored without one.
+async function deleteProjectFile(projectId, path, { recursive = false } = {}) {
+    const p = String(path || '').replace(/^[/]+/, '').replace(/[/]+$/, '');
+    if (!p) return [];
+    if (!recursive) {
+        return await sql`DELETE FROM project_files WHERE project_id = ${projectId} AND ltrim(path, '/') = ${p} RETURNING id`;
+    }
+    const prefix = p + '/';
+    return await sql`
+        DELETE FROM project_files
+        WHERE project_id = ${projectId}
+          AND (ltrim(path, '/') = ${p} OR left(ltrim(path, '/'), ${prefix.length}) = ${prefix})
+        RETURNING id
+    `;
 }
 
 async function deleteProject(projectId) {
@@ -114,7 +127,28 @@ async function upsertProjectFiles(projectId, files) {
     `;
 }
 
+// Rename a project (its id, used in links, never changes).
+async function renameProject(projectId, newName) {
+    const name = String(newName || '').replace(/\s+/g, ' ').trim().slice(0, 120);
+    if (!name) throw new Error("Name is required");
+    const rows = await sql`UPDATE projects SET name = ${name}, updated_at = CURRENT_TIMESTAMP WHERE id = ${projectId} RETURNING *`;
+    return rows[0] || null;
+}
+
+// A user's projects, newest first, one page at a time.
+async function getProjectsPage(userId, { limit, offset }) {
+    const user = await sql`SELECT id FROM users WHERE auth_provider_id = ${userId}`;
+    if (!user.length) return { items: [], total: 0, limit, offset };
+    const [items, count] = await Promise.all([
+        sql`SELECT * FROM projects WHERE user_id = ${user[0].id} ORDER BY updated_at DESC, id DESC LIMIT ${limit} OFFSET ${offset}`,
+        sql`SELECT COUNT(*)::int AS n FROM projects WHERE user_id = ${user[0].id}`,
+    ]);
+    return { items, total: count[0].n, limit, offset };
+}
+
 module.exports = {
+    getProjectsPage,
+    renameProject,
     createProject,
     upsertProjectFiles,
     getProjects,

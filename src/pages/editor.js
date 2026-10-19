@@ -86,6 +86,7 @@ function Editor() {
   const [isError, setIsError] = useState(false);
   const [execTime, setExecTime] = useState(undefined);
   const [statusEl, setStatusEl] = useState(null); // status-bar slot for the editor's cursor info
+  const [roomName, setRoomName] = useState(null); // display name; roomId is the link and never changes
   const [isExecuting, setIsExecuting] = useState(false);
   const [socketConnected, setSocketConnected] = useState(false);
   const [showLoading, setShowLoading] = useState(false);
@@ -317,19 +318,30 @@ function Editor() {
       socketRef.current.on("connect_error", (err) => handleErrors(err));
       socketRef.current.on("connect_failed", (err) => handleErrors(err));
 
+      // Connection trouble (server restart, network blip): stay in the room and let
+      // socket.io keep retrying; "connect" re-joins. Never navigate away on a retry error.
       function handleErrors(err) {
-        console.log("socket error", err);
-        toast.error("Socket Connection failed. Try Again !!");
-        reactNavigator("/");
+        console.log("socket error", err?.message || err);
+        setSocketConnected(false);
+        toast.loading("Connection lost. Reconnecting…", { id: "socket-reconnect" });
       }
+      fresh.on("connect", () => toast.dismiss("socket-reconnect"));
 
       socketRef.current.userName = userName;
-      socketRef.current.emit(ACTIONS.JOIN, {
-        roomId,
-        userName: userName,
-        userProfile: userRef.current,
-        clientId: CLIENT_ID,
-      });
+      // Join on every (re)connect: after a network drop or server restart the socket gets a
+      // new id in no rooms, so without this the person vanishes for everyone else (and stops
+      // seeing joins/leaves) until they refresh.
+      const join = () => {
+        fresh.emit(ACTIONS.JOIN, {
+          roomId,
+          userName: userName,
+          userProfile: userRef.current,
+          clientId: CLIENT_ID,
+        });
+      };
+      fresh.on("connect", () => { setSocketConnected(true); join(); });
+      fresh.on("disconnect", () => setSocketConnected(false));
+      if (fresh.connected) join();
       rememberRoom(roomId, languageRef.current);
 
       socketRef.current.on(
@@ -374,6 +386,8 @@ function Editor() {
         setExecTime(time);
       });
 
+      socketRef.current.on("room-meta", ({ name }) => setRoomName(name || null));
+
       socketRef.current.on(ACTIONS.SYNC_LANGUAGE, ({ language }) => {
         setLanguage(language);
       });
@@ -406,8 +420,13 @@ function Editor() {
     let ownSocket = null;
     init();
 
+    // Closing the tab: leave right away instead of waiting for the heartbeat to time out.
+    const onPageHide = () => ownSocket?.disconnect();
+    window.addEventListener("pagehide", onPageHide);
+
     return () => {
       isMounted = false;
+      window.removeEventListener("pagehide", onPageHide);
       const socket = ownSocket;
       if (socket) {
         socket.disconnect();
@@ -572,7 +591,7 @@ function Editor() {
         isLightMode={isLightMode}
         onLogo={() => reactNavigator("/")}
         mode="Room"
-        title={roomId.substring(0, 8)}
+        title={roomName || roomId.substring(0, 8)}
         onTitleClick={copyRoomId}
         clients={clients}
         currentUserName={userName}
@@ -587,14 +606,14 @@ function Editor() {
           { id: "history", label: "Version history", icon: <History size={18} />, onClick: () => setShowDiffViewer(true), section: "more" },
           { id: "analytics", label: "Analytics", icon: <Activity size={18} />, onClick: () => setShowAnalytics(true), section: "more" },
           ...(user ? [
-            { id: "focus", label: "Focus mode (Alt+F)", icon: <Zap size={18} />, onClick: () => setShowFocusModal(true), section: "more" },
+            { id: "focus", label: "Focus mode", icon: <Zap size={18} />, onClick: () => setShowFocusModal(true), section: "more" },
             { id: "snippet", label: "Import snippet", icon: <ImportIcon size={18} />, onClick: () => setShowSnippetModal(true), section: "more" },
           ] : []),
           { id: "gist", label: "Export to GitHub Gist", icon: <Github size={18} />, onClick: () => setShowGistModal(true), section: "more" },
           { id: "download", label: "Download code", icon: <Download size={18} />, onClick: downloadCode, section: "more" },
           { id: "copy", label: "Copy room ID", icon: <Copy size={18} />, onClick: copyRoomId, section: "more" },
           { id: "viewer", label: "Copy spectator link", icon: <Users size={18} />, onClick: () => handleShare("viewer"), section: "more" },
-          { id: "palette", label: "Command palette (Ctrl+K)", icon: <Zap size={18} />, onClick: () => setShowCommandPalette(true), section: "more", desktopOnly: true },
+          { id: "palette", label: "Command palette", icon: <Zap size={18} />, onClick: () => setShowCommandPalette(true), section: "more", desktopOnly: true },
           { id: "settings", label: "Editor settings", icon: <Settings size={18} />, onClick: () => setShowSettings(true), section: "more" },
           ...(user ? [{ id: "dash", label: "Back to dashboard", icon: <LayoutDashboard size={18} />, onClick: () => reactNavigator("/dashboard"), section: "more" }] : []),
           { id: "leave", label: "Leave room", icon: <LogOut size={18} />, onClick: leaveRoom, section: "more", tone: "red" },

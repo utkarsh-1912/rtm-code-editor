@@ -35,7 +35,19 @@ async function deleteSnippet(snippetId) {
     return await sql`DELETE FROM snippets WHERE id = ${snippetId}`;
 }
 
+// A user's snippets, newest first, one page at a time.
+async function getSnippetsPage(userId, { limit, offset }) {
+    const user = await sql`SELECT id FROM users WHERE auth_provider_id = ${userId}`;
+    if (!user.length) return { items: [], total: 0, limit, offset };
+    const [items, count] = await Promise.all([
+        sql`SELECT * FROM snippets WHERE user_id = ${user[0].id} ORDER BY updated_at DESC, id DESC LIMIT ${limit} OFFSET ${offset}`,
+        sql`SELECT COUNT(*)::int AS n FROM snippets WHERE user_id = ${user[0].id}`,
+    ]);
+    return { items, total: count[0].n, limit, offset };
+}
+
 module.exports = {
+    getSnippetsPage,
     getSnippets,
     createSnippet,
     updateSnippet,

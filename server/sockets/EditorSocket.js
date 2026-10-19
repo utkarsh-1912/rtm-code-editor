@@ -8,7 +8,7 @@ const AnalyticsRepository = require('../repositories/AnalyticsRepository');
 const pairedRooms = new Set();
 
 function setupEditorSocket(io, socket, safeSocket, context) {
-    const { userSocketMap, userPhotoMap, roomChatHistory, getAllClients, claimSeat } = context;
+    const { userSocketMap, userPhotoMap, roomChatHistory, getAllClients, claimSeat, pairing } = context;
     const safePhoto = (url) => (typeof url === 'string' && /^https:\/\//.test(url) ? url.slice(0, 500) : null);
 
     socket.on(ACTIONS.JOIN, safeSocket(async ({ roomId, userName, userProfile, clientId }) => {
@@ -18,6 +18,7 @@ function setupEditorSocket(io, socket, safeSocket, context) {
         userPhotoMap[socket.id] = safePhoto(userProfile?.photoURL);
         claimSeat(socket, roomId, { clientId, uid: userProfile?.uid });
         socket.join(roomId);
+        pairing?.recompute(roomId);
 
         // Announce the join before touching the database so a slow or cold DB
         // never blocks people from collaborating.
@@ -39,6 +40,7 @@ function setupEditorSocket(io, socket, safeSocket, context) {
                 // Only seed code from the DB when nobody else is in the room to sync it live.
                 if (getAllClients(roomId).length <= 1 && dbRoom.code !== null) socket.emit(ACTIONS.CODE_CHANGE, { code: dbRoom.code });
                 if (dbRoom.language) socket.emit(ACTIONS.SYNC_LANGUAGE, { language: dbRoom.language });
+                socket.emit('room-meta', { name: dbRoom.name || null });
             } else {
                 await RoomRepository.saveRoom(roomId, "", "javascript", []);
                 AnalyticsRepository.logActivity({ userId: userProfile?.uid || null, roomId, actionType: 'ROOM_STARTED' }).catch(() => { });
@@ -61,6 +63,7 @@ function setupEditorSocket(io, socket, safeSocket, context) {
         userPhotoMap[socket.id] = safePhoto(photoURL);
         claimSeat(socket, roomId, { clientId, uid });
         socket.join(roomId);
+        pairing?.recompute(roomId);
 
         const files = await ProjectRepository.getProjectFiles(projectId);
         files.forEach(file => socket.emit(ACTIONS.FILE_CHANGE, { fileId: file.id, path: file.path, content: file.content, socketId: 'server' }));
@@ -133,13 +136,11 @@ function setupEditorSocket(io, socket, safeSocket, context) {
 
     socket.on(ACTIONS.LEAVE, safeSocket(async ({ roomId }) => {
         socket.in(roomId).emit(ACTIONS.DISCONNECTED, { socketId: socket.id, userName: userSocketMap[socket.id] || "Guest" });
+        pairing?.close(socket.id);
         socket.leave(roomId);
-        const remaining = getAllClients(roomId);
-        if (remaining.length === 0) {
-            delete roomChatHistory[roomId];
-            const isGuest = await RoomRepository.isRoomGuest(roomId);
-            if (isGuest && !roomId.startsWith('project-')) await RoomRepository.deleteRoomPermanently(roomId);
-        }
+        pairing?.recompute(roomId);
+        // Guest rooms are cleaned up by jobs/cleanup.js after a few idle hours, not here.
+        if (getAllClients(roomId).length === 0) delete roomChatHistory[roomId];
     }));
 }
 

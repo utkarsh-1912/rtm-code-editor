@@ -23,7 +23,7 @@ import {
 } from "lucide-react";
 import toast from "react-hot-toast";
 import ProjectEditor from "../components/ProjectEditor";
-import ProjectFileTree, { FileIcon } from "../components/ProjectFileTree";
+import ProjectFileTree, { FileIcon, relPath } from "../components/ProjectFileTree";
 import WorkspaceHeader from "../components/WorkspaceHeader";
 import Client from "../components/clients";
 import Loader from "../components/ux/Loader";
@@ -440,7 +440,7 @@ const ProjectPage = () => {
             }
         ];
 
-        const fileActions = files.map(file => ({
+        const fileActions = files.filter(file => !file.is_directory).map(file => ({
             id: `file-${file.id}`,
             label: file.name,
             icon: <FileCode size={18} />,
@@ -498,9 +498,12 @@ const ProjectPage = () => {
 
 
 
+    // The name we joined with; re-sent on every reconnect (a reconnected socket has a new id
+    // and is in no rooms, so without this the person disappears for everyone else).
+    const joinedNameRef = useRef(null);
     const joinProject = React.useCallback((name) => {
-        if (!socketRef.current || hasJoinedRef.current) return;
-
+        if (!socketRef.current || !name) return;
+        joinedNameRef.current = name;
         socketRef.current.userName = name;
         socketRef.current.emit(ACTIONS.PROJECT_JOIN, {
             projectId,
@@ -509,7 +512,6 @@ const ProjectPage = () => {
             uid: user?.uid || null,
             clientId: CLIENT_ID,
         });
-
         hasJoinedRef.current = true;
     }, [projectId, user?.photoURL, user?.uid]);
 
@@ -541,18 +543,28 @@ const ProjectPage = () => {
                     || filesData.find((f) => base(f) === LANGS.find((l) => l.id === projData.type)?.file)
                     || filesData.find((f) => /^(main|index|app)\.[a-z]+$/i.test(base(f)) && languageForFile(base(f)))
                     || filesData.find((f) => !/^readme/i.test(base(f)) && !f.is_directory)
-                    || filesData[0];
+                    || filesData.find((f) => !f.is_directory);
                 if (entry) {
                     setActiveFile(entry);
                     setOpenFiles([entry]);
                 }
 
-                socketRef.current = await initSocket();
+                const sock = await initSocket();
+                if (cancelled) { sock.disconnect(); return; }
+                socketRef.current = sock;
+                sock.on('connect', () => {
+                    toast.dismiss('socket-reconnect');
+                    if (joinedNameRef.current) joinProject(joinedNameRef.current);
+                });
                 socketRef.current.on('connect_error', (err) => handleErrors(err));
                 socketRef.current.on('connect_failed', (err) => handleErrors(err));
 
                 socketRef.current.on('media-state-update', ({ userId, state }) => {
                     setMediaStates(prev => ({ ...prev, [userId]: { ...prev[userId], ...state } }));
+                });
+
+                socketRef.current.on('project-renamed', ({ name }) => {
+                    if (name) setProject((p) => (p ? { ...p, name } : p));
                 });
 
                 socketRef.current.on(ACTIONS.JOINED, ({ clients }) => {
@@ -624,10 +636,11 @@ const ProjectPage = () => {
                     });
                 });
 
+                // Connection trouble: stay on the project and keep retrying (socket.io does);
+                // "connect" re-joins. Never leave the page over a retry error.
                 function handleErrors(e) {
-                    console.log('socket error', e);
-                    toast.error('Socket connection failed, try again later.');
-                    navigate('/dashboard');
+                    console.log('socket error', e?.message || e);
+                    toast.loading('Connection lost. Reconnecting…', { id: 'socket-reconnect' });
                 }
 
                 // Bypass lobby and connect directly
@@ -654,15 +667,26 @@ const ProjectPage = () => {
             }
         };
 
+        let cancelled = false;
+        const onPageHide = () => socketRef.current?.disconnect();
+        window.addEventListener("pagehide", onPageHide);
         if (projectId) init();
 
         return () => {
+            cancelled = true;
             window.removeEventListener("resize", handleResize);
+            window.removeEventListener("pagehide", onPageHide);
             if (socketRef.current) {
                 socketRef.current.disconnect();
             }
+            // The next run makes a new socket that must join again.
+            hasJoinedRef.current = false;
+            joinedNameRef.current = null;
         };
-    }, [projectId, user, navigate, joinProject]);
+        // Re-run only when the project or the signed-in person changes, not on every profile
+        // update (that used to tear the socket down and leave the person out of the room).
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [projectId, user?.uid]);
 
 
 
@@ -721,71 +745,71 @@ const ProjectPage = () => {
         }
     };
 
-    const handleAddFile = async (nameArg) => {
-        const type = project?.type || "web";
-        let allowed = [];
-        if (type === "web") allowed = ["html", "css", "js"];
-        else if (type === "cpp") allowed = ["cpp", "h"];
-        else if (type === "python") allowed = ["py"];
-        else if (type === "java") allowed = ["java"];
-
-        const fileName = typeof nameArg === "string" ? nameArg : prompt(`Enter file name (Allowed: ${allowed.join(", ")}):`);
-        if (!fileName) return;
-
-        const ext = fileName.split('.').pop().toLowerCase();
-        if (!allowed.includes(ext)) {
-            toast.error(`Invalid extension for ${type} project. Allowed: ${allowed.join(", ")}`);
+    // Create a file or folder. `pathArg` is relative to the project root and may include
+    // folders ("src/utils/math.js"); missing parent folders appear from the path itself.
+    const handleAddFile = async (pathArg, { isDirectory = false } = {}) => {
+        const rel = String(typeof pathArg === "string" ? pathArg : "").replace(/\\/g, "/").replace(/^\/+|\/+$/g, "");
+        if (!rel) return;
+        if (rel.split("/").some((seg) => !seg || seg === "." || seg === "..")) {
+            toast.error("That name isn't a valid path.");
             return;
         }
-
+        if (files.some((f) => relPath(f) === rel)) {
+            toast.error(`${rel} already exists`);
+            return;
+        }
         try {
-            const backendUrl = getBackendUrl();
-            const res = await fetch(`${backendUrl}/api/projects/${projectId}/files`, {
+            const res = await fetch(`${getBackendUrl()}/api/projects/${projectId}/files`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    name: fileName,
-                    path: `/${fileName}`,
-                    content: '',
-                    isDirectory: false
-                })
+                body: JSON.stringify({ name: rel, path: `/${rel}`, content: '', isDirectory }),
             });
+            if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || "Failed to create");
+            const created = await res.json();
+            if (!created?.id) throw new Error("Failed to create");
 
-            if (!res.ok) throw new Error("Failed to create file");
-            const newFile = await res.json();
-
-            setFiles(prev => [...prev, newFile]);
-            setActiveFile(newFile);
-            setOpenFiles(prev => [...prev, newFile]);
-
-            socketRef.current.emit(ACTIONS.FILE_CHANGE, {
+            setFiles(prev => [...prev, created]);
+            if (!isDirectory) {
+                setActiveFile(created);
+                setOpenFiles(prev => [...prev, created]);
+            }
+            socketRef.current?.emit(ACTIONS.FILE_CHANGE, {
                 roomId: `project-${projectId}`,
-                fileId: newFile.id,
-                path: newFile.path,
+                fileId: created.id,
+                path: created.path,
                 content: '',
                 isNew: true
             });
-
-            toast.success("File created!");
+            toast.success(isDirectory ? `Folder ${rel} created` : `${rel} created`);
         } catch (err) {
-            toast.error("Error creating file");
+            toast.error(err.message || (isDirectory ? "Could not create the folder" : "Could not create the file"));
         }
     };
 
-
-
-    const handleDeleteFile = async (file) => {
-        if (!window.confirm(`Delete ${file.name}? This cannot be undone.`)) return;
+    // Delete a file, or a folder and everything inside it.
+    const handleDeleteFile = async (item) => {
+        const target = item.isFolder ? item.path : relPath(item);
+        const inside = (f) => {
+            const p = relPath(f);
+            return item.isFolder ? p === target || p.startsWith(`${target}/`) : f.id === item.id;
+        };
+        const doomed = files.filter(inside);
+        const fileCount = doomed.filter((f) => !f.is_directory).length;
+        const question = item.isFolder
+            ? `Delete folder ${target}${fileCount ? ` and ${fileCount} file${fileCount === 1 ? '' : 's'} in it` : ''}? This cannot be undone.`
+            : `Delete ${target}? This cannot be undone.`;
+        if (!window.confirm(question)) return;
         try {
-            const res = await fetch(`${getBackendUrl()}/api/projects/${projectId}/files?path=${encodeURIComponent(file.path || `/${file.name}`)}`, { method: 'DELETE' });
+            const res = await fetch(`${getBackendUrl()}/api/projects/${projectId}/files?path=${encodeURIComponent(`/${target}`)}${item.isFolder ? '&recursive=1' : ''}`, { method: 'DELETE' });
             if (!res.ok) throw new Error("Delete failed");
-            setFiles(prev => prev.filter(f => f.id !== file.id));
-            const nextOpen = openFiles.filter(f => f.id !== file.id);
+            const gone = new Set(doomed.map((f) => f.id));
+            setFiles(prev => prev.filter(f => !gone.has(f.id)));
+            const nextOpen = openFiles.filter(f => !gone.has(f.id));
             setOpenFiles(nextOpen);
-            if (activeFile?.id === file.id) setActiveFile(nextOpen[nextOpen.length - 1] || null);
-            toast.success("File deleted");
+            if (activeFile && gone.has(activeFile.id)) setActiveFile(nextOpen[nextOpen.length - 1] || null);
+            toast.success(item.isFolder ? `Deleted ${target}` : "File deleted");
         } catch (err) {
-            toast.error("Could not delete file");
+            toast.error(item.isFolder ? "Could not delete the folder" : "Could not delete file");
         }
     };
 
@@ -929,7 +953,7 @@ const ProjectPage = () => {
             {openFiles.map(file => (
                 <div key={file.id} role="tab" aria-selected={activeFile?.id === file.id} className={`ws-tab${activeFile?.id === file.id ? ' on' : ''}`} onClick={() => handleFileClick(file)}>
                     <FileIcon name={file.name} size={13} />
-                    <span>{file.name}</span>
+                    <span title={relPath(file)}>{relPath(file).split('/').pop()}</span>
                     <button onClick={(e) => handleCloseTab(e, file.id)} aria-label={`Close ${file.name}`}><X size={12} /></button>
                 </div>
             ))}
@@ -1009,8 +1033,8 @@ const ProjectPage = () => {
                         { id: 'ai', label: 'AI Copilot', icon: <AiIcon size={18} />, onClick: () => setShowAICopilot(true) },
                         { id: 'invite', label: 'Invite team', icon: <Plus size={18} />, onClick: () => setShowInviteModal(true) },
                         ...diskActions,
-                        { id: 'search', label: 'Command palette (Ctrl+K)', icon: <Search size={18} />, onClick: () => setShowCommandPalette(true), section: 'more' },
-                        { id: 'focus', label: 'Focus mode (Alt+F)', icon: <Zap size={18} />, onClick: () => setShowFocusModal(true), section: 'more' },
+                        { id: 'search', label: 'Command palette', icon: <Search size={18} />, onClick: () => setShowCommandPalette(true), section: 'more' },
+                        { id: 'focus', label: 'Focus mode', icon: <Zap size={18} />, onClick: () => setShowFocusModal(true), section: 'more' },
                         { id: 'history', label: 'Version history', icon: <History size={18} />, onClick: () => setShowDiffViewer(true), section: 'more' },
                         { id: 'analytics', label: 'Analytics', icon: <Activity size={18} />, onClick: () => setShowAnalytics(true), section: 'more' },
                         { id: 'dash', label: 'Back to dashboard', icon: <Layout size={18} />, onClick: () => navigate('/dashboard'), section: 'more' },

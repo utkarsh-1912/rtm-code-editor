@@ -30,12 +30,17 @@ export default function Terms() {
                 We may send you service messages such as invitations, security notices and, with your permission, push notifications. You can opt out of non-essential messages at any time.
             </p>
 
-            <h2>6. Persistent Data</h2>
+            <h2>6. Plans, Trials and Billing</h2>
+            <p>
+                Free is free. Team is billed in advance, monthly or yearly, through Stripe, and renews automatically until you cancel in Settings under Plan &amp; billing. The Team trial is 14 days and converts to a paid subscription at the end unless cancelled before then. When a paid plan ends you move to Free: your projects remain, but you cannot create new ones above the Free limit. Prices exclude applicable taxes. If a charge was a mistake, contact support within 14 days and we will make it right.
+            </p>
+
+            <h2>7. Persistent Data</h2>
             <p>
                 While we strive for 100% data availability, Utkristi Colabs is not intended as a primary backup service. You are encouraged to maintain local copies of your critical code snippets and room data.
             </p>
 
-            <h2>7. Disclaimer of Warranty</h2>
+            <h2>8. Disclaimer of Warranty</h2>
             <p>
                 Utkristi Colabs is provided "as is" and "as available" without any warranty of any kind. Your use of the service is at your own risk.
             </p>

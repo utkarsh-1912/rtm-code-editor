@@ -63,6 +63,7 @@ const VideoChat = ({
 
     // --- Refs for WebRTC & Audio ---
     const peersRef = useRef({}); // { socketId: RTCPeerConnection }
+    const remoteMediaRef = useRef({}); // { socketId: MediaStream } one stream per person, all their tracks
     const screenStreamRef = useRef(null);
     const audioContextRef = useRef(null);
     const analysersRef = useRef({}); // { socketId: AnalyserNode }
@@ -227,6 +228,7 @@ const VideoChat = ({
                 });
             }
 
+            localStreamRef.current = stream; // signalling reads this before React re-renders
             setLocalStream(stream);
             setInCall(true);
             onCallStateChange(true);
@@ -371,7 +373,7 @@ const VideoChat = ({
     // --- WebRTC Core Functions ---
 
 
-    const createPeer = useCallback((targetSocketId, name, stream) => {
+    const createPeer = useCallback((targetSocketId, name, stream, { offerer = false } = {}) => {
         const peer = new RTCPeerConnection({ iceServers: ICE_SERVERS, iceCandidatePoolSize: 2 });
 
         // Recover from dropped networks (Wi-Fi to mobile, VPN changes) with an ICE restart.
@@ -390,10 +392,12 @@ const VideoChat = ({
         peer.onnegotiationneeded = async () => {
             if (!peer.__negotiated || peer.signalingState !== 'stable' || !socketRef.current) return;
             try {
-                const offer = await peer.createOffer();
-                await peer.setLocalDescription(offer);
-                socketRef.current.emit('video-offer', { to: targetSocketId, offer });
-            } catch (e) { /* next change retries */ }
+                peer.__makingOffer = true;
+                await peer.setLocalDescription(await peer.createOffer());
+                socketRef.current.emit('video-offer', { to: targetSocketId, offer: peer.localDescription });
+            } catch (e) { /* next change retries */ } finally {
+                peer.__makingOffer = false;
+            }
         };
 
         // Bug 2: Initialize candidate queue for this peer
@@ -404,6 +408,14 @@ const VideoChat = ({
         if (stream) {
             stream.getTracks().forEach(track => peer.addTrack(track, stream));
         }
+        // The side making the offer always asks to receive audio and video, even with no
+        // camera or mic of its own; turning ours on later reuses these slots (addTrack) and
+        // renegotiates. The answering side gets its slots from that offer.
+        if (offerer) ['audio', 'video'].forEach((kind) => {
+            if (!peer.getTransceivers().some((t) => t.receiver.track?.kind === kind)) {
+                peer.addTransceiver(kind, { direction: 'recvonly' });
+            }
+        });
         setTimeout(() => tuneSenders(), 0);
 
         peer.onicecandidate = (event) => {
@@ -415,13 +427,23 @@ const VideoChat = ({
             }
         };
 
+        // Collect every incoming track into one stream per person (tracks can arrive in
+        // separate events and, after renegotiation, under different stream ids).
         peer.ontrack = (event) => {
-            const remoteStream = event.streams[0];
+            let remoteStream = remoteMediaRef.current[targetSocketId];
+            if (!remoteStream) {
+                remoteStream = new MediaStream();
+                remoteMediaRef.current[targetSocketId] = remoteStream;
+            }
+            remoteStream.getTracks()
+                .filter((t) => t.kind === event.track.kind && t !== event.track)
+                .forEach((t) => remoteStream.removeTrack(t));
+            if (!remoteStream.getTracks().includes(event.track)) remoteStream.addTrack(event.track);
             setRemoteUsers(prev => ({
                 ...prev,
-                [targetSocketId]: { ...prev[targetSocketId], stream: remoteStream, name }
+                [targetSocketId]: { ...prev[targetSocketId], stream: remoteStream, name: prev[targetSocketId]?.name || name, tracks: remoteStream.getTracks().length }
             }));
-            setupAudioAnalysis(remoteStream, targetSocketId);
+            if (event.track.kind === 'audio') setupAudioAnalysis(new MediaStream([event.track]), targetSocketId);
         };
 
         return peer;
@@ -485,128 +507,136 @@ const VideoChat = ({
     }, [projectId, socketRef]);
 
 
+    // Server restart / network drop: the socket comes back with a new id and in no rooms.
+    // Re-enter the call room so people joining later can still reach us.
+    const inCallRef = useRef(false);
+    useEffect(() => { inCallRef.current = inCall; }, [inCall]);
+    useEffect(() => {
+        const socket = socketRef.current;
+        if (!socket) return undefined;
+        const onReconnect = () => {
+            if (inCallRef.current) socket.emit('rejoin-video-chat', { projectId });
+        };
+        socket.on('connect', onReconnect);
+        return () => socket.off('connect', onReconnect);
+    }, [socketRef, projectId]);
+
     // --- Socket Signaling Handlers ---
+    // Who offers: only the person joining. They get the participant list and offer to each
+    // existing member; members just wait for that offer. (When both sides offered at once,
+    // each rejected the other's offer and video flowed one way or not at all.)
+    // Renegotiation later (camera/mic turned on) uses "polite peer" rules to settle clashes.
     useEffect(() => {
         if (!socketRef.current) return;
         const socket = socketRef.current;
 
-        const onUserJoined = async ({ userId, name, isSpectator }) => {
-            if (userId === socket.id) return;
-            // Spectators don't show joined toast, they just join the mesh
-            if (isSpectator) {
-                console.log(`${name} is watching`);
-            }
-
-            // Only create if we don't have this peer already
-            if (peersRef.current[userId]) return;
-
-            if (localStream) {
-                const peer = createPeer(userId, name, localStream);
+        const getPeer = (userId, name, offerer = false) => {
+            let peer = peersRef.current[userId];
+            if (!peer || peer.signalingState === 'closed') {
+                peer = createPeer(userId, name, localStreamRef.current, { offerer });
                 peersRef.current[userId] = peer;
+            }
+            return peer;
+        };
 
-                try {
-                    const offer = await peer.createOffer();
-                    await peer.setLocalDescription(offer);
-                    socket.emit('video-offer', { to: userId, offer });
-
-                    // Broadcast our current media state so the new user knows our status
-                    socket.emit(ACTIONS.MEDIA_STATE_CHANGE, {
-                        roomId: `call:${projectId}`,
-                        state: mediaStateRef.current
-                    });
-                } catch (err) { console.error("Offer error", err); }
-            } else {
-                socket.emit('request-streams', { to: userId });
+        const drainCandidates = async (userId, peer) => {
+            const pending = pendingCandidatesRef.current[userId] || [];
+            pendingCandidatesRef.current[userId] = [];
+            for (const candidate of pending) {
+                try { await peer.addIceCandidate(new RTCIceCandidate(candidate)); } catch (e) { /* stale */ }
             }
         };
 
-        const onVideoOffer = async ({ from, offer }) => {
-            let peer = peersRef.current[from];
-            if (!peer || peer.signalingState === 'closed') {
-                peer = createPeer(from, remoteUsersRef.current[from]?.name || "User", localStream);
-                peersRef.current[from] = peer;
-            }
-
+        // We joined: offer to someone already in the call.
+        const connectTo = async (userId, name) => {
+            if (userId === socket.id) return;
+            setRemoteUsers(prev => ({ ...prev, [userId]: { ...prev[userId], name: name || prev[userId]?.name } }));
+            const peer = getPeer(userId, name, true);
             try {
-                await peer.setRemoteDescription(new RTCSessionDescription(offer));
-                const answer = await peer.createAnswer();
-                await peer.setLocalDescription(answer);
-                socket.emit('video-answer', { to: from, answer });
-                peer.__negotiated = true;
+                peer.__makingOffer = true;
+                await peer.setLocalDescription(await peer.createOffer());
+                socket.emit('video-offer', { to: userId, offer: peer.localDescription });
+            } catch (err) {
+                console.error("Offer error", err);
+            } finally {
+                peer.__makingOffer = false;
+            }
+            socket.emit(ACTIONS.MEDIA_STATE_CHANGE, { roomId: `call:${projectId}`, state: mediaStateRef.current });
+        };
 
-                // Bug 2: Drain buffered ICE candidates now that remote description is set
-                const pending = pendingCandidatesRef.current[from] || [];
-                for (const candidate of pending) {
-                    try { await peer.addIceCandidate(new RTCIceCandidate(candidate)); } catch (e) { }
+        // Someone joined after us: show their tile; their offer arrives next.
+        const onUserJoined = ({ userId, name }) => {
+            if (userId === socket.id) return;
+            setRemoteUsers(prev => ({ ...prev, [userId]: { ...prev[userId], name: name || prev[userId]?.name || "Guest" } }));
+        };
+
+        const onParticipantsList = ({ clients }) => {
+            clients.forEach(c => connectTo(c.userId, c.name));
+        };
+
+        const onVideoOffer = async ({ from, offer }) => {
+            const peer = getPeer(from, remoteUsersRef.current[from]?.name || "Guest");
+            const collision = peer.__makingOffer || peer.signalingState !== 'stable';
+            const polite = socket.id > from; // both sides agree on who yields
+            if (collision && !polite) return; // they will accept ours instead
+            try {
+                if (collision) {
+                    await peer.setLocalDescription({ type: 'rollback' }).catch(() => { });
                 }
-                pendingCandidatesRef.current[from] = [];
-
-                // Also broadcast our media state back so they have ours
-                socket.emit(ACTIONS.MEDIA_STATE_CHANGE, {
-                    roomId: `call:${projectId}`,
-                    state: mediaStateRef.current
-                });
+                await peer.setRemoteDescription(new RTCSessionDescription(offer));
+                await peer.setLocalDescription(await peer.createAnswer());
+                socket.emit('video-answer', { to: from, answer: peer.localDescription });
+                peer.__negotiated = true;
+                await drainCandidates(from, peer);
+                socket.emit(ACTIONS.MEDIA_STATE_CHANGE, { roomId: `call:${projectId}`, state: mediaStateRef.current });
             } catch (err) { console.error("Answer error", err); }
         };
 
         const onVideoAnswer = async ({ from, answer }) => {
             const peer = peersRef.current[from];
-            if (peer) {
-                try {
-                    await peer.setRemoteDescription(new RTCSessionDescription(answer));
-                    peer.__negotiated = true;
-                    // Bug 2: Drain buffered ICE candidates now that remote description is set
-                    const pending = pendingCandidatesRef.current[from] || [];
-                    for (const candidate of pending) {
-                        try { await peer.addIceCandidate(new RTCIceCandidate(candidate)); } catch (e) { }
-                    }
-                    pendingCandidatesRef.current[from] = [];
-                } catch (err) { console.error("Set remote description error", err); }
-            }
+            if (!peer || peer.signalingState !== 'have-local-offer') return;
+            try {
+                await peer.setRemoteDescription(new RTCSessionDescription(answer));
+                peer.__negotiated = true;
+                await drainCandidates(from, peer);
+            } catch (err) { console.error("Set remote description error", err); }
         };
 
         const onIceCandidate = async ({ from, candidate }) => {
             const peer = peersRef.current[from];
-            if (!peer) return;
-            // Bug 2: If remote description not yet set, buffer the candidate
-            if (!peer.remoteDescription || !peer.remoteDescription.type) {
-                if (!pendingCandidatesRef.current[from]) pendingCandidatesRef.current[from] = [];
-                pendingCandidatesRef.current[from].push(candidate);
-            } else {
-                try { await peer.addIceCandidate(new RTCIceCandidate(candidate)); } catch (err) { }
+            if (!peer || !peer.remoteDescription || !peer.remoteDescription.type) {
+                // Not ready yet: keep it until the remote description is set.
+                (pendingCandidatesRef.current[from] = pendingCandidatesRef.current[from] || []).push(candidate);
+                return;
             }
+            try { await peer.addIceCandidate(new RTCIceCandidate(candidate)); } catch (err) { /* stale */ }
         };
 
-        const onRequestStreams = ({ from }) => {
-            if (localStream) onUserJoined({ userId: from, name: "Remote", isSpectator: false });
-        };
+        // Kept for older clients that ask us to (re)connect to them.
+        const onRequestStreams = ({ from }) => connectTo(from, remoteUsersRef.current[from]?.name);
 
         const onUserLeft = ({ userId }) => {
             if (peersRef.current[userId]) {
                 setTimeout(() => tuneSenders(), 0);
                 peersRef.current[userId].close();
                 delete peersRef.current[userId];
-                delete analysersRef.current[userId];
-                setRemoteUsers(prev => {
-                    const next = { ...prev };
-                    delete next[userId];
-                    return next;
-                });
             }
+            delete analysersRef.current[userId];
+            delete remoteMediaRef.current[userId];
+            delete pendingCandidatesRef.current[userId];
+            setRemoteUsers(prev => {
+                const next = { ...prev };
+                delete next[userId];
+                return next;
+            });
         };
 
         const onMediaStateChange = ({ userId, state }) => {
+            if (userId === socket.id) return;
             setRemoteUsers(prev => ({
                 ...prev,
                 [userId]: { ...prev[userId], ...state }
             }));
-        };
-
-        const onParticipantsList = ({ clients }) => {
-            console.log("Existing participants:", clients);
-            clients.forEach(c => {
-                onUserJoined({ userId: c.userId, name: c.name, isSpectator: c.isSpectator });
-            });
         };
 
         socket.on('video-participants', onParticipantsList);
@@ -628,7 +658,7 @@ const VideoChat = ({
             socket.off('user-left-video', onUserLeft);
             socket.off(ACTIONS.MEDIA_STATE_CHANGE, onMediaStateChange);
         };
-    }, [localStream, socketRef, createPeer, projectId, tuneSenders]);
+    }, [socketRef, createPeer, projectId, tuneSenders]);
 
     // --- Active Speaker Detection ---
     useEffect(() => {
@@ -708,6 +738,23 @@ const VideoChat = ({
         setDragOffset({ x: e.clientX - pipPosition.x, y: e.clientY - pipPosition.y });
     };
 
+    // --- Grid area size (for 16:9 tiles) ---
+    const [gridBox, setGridBox] = useState({ w: 0, h: 0 });
+    const gridObserverRef = useRef(null);
+    const gridRef = useCallback((node) => {
+        gridObserverRef.current?.disconnect();
+        if (!node) return;
+        const measure = () => {
+            const cs = getComputedStyle(node);
+            const w = node.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+            const h = node.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
+            setGridBox((b) => (Math.abs(b.w - w) < 1 && Math.abs(b.h - h) < 1 ? b : { w, h }));
+        };
+        measure();
+        gridObserverRef.current = new ResizeObserver(measure);
+        gridObserverRef.current.observe(node);
+    }, []);
+
     // --- Call clock ---
     const [elapsed, setElapsed] = useState(0);
     useEffect(() => {
@@ -756,7 +803,7 @@ const VideoChat = ({
     const mutedOf = (p) => (p.isLocal ? isMuted : !!p.isMuted);
     const cameraOn = (p) => (p.isLocal ? (!isVideoOff || isScreenSharing) && !!localStream : (!p.isVideoOff || p.isScreenSharing) && !!p.stream);
 
-    const renderTile = (p, variant) => {
+    const renderTile = (p, variant, style) => {
         const stage = variant === 'stage';
         const presenting = stage && p.id === sharer?.id;
         const name = nameFor(p);
@@ -766,12 +813,13 @@ const VideoChat = ({
             <div
                 key={`${variant}-${p.id}`}
                 className={`vc-tile vc-tile--${variant}${activeSpeaker === p.id && !mutedOf(p) ? ' is-speaking' : ''}${pinned === p.id ? ' is-pinned' : ''}`}
+                style={style}
                 onDoubleClick={() => !presenting && togglePin(p.id)}
             >
                 {cameraOn(p) ? (
                     <StreamVideo
                         stream={p.isLocal ? localStream : p.stream}
-                        muted={p.isLocal}
+                        muted
                         mirror={p.isLocal && !isScreenSharing}
                         fit={presenting ? (fitStage ? 'contain' : 'cover') : 'cover'}
                     />
@@ -829,10 +877,21 @@ const VideoChat = ({
                 </div>
             );
         }
-        const cols = count <= 1 ? 1 : count <= 4 ? 2 : count <= 9 ? 3 : 4;
+        // Pick the column count that gives the biggest 16:9 tiles for this window (Meet/Zoom
+        // style): wide tiles side by side, centred, instead of tall strips.
+        const GAP = 8;
+        let best = { w: 0, h: 0 };
+        for (let cols = 1; cols <= count; cols++) {
+            const rows = Math.ceil(count / cols);
+            const maxW = (gridBox.w - GAP * (cols - 1)) / cols;
+            const maxH = (gridBox.h - GAP * (rows - 1)) / rows;
+            const w = Math.max(0, Math.min(maxW, maxH * (16 / 9)));
+            if (w > best.w) best = { w: Math.floor(w), h: Math.floor(w * (9 / 16)) };
+        }
+        const tileStyle = best.w ? { width: best.w, height: best.h } : undefined;
         return (
-            <div className="vc-body vc-body--grid" style={{ '--cols': cols }}>
-                {allParticipants.map((p) => renderTile(p, 'grid'))}
+            <div className="vc-body vc-body--grid" ref={gridRef}>
+                {allParticipants.map((p) => renderTile(p, 'grid', tileStyle))}
                 {count === 1 && !spectator && (
                     <div className="vc-alone">Waiting for others to join. They join from the call button in this room.</div>
                 )}
@@ -912,6 +971,9 @@ const VideoChat = ({
             )}
 
             {renderBody()}
+            <div className="vc-audio" aria-hidden="true">
+                {Object.entries(remoteUsers).map(([id, u]) => (u.stream ? <RemoteAudio key={id} stream={u.stream} /> : null))}
+            </div>
 
             {isMinimized && (
                 <div className="vc-mini-top" onPointerDown={startDragging}>
@@ -959,9 +1021,35 @@ const Btn = ({ on, danger, warn, onClick, label, children, wide, compact }) => (
 const StreamVideo = ({ stream, muted, mirror, fit }) => {
     const ref = useRef(null);
     useEffect(() => {
-        if (ref.current && ref.current.srcObject !== stream) ref.current.srcObject = stream || null;
+        const el = ref.current;
+        if (!el) return undefined;
+        const attach = () => {
+            if (el.srcObject !== stream) el.srcObject = stream || null;
+            if (stream) el.play?.().catch(() => { /* retried on the next track */ });
+        };
+        attach();
+        // Tracks can arrive after the element mounted (renegotiation): re-attach and play.
+        stream?.addEventListener?.('addtrack', attach);
+        return () => stream?.removeEventListener?.('addtrack', attach);
     }, [stream]);
     return <video ref={ref} autoPlay playsInline muted={muted} className={`vc-video${mirror ? ' is-mirror' : ''}`} style={{ objectFit: fit }} />;
+};
+
+// A person's sound, separate from their video tile so it keeps playing with the camera off.
+const RemoteAudio = ({ stream }) => {
+    const ref = useRef(null);
+    useEffect(() => {
+        const el = ref.current;
+        if (!el) return undefined;
+        const attach = () => {
+            if (el.srcObject !== stream) el.srcObject = stream || null;
+            el.play?.().catch(() => { /* autoplay blocked until the next click; call UI has one */ });
+        };
+        attach();
+        stream?.addEventListener?.('addtrack', attach);
+        return () => stream?.removeEventListener?.('addtrack', attach);
+    }, [stream]);
+    return <audio ref={ref} autoPlay playsInline />;
 };
 
 export default VideoChat;

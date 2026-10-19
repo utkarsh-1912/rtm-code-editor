@@ -3,7 +3,8 @@ import { createPortal } from "react-dom";
 import { Download, Copy, Check, Sparkles, X } from "lucide-react";
 import CodeMirror from "@uiw/react-codemirror";
 import { esLint } from "@codemirror/lang-javascript";
-import { EditorView, Decoration, ViewPlugin, WidgetType } from "@codemirror/view";
+import { EditorView } from "@codemirror/view";
+import { remoteCursorPlugin } from "./remoteCursor";
 import { vim } from "@replit/codemirror-vim";
 import { emacs } from "@replit/codemirror-emacs";
 import { linter, lintGutter } from "@codemirror/lint";
@@ -15,69 +16,6 @@ import ACTIONS from "../Action";
 export const roomFileName = (language) => fileNameFor(language);
 
 // Remote cursor widget
-class CursorWidget extends WidgetType {
-  constructor(name, color) {
-    super();
-    this.name = name;
-    this.color = color;
-  }
-  toDOM() {
-    const wrap = document.createElement("span");
-    wrap.className = "remote-cursor";
-    wrap.style.borderLeft = `2px solid ${this.color}`;
-    wrap.style.position = "relative";
-    wrap.style.height = "1.2em";
-    wrap.style.display = "inline-block";
-    wrap.style.verticalAlign = "middle";
-    wrap.style.marginLeft = "-1px";
-    wrap.style.marginRight = "-1px";
-    wrap.style.pointerEvents = "none";
-
-    const label = document.createElement("div");
-    label.className = "remote-cursor-label";
-    label.textContent = this.name;
-    label.style.position = "absolute";
-    label.style.bottom = "100%";
-    label.style.left = "0";
-    label.style.whiteSpace = "nowrap";
-    label.style.backgroundColor = this.color;
-    label.style.color = "white";
-    label.style.fontSize = "10px";
-    label.style.padding = "1px 4px";
-    label.style.borderRadius = "2px";
-    label.style.pointerEvents = "none";
-    label.style.zIndex = "10";
-    label.style.marginBottom = "2px";
-
-    wrap.appendChild(label);
-    return wrap;
-  }
-}
-
-const cursorPlugin = (remoteCursors) => ViewPlugin.fromClass(class {
-  constructor(view) {
-    this.decorations = this.getDecorations(view);
-  }
-  update(update) {
-    if (update.docChanged || update.selectionSet || update.viewportChanged) {
-      this.decorations = this.getDecorations(update.view);
-    }
-  }
-  getDecorations(view) {
-    const widgets = [];
-    for (const [, data] of Object.entries(remoteCursors)) {
-      if (data.pos !== undefined && data.pos <= view.state.doc.length) {
-        widgets.push(Decoration.widget({
-          widget: new CursorWidget(data.userName, data.color),
-          side: 1
-        }).range(data.pos));
-      }
-    }
-    return Decoration.set(widgets.sort((a, b) => a.from - b.from));
-  }
-}, {
-  decorations: v => v.decorations
-});
 
 function EditorComp({
   socketRef,
@@ -211,7 +149,7 @@ function EditorComp({
   const getLanguageExtension = (lang) => editorLanguage(String(lang || "").toLowerCase());
 
   // Memoize cursor plugin — only rebuild when cursor positions change
-  const memoizedCursorPlugin = useMemo(() => cursorPlugin(remoteCursors), [remoteCursors]);
+  const memoizedCursorPlugin = useMemo(() => remoteCursorPlugin(remoteCursors), [remoteCursors]);
 
   // Memoize ESLint linter so it's not rebuilt on every render
   const esLintLinter = useMemo(() => {

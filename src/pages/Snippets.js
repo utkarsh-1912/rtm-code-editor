@@ -7,6 +7,10 @@ import { useAuth } from '../context/AuthContext';
 import { getBackendUrl } from '../utils/api';
 import { Modal, timeAgo, pad2 } from '../components/ux/primitives';
 import { SNIPPET_LANGS } from '../utils/languages';
+import Pager from '../components/ux/Pager';
+
+const SNIPPET_FETCH = 100; // per request
+const SNIPPET_PAGE = 15; // per list page
 
 const LANGS = SNIPPET_LANGS;
 const langShort = (l) => (LANGS.find(([v]) => v === l)?.[2]) || (l || '?').slice(0, 3);
@@ -88,22 +92,45 @@ const Snippets = () => {
         } catch (err) { /* teams are optional */ }
     }, [user]);
 
+    // Personal snippets come 100 at a time ({ items, total }); team vaults return a list.
+    const [total, setTotal] = useState(0);
+    const [loadingMore, setLoadingMore] = useState(false);
     const fetchSnippets = useCallback(async () => {
         if (!user) return;
         try {
             const backendUrl = getBackendUrl();
             const url = vault === 'personal'
-                ? `${backendUrl}/api/snippets?userId=${user.uid}`
+                ? `${backendUrl}/api/snippets?userId=${encodeURIComponent(user.uid)}&limit=${SNIPPET_FETCH}&offset=0`
                 : `${backendUrl}/api/snippets?orgId=${vault}`;
             const res = await fetch(url);
             const data = await res.json();
-            setSnippets(Array.isArray(data) ? data : []);
+            const items = Array.isArray(data) ? data : Array.isArray(data.items) ? data.items : [];
+            setSnippets(items);
+            setTotal(Array.isArray(data) ? items.length : data.total ?? items.length);
         } catch (err) {
             toast.error('Failed to load snippets');
         } finally {
             setLoading(false);
         }
     }, [user, vault]);
+
+    const loadMoreSnippets = async () => {
+        if (!user || vault !== 'personal') return;
+        setLoadingMore(true);
+        try {
+            const res = await fetch(`${getBackendUrl()}/api/snippets?userId=${encodeURIComponent(user.uid)}&limit=${SNIPPET_FETCH}&offset=${snippets.length}`);
+            const data = await res.json();
+            setSnippets((prev) => {
+                const seen = new Set(prev.map((x) => x.id));
+                return [...prev, ...(data.items || []).filter((x) => !seen.has(x.id))];
+            });
+            setTotal(data.total ?? total);
+        } catch {
+            toast.error('Could not load more snippets');
+        } finally {
+            setLoadingMore(false);
+        }
+    };
 
     useEffect(() => { fetchSnippets(); fetchOrgs(); }, [fetchSnippets, fetchOrgs]);
 
@@ -118,7 +145,12 @@ const Snippets = () => {
         });
     }, [snippets, query, tag]);
 
-    const selected = filtered.find((s) => s.id === selectedId) || filtered[0] || null;
+    const [page, setPage] = useState(1);
+    useEffect(() => { setPage(1); }, [query, tag, vault]);
+    const pageItems = filtered.slice((page - 1) * SNIPPET_PAGE, page * SNIPPET_PAGE);
+    const hasMore = vault === 'personal' && !query && !tag && snippets.length < total;
+
+    const selected = filtered.find((s) => s.id === selectedId) || pageItems[0] || null;
 
     const copy = (s) => {
         navigator.clipboard.writeText(s.code);
@@ -218,7 +250,7 @@ const Snippets = () => {
                                 <Search size={15} />
                                 <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder={`Search ${vaultName.toLowerCase()}`} aria-label="Search snippets" />
                             </label>
-                            <span className="u-label">{filtered.length} / {snippets.length}</span>
+                            <span className="u-label">{filtered.length} / {total || snippets.length}</span>
                         </div>
 
                         {allTags.length > 0 && (
@@ -241,7 +273,7 @@ const Snippets = () => {
                             </div>
                         ) : (
                             <ul className="u-rows" style={{ borderTop: 0 }}>
-                                {filtered.map((s, i) => {
+                                {pageItems.map((s, i) => {
                                     const isOn = !narrow && selected?.id === s.id;
                                     const pick = () => (narrow ? open('view', s) : setSelectedId(s.id));
                                     return (
@@ -250,7 +282,7 @@ const Snippets = () => {
                                             <div className="u-row-main">
                                                 <span className="u-row-title u-ellipsis" style={{ fontSize: 15.5 }}>{s.title}</span>
                                                 <span className="u-row-meta">
-                                                    <span className="u-mono">{pad2(i + 1)}</span>
+                                                    <span className="u-mono">{pad2((page - 1) * SNIPPET_PAGE + i + 1)}</span>
                                                     {(s.tags || []).slice(0, 3).map((t) => <span key={t} className="u-mono">#{t}</span>)}
                                                     <span className="u-mono">{timeAgo(s.updated_at || s.created_at)}</span>
                                                 </span>
@@ -262,6 +294,19 @@ const Snippets = () => {
                                     );
                                 })}
                             </ul>
+                        )}
+                        {!loading && filtered.length > 0 && (
+                            <Pager
+                                page={page}
+                                pageSize={SNIPPET_PAGE}
+                                loaded={filtered.length}
+                                total={query || tag ? filtered.length : total || snippets.length}
+                                onPage={setPage}
+                                hasMore={hasMore}
+                                onLoadMore={loadMoreSnippets}
+                                loadingMore={loadingMore}
+                                label="snippets"
+                            />
                         )}
                     </div>
 

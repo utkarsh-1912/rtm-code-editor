@@ -1,5 +1,5 @@
 import React from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { ArrowUpRight } from "lucide-react";
 import { newRoomId } from "../ux/primitives";
 
@@ -19,7 +19,10 @@ export default function CtaBand({
             </button>
             <div className="l-cta-foot">
                 <p className="u-lede" style={{ maxWidth: 520 }}>{text}</p>
-                <button className="u-btn u-btn--solid u-btn--lg" onClick={go}>{cta} <ArrowUpRight size={16} /></button>
+                <span style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+                    <Link to="/pricing" className="u-btn u-btn--ghost u-btn--lg">See pricing</Link>
+                    <button className="u-btn u-btn--solid u-btn--lg" onClick={go}>{cta} <ArrowUpRight size={16} /></button>
+                </span>
             </div>
         </section>
     );

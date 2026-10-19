@@ -10,27 +10,40 @@ export function useReveal(rootRef) {
     useEffect(() => {
         const root = rootRef.current;
         if (!root) return undefined;
+        // Elements already revealed. React rewrites the whole class attribute when an
+        // element's className changes (e.g. a status banner going from "wait" to "ok"),
+        // which drops "is-in" and hid the element again; we put it back.
+        const revealed = new WeakSet();
+        const show = (el) => { revealed.add(el); el.classList.add("is-in"); };
         if (!("IntersectionObserver" in window)) {
-            root.querySelectorAll(REVEAL).forEach((el) => el.classList.add("is-in"));
+            root.querySelectorAll(REVEAL).forEach(show);
             return undefined;
         }
         const io = new IntersectionObserver((entries) => {
             entries.forEach((e) => {
                 if (e.isIntersecting) {
-                    e.target.classList.add("is-in");
+                    show(e.target);
                     io.unobserve(e.target);
                 }
             });
         }, { rootMargin: "0px 0px -8% 0px", threshold: 0.08 });
         const scan = () => root.querySelectorAll(REVEAL).forEach((el) => {
+            if (revealed.has(el)) return;
             // Already on screen: reveal on the next frame instead of waiting for the observer.
             const r = el.getBoundingClientRect();
-            if (r.top < window.innerHeight && r.bottom > 0) requestAnimationFrame(() => el.classList.add("is-in"));
+            if (r.top < window.innerHeight && r.bottom > 0) requestAnimationFrame(() => show(el));
             else io.observe(el);
         });
         scan();
-        const mo = new MutationObserver(scan);
-        mo.observe(root, { childList: true, subtree: true });
+        const mo = new MutationObserver((mutations) => {
+            let added = false;
+            for (const m of mutations) {
+                if (m.type === "childList") added = true;
+                else if (revealed.has(m.target) && !m.target.classList.contains("is-in")) m.target.classList.add("is-in");
+            }
+            if (added) scan();
+        });
+        mo.observe(root, { childList: true, subtree: true, attributes: true, attributeFilter: ["class"] });
         return () => { io.disconnect(); mo.disconnect(); };
     }, [rootRef]);
 }

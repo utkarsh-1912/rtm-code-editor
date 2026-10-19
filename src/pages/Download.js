@@ -136,7 +136,7 @@ export default function Download() {
                         </div>
                     )}
                     <p className="u-label" style={{ marginTop: 14 }}>
-                        Builds are not code-signed yet, so Windows SmartScreen and macOS Gatekeeper ask before the first launch. <a href={RELEASES} target="_blank" rel="noreferrer" className="u-ul">All releases ↗</a>
+                        The desktop app is free on every plan. Builds are not code-signed yet, so Windows SmartScreen and macOS Gatekeeper ask before the first launch. <a href={RELEASES} target="_blank" rel="noreferrer" className="u-ul">All releases ↗</a>
                     </p>
                 </div>
             </div>

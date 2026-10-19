@@ -7,6 +7,7 @@ import SiteLayout from "../components/Site/SiteLayout";
 import CtaBand from "../components/Site/CtaBand";
 import JoinForm from "../components/Landing/JoinForm";
 import { extractRoomId, newRoomId, pad2 } from "../components/ux/primitives";
+import { catalogue, yearlyPrice } from "../utils/billing";
 
 const CODE = [
     ["c", "# pairing on the cart total"],
@@ -65,9 +66,13 @@ function TypingCode() {
                 return (
                     <div key={r} className="l-line">
                         <i>{r + 1}</i>
-                        <span>{parts}{active && <b className="l-caret" />}</span>
-                        {r === 2 && show > 20 && <em className="l-tag" style={{ "--c": "#8B5CF6" }}>Priya</em>}
-                        {r === 4 && show > 8 && <em className="l-tag" style={{ "--c": "#10B981" }}>Sam</em>}
+                        <span>
+                            {parts}
+                            {active && <b className="l-caret" />}
+                            {/* Teammates' cursors: caret + name tag floating above it, never over the code. */}
+                            {r === 2 && show > 20 && <span className="rc-caret l-rc" style={{ "--rc": "#8B5CF6" }}><span className="rc-tag">Priya</span></span>}
+                            {r === 4 && show > 8 && <span className="rc-caret l-rc" style={{ "--rc": "#10B981" }}><span className="rc-tag">Sam</span></span>}
+                        </span>
                     </div>
                 );
             })}
@@ -189,8 +194,8 @@ function HomePage() {
                         <h3 className="u-display u-xl">Projects</h3>
                         <p>A real multi-file workspace that sticks around between sessions.</p>
                         <ol className="l-list">
-                            <li><i>01</i>File tree, tabs and live preview</li>
-                            <li><i>02</i>Snapshots, history and diffs</li>
+                            <li><i>01</i>File tree, tabs, live preview and snapshots</li>
+                            <li><i>02</i>Ten projects free, unlimited on Team</li>
                             <li><i>03</i>Invite teammates by email, with push alerts</li>
                         </ol>
                         <Link to="/signup" className="u-btn l-btn-on-mark" style={{ alignSelf: "flex-start" }}>Start a project <ArrowUpRight size={15} /></Link>
@@ -240,6 +245,40 @@ function HomePage() {
                         </li>
                     ))}
                 </ul>
+            </section>
+
+            <section className="u-section">
+                <div className="u-section-head">
+                    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                        <span className="u-label" data-rise>Pricing</span>
+                        <p className="u-lede" data-rise><b>Free is real.</b> Guests, rooms, voice, video, 17 languages and {catalogue.plans.free.limits.projects} projects cost nothing. Upgrade when your team needs more.</p>
+                    </div>
+                    <Link to="/pricing" className="u-btn u-btn--ghost">Compare plans <ArrowUpRight size={15} /></Link>
+                </div>
+                <div className="l-price">
+                    <article className="u-card l-price-card" data-rise>
+                        <span className="u-label">Free</span>
+                        <div className="l-price-amt"><span className="u-display u-xl">$0</span><small>forever</small></div>
+                        <ul className="l-price-list">
+                            <li>Unlimited rooms and guests</li>
+                            <li>{catalogue.plans.free.limits.projects} projects</li>
+                            <li>{catalogue.plans.free.limits.aiPerDay} AI prompts a day</li>
+                            <li>Desktop apps for every OS</li>
+                        </ul>
+                        <Link to="/signup" className="u-btn u-btn--ghost" style={{ marginTop: "auto" }}>Start free <ArrowUpRight size={15} /></Link>
+                    </article>
+                    <article className="u-pane l-price-card" data-rise style={{ "--d": "80ms" }}>
+                        <span className="u-label">Team · {catalogue.trialDays}-day free trial</span>
+                        <div className="l-price-amt"><span className="u-display u-xl">${Math.round(yearlyPrice(catalogue.plans.team.monthly) / 12)}</span><small>/mo per member, billed yearly</small></div>
+                        <ul className="l-price-list">
+                            <li>Unlimited projects, snapshots and AI</li>
+                            <li>Organizations and email invites</li>
+                            <li>Push and email notifications</li>
+                            <li>Priority support</li>
+                        </ul>
+                        <Link to="/pricing" className="u-btn u-btn--solid" style={{ marginTop: "auto" }}>Try Team free <ArrowUpRight size={15} /></Link>
+                    </article>
+                </div>
             </section>
 
             <CtaBand />

@@ -9,6 +9,7 @@ import { getBackendUrl, publicOrigin } from '../utils/api';
 import useWorkspace, { itemDate, mergeActivity } from '../components/ux/useWorkspace';
 import { Modal, RollingNumber, newRoomId, timeAgo, greeting, extractRoomId } from '../components/ux/primitives';
 import { LANGS } from '../utils/languages';
+import Pager from '../components/ux/Pager';
 import { pickFolder, pickFiles, importProject, describeSkipped } from '../utils/localFiles';
 import { usePlan, isPlanLimit, showUpgradeToast, catalogue } from '../utils/billing';
 import { track } from '../utils/track';
@@ -19,7 +20,16 @@ const TEMPLATES = [
     ...LANGS.map((l) => ({ id: l.id, name: l.label, desc: l.file, short: l.short })),
 ];
 
+// Time spent in rooms with at least one other person: minutes under an hour, then hours.
+const pairingKpi = (seconds) => {
+    const mins = Math.round(seconds / 60);
+    if (mins < 60) return { label: 'Time pairing', value: mins, suffix: 'm' };
+    const hours = seconds / 3600;
+    return { label: 'Time pairing', value: hours >= 10 ? Math.round(hours) : Math.round(hours * 10) / 10, suffix: 'h' };
+};
+
 const DAYS = 14;
+const PAGE_SIZE = 12; // rows per table page
 
 
 // Item count per day for the last DAYS days, oldest first.
@@ -59,12 +69,13 @@ const Dashboard = () => {
     const { user, loading, refreshProfile } = useAuth();
     const navigate = useNavigate();
     const location = useLocation();
-    const { rooms, projects, stats, loading: loadingData, error, reload } = useWorkspace(user);
+    const { rooms, projects, roomsTotal, projectsTotal, stats, loading: loadingData, error, reload, loadingMore, loadMoreRooms, loadMoreProjects } = useWorkspace(user);
     const { plan: planInfo, reload: reloadPlan } = usePlan(user);
 
     const [view, setView] = useState('all'); // all | rooms | projects
     const [lang, setLang] = useState(null);
     const [sort, setSort] = useState('recent');
+    const [page, setPage] = useState(1);
     const [query, setQuery] = useState('');
     const [menuFor, setMenuFor] = useState(null);
     const [renameTarget, setRenameTarget] = useState(null);
@@ -143,6 +154,20 @@ const Dashboard = () => {
         return list;
     }, [view, rooms, projects, lang, query, sort]);
 
+    // Back to page 1 whenever the filter, tab, search or sort changes.
+    useEffect(() => { setPage(1); }, [view, lang, query, sort]);
+    const pageCount = Math.max(1, Math.ceil(items.length / PAGE_SIZE));
+    useEffect(() => { if (page > pageCount) setPage(pageCount); }, [page, pageCount]);
+    const pageItems = items.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+    // More on the server than loaded? (rooms and projects are fetched 100 at a time)
+    const moreRooms = rooms.length < roomsTotal;
+    const moreProjects = projects.length < projectsTotal;
+    const hasMore = view === 'rooms' ? moreRooms : view === 'projects' ? moreProjects : moreRooms || moreProjects;
+    const loadMore = async () => {
+        if (view !== 'projects' && moreRooms) await loadMoreRooms();
+        if (view !== 'rooms' && moreProjects) await loadMoreProjects();
+    };
+
     const bars = useMemo(() => activityByDay([...rooms, ...projects]), [rooms, projects]);
     const maxBar = Math.max(1, ...bars);
 
@@ -169,22 +194,31 @@ const Dashboard = () => {
         }
     };
 
+    // Rename changes the name only; the room/project id (its link) stays the same.
     const handleRename = async () => {
-        if (!newName.trim() || !renameTarget) return;
+        if (!renameTarget) return;
+        const isProject = renameTarget.kind === 'project';
+        if (isProject && !newName.trim()) return;
         setBusy(true);
         try {
-            const res = await fetch(`${getBackendUrl()}/api/rename-room`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ roomId: renameTarget.id, newName }),
-            });
+            const res = isProject
+                ? await fetch(`${getBackendUrl()}/api/projects/${renameTarget.id}`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name: newName }),
+                })
+                : await fetch(`${getBackendUrl()}/api/rename-room`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ roomId: renameTarget.id, newName }),
+                });
             if (!res.ok) throw new Error('rename failed');
-            toast.success('Room renamed');
+            toast.success(isProject ? 'Project renamed' : newName.trim() ? 'Room renamed' : 'Room name cleared');
             setRenameTarget(null);
             setNewName('');
             reload();
         } catch {
-            toast.error('Failed to rename room');
+            toast.error(isProject ? 'Failed to rename project' : 'Failed to rename room');
         } finally {
             setBusy(false);
         }
@@ -290,13 +324,13 @@ const Dashboard = () => {
     const setupLeft = checklist.filter((c) => !c.done).length;
 
     const kpis = [
-        { label: 'Projects', value: projects.length, to: () => setView('projects') },
-        { label: 'Rooms', value: stats.totalRooms || rooms.length, to: () => setView('rooms') },
+        { label: 'Projects', value: projectsTotal || projects.length, to: () => setView('projects') },
+        { label: 'Rooms', value: roomsTotal || stats.totalRooms || rooms.length, to: () => setView('rooms') },
         { label: 'Snippets', value: snippetCount ?? 0, to: () => navigate('/snippets') },
-        { label: 'Hours pairing', value: stats.hours || 0, suffix: 'h' },
+        pairingKpi(stats.pairingSeconds || 0),
     ];
 
-    const counts = { all: rooms.length + projects.length, rooms: rooms.length, projects: projects.length };
+    const counts = { all: (roomsTotal || rooms.length) + (projectsTotal || projects.length), rooms: roomsTotal || rooms.length, projects: projectsTotal || projects.length };
 
     return (
         <AppLayout>
@@ -420,7 +454,7 @@ const Dashboard = () => {
                     </div>
                 ) : (
                     <ul className="db-rows">
-                        {items.map((item) => {
+                        {pageItems.map((item) => {
                             const isProject = item.kind === 'project';
                             const key = `${item.kind}-${item.id}`;
                             const when = itemDate(item);
@@ -439,7 +473,7 @@ const Dashboard = () => {
                                         )}
                                         <RowMenu open={menuFor === key} onToggle={(v) => setMenuFor(v ? key : null)}>
                                             <button onClick={() => { setMenuFor(null); openItem(item); }}><ArrowUpRight size={16} />Open</button>
-                                            {!isProject && <button onClick={() => { setMenuFor(null); setRenameTarget(item); setNewName(item.name || ''); }}><Pencil size={16} />Rename</button>}
+                                            <button onClick={() => { setMenuFor(null); setRenameTarget(item); setNewName(isProject || item.customName ? (item.name || '') : ''); }}><Pencil size={16} />Rename</button>
                                             <button className="danger" onClick={() => { setMenuFor(null); setDeleteTarget(item); }}><Trash2 size={16} />{isProject ? 'Delete project' : 'Remove from list'}</button>
                                         </RowMenu>
                                     </span>
@@ -449,7 +483,23 @@ const Dashboard = () => {
                     </ul>
                 )}
                 {!loadingData && items.length > 0 && (
-                    <div className="db-foot u-label">Showing {items.length} of {counts[view]}{lang ? ` · ${lang}` : ''}</div>
+                    <div className="db-foot">
+                        {items.length > PAGE_SIZE || hasMore ? (
+                            <Pager
+                                page={page}
+                                pageSize={PAGE_SIZE}
+                                loaded={items.length}
+                                total={query || lang ? items.length : counts[view]}
+                                onPage={setPage}
+                                hasMore={!query && !lang && hasMore}
+                                onLoadMore={loadMore}
+                                loadingMore={loadingMore}
+                                label={view === 'rooms' ? 'rooms' : view === 'projects' ? 'projects' : 'items'}
+                            />
+                        ) : (
+                            <span className="u-label">Showing {items.length} of {query || lang ? items.length : counts[view]}{lang ? ` · ${lang}` : ''}</span>
+                        )}
+                    </div>
                 )}
             </section>
 
@@ -492,17 +542,18 @@ const Dashboard = () => {
             <Modal
                 open={!!renameTarget}
                 onClose={() => setRenameTarget(null)}
-                label={`room/${renameTarget?.id || ''}`}
-                title="Rename room"
+                label={renameTarget?.kind === 'project' ? `project/${renameTarget?.id || ''}` : `room/${renameTarget?.id || ''}`}
+                title={renameTarget?.kind === 'project' ? 'Rename project' : 'Rename room'}
+                description="Only the name changes. The link and ID stay the same, so everyone can still join."
                 onSubmit={handleRename}
                 footer={<>
                     <button type="button" className="u-btn u-btn--ghost" onClick={() => setRenameTarget(null)}>Cancel</button>
-                    <button type="submit" className="u-btn u-btn--solid" disabled={busy || !newName.trim()}>Rename</button>
+                    <button type="submit" className="u-btn u-btn--solid" disabled={busy || (renameTarget?.kind === 'project' && !newName.trim())}>Save name</button>
                 </>}
             >
                 <div className="u-field">
-                    <label htmlFor="rn-name">Room name</label>
-                    <input id="rn-name" className="u-input" autoFocus value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Room name" />
+                    <label htmlFor="rn-name">{renameTarget?.kind === 'project' ? 'Project name' : 'Room name'}</label>
+                    <input id="rn-name" className="u-input" autoFocus value={newName} maxLength={renameTarget?.kind === 'project' ? 120 : 80} onChange={(e) => setNewName(e.target.value)} placeholder={renameTarget?.kind === 'project' ? 'Project name' : `e.g. Interview prep (empty = ${renameTarget?.id || 'room id'})`} />
                 </div>
             </Modal>
 

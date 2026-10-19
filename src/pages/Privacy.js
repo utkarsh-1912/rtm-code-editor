@@ -25,7 +25,7 @@ export default function Privacy() {
 
             <h2>3. Third-Party Services</h2>
             <p>
-                We use <strong>Judge0</strong> for code execution, <strong>Neon (PostgreSQL)</strong> for data persistence and <strong>Firebase Auth</strong> for sign-in. Notifications are delivered with <strong>OneSignal</strong> (push and email fallback) and transactional email with <strong>Brevo</strong>. For push, your account ID is registered with OneSignal as your identifier, and your email address is shared with it when email delivery is needed. Please refer to their policies for further details.
+                We use <strong>Judge0</strong> for code execution, <strong>Neon (PostgreSQL)</strong> for data persistence and <strong>Firebase Auth</strong> for sign-in. Payments are processed by <strong>Stripe</strong>; we receive your plan status and a customer ID, never your card number. Notifications are delivered with <strong>OneSignal</strong> (push and email fallback) and transactional email with <strong>Brevo</strong>. For push, your account ID is registered with OneSignal as your identifier, and your email address is shared with it when email delivery is needed. Please refer to their policies for further details.
             </p>
 
             <h2>4. Desktop App and Local Processing</h2>
@@ -43,7 +43,12 @@ export default function Privacy() {
                 Push notifications are optional and need your permission. You can switch them off at any time in Settings, and every marketing email includes an unsubscribe link.
             </p>
 
-            <h2>7. Security</h2>
+            <h2>7. Plans and Billing Data</h2>
+            <p>
+                For paid plans we store your plan, billing period, trial dates and Stripe customer and subscription IDs. Invoices and payment methods are held by Stripe and managed in its customer portal.
+            </p>
+
+            <h2>8. Security</h2>
             <p>
                 We provide a dedicated <strong>Security</strong> dashboard where you can see all devices currently logged into your account and remotely terminate any unrecognized sessions.
             </p>

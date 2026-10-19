@@ -7,13 +7,13 @@
       "name": "Free",
       "tagline": "For solo devs and trying things out",
       "monthly": 0,
-      "limits": { "projects": 3, "aiPerDay": 10 },
+      "limits": { "projects": 10, "aiPerDay": 10 },
       "features": [
         "Unlimited rooms, guests join free",
         "Live sync, chat, voice, video and whiteboard",
         "17 languages, SQL with CSV import",
         "Desktop apps for every OS",
-        "3 projects",
+        "10 projects",
         "10 AI copilot prompts a day",
         "Snippets library"
       ]

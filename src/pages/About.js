@@ -16,6 +16,7 @@ const PRINCIPLES = [
     ["Fast to start", "A link is all it takes. Guests join without an account."],
     ["Calm to use", "A quiet interface with one accent, and nothing fighting for attention."],
     ["Yours to keep", "Projects, snippets and history persist across devices."],
+    ["Fair to grow", "Free is real: guests, rooms and ten projects cost nothing. You pay only when your team needs more, with one plan and no seat minimums."],
     ["Close to you", "The desktop app runs code and AI locally when it can, and only falls back to the server when it can't."],
 ];
 

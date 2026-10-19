@@ -6,7 +6,7 @@ Working document. Numbers marked *(assumption)* are starting guesses to be repla
 
 **Product:** real-time collaborative IDE. Live cursors, voice and video, whiteboard, chat, 17 runnable languages, SQL over imported CSV/JSON, projects and snapshots, an AI copilot (hosted or local), desktop apps for Windows, macOS and Linux, push and email notifications.
 
-**Pricing (implemented):** Free (3 projects, 10 AI prompts a day, everything else) / Team $12 per member per month or $10 on yearly billing, 14-day trial / Enterprise on request. Guests never need an account or a plan.
+**Pricing (implemented):** Free (10 projects, 10 AI prompts a day, everything else) / Team $12 per member per month or $10 on yearly billing, 14-day trial / Enterprise on request. Guests never need an account or a plan.
 
 **Honest strengths:** zero-install joining by link, a generous free tier, a desktop app that runs code and AI on the user's machine, a calm and fast interface.
 
@@ -67,7 +67,7 @@ Instrument first, spend second. These events are now recorded in `analytics_logs
 ## 5. Pricing and packaging decisions
 
 - **Free stays generous.** The product spreads when people invite guests; guests must never hit a wall. Limits sit on *persistence and AI*, not on collaboration.
-- **Limits chosen:** 3 projects and 10 AI prompts a day on Free. Both are visible in the dashboard and in Settings so a limit is never a surprise. Local AI in the desktop app is uncapped on purpose: it costs us nothing and it is a reason to install.
+- **Limits chosen:** 10 projects and 10 AI prompts a day on Free. Both are visible in the dashboard and in Settings so a limit is never a surprise. Local AI in the desktop app is uncapped on purpose: it costs us nothing and it is a reason to install.
 - **Trial:** 14 days, card collected by Stripe up front, no charge if cancelled. A card-up-front trial converts better than a card-free one; revisit if sign-up friction looks high.
 - **Yearly plan:** 17% off ($120 instead of $144). Default the toggle to Yearly. Target 40% of paying seats on yearly: it cuts churn and funds growth.
 - **Next experiments:** annual-only launch offer (first 100 teams, 30% off the first year), student pricing with `.edu` verification, a per-room "Pro room" add-on for interviewers who do not want a subscription.
@@ -162,6 +162,7 @@ Instrument first, spend second. These events are now recorded in `analytics_logs
 
 ## 13. What the code already does for this plan
 
+- Pricing shows up where people decide: a landing-page pricing section, a "Team from $10/mo" link in the top strip, a "See pricing" button on every closing call to action, plan details in the sign-up copy, billing notes on Support, Security, Privacy and Terms.
 - Pricing page with monthly/yearly toggle, comparison table, FAQ and trial messaging; Stripe Checkout, customer portal and signed webhooks; plan state stored per user.
 - Free limits enforced on the server (projects, AI prompts), with upgrade prompts in the product; usage meters in the dashboard and Settings.
 - SEO basics: meta and Open Graph tags, structured data, `robots.txt`, `sitemap.xml`, per-page titles.

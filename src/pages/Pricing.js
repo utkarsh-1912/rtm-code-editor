@@ -15,7 +15,7 @@ const COMPARE = [
     ["Live sync, chat, voice, video, whiteboard", true, true, true],
     ["17 languages and SQL with CSV import", true, true, true],
     ["Desktop apps (Windows, macOS, Linux)", true, true, true],
-    ["Projects", "3", "Unlimited", "Unlimited"],
+    ["Projects", "10", "Unlimited", "Unlimited"],
     ["Snapshots and version diffs", "Rooms only", true, true],
     ["AI copilot", `${plans.free.limits.aiPerDay} a day`, "Unlimited", "Unlimited"],
     ["Organizations and email invites", false, true, true],
@@ -26,7 +26,7 @@ const COMPARE = [
 ];
 
 const FAQ = [
-    ["Is there a free plan?", "Yes, and it is not a trial. Free covers real-time rooms, voice, video, the whiteboard, 17 languages, three projects and a daily allowance of AI prompts."],
+    ["Is there a free plan?", "Yes, and it is not a trial. Free covers real-time rooms, voice, video, the whiteboard, 17 languages, ten projects and a daily allowance of AI prompts."],
     ["How does the Team trial work?", `You get ${trialDays} days of Team to try everything. We ask for a card up front through Stripe, remind you before it ends, and you can cancel any time before then without being charged.`],
     ["Do guests need an account or a plan?", "No. Anyone with a room link can join with just a display name, whatever plan the host is on."],
     ["Is the desktop app free?", "Yes. It is the same app on Windows, macOS and Linux, and it runs code on your own Judge0 and AI on a local model when they are available. Local AI is not counted against any limit."],

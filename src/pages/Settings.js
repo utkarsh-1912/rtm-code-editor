@@ -50,6 +50,11 @@ const Settings = () => {
     };
     const [params] = useSearchParams();
     const [active, setActive] = useState(() => (SECTIONS.some((x) => x.id === params.get('section')) ? params.get('section') : 'profile'));
+    // Follow ?section= when it changes while this page is open (e.g. from the account menu).
+    const sectionParam = params.get('section');
+    useEffect(() => {
+        if (sectionParam && SECTIONS.some((x) => x.id === sectionParam)) setActive(sectionParam);
+    }, [sectionParam]);
     const { plan, error: planError, reload: reloadPlan } = usePlan(user);
     const [busyBilling, setBusyBilling] = useState(false);
     const manageBilling = async () => {

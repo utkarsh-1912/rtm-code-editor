@@ -7,6 +7,7 @@ import { getBackendUrl } from "../utils/api";
 const NOTES = [
     ["Your note", "A few lines are plenty. Steps to reproduce help with bugs."],
     ["A first reply", "By email, from a person, not a ticket bot."],
+    ["Billing questions", "Plans and invoices live in Settings. For refunds, write within 14 days of a charge."],
     ["Security reports", "Mark them clearly and we will prioritise them."],
 ];
 

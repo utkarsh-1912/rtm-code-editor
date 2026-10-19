@@ -86,7 +86,7 @@ export default function AuthPage({ mode }) {
                 <div className="au-card u-enter">
                     <span className="u-label">{isSignup ? "01 — Create account" : "01 — Sign in"}</span>
                     <h2>{isSignup ? "Create your account" : "Sign in to your workspace"}</h2>
-                    <p className="u-muted">{isSignup ? "Free to start. No credit card." : "Your projects, snippets and teams are waiting."}</p>
+                    <p className="u-muted">{isSignup ? "Free to start: no credit card, ten projects and a daily AI allowance. Try Team free for 14 days whenever you like." : "Your projects, snippets and teams are waiting."}</p>
 
                     <div className="au-providers">
                         <button className="u-btn u-btn--ghost u-btn--lg u-btn--block" onClick={() => handleLogin("google")} disabled={loading}><Mail size={17} /> Continue with Google</button>

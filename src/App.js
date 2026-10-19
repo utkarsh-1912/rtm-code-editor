@@ -47,6 +47,12 @@ function OnWebsite() {
 }
 
 // Desktop app: native menu items (Go > Workspace, File > Open Folder…) navigate in place.
+// A crash inside one page shows the error there; going to another page clears it.
+function PageBoundary({ children }) {
+  const { pathname } = useLocation();
+  return <ErrorBoundary key={pathname} compact>{children}</ErrorBoundary>;
+}
+
 function DesktopBridge() {
   const navigate = useNavigate();
   useEffect(() => desktop()?.onNavigate?.((to) => {
@@ -86,6 +92,7 @@ function App() {
         </div>
         <BrowserRouter>
           {IS_DESKTOP && <DesktopBridge />}
+          <PageBoundary>
           <Routes>
             <Route path="/" element={IS_DESKTOP ? <DesktopStart /> : <HomePage />} />
             <Route path="/editor/:roomId" element={<Editor />} />
@@ -108,6 +115,7 @@ function App() {
             <Route path="/unsubscribe" element={<Unsubscribe />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
+          </PageBoundary>
         </BrowserRouter>
       </AuthProvider>
       </BackendProvider>

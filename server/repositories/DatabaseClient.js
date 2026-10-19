@@ -180,6 +180,7 @@ async function initializeSchema() {
         await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS last_room_id VARCHAR(255);`;
         await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS is_unsubscribed BOOLEAN DEFAULT FALSE;`;
         await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS photo_url TEXT;`;
+        await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS pairing_seconds INTEGER DEFAULT 0;`;
         // Billing: plan state is written only by the Stripe webhook.
         await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS plan VARCHAR(20) DEFAULT 'free';`;
         await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS plan_status VARCHAR(30);`;
