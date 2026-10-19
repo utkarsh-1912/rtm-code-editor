@@ -10,6 +10,7 @@ export const PANELS = {
     code: { label: "Code" },
     io: { label: "Input / Output" },
     chat: { label: "Chat" },
+    call: { label: "Call" },
 };
 
 export const PRESETS = [
@@ -17,6 +18,8 @@ export const PRESETS = [
     { id: "classic", label: "Chat left", note: "Pair programming", layout: { left: ["chat"], right: ["code", "io"] } },
     { id: "study", label: "Problem and chat", note: "Interview", layout: { left: ["problem", "chat"], right: ["code", "io"] } },
     { id: "code-first", label: "Code left", note: "Wide editor", layout: { left: ["code", "io"], right: ["problem"] } },
+    { id: "interview-call", label: "Problem and call", note: "Live interview", layout: { left: ["problem", "call"], right: ["code", "io"] } },
+    { id: "pair-call", label: "Call and chat", note: "Remote pairing", layout: { left: ["call", "chat"], right: ["code", "io"] } },
     { id: "focus", label: "Focus", note: "Just the code", layout: { left: [], right: ["code", "io"] } },
 ];
 
@@ -55,7 +58,7 @@ export function useRoomLayout() {
             const col = next.left.includes("code") ? "left" : "right";
             next[col].splice(next[col].indexOf("code") + 1, 0, "io");
         } else {
-            // Problem and chat open beside the code, in the other column.
+            // Problem, chat and call open beside the code, in the other column.
             const col = next.left.includes("code") ? "right" : "left";
             next[col].unshift(id);
         }
@@ -81,31 +84,41 @@ export function useRoomLayout() {
         if (p) setLayout(clone(p.layout));
     }, []);
 
+    // The card being dragged lives here (not in RoomLayout) so a panel drawn outside the layout,
+    // like the docked call window, can start a drag of its own card.
+    const [dragging, setDragging] = useState(null);
+
     const presetId = PRESETS.find((p) => JSON.stringify(p.layout) === JSON.stringify(layout))?.id || null;
 
-    return { layout, has, toggle, move, applyPreset, presetId, reset: () => setLayout(clone(DEFAULT)) };
+    return { layout, has, toggle, move, applyPreset, presetId, dragging, setDragging, reset: () => setLayout(clone(DEFAULT)) };
 }
 
-// Card frame: a slim tab (handle + title + hide) above the panel, unless the panel puts the
-// handle in its own toolbar (the code editor does, to avoid a second row).
-function Card({ id, render, dragging, onDragStart, onDragEnd, onDropAt, onHide, inlineHandle }) {
-    const [zone, setZone] = useState(null); // "before" | "after"
-    const handle = (
+// The grip that moves a card. Cards draw it in their tab; the code editor and the docked call
+// draw it in their own toolbar.
+export function CardHandle({ id, state, onDragStart, onDragEnd }) {
+    return (
         <span
             className="rl-handle"
             draggable
             onDragStart={(e) => {
                 e.dataTransfer.effectAllowed = "move";
                 e.dataTransfer.setData("text/plain", id);
-                onDragStart(id);
+                (onDragStart || state.setDragging)(id);
             }}
-            onDragEnd={onDragEnd}
+            onDragEnd={onDragEnd || (() => state.setDragging(null))}
             title={`Drag to move ${PANELS[id].label}`}
             aria-label={`Move ${PANELS[id].label}`}
         >
             <GripVertical size={14} />
         </span>
     );
+}
+
+// Card frame: a slim tab (handle + title + hide) above the panel, unless the panel puts the
+// handle in its own toolbar (the code editor does, to avoid a second row).
+function Card({ id, render, dragging, onDragStart, onDragEnd, onDropAt, onHide, inlineHandle }) {
+    const [zone, setZone] = useState(null); // "before" | "after"
+    const handle = <CardHandle id={id} onDragStart={onDragStart} onDragEnd={onDragEnd} />;
     return (
         <div className={`rl-card${dragging === id ? " is-dragging" : ""}`}>
             {!inlineHandle && (
@@ -134,9 +147,8 @@ function Card({ id, render, dragging, onDragStart, onDragEnd, onDropAt, onHide, 
     );
 }
 
-export default function RoomLayout({ state, renderPanel }) {
-    const { layout, move, toggle } = state;
-    const [dragging, setDragging] = useState(null);
+export default function RoomLayout({ state, renderPanel, inlineHandles = [] }) {
+    const { layout, move, toggle, dragging, setDragging } = state;
     const endDrag = () => setDragging(null);
 
     const column = (col) => {
@@ -162,7 +174,7 @@ export default function RoomLayout({ state, renderPanel }) {
                             <Card
                                 id={id}
                                 render={(handle) => renderPanel(id, handle)}
-                                inlineHandle={id === "code"}
+                                inlineHandle={id === "code" || inlineHandles.includes(id)}
                                 dragging={dragging}
                                 onDragStart={setDragging}
                                 onDragEnd={endDrag}
@@ -229,7 +241,7 @@ export function LayoutMenu({ state, onClose }) {
                 ))}
             </div>
             <div className="rl-toggles">
-                {["problem", "io", "chat"].map((id) => (
+                {["problem", "io", "chat", "call"].map((id) => (
                     <button key={id} onClick={() => state.toggle(id)} aria-pressed={state.has(id)}>
                         <span className={`rl-check${state.has(id) ? " on" : ""}`}>{state.has(id) && <Check size={11} />}</span>
                         {PANELS[id].label}

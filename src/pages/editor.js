@@ -47,7 +47,7 @@ import DiffViewerModal from "../components/DiffViewerModal";
 import AnalyticsDashboardModal from "../components/AnalyticsDashboardModal";
 import FocusModeModal from "../components/FocusModeModal";
 import { History, Activity, Video as VideoIcon, LayoutTemplate, FileText } from "lucide-react";
-import RoomLayout, { useRoomLayout, LayoutMenu } from "../components/RoomLayout";
+import RoomLayout, { useRoomLayout, LayoutMenu, CardHandle } from "../components/RoomLayout";
 import ProblemPane from "../components/ProblemPane";
 import { rememberRoom } from "../utils/recentRooms";
 import AiIcon from "../components/AiIcon";
@@ -136,6 +136,25 @@ function Editor() {
   const [isMeetingActive, setIsMeetingActive] = useState(false);
   const [isMeetingMinimized, setIsMeetingMinimized] = useState(false);
   const [isMeetingStarting, setIsMeetingStarting] = useState(false);
+  // Call card in the layout: the card holds an empty slot and the (single) call window sits
+  // exactly over it, so moving between docked and floating never restarts the call.
+  const [callSlot, setCallSlot] = useState(null);
+  const [callRect, setCallRect] = useState(null);
+  useEffect(() => {
+    if (!callSlot) { setCallRect(null); return undefined; }
+    const measure = () => {
+      const r = callSlot.getBoundingClientRect();
+      setCallRect((p) => (p && p.left === r.left && p.top === r.top && p.width === r.width && p.height === r.height
+        ? p : { left: r.left, top: r.top, width: r.width, height: r.height }));
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(callSlot);
+    const area = callSlot.closest(".rl");
+    if (area) ro.observe(area);
+    window.addEventListener("resize", measure);
+    return () => { ro.disconnect(); window.removeEventListener("resize", measure); };
+  }, [callSlot]);
   const [mediaStates, setMediaStates] = useState({});
 
   useEffect(() => {
@@ -568,6 +587,17 @@ function Editor() {
                           />
       );
     }
+    if (id === "call") {
+      if (isMeetingActive) return <div ref={setCallSlot} className="rl-call-slot" />;
+      return (
+        <div className="rl-call-empty">
+          <span className="rl-call-icon"><VideoIcon size={20} /></span>
+          <strong>No call running</strong>
+          <span>Start a call and it plays here, next to your code.</span>
+          <button onClick={() => setIsMeetingActive(true)}><VideoIcon size={14} /> Start call</button>
+        </div>
+      );
+    }
     if (id === "chat") {
       return (
         <ChatWindow
@@ -699,7 +729,7 @@ function Editor() {
               </div>
             ) : (
               <div style={{ height: "100%", width: "100%", position: "relative" }}>
-                <RoomLayout state={roomLayout} renderPanel={renderRoomPanel} />
+                <RoomLayout state={roomLayout} renderPanel={renderRoomPanel} inlineHandles={isMeetingActive ? ["call"] : []} />
               </div>
             )}
           </>
@@ -739,12 +769,15 @@ function Editor() {
       )}
 
       {isMeetingActive && (
-        <div style={isMobile ? { position: "fixed", inset: 0, zIndex: 9998, backgroundColor: "#000" } : undefined}>
+        <div style={isMobile && !isMeetingMinimized ? { position: "fixed", inset: 0, zIndex: 9998, backgroundColor: "#000" } : undefined}>
           <VideoChat
             socketRef={socketRef}
             projectId={roomId}
             user={user || { name: userName || "Guest" }}
-            isMinimized={isMobile ? false : isMeetingMinimized}
+            isMinimized={isMeetingMinimized}
+            dock={!isMobile && roomLayout.has("call") ? callRect : null}
+            onDockToggle={() => roomLayout.toggle("call")}
+            dockHandle={<CardHandle id="call" state={roomLayout} />}
             onMinimizeToggle={(val) => setIsMeetingMinimized(val)}
             externalInCall={isMeetingStarting}
             onCallStateChange={(active) => {

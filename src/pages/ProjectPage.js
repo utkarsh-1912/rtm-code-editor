@@ -1069,7 +1069,6 @@ const ProjectPage = () => {
                                     projectId={projectId}
                                     user={user || { name: guestName || 'Guest', isGuest: true }}
                                     isMinimized={false}
-                                    onMinimizeToggle={() => {}}
                                     externalInCall={isMeetingStarting}
                                     onCallStateChange={setIsMeetingStarting}
                                     clients={clients}

@@ -9,8 +9,18 @@ function setupWhiteboardSocket(io, socket, safeSocket, context) {
         if (!roomWhiteboardState[roomId]) roomWhiteboardState[roomId] = [];
         if (action === 'ADD') roomWhiteboardState[roomId].push(payload);
         else if (action === 'CLEAR') roomWhiteboardState[roomId] = [];
-        else if (action === 'UNDO' || action === 'REDO') if (payload?.elements) roomWhiteboardState[roomId] = payload.elements;
-        socket.in(roomId).emit(ACTIONS.WHITEBOARD_DRAW, data);
+        else if (action === 'UNDO' || action === 'REDO') { if (payload?.elements) roomWhiteboardState[roomId] = payload.elements; }
+        else if (action === 'UPDATE') {
+            // Diagram edits (move, resize, text, style): replace elements by id.
+            const changed = new Map((Array.isArray(payload?.elements) ? payload.elements : []).filter((e) => e?.id).map((e) => [e.id, e]));
+            roomWhiteboardState[roomId] = roomWhiteboardState[roomId].map((e) => changed.get(e?.id) || e);
+        } else if (action === 'DELETE') {
+            const gone = new Set(Array.isArray(payload?.ids) ? payload.ids : []);
+            roomWhiteboardState[roomId] = roomWhiteboardState[roomId].filter((e) => !gone.has(e?.id));
+        }
+        // Drags send many transient updates; they are only for live viewers, so volatile is fine.
+        if (action === 'UPDATE' && payload?.transient) socket.volatile.in(roomId).emit(ACTIONS.WHITEBOARD_DRAW, data);
+        else socket.in(roomId).emit(ACTIONS.WHITEBOARD_DRAW, data);
     }));
 
     // Live cursors on the board (board coordinates). Volatile: a dropped frame doesn't matter.

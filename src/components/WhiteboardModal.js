@@ -1,8 +1,12 @@
-import React, { useRef, useEffect, useState, useLayoutEffect, useCallback } from "react";
+import React, { useRef, useEffect, useState, useLayoutEffect, useCallback, useMemo } from "react";
 import {
     X, Eraser, Pencil, Trash2, Download, Square, Circle, Minus,
-    Hand, Undo2, Redo2, ZoomIn, ZoomOut, Type
+    Hand, Undo2, Redo2, ZoomIn, ZoomOut, Type, MousePointer2, Shapes, Spline, Copy
 } from "lucide-react";
+import {
+    SHAPES, TEMPLATES, SHAPE_PREVIEW, makeNode, snap, nodeAt, connectorAt, onResizeHandle, labelPoint,
+    drawNode, drawConnector, drawNodeOutline,
+} from "./whiteboard/diagram";
 import toast from "react-hot-toast";
 import ACTIONS from "../Action";
 import { resolveTheme } from "../utils/theme";
@@ -11,7 +15,10 @@ const generateId = () => Math.random().toString(36).slice(2, 11);
 
 // Shortcut keys match common whiteboard apps.
 const TOOLS = [
+    { id: "select", key: "v", label: "Select & move", Icon: MousePointer2 },
     { id: "hand", key: "h", label: "Pan", Icon: Hand },
+    { id: "shape", key: "s", label: "Shapes & system design", Icon: Shapes },
+    { id: "connector", key: "a", label: "Connector (drag from shape to shape)", Icon: Spline },
     { id: "pencil", key: "p", label: "Pen", Icon: Pencil },
     { id: "eraser", key: "e", label: "Eraser", Icon: Eraser },
     { id: "text", key: "t", label: "Text", Icon: Type },
@@ -22,6 +29,9 @@ const TOOLS = [
 // "ink" is drawn in each viewer's own text colour, so it reads on dark and light boards.
 const PALETTE = ["ink", "#F05252", "#F5B544", "#4ADE80", "#38BDF8", "#7AA2FF", "#A78BFA", "#F472B6"];
 const inkColor = () => (resolveTheme() === "light" ? "#1B1A17" : "#F2F1EC");
+const boardBg = () => (resolveTheme() === "light" ? "#FAFAF7" : "#111110");
+const DIAGRAM_TOOLS = new Set(["select", "shape", "connector"]);
+const byIdOf = (els) => Object.fromEntries(els.filter((e) => e.type === "node").map((e) => [e.id, e]));
 
 const WhiteboardModal = ({ isOpen, onClose, socketRef, roomId }) => {
     const canvasRef = useRef(null);
@@ -50,6 +60,23 @@ const WhiteboardModal = ({ isOpen, onClose, socketRef, roomId }) => {
     // Text tool state
     const [textInput, setTextInput] = useState({ active: false, x: 0, y: 0, value: "" });
     const textInputRef = useRef(null);
+
+    // --- Diagram state (flowcharts / system design) ---
+    const [selectedId, setSelectedId] = useState(null);
+    const [editing, setEditing] = useState(null); // { id, value } text of a node or connector label
+    const [pick, setPick] = useState({ shape: "process", template: null }); // what the shape tool places
+    const [connectStyle, setConnectStyle] = useState({ route: "straight", dashed: false, arrows: "end" });
+    const [preview, setPreview] = useState(null); // connector being dragged: { from, pointer, target }
+    const [palOpen, setPalOpen] = useState(false); // colour & size popover on the dock
+    const [ctxPal, setCtxPal] = useState(false); // colour row in the selection toolbar
+    const tinyStrokes = useRef([]); // { id, at } dots left by clicks with the pen (removed on double-click edit)
+    const lastTap = useRef({ t: 0, x: 0, y: 0 }); // touch double-tap detection
+    const dragRef = useRef(null); // { mode: move | resize | connect, ... }
+    const lastUpdateSent = useRef(0);
+    const elementsRef = useRef(elements);
+    elementsRef.current = elements;
+    const nodesById = useMemo(() => byIdOf(elements), [elements]);
+    const selectedEl = elements.find((e) => e.id === selectedId) || null;
 
     // "ink" strokes follow the theme, so redraw when it changes.
     const [themeTick, setThemeTick] = useState(0);
@@ -111,6 +138,35 @@ const WhiteboardModal = ({ isOpen, onClose, socketRef, roomId }) => {
                     delete next[payload.socketId];
                     return next;
                 });
+            } else if (action === 'UPDATE') {
+                // Someone moved/resized/edited diagram elements. Drags arrive as "transient"
+                // updates (no history entry); the final one is recorded.
+                const changed = new Map((payload?.elements || []).map((e) => [e.id, e]));
+                setElements(prev => {
+                    const next = prev.map((e) => changed.get(e.id) || e);
+                    if (!payload?.transient) {
+                        const newHistory = historyRef.current.slice(0, historyIndexRef.current + 1);
+                        newHistory.push(next);
+                        historyRef.current = newHistory;
+                        historyIndexRef.current = newHistory.length - 1;
+                        setHistory(newHistory);
+                        setHistoryIndex(newHistory.length - 1);
+                    }
+                    return next;
+                });
+            } else if (action === 'DELETE') {
+                const gone = new Set(payload?.ids || []);
+                setElements(prev => {
+                    const next = prev.filter((e) => !gone.has(e.id));
+                    const newHistory = historyRef.current.slice(0, historyIndexRef.current + 1);
+                    newHistory.push(next);
+                    historyRef.current = newHistory;
+                    historyIndexRef.current = newHistory.length - 1;
+                    setHistory(newHistory);
+                    setHistoryIndex(newHistory.length - 1);
+                    return next;
+                });
+                setSelectedId((id) => (gone.has(id) ? null : id));
             } else if (action === 'UNDO' || action === 'REDO') {
                 if (payload && payload.elements) {
                     setElements(payload.elements);
@@ -189,6 +245,62 @@ const WhiteboardModal = ({ isOpen, onClose, socketRef, roomId }) => {
         }
     };
 
+    // --- Diagram edits (local + synced) ---
+    const emitDraw = (action, payload) => socketRef.current?.emit(ACTIONS.WHITEBOARD_DRAW, { roomId, action, payload });
+
+    const addElements = (els) => {
+        const next = [...elementsRef.current, ...els];
+        elementsRef.current = next;
+        commitAction(next);
+        els.forEach((el) => emitDraw('ADD', { ...el, socketId: socketRef.current?.id }));
+    };
+
+    const applyUpdate = (changed) => {
+        const map = new Map(changed.map((e) => [e.id, e]));
+        const next = elementsRef.current.map((e) => map.get(e.id) || e);
+        elementsRef.current = next;
+        commitAction(next);
+        emitDraw('UPDATE', { elements: changed });
+    };
+
+    // Deleting a node also deletes the connectors attached to it.
+    const deleteIds = (ids) => {
+        const gone = new Set(ids);
+        elementsRef.current.forEach((e) => { if (e.type === 'connector' && (gone.has(e.from) || gone.has(e.to))) gone.add(e.id); });
+        const next = elementsRef.current.filter((e) => !gone.has(e.id));
+        elementsRef.current = next;
+        commitAction(next);
+        emitDraw('DELETE', { ids: [...gone] });
+        setSelectedId(null);
+    };
+
+    const duplicateSelected = () => {
+        if (selectedEl?.type !== 'node') return;
+        const copy = { ...selectedEl, id: generateId(), x: snap(selectedEl.x + 24), y: snap(selectedEl.y + 24) };
+        addElements([copy]);
+        setSelectedId(copy.id);
+    };
+
+    const commitEdit = () => {
+        if (!editing) return;
+        const el = elementsRef.current.find((x) => x.id === editing.id);
+        setEditing(null);
+        if (!el) return;
+        const field = el.type === 'connector' ? 'label' : 'text';
+        const value = editing.value.trim() ? editing.value.replace(/\s+$/, '') : '';
+        if ((el[field] || '') !== value) applyUpdate([{ ...el, [field]: value }]);
+    };
+
+    // Colour / connector style changes apply to the selection too.
+    const chooseColor = (c) => {
+        setColor(c);
+        if (selectedEl && (selectedEl.type === 'node' || selectedEl.type === 'connector')) applyUpdate([{ ...selectedEl, color: c }]);
+    };
+    const chooseConnectStyle = (patch) => {
+        setConnectStyle((st) => ({ ...st, ...patch }));
+        if (selectedEl?.type === 'connector') applyUpdate([{ ...selectedEl, ...patch }]);
+    };
+
     // --- Rendering ---
     const drawElement = (ctx, el) => {
         ctx.globalCompositeOperation = el.type === 'eraser' ? 'destination-out' : 'source-over';
@@ -229,11 +341,25 @@ const WhiteboardModal = ({ isOpen, onClose, socketRef, roomId }) => {
         ctx.translate(pan.x * window.devicePixelRatio, pan.y * window.devicePixelRatio);
         ctx.scale(zoom * window.devicePixelRatio, zoom * window.devicePixelRatio);
 
-        elements.forEach(el => drawElement(ctx, el));
+        const ink = inkColor(), bg = boardBg();
+        const map = byIdOf(elements);
+        // Connectors under shapes, then shapes and freehand in the order they were made.
+        elements.forEach(el => {
+            if (el.type === 'connector') drawConnector(ctx, el, map, { ink, bg, selected: el.id === selectedId, editing: editing?.id === el.id });
+        });
+        elements.forEach(el => {
+            if (el.type === 'node') drawNode(ctx, el, { ink, editing: editing?.id === el.id });
+            else if (el.type !== 'connector') drawElement(ctx, el);
+        });
         Object.values(remoteStreams).forEach(el => drawElement(ctx, el));
         if (currentElement) drawElement(ctx, currentElement);
+        if (preview) {
+            drawConnector(ctx, { from: preview.from, to: null, ...connectStyle, color }, map, { ink, bg, pointer: preview.pointer });
+            if (preview.target && map[preview.target]) drawNodeOutline(ctx, map[preview.target], zoom, { handle: false, accent: '#4ADE80' });
+        }
+        if (selectedId && map[selectedId]) drawNodeOutline(ctx, map[selectedId], zoom, { handle: !editing });
         ctx.restore();
-    }, [elements, remoteStreams, currentElement, pan, zoom, themeTick]); // eslint-disable-line
+    }, [elements, remoteStreams, currentElement, pan, zoom, themeTick, selectedId, editing, preview, connectStyle, color]); // eslint-disable-line
 
     useEffect(() => { renderCanvas(); }, [renderCanvas]);
 
@@ -269,9 +395,71 @@ const WhiteboardModal = ({ isOpen, onClose, socketRef, roomId }) => {
                     };
     };
 
+    // Keep receiving moves while dragging outside the canvas (some pointers can't be captured).
+    const capturePointer = (e) => { try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* not capturable */ } };
+
     const handlePointerDown = (e) => {
+        setPalOpen(false);
+        if (e.pointerType === 'touch') {
+            const now = performance.now();
+            const prev = lastTap.current;
+            lastTap.current = { t: now, x: e.clientX, y: e.clientY };
+            if (now - prev.t < 320 && Math.hypot(e.clientX - prev.x, e.clientY - prev.y) < 24) {
+                lastTap.current = { t: 0, x: 0, y: 0 };
+                handleDoubleClick(e);
+                return;
+            }
+        }
         if (textInput.active) {
             commitTextInput();
+            return;
+        }
+        if (editing) {
+            commitEdit();
+            return;
+        }
+        // Diagram tools: select / move / resize, place shapes, connect shapes.
+        if (DIAGRAM_TOOLS.has(tool) && e.button !== 1) {
+            const pos = getPos(e);
+            const els = elementsRef.current;
+            const map = byIdOf(els);
+            if (tool === 'connector') {
+                const from = nodeAt(els, pos.x, pos.y);
+                if (from) {
+                    dragRef.current = { mode: 'connect', from: from.id, target: null };
+                    setPreview({ from: from.id, pointer: pos, target: null });
+                    capturePointer(e);
+                } else {
+                    setSelectedId(connectorAt(els, map, pos.x, pos.y, 10 / zoom)?.id || null);
+                }
+                return;
+            }
+            const sel = map[selectedId];
+            if (sel && onResizeHandle(sel, pos.x, pos.y, zoom)) {
+                dragRef.current = { mode: 'resize', id: sel.id, start: pos, orig: { ...sel }, moved: false };
+                capturePointer(e);
+                return;
+            }
+            const hitNode = nodeAt(els, pos.x, pos.y);
+            if (hitNode) {
+                setSelectedId(hitNode.id);
+                dragRef.current = { mode: 'move', id: hitNode.id, start: pos, orig: { ...hitNode }, moved: false };
+                capturePointer(e);
+                return;
+            }
+            const hitConn = connectorAt(els, map, pos.x, pos.y, 10 / zoom);
+            if (hitConn) { setSelectedId(hitConn.id); return; }
+            setSelectedId(null);
+            if (tool === 'shape') {
+                const node = makeNode({ shape: pick.shape, template: pick.template, x: pos.x, y: pos.y, color, id: generateId() });
+                addElements([node]);
+                setSelectedId(node.id);
+                setEditing({ id: node.id, value: node.text || '' });
+                return;
+            }
+            // Select tool on empty board: drag to pan.
+            setIsPanning(true);
+            lastMousePos.current = { x: e.clientX, y: e.clientY };
             return;
         }
         if (tool === 'text') {
@@ -325,6 +513,31 @@ const WhiteboardModal = ({ isOpen, onClose, socketRef, roomId }) => {
             lastMousePos.current = { x: cx, y: cy };
             return;
         }
+        const drag = dragRef.current;
+        if (drag) {
+            if (drag.mode === 'connect') {
+                const over = nodeAt(elementsRef.current, x, y);
+                drag.target = over && over.id !== drag.from ? over.id : null;
+                setPreview({ from: drag.from, pointer: { x, y }, target: drag.target });
+                return;
+            }
+            const dx = x - drag.start.x, dy = y - drag.start.y;
+            if (!drag.moved && Math.hypot(dx, dy) < 3 / zoom) return;
+            drag.moved = true;
+            const o = drag.orig;
+            const moved = drag.mode === 'move'
+                ? { ...o, x: snap(o.x + dx), y: snap(o.y + dy) }
+                : { ...o, w: Math.max(48, snap(o.w + dx)), h: Math.max(36, snap(o.h + dy)) };
+            const next = elementsRef.current.map((el) => (el.id === moved.id ? moved : el));
+            elementsRef.current = next;
+            setElements(next);
+            const now = performance.now();
+            if (now - lastUpdateSent.current > 50) {
+                lastUpdateSent.current = now;
+                emitDraw('UPDATE', { elements: [moved], transient: true });
+            }
+            return;
+        }
         if (!isDrawing || !currentElement) return;
         const updated = { ...currentElement };
         if (tool === 'pencil' || tool === 'eraser') {
@@ -342,12 +555,70 @@ const WhiteboardModal = ({ isOpen, onClose, socketRef, roomId }) => {
 
     const handlePointerUp = () => {
         setIsPanning(false);
+        const drag = dragRef.current;
+        if (drag) {
+            dragRef.current = null;
+            if (drag.mode === 'connect') {
+                setPreview(null);
+                if (drag.target) {
+                    const conn = { id: generateId(), type: 'connector', from: drag.from, to: drag.target, label: '', color, ...connectStyle };
+                    addElements([conn]);
+                    setSelectedId(conn.id);
+                }
+                return;
+            }
+            if (drag.moved) {
+                const el = elementsRef.current.find((x) => x.id === drag.id);
+                if (el) {
+                    commitAction(elementsRef.current);
+                    emitDraw('UPDATE', { elements: [el] });
+                }
+            }
+            return;
+        }
         if (!isDrawing || !currentElement) return;
         setIsDrawing(false);
+        if (currentElement.type === 'pencil') {
+            const pts = currentElement.points || [];
+            const span = pts.length ? Math.max(...pts.map((pt) => Math.hypot(pt.x - pts[0].x, pt.y - pts[0].y))) : 0;
+            if (span < 3) tinyStrokes.current = [...tinyStrokes.current.filter((t) => performance.now() - t.at < 800), { id: currentElement.id, at: performance.now() }];
+        }
         commitAction([...elements, currentElement]);
         socketRef.current?.emit(ACTIONS.WHITEBOARD_DRAW, { roomId, action: 'ADD', payload: currentElement });
         socketRef.current?.emit(ACTIONS.WHITEBOARD_DRAW, { roomId, action: 'STREAM_END', payload: { socketId: socketRef.current.id } });
         setCurrentElement(null);
+    };
+
+    // Double-click: edit a shape's text or a connector's label; on empty board (select tool)
+    // add a box.
+    // Clicks with the pen leave dots; when those clicks turn out to be a double-click on a
+    // shape, remove them.
+    const dropClickDots = () => {
+        const recent = tinyStrokes.current.filter((t) => performance.now() - t.at < 800).map((t) => t.id);
+        tinyStrokes.current = [];
+        const ids = recent.filter((id) => elementsRef.current.some((el) => el.id === id));
+        if (ids.length) deleteIds(ids);
+    };
+
+    const startEdit = (el) => {
+        setSelectedId(el.id);
+        setCtxPal(false);
+        setEditing({ id: el.id, value: (el.type === 'connector' ? el.label : el.text) || '' });
+    };
+
+    const handleDoubleClick = (e) => {
+        const pos = getPos(e);
+        const els = elementsRef.current;
+        const n = nodeAt(els, pos.x, pos.y);
+        if (n) { dropClickDots(); startEdit(n); return; }
+        const c = connectorAt(els, byIdOf(els), pos.x, pos.y, 10 / zoom);
+        if (c) { dropClickDots(); startEdit(c); return; }
+        if (tool === 'select' || tool === 'shape') {
+            const node = makeNode({ shape: pick.shape, template: pick.template, x: pos.x, y: pos.y, color, id: generateId() });
+            addElements([node]);
+            setSelectedId(node.id);
+            setEditing({ id: node.id, value: node.text || '' });
+        }
     };
 
     // Wheel: pan, Ctrl/pinch zooms around the pointer. Native listener so preventDefault works.
@@ -415,8 +686,15 @@ const WhiteboardModal = ({ isOpen, onClose, socketRef, roomId }) => {
             const k = e.key.toLowerCase();
             if ((e.ctrlKey || e.metaKey) && k === 'z') { e.preventDefault(); if (e.shiftKey) handleRedo(); else handleUndo(); return; }
             if ((e.ctrlKey || e.metaKey) && k === 'y') { e.preventDefault(); handleRedo(); return; }
+            if ((e.ctrlKey || e.metaKey) && k === 'd' && selectedEl?.type === 'node') { e.preventDefault(); duplicateSelected(); return; }
             if (e.ctrlKey || e.metaKey || e.altKey) return;
-            if (k === 'escape') { onClose(); return; }
+            if ((k === 'delete' || k === 'backspace') && selectedEl) { e.preventDefault(); deleteIds([selectedEl.id]); return; }
+            if (k === 'enter' && selectedEl && (selectedEl.type === 'node' || selectedEl.type === 'connector')) {
+                e.preventDefault();
+                setEditing({ id: selectedEl.id, value: (selectedEl.type === 'node' ? selectedEl.text : selectedEl.label) || '' });
+                return;
+            }
+            if (k === 'escape') { if (selectedId) setSelectedId(null); else onClose(); return; }
             const t = TOOLS.find((x) => x.key === k);
             if (t) setTool(t.id);
             if (k === '0') resetView();
@@ -467,7 +745,40 @@ const WhiteboardModal = ({ isOpen, onClose, socketRef, roomId }) => {
                     onPointerMove={handlePointerMove}
                     onPointerUp={handlePointerUp}
                     onPointerLeave={handlePointerUp}
+                    onDoubleClick={handleDoubleClick}
                 />
+
+                {/* Editing a shape's text or a connector's label, in place. */}
+                {editing && (() => {
+                    const el = elements.find((x) => x.id === editing.id);
+                    if (!el) return null;
+                    let style;
+                    if (el.type === 'node') {
+                        const box = el.shape === 'actor' ? { x: el.x - 50, y: el.y + el.h + 2, w: el.w + 100, h: 44 } : el;
+                        style = { left: box.x * zoom + pan.x, top: box.y * zoom + pan.y, width: box.w * zoom, height: box.h * zoom, fontSize: 13.5 * zoom };
+                    } else {
+                        const m = labelPoint(el, nodesById);
+                        if (!m) return null;
+                        style = { left: m.x * zoom + pan.x - 90, top: m.y * zoom + pan.y - 16, width: 180, height: 32, fontSize: 12.5 };
+                    }
+                    return (
+                        <textarea
+                            className={`wb-edit${el.type === 'connector' ? ' wb-edit--label' : ''}`}
+                            style={style}
+                            autoFocus
+                            value={editing.value}
+                            onChange={(e) => setEditing((ed) => ({ ...ed, value: e.target.value }))}
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); commitEdit(); }
+                                if (e.key === 'Escape') { e.preventDefault(); setEditing(null); }
+                            }}
+                            onBlur={commitEdit}
+                            onFocus={(e) => e.target.select()}
+                            placeholder={el.type === 'connector' ? 'Label (e.g. HTTPS, async)' : 'Type, Enter to finish'}
+                            aria-label={el.type === 'connector' ? 'Connector label' : 'Shape text'}
+                        />
+                    );
+                })()}
 
                 {textInput.active && (
                     <input
@@ -490,14 +801,14 @@ const WhiteboardModal = ({ isOpen, onClose, socketRef, roomId }) => {
                 ))}
 
                 {!elements.length && !currentElement && (
-                    <div className="wb-empty">Draw, sketch an idea or circle a bug. Everyone in the room sees it live.</div>
+                    <div className="wb-empty">Draw, sketch an idea, or build a flowchart or system design with shapes (S) and connectors (A). Everyone in the room sees it live.</div>
                 )}
 
                 {/* Tools */}
                 <div className="wb-dock" role="toolbar" aria-label="Tools">
                     {TOOLS.map((t, i) => (
                         <React.Fragment key={t.id}>
-                            {(i === 1 || i === 4) && <span className="wb-sep" />}
+                            {(i === 2 || i === 4 || i === 7) && <span className="wb-sep" />}
                             <button
                                 className={tool === t.id ? 'on' : ''}
                                 onClick={() => { setTool(t.id); if (textInput.active) commitTextInput(); }}
@@ -510,26 +821,126 @@ const WhiteboardModal = ({ isOpen, onClose, socketRef, roomId }) => {
                             </button>
                         </React.Fragment>
                     ))}
+                    <span className="wb-sep" />
+                    <span className="wb-colorpick">
+                        <button className={`wb-chip wb-chip--dock${palOpen ? ' on' : ''}`} style={{ '--sw': color === 'ink' ? 'var(--wb-ink)' : color }} onClick={(e) => { e.stopPropagation(); setPalOpen((o) => !o); }} title="Colour & size" aria-label="Colour and size" aria-expanded={palOpen} disabled={tool === 'eraser'}>
+                            <i />
+                        </button>
+                    </span>
                 </div>
-
-                {/* Style */}
-                {tool !== 'hand' && (
-                    <div className="wb-style" aria-label="Style">
+                {/* Colour & size popover: outside the dock so its scrolling (narrow screens) cannot clip it */}
+                {palOpen && (
+                    <div className="wb-pop" role="dialog" aria-label="Colour and size" onPointerDown={(e) => e.stopPropagation()}>
                         <div className="wb-swatches">
                             {PALETTE.map((c, i) => (
-                                <button key={c} className={color === c ? 'on' : ''} style={{ '--sw': i === 0 ? 'var(--wb-ink)' : c }} onClick={() => setColor(c)} aria-label={`Colour ${i === 0 ? 'ink' : c}`} disabled={tool === 'eraser'} />
+                                <button key={c} className={color === c ? 'on' : ''} style={{ '--sw': i === 0 ? 'var(--wb-ink)' : c }} onClick={() => { setColor(c); setPalOpen(false); }} aria-label={`Colour ${i === 0 ? 'ink' : c}`} />
                             ))}
                             <label className="wb-custom" title="Custom colour">
-                                <input type="color" value={color.startsWith('#') ? color : '#7AA2FF'} onChange={(e) => setColor(e.target.value)} disabled={tool === 'eraser'} />
+                                <input type="color" value={color.startsWith('#') ? color : '#7AA2FF'} onChange={(e) => setColor(e.target.value)} />
                             </label>
                         </div>
-                        <div className="wb-size">
-                            {[2, 4, 8, 14].map((s) => (
-                                <button key={s} className={brushSize === s ? 'on' : ''} onClick={() => setBrushSize(s)} aria-label={`Size ${s}`} title={tool === 'text' ? `Text ${s * 4 + 8}px` : `${s}px`}>
-                                    <i style={{ width: Math.min(16, s + 2), height: Math.min(16, s + 2) }} />
+                        {!DIAGRAM_TOOLS.has(tool) && (
+                            <div className="wb-size">
+                                {[2, 4, 8, 14].map((sz) => (
+                                    <button key={sz} className={brushSize === sz ? 'on' : ''} onClick={() => setBrushSize(sz)} aria-label={`Size ${sz}`} title={tool === 'text' ? `Text ${sz * 4 + 8}px` : `${sz}px`}>
+                                        <i style={{ width: Math.min(16, sz + 2), height: Math.min(16, sz + 2) }} />
+                                    </button>
+                                ))}
+                            </div>
+                        )}
+                        {tool === 'connector' && (
+                            <div className="wb-conn">
+                                <div className="wb-seg">
+                                    <button className={connectStyle.route !== 'elbow' ? 'on' : ''} onClick={() => setConnectStyle((st) => ({ ...st, route: 'straight' }))}>Straight</button>
+                                    <button className={connectStyle.route === 'elbow' ? 'on' : ''} onClick={() => setConnectStyle((st) => ({ ...st, route: 'elbow' }))}>Elbow</button>
+                                </div>
+                                <div className="wb-seg">
+                                    <button className={!connectStyle.dashed ? 'on' : ''} onClick={() => setConnectStyle((st) => ({ ...st, dashed: false }))}>Solid</button>
+                                    <button className={connectStyle.dashed ? 'on' : ''} onClick={() => setConnectStyle((st) => ({ ...st, dashed: true }))}>Dashed</button>
+                                </div>
+                            </div>
+                        )}
+                        <p className="wb-pop-tip">{DIAGRAM_TOOLS.has(tool) ? 'Used for new shapes and connectors. Select one to recolour it.' : 'Pen, shapes and text use this colour.'}</p>
+                    </div>
+                )}
+
+                {/* Selection toolbar: floats just above the selected shape / connector */}
+                {selectedEl && !editing && (selectedEl.type === 'node' || selectedEl.type === 'connector') && (() => {
+                    const area = areaRef.current;
+                    const aw = area?.clientWidth || 800;
+                    let cx, top, bottom;
+                    if (selectedEl.type === 'node') {
+                        cx = (selectedEl.x + selectedEl.w / 2) * zoom + pan.x;
+                        top = selectedEl.y * zoom + pan.y;
+                        bottom = (selectedEl.y + selectedEl.h) * zoom + pan.y;
+                    } else {
+                        const m = labelPoint(selectedEl, nodesById);
+                        if (!m) return null;
+                        cx = m.x * zoom + pan.x;
+                        top = m.y * zoom + pan.y - 14;
+                        bottom = m.y * zoom + pan.y + 14;
+                    }
+                    const isConn = selectedEl.type === 'connector';
+                    const width = isConn ? 300 : 196;
+                    const y = top - 52 >= 8 ? top - 52 : bottom + 12;
+                    const x = Math.max(8, Math.min(aw - width - 8, cx - width / 2));
+                    const cur = selectedEl.color || 'ink';
+                    return (
+                        <div className="wb-ctx" style={{ left: x, top: y }} role="toolbar" aria-label={isConn ? 'Connector' : 'Shape'} onPointerDown={(e) => e.stopPropagation()}>
+                            <span className="wb-ctx-pal">
+                                <button className="wb-chip" style={{ '--sw': cur === 'ink' ? 'var(--wb-ink)' : cur }} onClick={() => setCtxPal((o) => !o)} title="Colour" aria-label="Colour" aria-expanded={ctxPal}><i /></button>
+                                {ctxPal && (
+                                    <span className="wb-ctx-swatches">
+                                        {PALETTE.map((c, i) => (
+                                            <button key={c} className={cur === c ? 'on' : ''} style={{ '--sw': i === 0 ? 'var(--wb-ink)' : c }} onClick={() => { chooseColor(c); setCtxPal(false); }} aria-label={`Colour ${i === 0 ? 'ink' : c}`} />
+                                        ))}
+                                    </span>
+                                )}
+                            </span>
+                            {isConn && (
+                                <>
+                                    <span className="wb-ctx-sep" />
+                                    <button className={selectedEl.route === 'elbow' ? 'on' : ''} onClick={() => chooseConnectStyle({ route: selectedEl.route === 'elbow' ? 'straight' : 'elbow' })} title={selectedEl.route === 'elbow' ? 'Elbow (click for straight)' : 'Straight (click for elbow)'} aria-label="Route">
+                                        <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d={selectedEl.route === 'elbow' ? 'M2 3h6v10h6' : 'M2 13L14 3'} fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                                    </button>
+                                    <button className={selectedEl.dashed ? 'on' : ''} onClick={() => chooseConnectStyle({ dashed: !selectedEl.dashed })} title={selectedEl.dashed ? 'Dashed (async)' : 'Solid'} aria-label="Line style">
+                                        <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M2 8h12" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeDasharray={selectedEl.dashed ? '2.5 2.5' : '0'} /></svg>
+                                    </button>
+                                    <button onClick={() => chooseConnectStyle({ arrows: ({ end: 'both', both: 'none', none: 'end' })[selectedEl.arrows || 'end'] })} title="Arrows: one way, both ways, none" aria-label="Arrows">
+                                        <span className="wb-ctx-glyph">{({ end: '→', both: '↔', none: '—' })[selectedEl.arrows || 'end']}</span>
+                                    </button>
+                                </>
+                            )}
+                            <span className="wb-ctx-sep" />
+                            <button onClick={() => startEdit(selectedEl)} title={isConn ? 'Edit label (Enter)' : 'Edit text (Enter)'} aria-label="Edit text"><Type size={15} /></button>
+                            {!isConn && <button onClick={duplicateSelected} title="Duplicate (Ctrl+D)" aria-label="Duplicate"><Copy size={15} /></button>}
+                            <button className="wb-ctx-del" onClick={() => deleteIds([selectedEl.id])} title="Delete (Del)" aria-label="Delete"><Trash2 size={15} /></button>
+                        </div>
+                    );
+                })()}
+
+                {/* Shape library: flowchart shapes and system-design blocks */}
+                {tool === 'shape' && (
+                    <div className="wb-lib" aria-label="Shapes">
+                        <span className="wb-lib-h">Flowchart</span>
+                        <div className="wb-lib-shapes">
+                            {SHAPES.map((sh) => (
+                                <button key={sh.id} className={!pick.template && pick.shape === sh.id ? 'on' : ''} onClick={() => setPick({ shape: sh.id, template: null })} title={sh.label} aria-label={sh.label}>
+                                    <svg width="32" height="26" viewBox="0 0 32 26" aria-hidden="true"><path d={SHAPE_PREVIEW[sh.id]} fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" strokeLinecap="round" /></svg>
+                                    <span>{sh.label}</span>
                                 </button>
                             ))}
                         </div>
+                        <span className="wb-lib-h">System design</span>
+                        <div className="wb-lib-blocks">
+                            {TEMPLATES.map((t) => (
+                                <button key={t.id} className={pick.template === t.id ? 'on' : ''} onClick={() => setPick({ shape: t.shape, template: t.id })} title={t.text}>
+                                    <i style={{ background: t.color === 'ink' ? 'var(--wb-ink)' : t.color }} />
+                                    {t.label}
+                                </button>
+                            ))}
+                        </div>
+                        <p className="wb-lib-tip">Click the board to place it. Connect shapes with the connector (A); double-click to edit text.</p>
                     </div>
                 )}
 
