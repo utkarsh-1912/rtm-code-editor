@@ -1,7 +1,8 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
     FileCode, FileText, Plus, Search, Trash2, Upload, Braces, Palette, Globe, Coffee, Terminal, X,
-    ChevronRight, Folder, FolderOpen, FolderPlus, FilePlus, ChevronsDownUp,
+    ChevronRight, Folder, FolderOpen, FolderPlus, FilePlus, ChevronsDownUp, MoreVertical, Pencil,
+    FolderInput, CornerLeftUp,
 } from "lucide-react";
 
 const ICONS = {
@@ -14,6 +15,7 @@ const ICONS = {
 const extOf = (name) => (name.includes(".") ? name.split(".").pop().toLowerCase() : "");
 export const relPath = (f) => String(f.path || f.name || "").replace(/\\/g, "/").replace(/^\/+/, "").replace(/\/+$/, "");
 const baseName = (p) => p.split("/").pop();
+const parentOf = (p) => p.split("/").slice(0, -1).join("/");
 
 export function FileIcon({ name, size = 14 }) {
     const [Icon, color] = ICONS[extOf(name)] || [FileText, "var(--text-muted)"];
@@ -47,13 +49,26 @@ function buildTree(files) {
 
 const ancestors = (p) => p.split("/").slice(0, -1).map((_, i, a) => a.slice(0, i + 1).join("/"));
 
-// File explorer for the project workspace: nested folders, search, inline creation of files
-// and folders (anywhere in the tree), and delete.
-export default function ProjectFileTree({ files, activeFile, onSelect, onCreate, onDelete, onImport, project }) {
+// Every folder path in the tree (for the "Move to" picker), sorted.
+function allFolders(node, out = []) {
+    for (const f of node.folders.values()) { out.push(f.path); allFolders(f, out); }
+    return out.sort((a, b) => a.localeCompare(b));
+}
+
+// File explorer for the project workspace: nested folders, search, create files and folders
+// anywhere, rename, move (menu or drag and drop) and delete. All actions sit in "⋮" menus so a
+// narrow sidebar never hides them.
+export default function ProjectFileTree({ files, activeFile, onSelect, onCreate, onDelete, onImport, onMove, project }) {
     const storeKey = `ftree-open-${project?.id || "x"}`;
     const [query, setQuery] = useState("");
     const [creating, setCreating] = useState(null); // { parent: "src", kind: "file" | "folder" }
     const [name, setName] = useState("");
+    const [renaming, setRenaming] = useState(null); // { path, value }
+    const [menu, setMenu] = useState(null); // { x, y, items, title }
+    const [picker, setPicker] = useState(null); // { path, isFolder, x, y }: "Move to" folder list
+    const [dragPath, setDragPath] = useState(null);
+    const [dropAt, setDropAt] = useState(null); // folder path ("" = root) under the pointer
+    const importRef = useRef(null);
     const [open, setOpen] = useState(() => {
         try { return new Set(JSON.parse(localStorage.getItem(storeKey)) || []); } catch { return new Set(); }
     });
@@ -72,7 +87,24 @@ export default function ProjectFileTree({ files, activeFile, onSelect, onCreate,
         });
     }, [activePath]);
 
+    // Close menus on outside click, Escape, scroll or resize.
+    useEffect(() => {
+        if (!menu && !picker) return undefined;
+        const close = () => { setMenu(null); setPicker(null); };
+        const away = (e) => { if (!e.target.closest?.(".ftree-pop")) close(); };
+        const esc = (e) => e.key === "Escape" && close();
+        document.addEventListener("mousedown", away);
+        document.addEventListener("keydown", esc);
+        window.addEventListener("resize", close);
+        return () => {
+            document.removeEventListener("mousedown", away);
+            document.removeEventListener("keydown", esc);
+            window.removeEventListener("resize", close);
+        };
+    }, [menu, picker]);
+
     const tree = useMemo(() => buildTree(files), [files]);
+    const folders = useMemo(() => allFolders(tree), [tree]);
     const fileCount = useMemo(() => files.filter((f) => !(f.is_directory || f.isDirectory)).length, [files]);
 
     const matches = useMemo(() => {
@@ -108,6 +140,95 @@ export default function ProjectFileTree({ files, activeFile, onSelect, onCreate,
         setCreating(null);
     };
 
+    // Move `from` into folder `toFolder` ("" = root), keeping its name.
+    const canMoveInto = (from, toFolder) => toFolder !== parentOf(from) && toFolder !== from && !toFolder.startsWith(`${from}/`);
+    const moveInto = (from, toFolder) => {
+        if (!onMove || !canMoveInto(from, toFolder)) return;
+        const to = toFolder ? `${toFolder}/${baseName(from)}` : baseName(from);
+        if (toFolder) setOpen((prev) => new Set([...prev, toFolder, ...ancestors(`${toFolder}/x`)]));
+        onMove(from, to);
+    };
+
+    const submitRename = (e) => {
+        e.preventDefault();
+        const n = (renaming?.value || "").trim().replace(/\\/g, "/").replace(/^\/+|\/+$/g, "");
+        if (renaming && n && n !== baseName(renaming.path) && onMove) {
+            const parent = parentOf(renaming.path);
+            onMove(renaming.path, parent ? `${parent}/${n}` : n);
+        }
+        setRenaming(null);
+    };
+
+    // Opens the shared menu next to the button that was clicked (fixed position, so the
+    // scrolling list never clips it).
+    const openMenu = (e, items, title) => {
+        e.stopPropagation();
+        const r = e.currentTarget.getBoundingClientRect();
+        const width = 210;
+        const x = Math.max(8, Math.min(window.innerWidth - width - 8, r.right - width));
+        const below = r.bottom + 6;
+        const y = below + items.length * 36 + 16 > window.innerHeight ? Math.max(8, r.top - items.length * 36 - 22) : below;
+        setPicker(null);
+        setMenu({ x, y, items, title });
+    };
+
+    const openPicker = (path, isFolder) => {
+        setPicker({ path, isFolder, x: menu?.x ?? 40, y: Math.min(menu?.y ?? 80, window.innerHeight - 320) });
+        setMenu(null);
+    };
+
+    const folderItems = (f) => [
+        { icon: FilePlus, label: "New file here", run: () => startCreate(f.path, "file") },
+        { icon: FolderPlus, label: "New folder here", run: () => startCreate(f.path, "folder") },
+        ...(onMove ? [
+            { icon: Pencil, label: "Rename", run: () => setRenaming({ path: f.path, value: f.name }) },
+            { icon: FolderInput, label: "Move to…", run: () => openPicker(f.path, true), keep: true },
+        ] : []),
+        { icon: Trash2, label: "Delete folder", danger: true, run: () => onDelete({ isFolder: true, path: f.path, name: f.name }) },
+    ];
+    const fileItems = (file, path) => [
+        ...(onMove ? [
+            { icon: Pencil, label: "Rename", run: () => setRenaming({ path, value: baseName(path) }) },
+            { icon: FolderInput, label: "Move to…", run: () => openPicker(path, false), keep: true },
+            ...(path.includes("/") ? [{ icon: CornerLeftUp, label: "Move to project root", run: () => moveInto(path, "") }] : []),
+        ] : []),
+        { icon: Trash2, label: "Delete file", danger: true, run: () => onDelete(file) },
+    ];
+    const rootItems = [
+        { icon: FilePlus, label: "New file", run: () => startCreate("", "file") },
+        { icon: FolderPlus, label: "New folder", run: () => startCreate("", "folder") },
+        { icon: Upload, label: "Import file", run: () => importRef.current?.click() },
+        { icon: ChevronsDownUp, label: "Collapse all folders", run: () => setOpen(new Set()), disabled: !open.size },
+    ];
+
+    // Drag and drop: drag any row onto a folder (or the empty area for the root).
+    const dragProps = (path) => (onMove ? {
+        draggable: !renaming,
+        onDragStart: (e) => {
+            e.dataTransfer.effectAllowed = "move";
+            e.dataTransfer.setData("text/plain", path);
+            setDragPath(path);
+        },
+        onDragEnd: () => { setDragPath(null); setDropAt(null); },
+    } : {});
+    const dropProps = (folderPath) => (onMove ? {
+        onDragOver: (e) => {
+            if (!dragPath) return;
+            e.stopPropagation(); // a row answers for itself, even when it refuses the drop
+            if (!canMoveInto(dragPath, folderPath)) { if (dropAt !== null) setDropAt(null); return; }
+            e.preventDefault();
+            if (dropAt !== folderPath) setDropAt(folderPath);
+        },
+        onDrop: (e) => {
+            if (!dragPath) return;
+            e.preventDefault();
+            e.stopPropagation();
+            moveInto(dragPath, folderPath);
+            setDragPath(null);
+            setDropAt(null);
+        },
+    } : {});
+
     const createRow = (parent, depth) => (creating && creating.parent === parent ? (
         <form onSubmit={submit} className="ftree-new" style={{ paddingLeft: 10 + depth * 14 }}>
             {creating.kind === "folder" ? <Folder size={14} /> : <FileText size={14} />}
@@ -123,34 +244,55 @@ export default function ProjectFileTree({ files, activeFile, onSelect, onCreate,
         </form>
     ) : null);
 
+    const label = (path, text) => (renaming?.path === path ? (
+        <form className="ftree-rename" onSubmit={submitRename} onClick={(e) => e.stopPropagation()}>
+            <input
+                autoFocus
+                value={renaming.value}
+                onChange={(e) => setRenaming((r) => ({ ...r, value: e.target.value }))}
+                onBlur={submitRename}
+                onKeyDown={(e) => { e.stopPropagation(); if (e.key === "Escape") setRenaming(null); }}
+                onFocus={(e) => { const dot = e.target.value.lastIndexOf("."); e.target.setSelectionRange(0, dot > 0 ? dot : e.target.value.length); }}
+                aria-label={`New name for ${path}`}
+            />
+        </form>
+    ) : <span className="ftree-name">{text}</span>);
+
+    const moreButton = (items, title) => (
+        <button className="ftree-more" title="More actions" aria-label={`More actions for ${title}`} aria-haspopup="menu" onClick={(e) => openMenu(e, items, title)}>
+            <MoreVertical size={14} />
+        </button>
+    );
+
     const renderFolder = (node, depth) => {
-        const folders = [...node.folders.values()].sort((a, b) => a.name.localeCompare(b.name));
+        const subfolders = [...node.folders.values()].sort((a, b) => a.name.localeCompare(b.name));
         const leaves = [...node.files].sort((a, b) => a.name.localeCompare(b.name));
         return (
             <>
                 {createRow(node.path, depth)}
-                {folders.map((f) => {
+                {subfolders.map((f) => {
                     const isOpen = open.has(f.path);
                     return (
                         <React.Fragment key={`d:${f.path}`}>
                             <div
-                                className="ftree-item ftree-folder"
+                                className={`ftree-item ftree-folder${dropAt === f.path ? " is-drop" : ""}${dragPath === f.path ? " is-dragging" : ""}`}
                                 style={{ paddingLeft: 6 + depth * 14 }}
                                 onClick={() => toggle(f.path)}
                                 role="treeitem"
                                 aria-expanded={isOpen}
                                 tabIndex={0}
-                                onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && (e.preventDefault(), toggle(f.path))}
+                                onKeyDown={(e) => {
+                                    if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggle(f.path); }
+                                    if (e.key === "F2" && onMove) setRenaming({ path: f.path, value: f.name });
+                                }}
                                 title={f.path}
+                                {...dragProps(f.path)}
+                                {...dropProps(f.path)}
                             >
                                 <ChevronRight size={13} className={`ftree-chev${isOpen ? " open" : ""}`} />
                                 {isOpen ? <FolderOpen size={14} className="ftree-dir" /> : <Folder size={14} className="ftree-dir" />}
-                                <span className="ftree-name">{f.name}</span>
-                                <span className="ftree-row-actions">
-                                    <button title="New file in folder" aria-label={`New file in ${f.path}`} onClick={(e) => { e.stopPropagation(); startCreate(f.path, "file"); }}><FilePlus size={13} /></button>
-                                    <button title="New folder in folder" aria-label={`New folder in ${f.path}`} onClick={(e) => { e.stopPropagation(); startCreate(f.path, "folder"); }}><FolderPlus size={13} /></button>
-                                    <button className="ftree-del" title="Delete folder" aria-label={`Delete ${f.path}`} onClick={(e) => { e.stopPropagation(); onDelete({ isFolder: true, path: f.path, name: f.name }); }}><Trash2 size={13} /></button>
-                                </span>
+                                {label(f.path, f.name)}
+                                {moreButton(folderItems(f), f.path)}
                             </div>
                             {isOpen && (
                                 <div role="group">
@@ -163,22 +305,25 @@ export default function ProjectFileTree({ files, activeFile, onSelect, onCreate,
                         </React.Fragment>
                     );
                 })}
-                {leaves.map(({ file, name: label, path }) => (
+                {leaves.map(({ file, name: text, path }) => (
                     <div
                         key={file.id || path}
-                        className={`ftree-item${activeFile?.id === file.id ? " active" : ""}`}
+                        className={`ftree-item${activeFile?.id === file.id ? " active" : ""}${dragPath === path ? " is-dragging" : ""}`}
                         style={{ paddingLeft: 25 + depth * 14 }}
-                        onClick={() => onSelect(file)}
+                        onClick={() => renaming?.path !== path && onSelect(file)}
                         role="treeitem"
                         tabIndex={0}
-                        onKeyDown={(e) => e.key === "Enter" && onSelect(file)}
+                        onKeyDown={(e) => {
+                            if (e.key === "Enter") onSelect(file);
+                            if (e.key === "F2" && onMove) setRenaming({ path, value: baseName(path) });
+                        }}
                         title={path}
+                        {...dragProps(path)}
+                        {...dropProps(node.path)}
                     >
-                        <FileIcon name={label} />
-                        <span className="ftree-name">{label}</span>
-                        <span className="ftree-row-actions">
-                            <button className="ftree-del" title="Delete file" aria-label={`Delete ${path}`} onClick={(e) => { e.stopPropagation(); onDelete(file); }}><Trash2 size={13} /></button>
-                        </span>
+                        <FileIcon name={text} />
+                        {label(path, text)}
+                        {moreButton(fileItems(file, path), path)}
                     </div>
                 ))}
             </>
@@ -199,15 +344,16 @@ export default function ProjectFileTree({ files, activeFile, onSelect, onCreate,
                     {query && <button onClick={() => setQuery("")} aria-label="Clear search"><X size={12} /></button>}
                 </div>
                 <button className="ftree-icon" title="New file" aria-label="New file" onClick={() => startCreate("", "file")}><FilePlus size={15} /></button>
-                <button className="ftree-icon" title="New folder" aria-label="New folder" onClick={() => startCreate("", "folder")}><FolderPlus size={15} /></button>
-                <button className="ftree-icon" title="Collapse all folders" aria-label="Collapse all folders" onClick={() => setOpen(new Set())} disabled={!open.size}><ChevronsDownUp size={14} /></button>
-                <label className="ftree-icon" title="Import file">
-                    <Upload size={14} />
-                    <input type="file" style={{ display: "none" }} onChange={onImport} />
-                </label>
+                <button className="ftree-icon" title="More: new folder, import, collapse" aria-label="More file actions" aria-haspopup="menu" onClick={(e) => openMenu(e, rootItems, "Project files")}><MoreVertical size={15} /></button>
+                <input ref={importRef} type="file" style={{ display: "none" }} onChange={onImport} />
             </div>
 
-            <div className="ftree-list" role="tree" aria-label="Project files">
+            <div
+                className={`ftree-list${dropAt === "" ? " is-drop-root" : ""}`}
+                role="tree"
+                aria-label="Project files"
+                {...dropProps("")}
+            >
                 {matches ? (
                     matches.length ? matches.map((file) => {
                         const p = relPath(file);
@@ -215,7 +361,7 @@ export default function ProjectFileTree({ files, activeFile, onSelect, onCreate,
                             <div key={file.id || p} className={`ftree-item${activeFile?.id === file.id ? " active" : ""}`} onClick={() => onSelect(file)} title={p}>
                                 <FileIcon name={p} />
                                 <span className="ftree-name">{baseName(p)}</span>
-                                {p.includes("/") && <span className="ftree-dirhint">{p.split("/").slice(0, -1).join("/")}</span>}
+                                {p.includes("/") && <span className="ftree-dirhint">{parentOf(p)}</span>}
                             </div>
                         );
                     }) : <div className="ftree-empty"><p>No files match "{query}".</p></div>
@@ -230,9 +376,42 @@ export default function ProjectFileTree({ files, activeFile, onSelect, onCreate,
                                 </button>
                             </div>
                         )}
+                        {dragPath && parentOf(dragPath) !== "" && (
+                            <div className="ftree-hint ftree-drop-hint">Drop here to move to the project root</div>
+                        )}
                     </>
                 )}
             </div>
+
+            {menu && (
+                <div className="u-pop ftree-pop" role="menu" aria-label={menu.title} style={{ position: "fixed", left: menu.x, top: menu.y, right: "auto", width: 210, minWidth: 0 }}>
+                    {menu.items.map((it) => (
+                        <button
+                            key={it.label}
+                            role="menuitem"
+                            className={it.danger ? "danger" : ""}
+                            disabled={it.disabled}
+                            onClick={() => { if (!it.keep) setMenu(null); it.run(); }}
+                        >
+                            <it.icon size={14} /> {it.label}
+                        </button>
+                    ))}
+                </div>
+            )}
+
+            {picker && (
+                <div className="u-pop ftree-pop ftree-picker" role="dialog" aria-label={`Move ${picker.path}`} style={{ position: "fixed", left: picker.x, top: picker.y, right: "auto", width: 240, minWidth: 0 }}>
+                    <div className="ftree-picker-head">Move <b>{baseName(picker.path)}</b> to</div>
+                    <div className="ftree-picker-list">
+                        {["", ...folders].filter((p) => canMoveInto(picker.path, p)).map((p) => (
+                            <button key={p || "/"} onClick={() => { moveInto(picker.path, p); setPicker(null); }}>
+                                <Folder size={14} /> <span>{p ? p : "Project root"}</span>
+                            </button>
+                        ))}
+                        {!["", ...folders].some((p) => canMoveInto(picker.path, p)) && <p className="ftree-hint" style={{ padding: "6px 10px" }}>No other folder yet. Create one first.</p>}
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

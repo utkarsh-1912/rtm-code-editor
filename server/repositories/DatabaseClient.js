@@ -174,6 +174,12 @@ async function initializeSchema() {
         await sql`ALTER TABLE sessions ADD COLUMN IF NOT EXISTS name VARCHAR(80);`;
         await sql`ALTER TABLE sessions ADD COLUMN IF NOT EXISTS revoked_at TIMESTAMP WITH TIME ZONE;`;
         await sql`ALTER TABLE rooms ADD COLUMN IF NOT EXISTS name VARCHAR(255);`;
+        // Project chat lives with the project (rooms rows are cleaned up after idle hours).
+        await sql`ALTER TABLE projects ADD COLUMN IF NOT EXISTS chat_history JSONB DEFAULT '[]'::jsonb;`;
+        // When each person last opened a room ("last active" on their dashboard).
+        // Added empty (a default here would stamp every existing row "now"), then defaulted.
+        await sql`ALTER TABLE user_rooms ADD COLUMN IF NOT EXISTS last_opened_at TIMESTAMP WITH TIME ZONE;`;
+        await sql`ALTER TABLE user_rooms ALTER COLUMN last_opened_at SET DEFAULT CURRENT_TIMESTAMP;`;
         // users created before these columns existed (CREATE TABLE IF NOT EXISTS never adds columns)
         await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS bio TEXT DEFAULT '';`;
         await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS social_links JSONB DEFAULT '{}'::jsonb;`;

@@ -54,7 +54,7 @@ export function parseReply(action, text, meta = {}) {
 
 /**
  * Ask the copilot. Installed app: local model via the desktop bridge (Ollama on this
- * machine) first, then the server. Browser: the server, which talks to its own model.
+ * machine) first, then the server. Browser: the server, which asks Gemini with its own key.
  */
 export async function askCopilot({ action, code, language, prompt, roomId, projectId, userId }) {
     const messages = buildMessages({ action, code, language, prompt });

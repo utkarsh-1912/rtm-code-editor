@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Search, Plus, Trash2, Pencil, Copy, Check, X, Users, Hash } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Search, Plus, Trash2, Pencil, Copy, Check, X, Users, Hash, User, Code2, LogIn } from 'lucide-react';
 import toast from 'react-hot-toast';
 import AppLayout from '../components/AppLayout';
 import OrganizationSettings from '../components/OrganizationSettings';
 import { useAuth } from '../context/AuthContext';
 import { getBackendUrl } from '../utils/api';
-import { Modal, timeAgo, pad2 } from '../components/ux/primitives';
+import { Modal, timeAgo } from '../components/ux/primitives';
 import { SNIPPET_LANGS } from '../utils/languages';
 import Pager from '../components/ux/Pager';
 
@@ -67,6 +68,7 @@ function SnippetView({ snippet, copied, onCopy, onEdit, onDelete, onClose }) {
 
 const Snippets = () => {
     const { user } = useAuth();
+    const navigate = useNavigate();
     const narrow = useIsNarrow();
     const [snippets, setSnippets] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -75,16 +77,17 @@ const Snippets = () => {
     const [copiedId, setCopiedId] = useState(null);
     const [organizations, setOrganizations] = useState([]);
     const [vault, setVault] = useState('personal');
-    const [showOrgSettings, setShowOrgSettings] = useState(false);
     const [selectedId, setSelectedId] = useState(null);
     const [mode, setMode] = useState(null); // create | edit | delete | view
     const [target, setTarget] = useState(null);
     const [form, setForm] = useState(EMPTY);
     const [tagDraft, setTagDraft] = useState('');
     const [busy, setBusy] = useState(false);
+    const [tab, setTab] = useState('snippets'); // snippets | teams
+    const [lang, setLang] = useState(null);
 
     const fetchOrgs = useCallback(async () => {
-        if (!user) return;
+        if (!user?.uid) return;
         try {
             const res = await fetch(`${getBackendUrl()}/api/organizations?userId=${user.uid}`);
             const data = await res.json();
@@ -96,7 +99,7 @@ const Snippets = () => {
     const [total, setTotal] = useState(0);
     const [loadingMore, setLoadingMore] = useState(false);
     const fetchSnippets = useCallback(async () => {
-        if (!user) return;
+        if (!user?.uid) { setLoading(false); return; }
         try {
             const backendUrl = getBackendUrl();
             const url = vault === 'personal'
@@ -141,14 +144,21 @@ const Snippets = () => {
         return snippets.filter((s) => {
             const matches = !q || [s.title, s.code, s.language].some((v) => (v || '').toLowerCase().includes(q))
                 || (s.tags || []).some((t) => t.toLowerCase().includes(q));
-            return matches && (!tag || (s.tags || []).includes(tag));
+            return matches && (!tag || (s.tags || []).includes(tag)) && (!lang || s.language === lang);
         });
-    }, [snippets, query, tag]);
+    }, [snippets, query, tag, lang]);
+
+    // Languages in this vault, most used first (side rail filter).
+    const langCounts = useMemo(() => {
+        const counts = new Map();
+        snippets.forEach((s) => counts.set(s.language, (counts.get(s.language) || 0) + 1));
+        return [...counts.entries()].sort((a, b) => b[1] - a[1]);
+    }, [snippets]);
 
     const [page, setPage] = useState(1);
-    useEffect(() => { setPage(1); }, [query, tag, vault]);
+    useEffect(() => { setPage(1); }, [query, tag, vault, lang]);
     const pageItems = filtered.slice((page - 1) * SNIPPET_PAGE, page * SNIPPET_PAGE);
-    const hasMore = vault === 'personal' && !query && !tag && snippets.length < total;
+    const hasMore = vault === 'personal' && !query && !tag && !lang && snippets.length < total;
 
     const selected = filtered.find((s) => s.id === selectedId) || pageItems[0] || null;
 
@@ -219,77 +229,129 @@ const Snippets = () => {
     };
 
     const vaultName = vault === 'personal' ? 'My vault' : organizations.find((o) => o.id === vault)?.name || 'Team';
+    const pickVault = (id) => { setVault(id); setTag(null); setLang(null); setSelectedId(null); setLoading(true); setTab('snippets'); };
+    const preview = (code) => (code || '').split('\n').filter((l) => l.trim()).slice(0, 2).join('\n');
 
     return (
         <AppLayout>
-            <div className="u-head">
-                <span className="u-label" data-rise>02 — Library</span>
-                <div className="u-head-body">
-                    <h1 className="u-lede" data-rise style={{ '--d': '60ms' }}>
-                        <b>Code worth keeping.</b> Save a snippet once and drop it into any room.
-                    </h1>
-                    <div className="u-head-actions" data-rise style={{ '--d': '120ms' }}>
-                        <button className="u-btn u-btn--solid" onClick={() => open('create')}><Plus size={16} /> New snippet</button>
-                        <button className="u-btn u-btn--ghost" onClick={() => setShowOrgSettings(true)}><Users size={16} /> Teams</button>
+            <div className="sn-head" data-rise>
+                <div className="sn-head-text">
+                    <span className="u-label">Library</span>
+                    <h1>Snippets</h1>
+                    <p>Save code once, drop it into any room. Share a vault with your team.</p>
+                </div>
+                <div className="sn-head-actions">
+                    <div className="u-seg" role="tablist" aria-label="Library">
+                        <button role="tab" aria-selected={tab === 'snippets'} className={tab === 'snippets' ? 'on' : ''} onClick={() => setTab('snippets')}><Code2 size={13} /> Snippets</button>
+                        <button role="tab" aria-selected={tab === 'teams'} className={tab === 'teams' ? 'on' : ''} onClick={() => setTab('teams')}><Users size={13} /> Teams{organizations.length ? ` · ${organizations.length}` : ''}</button>
                     </div>
+                    {tab === 'snippets' && user?.uid && <button className="u-btn u-btn--solid u-btn--sm" onClick={() => open('create')}><Plus size={15} /> New snippet</button>}
                 </div>
             </div>
 
-            <div className="s-vaults" data-rise style={{ marginBottom: 14 }}>
-                <button className={`u-chip${vault === 'personal' ? ' on' : ''}`} onClick={() => { setVault('personal'); setTag(null); setLoading(true); }}>My vault</button>
-                {organizations.map((org) => (
-                    <button key={org.id} className={`u-chip${vault === org.id ? ' on' : ''}`} onClick={() => { setVault(org.id); setTag(null); setLoading(true); }}>{org.name}</button>
-                ))}
-            </div>
+            {!user?.uid ? (
+                <div className="u-card sn-guest" data-rise>
+                    <span className="sn-empty-ico"><Code2 size={22} /></span>
+                    <b>Sign in to keep snippets</b>
+                    <p>Snippets and team vaults belong to your account, so they follow you to every room and device.</p>
+                    <button className="u-btn u-btn--solid u-btn--sm" onClick={() => navigate('/login', { state: { from: '/snippets' } })}><LogIn size={15} /> Sign in</button>
+                </div>
+            ) : tab === 'teams' ? (
+                <div className="u-card sn-teams" data-rise>
+                    <OrganizationSettings
+                        inline
+                        userId={user?.uid}
+                        userName={user?.name || user?.email?.split('@')[0]}
+                        userEmail={user?.email}
+                        onChanged={fetchOrgs}
+                        onOpenVault={pickVault}
+                    />
+                </div>
+            ) : (
+                <div className="sn-lib" data-rise style={{ '--d': '60ms' }}>
+                    <aside className="sn-rail" aria-label="Filters">
+                        <div className="sn-rail-group">
+                            <span className="u-label">Vaults</span>
+                            <button className={vault === 'personal' ? 'on' : ''} onClick={() => pickVault('personal')}>
+                                <User size={14} /> <span className="u-ellipsis">My vault</span>
+                                {vault === 'personal' && <em>{total || snippets.length}</em>}
+                            </button>
+                            {organizations.map((org) => (
+                                <button key={org.id} className={vault === org.id ? 'on' : ''} onClick={() => pickVault(org.id)}>
+                                    <Users size={14} /> <span className="u-ellipsis">{org.name}</span>
+                                    {vault === org.id && <em>{snippets.length}</em>}
+                                </button>
+                            ))}
+                            <button className="sn-rail-link" onClick={() => setTab('teams')}><Plus size={14} /> {organizations.length ? 'Manage teams' : 'Create a team'}</button>
+                        </div>
+                        {langCounts.length > 1 && (
+                            <div className="sn-rail-group">
+                                <span className="u-label">Language</span>
+                                {langCounts.map(([l, n]) => (
+                                    <button key={l} className={lang === l ? 'on' : ''} onClick={() => setLang(lang === l ? null : l)}>
+                                        <span className="sn-dot" data-lang={l} /> <span className="u-ellipsis">{langName(l)}</span> <em>{n}</em>
+                                    </button>
+                                ))}
+                            </div>
+                        )}
+                        {allTags.length > 0 && (
+                            <div className="sn-rail-group">
+                                <span className="u-label">Tags</span>
+                                <div className="sn-rail-tags">
+                                    {allTags.map((t) => (
+                                        <button key={t} className={`u-chip u-chip--mono${tag === t ? ' on' : ''}`} onClick={() => setTag(tag === t ? null : t)}><Hash size={11} />{t}</button>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                    </aside>
 
-            <div className="u-sheetbox" data-rise style={{ '--d': '80ms' }}>
-                <div className="s-lib">
-                    <div className="u-card s-list">
-                        <div className="d-toolbar">
+                    <div className="u-card sn-list">
+                        <div className="sn-toolbar">
                             <label className="u-search" style={{ flex: 1, maxWidth: 'none' }}>
                                 <Search size={15} />
                                 <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder={`Search ${vaultName.toLowerCase()}`} aria-label="Search snippets" />
                             </label>
-                            <span className="u-label">{filtered.length} / {total || snippets.length}</span>
+                            <span className="u-label">{filtered.length}{(query || tag || lang) ? ` / ${total || snippets.length}` : ''}</span>
                         </div>
-
-                        {allTags.length > 0 && (
-                            <div className="s-tags">
-                                {allTags.map((t) => (
-                                    <button key={t} className={`u-chip u-chip--mono${tag === t ? ' on' : ''}`} onClick={() => setTag(tag === t ? null : t)}><Hash size={11} />{t}</button>
-                                ))}
+                        {(tag || lang) && (
+                            <div className="sn-active-filters">
+                                {lang && <button className="u-chip on" onClick={() => setLang(null)}>{langName(lang)} <X size={11} /></button>}
+                                {tag && <button className="u-chip u-chip--mono on" onClick={() => setTag(null)}>#{tag} <X size={11} /></button>}
                             </div>
                         )}
 
                         {loading ? (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                                {[0, 1, 2, 3].map((i) => <div key={i} className="u-skel" style={{ height: 56 }} />)}
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: 4 }}>
+                                {[0, 1, 2, 3].map((i) => <div key={i} className="u-skel" style={{ height: 76 }} />)}
                             </div>
                         ) : filtered.length === 0 ? (
-                            <div className="u-empty">
-                                <span className="u-display">{query || tag ? 'No match' : 'Empty'}</span>
-                                <p>{query || tag ? 'Try another search or clear the tag.' : `Nothing in ${vaultName.toLowerCase()} yet.`}</p>
-                                {!query && !tag && <button className="u-btn u-btn--solid" onClick={() => open('create')}><Plus size={16} /> New snippet</button>}
+                            <div className="u-empty sn-empty">
+                                <span className="sn-empty-ico"><Code2 size={22} /></span>
+                                <b>{query || tag || lang ? 'Nothing matches' : `${vaultName} is empty`}</b>
+                                <p>{query || tag || lang ? 'Try another search or clear the filters.' : 'Save a snippet you reuse: a hook, a query, a config.'}</p>
+                                {!query && !tag && !lang && <button className="u-btn u-btn--solid u-btn--sm" onClick={() => open('create')}><Plus size={15} /> New snippet</button>}
                             </div>
                         ) : (
-                            <ul className="u-rows" style={{ borderTop: 0 }}>
-                                {pageItems.map((s, i) => {
+                            <ul className="sn-cards">
+                                {pageItems.map((s) => {
                                     const isOn = !narrow && selected?.id === s.id;
                                     const pick = () => (narrow ? open('view', s) : setSelectedId(s.id));
                                     return (
-                                        <li key={s.id} className={`u-row s-item${isOn ? ' on' : ''}`} tabIndex={0} onClick={pick} onKeyDown={(e) => e.key === 'Enter' && pick()}>
-                                            <span className="s-lang">{langShort(s.language)}</span>
-                                            <div className="u-row-main">
-                                                <span className="u-row-title u-ellipsis" style={{ fontSize: 15.5 }}>{s.title}</span>
-                                                <span className="u-row-meta">
-                                                    <span className="u-mono">{pad2((page - 1) * SNIPPET_PAGE + i + 1)}</span>
-                                                    {(s.tags || []).slice(0, 3).map((t) => <span key={t} className="u-mono">#{t}</span>)}
-                                                    <span className="u-mono">{timeAgo(s.updated_at || s.created_at)}</span>
-                                                </span>
+                                        <li key={s.id} className={`sn-card${isOn ? ' on' : ''}`} tabIndex={0} onClick={pick} onKeyDown={(e) => e.key === 'Enter' && pick()}>
+                                            <div className="sn-card-top">
+                                                <span className="s-lang" data-lang={s.language}>{langShort(s.language)}</span>
+                                                <b className="u-ellipsis">{s.title}</b>
+                                                <button className="u-icon sn-copy" onClick={(e) => { e.stopPropagation(); copy(s); }} aria-label={`Copy ${s.title}`} title="Copy">
+                                                    {copiedId === s.id ? <Check size={15} /> : <Copy size={15} />}
+                                                </button>
                                             </div>
-                                            <button className="u-icon" onClick={(e) => { e.stopPropagation(); copy(s); }} aria-label={`Copy ${s.title}`}>
-                                                {copiedId === s.id ? <Check size={16} /> : <Copy size={16} />}
-                                            </button>
+                                            {preview(s.code) && <pre className="sn-card-code">{preview(s.code)}</pre>}
+                                            <div className="sn-card-meta">
+                                                {(s.tags || []).slice(0, 3).map((t) => <span key={t}>#{t}</span>)}
+                                                {s.author_name && vault !== 'personal' && <span>by {s.author_name}</span>}
+                                                <span className="sn-card-when">{timeAgo(s.updated_at || s.created_at)}</span>
+                                            </div>
                                         </li>
                                     );
                                 })}
@@ -300,7 +362,7 @@ const Snippets = () => {
                                 page={page}
                                 pageSize={SNIPPET_PAGE}
                                 loaded={filtered.length}
-                                total={query || tag ? filtered.length : total || snippets.length}
+                                total={query || tag || lang ? filtered.length : total || snippets.length}
                                 onPage={setPage}
                                 hasMore={hasMore}
                                 onLoadMore={loadMoreSnippets}
@@ -327,7 +389,7 @@ const Snippets = () => {
                         )}
                     </section>
                 </div>
-            </div>
+            )}
 
             {mode === 'view' && target && (
                 <div className="u-modal-back" onMouseDown={(e) => e.target === e.currentTarget && close()}>
@@ -401,12 +463,6 @@ const Snippets = () => {
                 </>}
             />
 
-            <OrganizationSettings
-                isOpen={showOrgSettings}
-                onClose={() => { setShowOrgSettings(false); fetchOrgs(); }}
-                userId={user?.uid}
-                userName={user?.name || user?.email?.split('@')[0]}
-            />
         </AppLayout>
     );
 };

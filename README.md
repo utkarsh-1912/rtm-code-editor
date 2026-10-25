@@ -78,9 +78,12 @@ JUDGE0_URL=http://localhost:2358     # self-hosted Judge0 CE
 # RUNNER_ENGINES=judge0,local        # order to try; "local" runs processes on the server
 # RUNNER_LOCAL=1                     # allow the local engine in production (unsandboxed!)
 
-# AI copilot (any OpenAI-compatible endpoint)
-LLM_BASE_URL=http://localhost:11434/v1
-LLM_MODEL=qwen2.5-coder:1.5b
+# AI copilot: Google Gemini (key stays on the server)
+GEMINI_API_KEY=…
+# GEMINI_MODEL=gemini-3.6-flash
+# Self-hosted model instead (wins over Gemini when set): any OpenAI-compatible server
+# LLM_BASE_URL=http://localhost:11434/v1
+# LLM_MODEL=qwen2.5-coder:1.5b
 # LLM_API_KEY=…
 ```
 
@@ -110,7 +113,9 @@ API: `POST /api/run` with `{ "language": "python", "source": "print(1)", "stdin"
 
 ### AI copilot
 
-The client builds the prompt and the server forwards it to `LLM_BASE_URL`, so any OpenAI-compatible server works. Small open-weight code models are a good fit:
+The client builds the prompt and the server forwards it to the model. The website uses **Google Gemini** (`gemini-3.6-flash` by default) with `GEMINI_API_KEY`, which stays on the server and never reaches the browser. Get a key from Google AI Studio.
+
+The desktop app runs a local model on your machine first (Ollama), then falls back to the server. To self-host the server's model instead of Gemini, set `LLM_BASE_URL` to any OpenAI-compatible server. Small open-weight code models are a good fit:
 
 | Model | Size | Good for |
 | --- | --- | --- |
@@ -161,7 +166,7 @@ npm run dist              # bundle-web + installers for the current OS into desk
 - **API + web:** `npm run build` then `NODE_ENV=production node server.js`. In production the server also serves the React build. Render, Railway and Fly all work, and so does any Node host.
 - **Database:** any Postgres. The schema is created automatically on start, and `npm run setup-db` creates it on demand.
 - **Code runner:** point `JUDGE0_URL` at a Judge0 instance, or deploy `npm run runner` separately next to it.
-- **AI:** point `LLM_BASE_URL` at your model server. Without one, the copilot says no model is reachable instead of failing silently.
+- **AI:** set `GEMINI_API_KEY` on the API host (or `LLM_BASE_URL` for a self-hosted model). Without either, the copilot says it isn't set up instead of failing silently.
 
 ## Project layout
 

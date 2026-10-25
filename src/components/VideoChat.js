@@ -792,9 +792,17 @@ const VideoChat = ({
     const [pinned, setPinned] = useState(null);
     const [fitStage, setFitStage] = useState(true); // contain (true) or fill the stage
     const [clearKey, setClearKey] = useState(0);
+    const layoutBeforePin = useRef('grid');
+    // Pin puts someone on the stage; unpin returns to the view you had before pinning.
     const togglePin = (id) => {
-        setPinned((cur) => (cur === id ? null : id));
-        setLayout((l) => (pinned === id ? l : 'speaker'));
+        if (pinned === id) {
+            setPinned(null);
+            setLayout(layoutBeforePin.current);
+            return;
+        }
+        if (!pinned) layoutBeforePin.current = layout;
+        setPinned(id);
+        setLayout('speaker');
     };
     const toggleFullscreen = () => {
         const el = rootRef.current;
@@ -842,7 +850,7 @@ const VideoChat = ({
                 className={`vc-tile vc-tile--${variant}${activeSpeaker === p.id && !mutedOf(p) ? ' is-speaking' : ''}${pinned === p.id ? ' is-pinned' : ''}`}
                 style={style}
                 onDoubleClick={() => !presenting && variant !== 'strip' && togglePin(p.id)}
-                onClick={variant === 'strip' ? () => (isScreen ? setPinned(null) : togglePin(p.id)) : undefined}
+                onClick={variant === 'strip' ? () => (isScreen ? pinned && togglePin(pinned) : togglePin(p.id)) : undefined}
                 title={variant === 'strip' ? (isScreen ? 'Back to the shared screen' : `Show ${name} on the stage`) : undefined}
             >
                 {cameraOn(p) ? (
@@ -862,6 +870,11 @@ const VideoChat = ({
                     {mutedOf(p) ? <MicOff size={12} className="vc-red" /> : <Mic size={12} />}
                     <span>{label}</span>
                 </div>
+                {variant === 'stage' && pinned === p.id && (
+                    <button className="vc-unpin" onClick={() => togglePin(p.id)} title="Unpin" aria-label={`Unpin ${name}`}>
+                        <PinOff size={13} /> Unpin
+                    </button>
+                )}
                 {variant === 'grid' && count > 1 && (
                     <button className="vc-pin" onClick={() => togglePin(p.id)} title={pinned === p.id ? 'Unpin' : 'Pin to spotlight'} aria-label={pinned === p.id ? `Unpin ${name}` : `Pin ${name}`}>
                         {pinned === p.id ? <PinOff size={13} /> : <Pin size={13} />}
@@ -905,7 +918,7 @@ const VideoChat = ({
                                 <span className="vc-live-dot" />
                                 <span>{sharer.isLocal ? "You're presenting" : `${nameFor(sharer)} is presenting`}</span>
                                 <span className="vc-banner-actions">
-                                    <button className="vc-back" onClick={() => setPinned(null)}><ScreenShare size={13} /> Back to shared screen</button>
+                                    <button className="vc-back" onClick={() => togglePin(pinned)}><ScreenShare size={13} /> Back to shared screen</button>
                                 </span>
                             </div>
                         )}

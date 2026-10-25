@@ -25,7 +25,7 @@ export default function Privacy() {
 
             <h2>3. Third-Party Services</h2>
             <p>
-                We use <strong>Judge0</strong> for code execution, <strong>Neon (PostgreSQL)</strong> for data persistence and <strong>Firebase Auth</strong> for sign-in. Payments are processed by <strong>Stripe</strong>; we receive your plan status and a customer ID, never your card number. Notifications are delivered with <strong>OneSignal</strong> (push and email fallback) and transactional email with <strong>Brevo</strong>. For push, your account ID is registered with OneSignal as your identifier, and your email address is shared with it when email delivery is needed. Please refer to their policies for further details.
+                We use <strong>Judge0</strong> for code execution, <strong>Neon (PostgreSQL)</strong> for data persistence and <strong>Firebase Auth</strong> for sign-in. Payments are processed by <strong>Stripe</strong>; we receive your plan status and a customer ID, never your card number. The AI copilot on the website uses <strong>Google Gemini</strong>: when you ask it something, your prompt and the code you asked about are sent through our server to Google to get an answer. Notifications are delivered with <strong>OneSignal</strong> (push and email fallback) and transactional email with <strong>Brevo</strong>. For push, your account ID is registered with OneSignal as your identifier, and your email address is shared with it when email delivery is needed. Please refer to their policies for further details.
             </p>
 
             <h2>4. Desktop App and Local Processing</h2>

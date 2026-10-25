@@ -23,7 +23,7 @@ function setupEditorSocket(io, socket, safeSocket, context) {
         // Announce the join before touching the database so a slow or cold DB
         // never blocks people from collaborating.
         io.in(roomId).emit(ACTIONS.JOINED, { clients: getAllClients(roomId), userName: finalUserName, socketId: socket.id });
-        if (roomChatHistory[roomId]?.length > 0) socket.emit(ACTIONS.SYNC_CHAT, { messages: roomChatHistory[roomId] });
+        if (roomChatHistory[roomId]) socket.emit(ACTIONS.SYNC_CHAT, { messages: roomChatHistory[roomId] });
 
         if (getAllClients(roomId).length >= 2 && !pairedRooms.has(roomId)) {
             pairedRooms.add(roomId);
@@ -35,7 +35,7 @@ function setupEditorSocket(io, socket, safeSocket, context) {
             if (dbRoom) {
                 if (!roomChatHistory[roomId]) {
                     roomChatHistory[roomId] = dbRoom.chat_history || [];
-                    if (roomChatHistory[roomId].length) socket.emit(ACTIONS.SYNC_CHAT, { messages: roomChatHistory[roomId] });
+                    socket.emit(ACTIONS.SYNC_CHAT, { messages: roomChatHistory[roomId] });
                 }
                 // Only seed code from the DB when nobody else is in the room to sync it live.
                 if (getAllClients(roomId).length <= 1 && dbRoom.code !== null) socket.emit(ACTIONS.CODE_CHANGE, { code: dbRoom.code });
@@ -68,7 +68,17 @@ function setupEditorSocket(io, socket, safeSocket, context) {
         const files = await ProjectRepository.getProjectFiles(projectId);
         files.forEach(file => socket.emit(ACTIONS.FILE_CHANGE, { fileId: file.id, path: file.path, content: file.content, socketId: 'server' }));
 
-        if (roomChatHistory[roomId]?.length > 0) socket.emit(ACTIONS.SYNC_CHAT, { messages: roomChatHistory[roomId] });
+        // Chat is stored on the project; load it once per server run, then keep it in memory.
+        if (!roomChatHistory[roomId]) {
+            try {
+                const stored = await RoomRepository.getChatHistory(roomId);
+                if (stored && !roomChatHistory[roomId]) roomChatHistory[roomId] = stored;
+            } catch (err) {
+                console.error("Project chat unavailable:", err.message);
+            }
+        }
+        if (roomChatHistory[roomId]) socket.emit(ACTIONS.SYNC_CHAT, { messages: roomChatHistory[roomId] });
+        ProjectRepository.touchProject(projectId).catch(() => { });
         if (context.roomWhiteboardState[roomId]?.length > 0) socket.emit(ACTIONS.WHITEBOARD_SYNC, { elements: context.roomWhiteboardState[roomId] });
 
         const clients = getAllClients(roomId);
@@ -121,16 +131,22 @@ function setupEditorSocket(io, socket, safeSocket, context) {
         roomChatHistory[roomId].push(message);
         if (roomChatHistory[roomId].length > 50) roomChatHistory[roomId].shift();
         socket.in(roomId).emit(ACTIONS.RECEIVE_MESSAGE, message);
-        RoomRepository.updateRoomChat(roomId, roomChatHistory[roomId]);
+        RoomRepository.updateRoomChat(roomId, roomChatHistory[roomId]).catch(() => { });
     }));
 
     socket.on(ACTIONS.EDIT_MESSAGE, safeSocket(({ roomId, messageId, newText }) => {
-        if (roomChatHistory[roomId]) roomChatHistory[roomId] = roomChatHistory[roomId].map(m => m.id === messageId ? { ...m, text: newText, isEdited: true } : m);
+        if (roomChatHistory[roomId]) {
+            roomChatHistory[roomId] = roomChatHistory[roomId].map(m => m.id === messageId ? { ...m, text: newText, isEdited: true } : m);
+            RoomRepository.updateRoomChat(roomId, roomChatHistory[roomId]).catch(() => { });
+        }
         socket.in(roomId).emit(ACTIONS.EDIT_MESSAGE, { messageId, newText });
     }));
 
     socket.on(ACTIONS.DELETE_MESSAGE, safeSocket(({ roomId, messageId }) => {
-        if (roomChatHistory[roomId]) roomChatHistory[roomId] = roomChatHistory[roomId].filter(m => m.id !== messageId);
+        if (roomChatHistory[roomId]) {
+            roomChatHistory[roomId] = roomChatHistory[roomId].filter(m => m.id !== messageId);
+            RoomRepository.updateRoomChat(roomId, roomChatHistory[roomId]).catch(() => { });
+        }
         socket.in(roomId).emit(ACTIONS.DELETE_MESSAGE, { messageId });
     }));
 

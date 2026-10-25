@@ -35,7 +35,30 @@ async function updateRoomLanguage(roomId, language) {
     `;
 }
 
+// Project chat uses the socket room "project-<id>" and is stored on the project row.
+const projectIdOf = (roomId) => {
+    const m = /^project-(\d+)$/.exec(String(roomId || ''));
+    return m ? Number(m[1]) : null;
+};
+
+// Stored chat for a room or a project room; null when there is no row.
+async function getChatHistory(roomId) {
+    const projectId = projectIdOf(roomId);
+    const rows = projectId
+        ? await sql`SELECT chat_history FROM projects WHERE id = ${projectId}`
+        : await sql`SELECT chat_history FROM rooms WHERE room_id = ${roomId}`;
+    return rows.length ? (Array.isArray(rows[0].chat_history) ? rows[0].chat_history : []) : null;
+}
+
 async function updateRoomChat(roomId, chatHistory) {
+    const projectId = projectIdOf(roomId);
+    if (projectId) {
+        return await sql`
+            UPDATE projects
+            SET chat_history = ${JSON.stringify(chatHistory)}, updated_at = CURRENT_TIMESTAMP
+            WHERE id = ${projectId}
+        `;
+    }
     return await sql`
         UPDATE rooms 
         SET chat_history = ${JSON.stringify(chatHistory)}, updated_at = CURRENT_TIMESTAMP 
@@ -71,9 +94,9 @@ async function linkRoomToUser(userId, roomId) {
     if (!room.length) return null;
 
     return await sql`
-        INSERT INTO user_rooms (user_id, room_id)
-        VALUES (${user[0].id}, ${room[0].id})
-        ON CONFLICT (user_id, room_id) DO NOTHING
+        INSERT INTO user_rooms (user_id, room_id, last_opened_at)
+        VALUES (${user[0].id}, ${room[0].id}, CURRENT_TIMESTAMP)
+        ON CONFLICT (user_id, room_id) DO UPDATE SET last_opened_at = CURRENT_TIMESTAMP
         RETURNING *
     `;
 }
@@ -134,10 +157,11 @@ async function getUserRoomsPage(userId, { limit, offset }) {
     const uid = user[0].id;
     const [rows, count] = await Promise.all([
         sql`
-            SELECT r.room_id, r.name, r.language, r.updated_at
+            SELECT r.room_id, r.name, r.language,
+                   GREATEST(r.updated_at, COALESCE(ur.last_opened_at, r.updated_at)) AS updated_at
             FROM rooms r JOIN user_rooms ur ON r.id = ur.room_id
             WHERE ur.user_id = ${uid}
-            ORDER BY r.updated_at DESC, r.id DESC
+            ORDER BY 4 DESC, r.id DESC
             LIMIT ${limit} OFFSET ${offset}
         `,
         sql`SELECT COUNT(*)::int AS n FROM user_rooms WHERE user_id = ${uid}`,
@@ -157,6 +181,7 @@ module.exports = {
     updateRoomCode,
     updateRoomLanguage,
     updateRoomChat,
+    getChatHistory,
     updateRoomName,
     updateLastRoom,
     linkRoomToUser,

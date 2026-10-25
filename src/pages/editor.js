@@ -47,7 +47,7 @@ import DiffViewerModal from "../components/DiffViewerModal";
 import AnalyticsDashboardModal from "../components/AnalyticsDashboardModal";
 import FocusModeModal from "../components/FocusModeModal";
 import { History, Activity, Video as VideoIcon, LayoutTemplate, FileText } from "lucide-react";
-import RoomLayout, { useRoomLayout, LayoutMenu, CardHandle } from "../components/RoomLayout";
+import RoomLayout, { useRoomLayout, LayoutMenu, CardHandle, useDockSlot } from "../components/RoomLayout";
 import ProblemPane from "../components/ProblemPane";
 import { rememberRoom } from "../utils/recentRooms";
 import AiIcon from "../components/AiIcon";
@@ -138,23 +138,7 @@ function Editor() {
   const [isMeetingStarting, setIsMeetingStarting] = useState(false);
   // Call card in the layout: the card holds an empty slot and the (single) call window sits
   // exactly over it, so moving between docked and floating never restarts the call.
-  const [callSlot, setCallSlot] = useState(null);
-  const [callRect, setCallRect] = useState(null);
-  useEffect(() => {
-    if (!callSlot) { setCallRect(null); return undefined; }
-    const measure = () => {
-      const r = callSlot.getBoundingClientRect();
-      setCallRect((p) => (p && p.left === r.left && p.top === r.top && p.width === r.width && p.height === r.height
-        ? p : { left: r.left, top: r.top, width: r.width, height: r.height }));
-    };
-    measure();
-    const ro = new ResizeObserver(measure);
-    ro.observe(callSlot);
-    const area = callSlot.closest(".rl");
-    if (area) ro.observe(area);
-    window.addEventListener("resize", measure);
-    return () => { ro.disconnect(); window.removeEventListener("resize", measure); };
-  }, [callSlot]);
+  const [setCallSlot, callRect] = useDockSlot();
   const [mediaStates, setMediaStates] = useState({});
 
   useEffect(() => {

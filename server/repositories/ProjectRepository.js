@@ -100,6 +100,39 @@ async function deleteProjectFile(projectId, path, { recursive = false } = {}) {
     `;
 }
 
+// Move (or rename) a file, or a folder with everything under it, to a new path. Fails when
+// something already sits at a destination path. Returns the moved rows.
+async function moveProjectPath(projectId, from, to) {
+    const norm = (v) => String(v || '').replace(/\\/g, '/').replace(/^[/]+/, '').replace(/[/]+$/, '');
+    const f = norm(from);
+    const t = norm(to);
+    const fail = (status, message) => Object.assign(new Error(message), { status });
+    if (!f || !t) throw fail(400, 'Missing path');
+    if (t.length > 400 || t.split('/').some((seg) => !seg || seg === '.' || seg === '..')) throw fail(400, `Bad path: ${to}`);
+    if (f === t) return [];
+    if (t.startsWith(`${f}/`)) throw fail(400, 'A folder cannot move into itself');
+    const rows = await sql`SELECT id, path FROM project_files WHERE project_id = ${projectId}`;
+    const rel = (r) => norm(r.path);
+    const moving = rows.filter((r) => rel(r) === f || rel(r).startsWith(`${f}/`));
+    if (!moving.length) throw fail(404, `${f} not found`);
+    const staying = new Set(rows.filter((r) => !moving.includes(r)).map(rel));
+    const target = moving.map((r) => t + rel(r).slice(f.length));
+    const clash = target.find((p) => staying.has(p));
+    if (clash) throw fail(409, `${clash} already exists`);
+    return await sql`
+        UPDATE project_files AS pf
+        SET path = '/' || v.p, name = left(v.p, 255), updated_at = CURRENT_TIMESTAMP
+        FROM unnest(${moving.map((r) => r.id)}::int[], ${target}::text[]) AS v(id, p)
+        WHERE pf.id = v.id AND pf.project_id = ${projectId}
+        RETURNING pf.*;
+    `;
+}
+
+// Mark a project as active now (opened, or its files changed): "last active" on dashboards.
+async function touchProject(projectId) {
+    return await sql`UPDATE projects SET updated_at = CURRENT_TIMESTAMP WHERE id = ${projectId}`;
+}
+
 async function deleteProject(projectId) {
     return await sql`DELETE FROM projects WHERE id = ${projectId}`;
 }
@@ -156,5 +189,7 @@ module.exports = {
     getProjectFiles,
     upsertProjectFile,
     deleteProjectFile,
+    moveProjectPath,
+    touchProject,
     deleteProject
 };

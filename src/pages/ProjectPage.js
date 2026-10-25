@@ -25,6 +25,7 @@ import toast from "react-hot-toast";
 import ProjectEditor from "../components/ProjectEditor";
 import ProjectFileTree, { FileIcon, relPath } from "../components/ProjectFileTree";
 import WorkspaceHeader from "../components/WorkspaceHeader";
+import RoomLayout, { useRoomLayout, LayoutMenu, CardHandle, useDockSlot } from "../components/RoomLayout";
 import Client from "../components/clients";
 import Loader from "../components/ux/Loader";
 import { getBackendUrl } from "../utils/api";
@@ -57,7 +58,8 @@ import {
     SquareTerminal,
     HardDriveDownload,
     FileUp,
-    FolderOpen
+    FolderOpen,
+    LayoutTemplate
 } from "lucide-react";
 import { bundleWebProject } from "../utils/webBundle";
 import AiIcon from "../components/AiIcon";
@@ -68,6 +70,34 @@ const SIDE_TABS = [
     { id: 'chat', label: 'Chat', Icon: MessageSquare },
     { id: 'users', label: 'People', Icon: Users },
 ];
+
+// Optional card layout (same machinery as rooms, project cards). Classic, the sidebar layout,
+// stays the default; cards are opt-in from the status bar's layout menu.
+const PROJECT_LAYOUT = {
+    key: 'project-layout-v1',
+    panels: {
+        files: { label: 'Files' },
+        code: { label: 'Editor' },
+        output: { label: 'Output' },
+        chat: { label: 'Chat' },
+        people: { label: 'People' },
+        call: { label: 'Call' },
+    },
+    presets: [
+        { id: 'ide', label: 'Files left', note: 'Like an IDE', layout: { left: ['files'], right: ['code', 'output'] } },
+        { id: 'team', label: 'Files and chat', note: 'Team project', layout: { left: ['files', 'chat'], right: ['code', 'output'] } },
+        { id: 'preview', label: 'Preview right', note: 'Web projects', layout: { left: ['files', 'code'], right: ['output'] } },
+        { id: 'pair', label: 'Files and call', note: 'Pairing', layout: { left: ['files', 'call'], right: ['code', 'output'] } },
+        { id: 'review', label: 'Chat right', note: 'Code review', layout: { left: ['code', 'output'], right: ['chat', 'people'] } },
+        { id: 'focus', label: 'Focus', note: 'Just the code', layout: { left: [], right: ['code', 'output'] } },
+    ],
+    fallback: { left: ['files'], right: ['code', 'output'] },
+    toggles: ['files', 'chat', 'people', 'call'],
+    below: { output: 'code' },
+};
+// Default card heights in a column, by weight (the editor gets most of it).
+const PROJECT_WEIGHT = { code: 3, output: 1.4, files: 1, chat: 1.2, people: 0.8, call: 1.4 };
+const projectFlex = (id, ids) => (PROJECT_WEIGHT[id] || 1) / ids.reduce((sum, x) => sum + (PROJECT_WEIGHT[x] || 1), 0);
 
 const ProjectPage = () => {
     const { projectId } = useParams();
@@ -127,11 +157,22 @@ const ProjectPage = () => {
     const [isMeetingStarting, setIsMeetingStarting] = useState(false);
     const [isZenMode, setIsZenMode] = useState(false);
     const [showCommandPalette, setShowCommandPalette] = useState(false);
+    const projectLayout = useRoomLayout(PROJECT_LAYOUT);
+    const [layoutMode, setLayoutMode] = useState(() => {
+        try { return localStorage.getItem('project-layout-mode') === 'cards' ? 'cards' : 'classic'; } catch { return 'classic'; }
+    });
+    useEffect(() => {
+        try { localStorage.setItem('project-layout-mode', layoutMode); } catch { /* storage blocked */ }
+    }, [layoutMode]);
+    const [showLayoutMenu, setShowLayoutMenu] = useState(false);
+    const [setCallSlot, callRect] = useDockSlot();
+    const cards = layoutMode === 'cards' && !isMobile && !isZenMode;
 
     const socketRef = useRef(null);
     const hasJoinedRef = useRef(false);
     const filesRef = useRef([]);
     const openFilesRef = useRef([]);
+    const reloadFilesRef = useRef(null);
     const saveTimeoutRef = useRef(null);
     const compileRef = useRef(null);
     const saveDiskRef = useRef(null);
@@ -333,7 +374,7 @@ const ProjectPage = () => {
                             <button className="u-icon" onClick={() => window.open(`/render/${projectId}`, '_blank')} title="Open preview in a new tab" aria-label="Open preview in a new tab"><ExternalLink size={14} /></button>
                         </>
                     )}
-                    <button className="u-icon" onClick={() => setIsOutputVisible(false)} title="Hide panel" aria-label="Hide panel"><X size={14} /></button>
+                    {!cards && <button className="u-icon" onClick={() => setIsOutputVisible(false)} title="Hide panel" aria-label="Hide panel"><X size={14} /></button>}
                 </div>
             </div>
             <div style={{ flex: 1, position: 'relative', overflow: 'hidden', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
@@ -369,7 +410,7 @@ const ProjectPage = () => {
                     <span>Output</span>
                     <div className="ws-out-actions">
                         <button className="u-icon" onClick={() => setOutput("")} title="Clear output" aria-label="Clear output"><Trash2 size={14} /></button>
-                        <button className="u-icon" onClick={() => setIsOutputVisible(false)} title="Hide panel" aria-label="Hide panel"><X size={14} /></button>
+                        {!cards && <button className="u-icon" onClick={() => setIsOutputVisible(false)} title="Hide panel" aria-label="Hide panel"><X size={14} /></button>}
                     </div>
                 </div>
                 <pre className="ws-console">{isExecuting ? <span className="u-caret">Running</span> : (output || <span className="u-caret">No output yet. Press Run</span>)}</pre>
@@ -563,6 +604,9 @@ const ProjectPage = () => {
                     setMediaStates(prev => ({ ...prev, [userId]: { ...prev[userId], ...state } }));
                 });
 
+                // Someone created, moved, imported or deleted files: reload the list.
+                socketRef.current.on('project-files-changed', () => { reloadFilesRef.current?.(); });
+
                 socketRef.current.on('project-renamed', ({ name }) => {
                     if (name) setProject((p) => (p ? { ...p, name } : p));
                 });
@@ -592,11 +636,12 @@ const ProjectPage = () => {
                 });
 
                 // Sync chat history when joining project room
+                // The server's history wins over the browser cache: it knows about deleted
+                // messages and ones sent while you were away. The cache only shows until it arrives.
                 socketRef.current.on(ACTIONS.SYNC_CHAT, ({ messages: history }) => {
-                    setMessages(prev => {
-                        if (prev.length > 0) return prev; // already loaded from localStorage
-                        return history;
-                    });
+                    const list = Array.isArray(history) ? history : [];
+                    setMessages(list);
+                    try { localStorage.setItem(`project-chat-${projectId}`, JSON.stringify(list)); } catch { /* storage blocked */ }
                 });
 
                 socketRef.current.on(ACTIONS.FOLLOW_MODE, ({ viewState, userName }) => {
@@ -762,7 +807,7 @@ const ProjectPage = () => {
             const res = await fetch(`${getBackendUrl()}/api/projects/${projectId}/files`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ name: rel, path: `/${rel}`, content: '', isDirectory }),
+                body: JSON.stringify({ name: rel, path: `/${rel}`, content: '', isDirectory, isNew: true }),
             });
             if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || "Failed to create");
             const created = await res.json();
@@ -813,6 +858,42 @@ const ProjectPage = () => {
         }
     };
 
+    // Reload the file list from the server (after a move here, or a change by someone else).
+    // Rows are matched by id, so a moved file keeps its open tab and its unsaved text.
+    const reloadFiles = async () => {
+        try {
+            const res = await fetch(`${getBackendUrl()}/api/projects/${projectId}/files`);
+            if (!res.ok) return;
+            const rows = await res.json();
+            if (!Array.isArray(rows)) return;
+            const byId = new Map(rows.map((r) => [r.id, r]));
+            const local = new Map(filesRef.current.map((f) => [f.id, f]));
+            setFiles(rows.map((r) => (local.has(r.id) ? { ...local.get(r.id), path: r.path, name: r.name } : r)));
+            const remap = (f) => (byId.has(f.id) ? { ...f, path: byId.get(f.id).path, name: byId.get(f.id).name } : null);
+            setOpenFiles((prev) => prev.map(remap).filter(Boolean));
+            setActiveFile((prev) => (prev ? remap(prev) : prev));
+        } catch { /* offline: the next change reloads it */ }
+    };
+    reloadFilesRef.current = reloadFiles;
+
+    // Move or rename a file, or a folder with everything in it (paths from the project root).
+    const handleMoveFile = async (from, to) => {
+        try {
+            const res = await fetch(`${getBackendUrl()}/api/projects/${projectId}/files/move`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ from, to }),
+            });
+            const body = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error(body.error || 'Could not move it');
+            await reloadFiles();
+            const renamed = from.split('/').slice(0, -1).join('/') === to.split('/').slice(0, -1).join('/');
+            toast.success(renamed ? `Renamed to ${to.split('/').pop()}` : `Moved to ${to.includes('/') ? to.split('/').slice(0, -1).join('/') : 'the project root'}`);
+        } catch (err) {
+            toast.error(err.message || 'Could not move it');
+        }
+    };
+
     const handleImportFile = (e) => {
         const file = e.target.files[0];
         if (!file) return;
@@ -831,7 +912,8 @@ const ProjectPage = () => {
                         name: fileName,
                         path: `/${fileName}`,
                         content: content,
-                        isDirectory: false
+                        isDirectory: false,
+                        isNew: true
                     })
                 });
 
@@ -948,8 +1030,9 @@ const ProjectPage = () => {
         </div>
     );
 
-    const renderTabs = () => (
+    const renderTabs = (handle = null) => (
         <div className="ws-tabs" role="tablist" aria-label="Open files">
+            {handle}
             {openFiles.map(file => (
                 <div key={file.id} role="tab" aria-selected={activeFile?.id === file.id} className={`ws-tab${activeFile?.id === file.id ? ' on' : ''}`} onClick={() => handleFileClick(file)}>
                     <FileIcon name={file.name} size={13} />
@@ -1012,6 +1095,40 @@ const ProjectPage = () => {
         </div>
     );
 
+    // One card of the optional card layout. `handle` is the drag grip for cards that show it inline.
+    const renderProjectPanel = (id, handle) => {
+        if (id === 'files') {
+            return (
+                <div className="ws-card-scroll" style={{ background: 'var(--u-bg-2)' }}>
+                    <ProjectFileTree files={files} activeFile={activeFile} project={project} onSelect={handleFileClick} onCreate={handleAddFile} onDelete={handleDeleteFile} onImport={handleImportFile} onMove={handleMoveFile} />
+                </div>
+            );
+        }
+        if (id === 'code') {
+            return (
+                <div style={{ display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+                    {renderTabs(handle)}
+                    <div style={{ flex: 1, position: 'relative', minHeight: 0 }}>{renderEditor()}</div>
+                </div>
+            );
+        }
+        if (id === 'output') return renderOutputPanel();
+        if (id === 'chat') return <ChatWindow socketRef={socketRef} roomId={`project-${projectId}`} userName={me} isLightMode={isLightMode} isMobile={isMobile} messages={messages} setMessages={setMessages} />;
+        if (id === 'people') return <div className="ws-card-scroll">{renderPeople()}</div>;
+        if (id === 'call') {
+            if (isMeetingActive) return <div ref={setCallSlot} className="rl-call-slot" />;
+            return (
+                <div className="rl-call-empty">
+                    <span className="rl-call-icon"><Video size={20} /></span>
+                    <strong>No call running</strong>
+                    <span>Start a call and it plays here, next to your code.</span>
+                    <button onClick={() => setIsMeetingActive(true)}><Video size={14} /> Start call</button>
+                </div>
+            );
+        }
+        return null;
+    };
+
     return (
         <div className="ws project-workspace">
             {!isZenMode && (
@@ -1048,7 +1165,7 @@ const ProjectPage = () => {
                         {activeTab === 'code' && renderWorkArea(0.4)}
                         {activeTab === 'files' && (
                             <div style={{ flex: 1, background: 'var(--u-bg-2)', overflow: 'hidden' }}>
-                                <ProjectFileTree files={files} activeFile={activeFile} project={project} onSelect={(f) => { handleFileClick(f); setActiveTab('code'); }} onCreate={handleAddFile} onDelete={handleDeleteFile} onImport={handleImportFile} />
+                                <ProjectFileTree files={files} activeFile={activeFile} project={project} onSelect={(f) => { handleFileClick(f); setActiveTab('code'); }} onCreate={handleAddFile} onDelete={handleDeleteFile} onImport={handleImportFile} onMove={handleMoveFile} />
                             </div>
                         )}
                         {activeTab === 'chat' && (
@@ -1080,13 +1197,24 @@ const ProjectPage = () => {
                             </div>
                         )}
                     </div>
+                ) : cards ? (
+                    <div style={{ flex: 1, position: 'relative', minHeight: 0 }}>
+                        <RoomLayout
+                            state={projectLayout}
+                            renderPanel={renderProjectPanel}
+                            inlineHandles={isMeetingActive ? ['call'] : []}
+                            flexOf={projectFlex}
+                            hidden={isOutputVisible ? [] : ['output']}
+                            onHideCard={(id) => { if (id !== 'output') return false; setIsOutputVisible(false); return true; }}
+                        />
+                    </div>
                 ) : (
                     <ReflexContainer orientation="vertical" style={{ flex: 1, height: '100%', minHeight: 0 }}>
                         {!isZenMode && isSidebarOpen && ['files', 'chat', 'users'].includes(sidebarTab) && (
                             <ReflexElement flex={0.2} minSize={240} style={{ height: '100%', minHeight: 0, background: 'var(--u-bg-2)', display: 'flex', flexDirection: 'column' }}>
                                 {renderSideTabs()}
                                 <div style={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
-                                    {sidebarTab === 'files' && <ProjectFileTree files={files} activeFile={activeFile} project={project} onSelect={handleFileClick} onCreate={handleAddFile} onDelete={handleDeleteFile} onImport={handleImportFile} />}
+                                    {sidebarTab === 'files' && <ProjectFileTree files={files} activeFile={activeFile} project={project} onSelect={handleFileClick} onCreate={handleAddFile} onDelete={handleDeleteFile} onImport={handleImportFile} onMove={handleMoveFile} />}
                                     {sidebarTab === 'chat' && <ChatWindow socketRef={socketRef} roomId={`project-${projectId}`} userName={me} isLightMode={isLightMode} isMobile={isMobile} messages={messages} setMessages={setMessages} />}
                                     {sidebarTab === 'users' && renderPeople()}
                                 </div>
@@ -1121,6 +1249,9 @@ const ProjectPage = () => {
                     user={user || { name: guestName || 'Guest', isGuest: true }}
                     isMinimized={isMeetingMinimized}
                     onMinimizeToggle={(val) => setIsMeetingMinimized(val)}
+                    dock={cards && projectLayout.has('call') ? callRect : null}
+                    onDockToggle={cards ? () => projectLayout.toggle('call') : undefined}
+                    dockHandle={<CardHandle id="call" state={projectLayout} />}
                     externalInCall={isMeetingStarting}
                     onCallStateChange={(active) => {
                         setIsMeetingStarting(active);
@@ -1144,6 +1275,18 @@ const ProjectPage = () => {
                     </div>
                     <div>
                         <span>{clients.length} online</span>
+                        <span className="rl-anchor">
+                            <button className={showLayoutMenu ? 'on' : ''} onClick={() => setShowLayoutMenu((v) => !v)} aria-expanded={showLayoutMenu} title="Layout: classic sidebar or rearrangeable cards">
+                                <LayoutTemplate size={12} /> layout
+                            </button>
+                            {showLayoutMenu && (
+                                <LayoutMenu
+                                    state={projectLayout}
+                                    onClose={() => setShowLayoutMenu(false)}
+                                    classic={{ on: layoutMode === 'classic', onPick: () => setLayoutMode('classic'), onCards: () => setLayoutMode('cards') }}
+                                />
+                            )}
+                        </span>
                         <button className={isOutputVisible ? 'on' : ''} onClick={() => setIsOutputVisible(!isOutputVisible)} title="Toggle output panel">
                             <Terminal size={12} /> output
                         </button>

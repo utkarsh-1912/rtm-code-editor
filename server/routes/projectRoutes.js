@@ -87,6 +87,8 @@ router.post('/projects/:id/files', async (req, res) => {
             return res.status(400).json({ error: `Bad path: ${path}` });
         }
         const rows = await ProjectRepository.upsertProjectFile(req.params.id, String(name).slice(0, 400), `/${segments.join('/')}`, content || "", !!isDirectory);
+        if (req.body?.isNew) filesChanged(req, { reason: 'create' });
+        ProjectRepository.touchProject(req.params.id).catch(() => { });
         res.json(rows[0] || null);
     } catch (err) {
         console.error(err);
@@ -114,6 +116,7 @@ router.post('/projects/:id/files/bulk', express.json({ limit: '10mb' }), async (
             clean.push({ name: path, path: `/${path}`, content });
         }
         const saved = await ProjectRepository.upsertProjectFiles(req.params.id, clean);
+        filesChanged(req, { reason: 'import' });
         res.json({ success: true, count: saved.length, files: saved });
     } catch (err) {
         console.error(err);
@@ -133,6 +136,24 @@ router.patch('/projects/:id', async (req, res) => {
     }
 });
 
+// Tell everyone in the project that its file list changed (they reload it).
+const filesChanged = (req, extra = {}) => req.app.get('io')?.to(`project-${req.params.id}`).emit('project-files-changed', extra);
+
+// Move or rename a file, or a folder and everything in it: { from, to } (paths from the root).
+router.post('/projects/:id/files/move', async (req, res) => {
+    try {
+        const moved = await ProjectRepository.moveProjectPath(req.params.id, req.body?.from, req.body?.to);
+        if (moved.length) {
+            filesChanged(req, { reason: 'move', by: req.body?.by || null });
+            ProjectRepository.touchProject(req.params.id).catch(() => { });
+        }
+        res.json({ success: true, files: moved });
+    } catch (err) {
+        if (!err.status) console.error(err);
+        res.status(err.status || 500).json({ error: err.message });
+    }
+});
+
 // Delete project file
 router.delete('/projects/:id/files', async (req, res) => {
     try {
@@ -140,6 +161,10 @@ router.delete('/projects/:id/files', async (req, res) => {
         if (!filePath) return res.status(400).json({ error: "Missing path parameter" });
         const recursive = req.query.recursive === '1' || req.body?.recursive === true;
         const deleted = await ProjectRepository.deleteProjectFile(req.params.id, filePath, { recursive });
+        if (deleted.length) {
+            filesChanged(req, { reason: 'delete' });
+            ProjectRepository.touchProject(req.params.id).catch(() => { });
+        }
         res.json({ success: true, count: deleted.length });
     } catch (err) {
         console.error(err);
