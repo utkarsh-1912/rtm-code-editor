@@ -12,12 +12,13 @@ export default function Privacy() {
             <ul>
                 <li><strong>Account Data:</strong> If you sign in via Google or GitHub, we store your email, name, and profile picture to manage your workspaces.</li>
                 <li><strong>User Profiles:</strong> Information about your bio, social links, and editor preferences (theme, font size) is stored securely.</li>
+                <li><strong>Meetings and Room Invites:</strong> When you schedule a call or make a room invite-only or private, we store the title, time and the email addresses you invite, to send invitations and reminders and to check who may join.</li>
                 <li><strong>Session Metadata:</strong> We track active sessions (device type, user agent) to allow you to manage and remotely sign out of other devices for security.</li>
             </ul>
 
             <h2>2. Data Persistence</h2>
             <p>
-                <strong>Your Code & Workspaces:</strong> Unlike ephemeral editors, Utkristi Colabs uses a PostgreSQL backend to persist your rooms, code, and chat history. This allows you to revisit your work across different devices seamlessly.
+                <strong>Your Code & Workspaces:</strong> Unlike ephemeral editors, Utkristi Colabs stores your rooms, code, and chat history in a managed database. This allows you to revisit your work across different devices seamlessly.
             </p>
             <p>
                 <strong>Snippets:</strong> Any code you save to your personal "Snippets Library" is stored permanently until you choose to delete it.
@@ -25,12 +26,12 @@ export default function Privacy() {
 
             <h2>3. Third-Party Services</h2>
             <p>
-                We use <strong>Judge0</strong> for code execution, <strong>Neon (PostgreSQL)</strong> for data persistence and <strong>Firebase Auth</strong> for sign-in. Payments are processed by <strong>Stripe</strong>; we receive your plan status and a customer ID, never your card number. The AI copilot on the website uses <strong>Google Gemini</strong>: when you ask it something, your prompt and the code you asked about are sent through our server to Google to get an answer. Notifications are delivered with <strong>OneSignal</strong> (push and email fallback) and transactional email with <strong>Brevo</strong>. For push, your account ID is registered with OneSignal as your identifier, and your email address is shared with it when email delivery is needed. Please refer to their policies for further details.
+                We rely on a small number of trusted service providers, each only for its job: running code in isolated sandboxes, hosting our database, signing you in, processing payments (we receive your plan status and a customer reference, never your card number), sending email and push notifications, and answering AI copilot requests. When you ask the AI copilot something, your prompt and the code you asked about are sent through our server to an AI model provider to get an answer. For push notifications your account ID is registered with the notification provider, and your email address is shared with it when email delivery is needed. Each provider processes data only to deliver its service to you. A list of the providers we use is available on request through <a href="/support">Support</a>.
             </p>
 
             <h2>4. Desktop App and Local Processing</h2>
             <p>
-                The desktop app can run your code on a Judge0 instance on your own machine and send AI requests to a local model. Those requests stay on your computer. If neither is running, the app falls back to our server, exactly like the web version.
+                The desktop app can run your code and AI requests on your own machine. Those requests stay on your computer. If neither is running, the app falls back to our server, exactly like the web version.
             </p>
 
             <h2>5. Imported Data (SQL)</h2>
@@ -45,7 +46,7 @@ export default function Privacy() {
 
             <h2>7. Plans and Billing Data</h2>
             <p>
-                For paid plans we store your plan, billing period, trial dates and Stripe customer and subscription IDs. Invoices and payment methods are held by Stripe and managed in its customer portal.
+                For paid plans we store your plan, billing period, trial dates and our payment processor's customer and subscription references. Invoices and payment methods are held by the payment processor and managed in its billing portal, linked from Settings.
             </p>
 
             <h2>8. Security</h2>

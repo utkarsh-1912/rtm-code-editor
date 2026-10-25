@@ -20,23 +20,24 @@ const plain = (row) => row.filter((_, i) => i % 2 === 1).join("");
 const TOTAL = CODE.reduce((n, r) => n + plain(r).length + 1, 0);
 
 const STEPS = [
-    { title: "Create a room", copy: "One click makes a private room with its own link. No setup, no install.", kicker: "room/k3f9a2x1" },
-    { title: "Send the link", copy: "Teammates join with just a display name, even before they register.", kicker: "3 people joined" },
+    { title: "Create a room", copy: "One click makes a room with its own link. No setup, no install. Keep it open, ask-to-join or invite-only.", kicker: "room/k3f9a2x1" },
+    { title: "Send the link", copy: "Teammates join with just a display name, or schedule the call and everyone gets a calendar invite.", kicker: "3 people joined" },
     { title: "Build together", copy: "Edit, talk, draw, query and run code in the same space. Everyone sees the same output.", kicker: "Total: 42.50" },
 ];
 
 const FEATURES = [
     ["Multiplayer editing", "Everyone types in the same file with live cursors and conflict-free sync."],
     ["Voice & video", "Calls live inside the room, with screen sharing and annotations."],
-    ["Whiteboard", "Sketch an architecture or circle a bug, from a laptop or a phone."],
+    ["Whiteboard & diagrams", "Sketch, or build flowcharts and system designs with real blocks and arrows."],
     ["Run 17 languages", "Execute code together and share the output instantly, from Python to Rust."],
     ["SQL with your data", "Import a CSV, TSV or JSON file and query it right in the room."],
     ["Desktop apps", "Windows, macOS and Linux. Runs code and AI on your own machine when it can."],
     ["Room chat", "Talk beside the code you are discussing, with emoji and edits."],
     ["Projects & snippets", "Keep multi-file work, history and reusable code between sessions."],
+    ["Scheduled calls", "Plan interviews and pairing sessions with invites, calendar links and reminders."],
 ];
 
-const CAPABILITIES = ["Live cursors", "Voice & video", "Whiteboard", "17 languages", "SQL + CSV", "Desktop app", "Local AI", "Push alerts", "Room chat", "Snapshots", "AI copilot"];
+const CAPABILITIES = ["Live cursors", "Voice & video", "Whiteboard", "System design", "17 languages", "SQL + CSV", "Desktop app", "Local AI", "Scheduled calls", "Private rooms", "Push alerts", "Room chat", "Snapshots", "AI copilot"];
 
 // Code that types itself out, then starts over.
 function TypingCode() {

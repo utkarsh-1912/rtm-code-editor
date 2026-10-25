@@ -8,12 +8,34 @@ const AnalyticsRepository = require('../repositories/AnalyticsRepository');
 const pairedRooms = new Set();
 
 function setupEditorSocket(io, socket, safeSocket, context) {
-    const { userSocketMap, userPhotoMap, roomChatHistory, getAllClients, claimSeat, pairing } = context;
+    const { userSocketMap, userPhotoMap, roomChatHistory, getAllClients, claimSeat, pairing, access } = context;
+
+    // What this socket may know about the room's access (owners also get the invite list).
+    const accessMeta = (roomId, acc) => ({
+        visibility: acc?.visibility || 'public',
+        hasOwner: !!acc?.ownerUid,
+        isOwner: access.isOwner(acc, socket.id),
+        allowed: access.isOwner(acc, socket.id) ? acc.allowed : undefined,
+    });
     const safePhoto = (url) => (typeof url === 'string' && /^https:\/\//.test(url) ? url.slice(0, 500) : null);
 
-    socket.on(ACTIONS.JOIN, safeSocket(async ({ roomId, userName, userProfile, clientId }) => {
+    socket.on(ACTIONS.JOIN, safeSocket(async ({ roomId, userName, userProfile, clientId, idToken }) => {
         if (!roomId) return;
         const finalUserName = userName || "Guest";
+
+        // Who is this (verified), and may they come in?
+        const who = await access.identify(socket, idToken);
+        const acc = await access.load(roomId);
+        if (!access.mayEnter(roomId, acc, socket, clientId)) {
+            if (acc.visibility === 'private') {
+                socket.emit('room-access', { status: 'denied', reason: who ? 'not-invited' : 'sign-in', visibility: 'private' });
+            } else {
+                const ownerHere = access.knock(roomId, acc, socket, { name: finalUserName, clientId });
+                socket.emit('room-access', { status: 'waiting', ownerHere, visibility: 'invite' });
+            }
+            return;
+        }
+        socket.emit('room-access', { status: 'in' });
         userSocketMap[socket.id] = finalUserName;
         userPhotoMap[socket.id] = safePhoto(userProfile?.photoURL);
         claimSeat(socket, roomId, { clientId, uid: userProfile?.uid });
@@ -43,8 +65,19 @@ function setupEditorSocket(io, socket, safeSocket, context) {
                 socket.emit('room-meta', { name: dbRoom.name || null });
             } else {
                 await RoomRepository.saveRoom(roomId, "", "javascript", []);
+                access.forget(roomId);
                 AnalyticsRepository.logActivity({ userId: userProfile?.uid || null, roomId, actionType: 'ROOM_STARTED' }).catch(() => { });
             }
+            // The first verified signed-in person becomes the room's owner.
+            if (who) {
+                const current = await access.load(roomId);
+                if (current && !current.ownerUid && await RoomRepository.claimRoomOwner(roomId, who.uid)) {
+                    access.set(roomId, { ...current, ownerUid: who.uid });
+                }
+            }
+            const now = await access.load(roomId);
+            socket.emit('room-meta', { ...accessMeta(roomId, now), ...(dbRoom ? { name: dbRoom.name || null } : {}) });
+            if (access.isOwner(now, socket.id)) access.pendingFor(roomId).forEach((k) => socket.emit('room-knock', k));
             if (userProfile?.uid) {
                 await UserRepository.findOrCreateUser(userProfile);
                 await RoomRepository.linkRoomToUser(userProfile.uid, roomId);
@@ -83,6 +116,33 @@ function setupEditorSocket(io, socket, safeSocket, context) {
 
         const clients = getAllClients(roomId);
         io.in(roomId).emit(ACTIONS.JOINED, { clients, userName: finalUserName, socketId: socket.id });
+    }));
+
+    // Owner lets someone in (or not). "always" also adds their email to the invite list.
+    socket.on('room-knock-answer', safeSocket(async ({ roomId, socketId, allow, always } = {}) => {
+        const acc = await access.load(roomId);
+        if (!access.isOwner(acc, socket.id)) return;
+        const request = access.answer(roomId, socketId, !!allow);
+        if (!request) return;
+        if (allow && always && request.email && !acc.allowed.includes(request.email)) {
+            const next = await RoomRepository.setRoomAccess(roomId, acc.ownerUid, { visibility: acc.visibility, allowed: [...acc.allowed, request.email] });
+            if (next) { access.set(roomId, next); socket.emit('room-meta', accessMeta(roomId, next)); }
+        }
+        io.to(socketId).emit('room-access', allow ? { status: 'granted' } : { status: 'denied', reason: 'declined', visibility: acc.visibility });
+    }));
+
+    // Owner changes who can join. People already in the room stay.
+    socket.on('room-access-update', safeSocket(async ({ roomId, visibility, allowed } = {}) => {
+        if (!roomId || !socket.rooms.has(roomId)) return;
+        const acc = await access.load(roomId);
+        if (!access.isOwner(acc, socket.id)) return;
+        const next = await RoomRepository.setRoomAccess(roomId, acc.ownerUid, { visibility, allowed });
+        if (!next) return;
+        access.set(roomId, next);
+        for (const id of io.sockets.adapter.rooms.get(roomId) || []) {
+            const s = io.sockets.sockets.get(id);
+            if (s) s.emit('room-meta', { visibility: next.visibility, hasOwner: true, isOwner: access.isOwner(next, id), allowed: access.isOwner(next, id) ? next.allowed : undefined });
+        }
     }));
 
     socket.on(ACTIONS.CODE_CHANGE, safeSocket(({ roomId, code }) => {

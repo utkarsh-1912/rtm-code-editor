@@ -55,12 +55,25 @@ import VideoChat from "../components/VideoChat";
 import WorkspaceHeader from "../components/WorkspaceHeader";
 import CommandPalette from "../components/CommandPalette";
 import ShareModal from "../components/ShareModal";
+import { AccessScreen, KnockList } from "../components/RoomAccess";
+import { ScheduleModal } from "../components/Meetings";
+import { CalendarPlus } from "lucide-react";
+import { auth } from "../firebase";
 import { getBackendUrl, publicOrigin } from "../utils/api";
 
 function Editor() {
   const socketRef = useRef(null);
   const location = useLocation();
   const reactNavigator = useNavigate();
+
+  // Desktop app with no internet: rooms need the server, so open the offline editor right
+  // away (before asking for a name or waiting on a server that can't answer).
+  useEffect(() => {
+    if (window.colabsDesktop && navigator.onLine === false) {
+      toast("You're offline, so rooms are unavailable. Keep coding in the offline editor.", { icon: "📴", duration: 6000, id: "offline-room" });
+      reactNavigator("/offline", { replace: true });
+    }
+  }, [reactNavigator]);
   const { roomId } = useParams();
   const { user, loading: authLoading } = useAuth();
   const userRef = useRef(user);
@@ -132,6 +145,12 @@ function Editor() {
   const [showFocusModal, setShowFocusModal] = useState(false);
   const [showCommandPalette, setShowCommandPalette] = useState(false);
   const [showShare, setShowShare] = useState(false);
+  // Room access: { status: in|waiting|denied|granted, reason }, the room's settings, and (for
+  // the owner) people asking to join.
+  const [accessState, setAccessState] = useState(null);
+  const [roomMeta, setRoomMeta] = useState(null);
+  const [knocks, setKnocks] = useState([]);
+  const [scheduleOpen, setScheduleOpen] = useState(false);
   const runShortcutRef = useRef(null);
   const [isMeetingActive, setIsMeetingActive] = useState(false);
   const [isMeetingMinimized, setIsMeetingMinimized] = useState(false);
@@ -301,8 +320,16 @@ function Editor() {
         return false;
       };
 
-      const isAlive = await wakeServer();
+      // Desktop app with no internet: rooms need the server, so go straight to the offline
+      // editor instead of waiting for a server that can't answer.
+      const isDesktop = !!window.colabsDesktop;
+      const isAlive = isDesktop && navigator.onLine === false ? false : await wakeServer();
       if (!isAlive) {
+        if (isDesktop) {
+          toast("Can't reach the server, so rooms are unavailable. You can keep coding in the offline editor.", { icon: "📴", duration: 6000 });
+          reactNavigator("/offline");
+          return;
+        }
         toast.error("System unreachable. Please try again.");
         reactNavigator("/");
         return;
@@ -334,14 +361,23 @@ function Editor() {
       // Join on every (re)connect: after a network drop or server restart the socket gets a
       // new id in no rooms, so without this the person vanishes for everyone else (and stops
       // seeing joins/leaves) until they refresh.
-      const join = () => {
+      // The sign-in token lets the server check who you are (private rooms, ownership).
+      const join = async () => {
+        const idToken = await auth.currentUser?.getIdToken().catch(() => null);
         fresh.emit(ACTIONS.JOIN, {
           roomId,
           userName: userName,
           userProfile: userRef.current,
           clientId: CLIENT_ID,
+          idToken: idToken || undefined,
         });
       };
+      fresh.on("room-access", (state) => {
+        setAccessState(state);
+        if (state?.status === "granted") join(); // the owner let us in: join for real
+      });
+      fresh.on("room-knock", (k) => setKnocks((prev) => [...prev.filter((x) => x.socketId !== k.socketId), k]));
+      fresh.on("room-knock-gone", ({ socketId }) => setKnocks((prev) => prev.filter((x) => x.socketId !== socketId)));
       fresh.on("connect", () => { setSocketConnected(true); join(); });
       fresh.on("disconnect", () => setSocketConnected(false));
       if (fresh.connected) join();
@@ -389,7 +425,10 @@ function Editor() {
         setExecTime(time);
       });
 
-      socketRef.current.on("room-meta", ({ name }) => setRoomName(name || null));
+      socketRef.current.on("room-meta", (meta = {}) => {
+        if ("name" in meta) setRoomName(meta.name || null);
+        if ("visibility" in meta) setRoomMeta((prev) => ({ ...prev, ...meta }));
+      });
 
       socketRef.current.on(ACTIONS.SYNC_LANGUAGE, ({ language }) => {
         setLanguage(language);
@@ -509,7 +548,9 @@ function Editor() {
     let meta = { by: userName, at: Date.now() };
     try {
       const source = language === "sql" ? buildSqlPrelude(sqlTables) + codeRef.current : codeRef.current;
-      const result = await runCode({ language, source, stdin });
+      // Others can edit this room unless it's yours and you're alone: ask before running locally.
+      const shared = clients.length > 1 || !roomMeta?.isOwner;
+      const result = await runCode({ language, source, stdin, sharedScope: shared ? `room:${roomId}` : null });
       text = formatRun(result);
       failed = !result.ok;
       time = result.timeMs != null ? (result.timeMs / 1000).toFixed(3) : undefined;
@@ -614,6 +655,7 @@ function Editor() {
         onToggleTheme={toggleTheme}
         actions={[
           { id: "call", label: isMeetingActive ? "Leave call" : "Start voice & video call", icon: <VideoIcon size={18} />, onClick: () => setIsMeetingActive((v) => !v), active: isMeetingActive, tone: "green" },
+          ...(user?.uid ? [{ id: "schedule", label: "Schedule a call in this room", icon: <CalendarPlus size={18} />, onClick: () => setScheduleOpen(true), section: "more" }] : []),
           { id: "board", label: "Whiteboard", icon: <PencilLine size={18} />, onClick: () => setShowWhiteboard(true) },
           { id: "ai", label: "AI Copilot", icon: <AiIcon size={18} />, onClick: () => setShowAICopilot(true) },
           { id: "share", label: "Invite people", icon: <Share2 size={18} />, onClick: () => setShowShare(true) },
@@ -840,7 +882,30 @@ function Editor() {
         </div>
       )}
 
-      <ShareModal open={showShare} onClose={() => setShowShare(false)} roomId={roomId} peopleOnline={clients.length} />
+      <ShareModal
+        open={showShare}
+        onClose={() => setShowShare(false)}
+        roomId={roomId}
+        peopleOnline={clients.length}
+        access={roomMeta}
+        onAccessChange={(visibility, allowed) => socketRef.current?.emit("room-access-update", { roomId, visibility, allowed })}
+      />
+
+      <ScheduleModal open={scheduleOpen} onClose={() => setScheduleOpen(false)} roomId={roomId} hostName={user?.name || userName} />
+
+      <KnockList
+        knocks={knocks}
+        onAnswer={(k, allow, always) => {
+          socketRef.current?.emit("room-knock-answer", { roomId, socketId: k.socketId, allow, always });
+          setKnocks((prev) => prev.filter((x) => x.socketId !== k.socketId));
+        }}
+      />
+      <AccessScreen
+        access={accessState}
+        signedInAs={user?.email}
+        onSignIn={() => reactNavigator("/login", { state: { from: `/editor/${roomId}` } })}
+        onHome={() => reactNavigator("/")}
+      />
 
       <CommandPalette
         isOpen={showCommandPalette}

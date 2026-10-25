@@ -3,15 +3,28 @@ import { getBackendUrl } from "../../utils/api";
 
 const PAGE = 100; // rows fetched per request; the table pages through them
 
+// Last good copy of the workspace on this device: shown instantly on open, and instead of an
+// error when the server can't be reached (offline, or the desktop app with no internet).
+const cacheKey = (uid) => `ws-cache-${uid}`;
+const readCache = (uid) => {
+    try { return JSON.parse(localStorage.getItem(cacheKey(uid))) || null; } catch { return null; }
+};
+const writeCache = (uid, data) => {
+    try { localStorage.setItem(cacheKey(uid), JSON.stringify({ ...data, at: Date.now() })); } catch { /* full or blocked */ }
+};
+
 // Rooms, projects and usage stats for the signed-in user. Rooms and projects are fetched a
 // page at a time; loadMoreRooms / loadMoreProjects fetch the next page.
 export default function useWorkspace(user) {
-    const [rooms, setRooms] = useState([]);
-    const [projects, setProjects] = useState([]);
-    const [roomsTotal, setRoomsTotal] = useState(0);
-    const [projectsTotal, setProjectsTotal] = useState(0);
-    const [stats, setStats] = useState({ totalRooms: 0, sessions: 0, hours: 0 });
-    const [loading, setLoading] = useState(true);
+    const cached = user?.uid ? readCache(user.uid) : null;
+    const [rooms, setRooms] = useState(cached?.rooms || []);
+    const [projects, setProjects] = useState(cached?.projects || []);
+    const [roomsTotal, setRoomsTotal] = useState(cached?.roomsTotal || 0);
+    const [projectsTotal, setProjectsTotal] = useState(cached?.projectsTotal || 0);
+    const [stats, setStats] = useState(cached?.stats || { totalRooms: 0, sessions: 0, hours: 0 });
+    const [loading, setLoading] = useState(!cached);
+    // When showing the saved copy because the server couldn't be reached: when it was saved.
+    const [staleAt, setStaleAt] = useState(null);
     const [loadingMore, setLoadingMore] = useState(false);
     const [error, setError] = useState(null);
 
@@ -38,15 +51,41 @@ export default function useWorkspace(user) {
             setProjectsTotal(Array.isArray(proj) ? proj.length : proj.total ?? projItems.length);
             setStats(dash.stats || { totalRooms: 0, sessions: 0, hours: 0 });
             setError(null);
+            setStaleAt(null);
+            writeCache(user.uid, {
+                rooms: Array.isArray(roomPage.items) ? roomPage.items : [],
+                roomsTotal: roomPage.total ?? 0,
+                projects: projItems,
+                projectsTotal: Array.isArray(proj) ? proj.length : proj.total ?? projItems.length,
+                stats: dash.stats || { totalRooms: 0, sessions: 0, hours: 0 },
+            });
         } catch (err) {
-            console.error("Workspace fetch error:", err);
-            setError(err);
+            const saved = readCache(user.uid);
+            if (saved) {
+                // Offline or the server is down: show the last copy instead of an error.
+                setRooms(saved.rooms || []);
+                setProjects(saved.projects || []);
+                setRoomsTotal(saved.roomsTotal || 0);
+                setProjectsTotal(saved.projectsTotal || 0);
+                setStats(saved.stats || { totalRooms: 0, sessions: 0, hours: 0 });
+                setStaleAt(saved.at || Date.now());
+                setError(null);
+            } else {
+                console.error("Workspace fetch error:", err);
+                setError(err);
+            }
         } finally {
             setLoading(false);
         }
     }, [user?.uid]);
 
     useEffect(() => { reload(); }, [reload]);
+    // Back online: refresh.
+    useEffect(() => {
+        const onOnline = () => reload();
+        window.addEventListener('online', onOnline);
+        return () => window.removeEventListener('online', onOnline);
+    }, [reload]);
 
     const loadMore = useCallback(async (kind) => {
         if (!user?.uid) return;
@@ -69,7 +108,7 @@ export default function useWorkspace(user) {
     }, [user?.uid, rooms, projects]);
 
     return {
-        rooms, projects, roomsTotal, projectsTotal, stats, loading, error, reload,
+        rooms, projects, roomsTotal, projectsTotal, stats, loading, error, reload, staleAt,
         loadingMore,
         loadMoreRooms: () => loadMore("rooms"),
         loadMoreProjects: () => loadMore("projects"),

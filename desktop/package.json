@@ -2,7 +2,7 @@
   "name": "utkristi-colabs-desktop",
   "productName": "Utkristi CoLabs",
   "version": "1.0.0",
-  "description": "Desktop app for Utkristi CoLabs: real-time pair programming with local Judge0 and a local AI model.",
+  "description": "Desktop app for Utkristi CoLabs: real-time pair programming with a built-in code runner and a local AI model.",
   "homepage": "https://github.com/utkarsh-1912/rtm-code-editor",
   "main": "main.js",
   "author": "Utkristi.io",
@@ -24,6 +24,10 @@
   "build": {
     "appId": "io.utkristi.colabs",
     "productName": "Utkristi CoLabs",
+    "asarUnpack": [
+      "node_modules/pyodide/**",
+      "node_modules/sql.js/dist/sql-wasm.*"
+    ],
     "directories": {
       "output": "dist",
       "buildResources": "build"
@@ -32,6 +36,9 @@
       "main.js",
       "preload.js",
       "local.js",
+      "runner.js",
+      "sandbox.js",
+      "packs.js",
       "fsAccess.js",
       "terminal.js",
       "terminal-preload.js",
@@ -40,7 +47,14 @@
       "localUi.js",
       "splash.html",
       "build/icon.png",
-      "web/**/*"
+      "web/**/*",
+      "!node_modules/sql.js/dist/sql-asm*",
+      "!node_modules/sql.js/dist/*debug*",
+      "!node_modules/sql.js/dist/sql-wasm-browser*",
+      "!node_modules/sql.js/dist/worker*",
+      "!node_modules/sql.js/dist/*.zip",
+      "!node_modules/pyodide/*.map",
+      "!node_modules/pyodide/*.html"
     ],
     "win": {
       "target": [
@@ -109,5 +123,12 @@
         "releaseType": "release"
       }
     ]
+  },
+  "dependencies": {
+    "extract-zip": "^2.0.1",
+    "fengari": "^0.1.5",
+    "pyodide": "^314.0.7",
+    "sql.js": "^1.15.1",
+    "sucrase": "^3.35.1"
   }
 }

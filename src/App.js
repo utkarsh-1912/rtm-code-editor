@@ -18,10 +18,14 @@ import { applyTheme, getThemePref } from "./utils/theme";
 import { AuthProvider } from "./context/AuthContext";
 import { BackendProvider } from "./context/BackendContext";
 import ServerWake from "./components/ux/ServerWake";
+import OfflineNotice from "./components/ux/OfflineNotice";
 import Login from "./pages/Login";
 import SignUp from "./pages/SignUp";
 import Dashboard from "./pages/Dashboard";
 import Snippets from "./pages/Snippets";
+import MeetPage from "./pages/MeetPage";
+import OfflinePage from "./pages/OfflinePage";
+import Docs from "./pages/Docs";
 import Settings from "./pages/Settings";
 import ProjectPage from "./pages/ProjectPage";
 import WebRenderPage from "./pages/WebRenderPage";
@@ -80,6 +84,7 @@ function App() {
       <AuthProvider>
         <OfflineBanner />
         <ServerWake />
+        <OfflineNotice />
         <div>
           <Toaster
             position="top-right"
@@ -109,6 +114,9 @@ function App() {
             <Route path="/signup" element={<SignUp />} />
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/snippets" element={<Snippets />} />
+            <Route path="/meet/:meetingId" element={<MeetPage />} />
+            <Route path="/offline" element={<OfflinePage />} />
+            <Route path="/docs" element={<Docs />} />
             <Route path="/settings" element={<Settings />} />
             <Route path="/project/:projectId" element={<ProjectPage />} />
             <Route path="/render/:projectId" element={<WebRenderPage />} />

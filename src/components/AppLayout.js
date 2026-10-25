@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Bell, Sun, Moon, LogOut, Settings as SettingsIcon, LayoutGrid, Code2, Plus, UserRound, ShieldCheck, CreditCard } from 'lucide-react';
+import { Search, Bell, Sun, Moon, LogOut, LifeBuoy, Settings as SettingsIcon, LayoutGrid, Code2, Plus, UserRound, ShieldCheck, CreditCard } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
 import { getBackendUrl } from '../utils/api';
 import SearchModal from './SearchModal';
+import HelpModal from './HelpModal';
 import Announcements from './ux/Announcements';
 import NotificationCenter from './NotificationCenter';
 import Shell, { useOnline, useThemeToggle } from './ux/Shell';
@@ -33,6 +34,7 @@ const AppLayout = ({ children }) => {
     const [isLight, toggleTheme] = useThemeToggle();
     const [userMenu, setUserMenu] = useState(false);
     const [searchOpen, setSearchOpen] = useState(false);
+    const [helpOpen, setHelpOpen] = useState(false);
     const [notifOpen, setNotifOpen] = useState(false);
     const [hasUnread, setHasUnread] = useState(false);
     const online = useOnline();
@@ -69,6 +71,12 @@ const AppLayout = ({ children }) => {
             if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
                 e.preventDefault();
                 setSearchOpen(true);
+            }
+            // "?" opens help, unless you're typing.
+            const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(e.target?.tagName || '') || e.target?.isContentEditable;
+            if (e.key === '?' && !typing && !e.metaKey && !e.ctrlKey) {
+                e.preventDefault();
+                setHelpOpen(true);
             }
         };
         window.addEventListener('keydown', onKey);
@@ -108,9 +116,9 @@ const AppLayout = ({ children }) => {
                 </span>
                 <span className="u-strip-hide u-ellipsis"><Announcements audience="app" /></span>
             </>}
-            stripRight={<button onClick={() => setSearchOpen(true)}>Search <kbd style={{ font: 'inherit' }}>Ctrl K</kbd></button>}
+            stripRight={<button onClick={() => setHelpOpen(true)} title="Help, what's new and shortcuts (?)"><LifeBuoy size={12} style={{ verticalAlign: '-2px' }} /> Help</button>}
             right={<>
-                <button className="u-icon u-icon--hide" onClick={() => setSearchOpen(true)} aria-label="Search"><Search size={18} /></button>
+                <button className="u-icon" onClick={() => setSearchOpen(true)} aria-label="Search (Ctrl K)" title="Search (Ctrl K)"><Search size={18} /></button>
                 <div style={{ position: 'relative' }}>
                     <button className={`u-icon${notifOpen ? ' on' : ''}`} onClick={() => { setNotifOpen((v) => !v); setHasUnread(false); }} aria-label="Notifications">
                         <Bell size={18} />
@@ -155,7 +163,10 @@ const AppLayout = ({ children }) => {
                 </div>
             </>}
             footerCta={<button className="u-btn u-btn--solid u-btn--lg" onClick={startRoom}><Plus size={16} /> New room</button>}
-            after={<SearchModal isOpen={searchOpen} onClose={closeSearch} />}
+            after={<>
+                <SearchModal isOpen={searchOpen} onClose={closeSearch} onOpenHelp={() => setHelpOpen(true)} onToggleTheme={toggleTheme} />
+                <HelpModal open={helpOpen} onClose={() => setHelpOpen(false)} />
+            </>}
         >
             {children}
         </Shell>

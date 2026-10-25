@@ -9,6 +9,25 @@ contextBridge.exposeInMainWorld("colabsDesktop", {
     // is served from the app itself (see localUi.js). Read once, synchronously, at startup.
     config: ipcRenderer.sendSync("colabs:config"),
     runLocal: (payload) => ipcRenderer.invoke("colabs:runLocal", payload),
+    runBuiltin: (payload) => ipcRenderer.invoke("colabs:runBuiltin", payload),
+    toolchains: (payload) => ipcRenderer.invoke("colabs:toolchains", payload),
+    packs: () => ipcRenderer.invoke("colabs:packs"),
+    installPack: (id) => ipcRenderer.invoke("colabs:installPack", { id }),
+    removePack: (id) => ipcRenderer.invoke("colabs:removePack", { id }),
+    installAppleTools: () => ipcRenderer.invoke("colabs:installAppleTools"),
+    onPackProgress: (fn) => {
+        const listener = (_e, info) => fn(info);
+        ipcRenderer.on("colabs:packProgress", listener);
+        return () => ipcRenderer.removeListener("colabs:packProgress", listener);
+    },
+    // Terminal docked in the window: the page only places it (slot position) or closes it.
+    terminalDock: (payload) => ipcRenderer.invoke("colabs:terminalDock", payload),
+    terminalClose: (payload) => ipcRenderer.invoke("colabs:terminalClose", payload),
+    onTerminalClosed: (fn) => {
+        const listener = (_e, info) => fn(info);
+        ipcRenderer.on("colabs:terminalClosed", listener);
+        return () => ipcRenderer.removeListener("colabs:terminalClosed", listener);
+    },
     llmLocal: (payload) => ipcRenderer.invoke("colabs:llmLocal", payload),
     localStatus: () => ipcRenderer.invoke("colabs:localStatus"),
     info: () => ipcRenderer.invoke("colabs:info"),

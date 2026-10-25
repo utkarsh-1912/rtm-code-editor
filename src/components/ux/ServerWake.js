@@ -11,6 +11,9 @@ export default function ServerWake() {
     if (status === "up" || hidden || (status === "checking" && waitedMs < 1500)) return null;
 
     const down = status === "down";
+    // Your own connection being down is a different problem (see OfflineNotice): the server
+    // can't be judged while you're offline, so this stays quiet then.
+    if (typeof navigator !== "undefined" && navigator.onLine === false) return null;
     return (
         <div className="ux sw" role="status" aria-live="polite">
             <span className="sw-mark" aria-hidden="true"><i /></span>

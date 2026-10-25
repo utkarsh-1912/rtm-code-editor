@@ -79,6 +79,44 @@ async function updateRoomName(roomId, newName) {
     return rows[0] || null;
 }
 
+// --- Room access -------------------------------------------------------------------------
+// public: anyone with the link. invite: people ask to join and the owner lets them in.
+// private: only the owner and the emails on the room's invite list (signed in).
+const VISIBILITY = new Set(['public', 'invite', 'private']);
+const cleanEmails = (list) => [...new Set((Array.isArray(list) ? list : [])
+    .map((e) => String(e || '').trim().toLowerCase())
+    .filter((e) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e) && e.length <= 200))].slice(0, 200);
+
+async function getRoomAccess(roomId) {
+    const rows = await sql`SELECT owner_uid, visibility, allowed_emails FROM rooms WHERE room_id = ${roomId}`;
+    if (!rows.length) return null;
+    const r = rows[0];
+    return {
+        ownerUid: r.owner_uid || null,
+        visibility: VISIBILITY.has(r.visibility) ? r.visibility : 'public',
+        allowed: Array.isArray(r.allowed_emails) ? r.allowed_emails : [],
+    };
+}
+
+// The first signed-in person in a room without an owner becomes its owner.
+async function claimRoomOwner(roomId, uid) {
+    const rows = await sql`UPDATE rooms SET owner_uid = ${uid} WHERE room_id = ${roomId} AND owner_uid IS NULL RETURNING owner_uid`;
+    return rows.length > 0;
+}
+
+// Only the owner can change access. Returns the new access, or null if not allowed.
+async function setRoomAccess(roomId, ownerUid, { visibility, allowed }) {
+    const vis = VISIBILITY.has(visibility) ? visibility : 'public';
+    const emails = cleanEmails(allowed);
+    const rows = await sql`
+        UPDATE rooms SET visibility = ${vis}, allowed_emails = ${JSON.stringify(emails)}::jsonb
+        WHERE room_id = ${roomId} AND owner_uid = ${ownerUid}
+        RETURNING owner_uid, visibility, allowed_emails
+    `;
+    if (!rows.length) return null;
+    return { ownerUid: rows[0].owner_uid, visibility: rows[0].visibility, allowed: rows[0].allowed_emails || [] };
+}
+
 async function updateLastRoom(userId, roomId) {
     return await sql`
         UPDATE users 
@@ -182,6 +220,9 @@ module.exports = {
     updateRoomLanguage,
     updateRoomChat,
     getChatHistory,
+    getRoomAccess,
+    claimRoomOwner,
+    setRoomAccess,
     updateRoomName,
     updateLastRoom,
     linkRoomToUser,

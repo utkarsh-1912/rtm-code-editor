@@ -16,7 +16,7 @@ const LINKS = [
 const COLUMNS = [
     { title: "Product", links: [["Features", "/features"], ["Pricing", "/pricing"], ["Download", "/download"]] },
     { title: "Company", links: [["About", "/about"], ["Security", "/security"], ["Support", "/support"]] },
-    { title: "Resources", links: [["Status", "/status"], ["Source code", "https://github.com/utkarsh-1912/rtm-code-editor"]] },
+    { title: "Resources", links: [["Status", "/status"], ["Docs", "/docs"]] },
     { title: "Legal", links: [["Privacy", "/privacy"], ["Terms", "/terms"]] },
 ];
 

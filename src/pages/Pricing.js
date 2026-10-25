@@ -20,19 +20,19 @@ const COMPARE = [
     ["AI copilot", `${plans.free.limits.aiPerDay} a day`, "Unlimited", "Unlimited"],
     ["Organizations and email invites", false, true, true],
     ["Push and email notifications", false, true, true],
-    ["Self-hosted runner and Judge0", false, false, true],
+    ["Self-hosted code runner", false, false, true],
     ["SSO and advanced access", false, false, true],
     ["Support", "Community", "Priority", "Dedicated + SLA"],
 ];
 
 const FAQ = [
     ["Is there a free plan?", "Yes, and it is not a trial. Free covers real-time rooms, voice, video, the whiteboard, 17 languages, ten projects and a daily allowance of AI prompts."],
-    ["How does the Team trial work?", `You get ${trialDays} days of Team to try everything. We ask for a card up front through Stripe, remind you before it ends, and you can cancel any time before then without being charged.`],
+    ["How does the Team trial work?", `You get ${trialDays} days of Team to try everything. We ask for a card up front through our secure checkout, remind you before it ends, and you can cancel any time before then without being charged.`],
     ["Do guests need an account or a plan?", "No. Anyone with a room link can join with just a display name, whatever plan the host is on."],
-    ["Is the desktop app free?", "Yes. It is the same app on Windows, macOS and Linux, and it runs code on your own Judge0 and AI on a local model when they are available. Local AI is not counted against any limit."],
+    ["Is the desktop app free?", "Yes. It is the same app on Windows, macOS and Linux, and it runs code and AI on your own computer when you set them up. Local AI is not counted against any limit."],
     ["Can I use my own data in SQL?", "Yes. Import CSV, TSV or JSON files in a SQL room and query them by table name."],
     ["How do I cancel or change plan?", "From Settings, Plan & billing, open Manage billing. You keep Team until the end of the period you paid for, then move to Free. Your projects stay; you just cannot create new ones above the Free limit."],
-    ["What about taxes and invoices?", "Prices exclude any local taxes, which Stripe adds at checkout where required. Every payment gets an emailed invoice, and past invoices live in the billing portal."],
+    ["What about taxes and invoices?", "Prices exclude any local taxes, which are added at checkout where required. Every payment gets an emailed invoice, and past invoices live in the billing portal."],
     ["Do you offer refunds?", "If something went wrong, write to support within 14 days of a charge and we will make it right."],
 ];
 

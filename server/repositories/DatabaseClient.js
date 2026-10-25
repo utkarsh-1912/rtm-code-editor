@@ -174,6 +174,49 @@ async function initializeSchema() {
         await sql`ALTER TABLE sessions ADD COLUMN IF NOT EXISTS name VARCHAR(80);`;
         await sql`ALTER TABLE sessions ADD COLUMN IF NOT EXISTS revoked_at TIMESTAMP WITH TIME ZONE;`;
         await sql`ALTER TABLE rooms ADD COLUMN IF NOT EXISTS name VARCHAR(255);`;
+        // Scheduled calls/meetings in a room.
+        await sql`
+        CREATE TABLE IF NOT EXISTS meetings (
+            id VARCHAR(32) PRIMARY KEY,
+            room_id VARCHAR(255) NOT NULL,
+            title VARCHAR(200) NOT NULL,
+            description TEXT DEFAULT '',
+            starts_at TIMESTAMP WITH TIME ZONE NOT NULL,
+            duration_min INTEGER NOT NULL DEFAULT 30,
+            time_zone VARCHAR(64) DEFAULT 'UTC',
+            host_uid VARCHAR(128) NOT NULL,
+            host_name VARCHAR(120),
+            host_email VARCHAR(200),
+            invitees JSONB DEFAULT '[]'::jsonb,
+            access VARCHAR(16) DEFAULT 'public',
+            reminded_at TIMESTAMP WITH TIME ZONE,
+            cancelled_at TIMESTAMP WITH TIME ZONE,
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+        );
+        `;
+        await sql`CREATE INDEX IF NOT EXISTS meetings_starts_at ON meetings (starts_at);`;
+        // Room access: who owns a room, who may join it (public link, invite-only, private).
+        await sql`ALTER TABLE rooms ADD COLUMN IF NOT EXISTS owner_uid VARCHAR(128);`;
+        await sql`ALTER TABLE rooms ADD COLUMN IF NOT EXISTS visibility VARCHAR(16) DEFAULT 'public';`;
+        await sql`ALTER TABLE rooms ADD COLUMN IF NOT EXISTS allowed_emails JSONB DEFAULT '[]'::jsonb;`;
+        // Older databases created organizations with "created_by" instead of "owner_id".
+        await sql`ALTER TABLE organizations ADD COLUMN IF NOT EXISTS owner_id INTEGER REFERENCES users(id) ON DELETE SET NULL;`;
+        await sql`
+            DO $$ BEGIN
+                IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'organizations' AND column_name = 'created_by') THEN
+                    UPDATE organizations SET owner_id = created_by WHERE owner_id IS NULL;
+                END IF;
+            END $$;
+        `;
+        // Older databases named the notification flag "is_read"; the code uses "read".
+        await sql`ALTER TABLE notifications ADD COLUMN IF NOT EXISTS read BOOLEAN DEFAULT FALSE;`;
+        await sql`
+            DO $$ BEGIN
+                IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'notifications' AND column_name = 'is_read') THEN
+                    UPDATE notifications SET read = COALESCE(is_read, FALSE) WHERE read IS DISTINCT FROM COALESCE(is_read, FALSE) AND read = FALSE;
+                END IF;
+            END $$;
+        `;
         // Project chat lives with the project (rooms rows are cleaned up after idle hours).
         await sql`ALTER TABLE projects ADD COLUMN IF NOT EXISTS chat_history JSONB DEFAULT '[]'::jsonb;`;
         // When each person last opened a room ("last active" on their dashboard).

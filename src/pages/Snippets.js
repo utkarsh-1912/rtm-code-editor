@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { Search, Plus, Trash2, Pencil, Copy, Check, X, Users, Hash, User, Code2, LogIn } from 'lucide-react';
 import toast from 'react-hot-toast';
 import AppLayout from '../components/AppLayout';
@@ -69,6 +69,7 @@ function SnippetView({ snippet, copied, onCopy, onEdit, onDelete, onClose }) {
 const Snippets = () => {
     const { user } = useAuth();
     const navigate = useNavigate();
+    const location = useLocation();
     const narrow = useIsNarrow();
     const [snippets, setSnippets] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -85,6 +86,14 @@ const Snippets = () => {
     const [busy, setBusy] = useState(false);
     const [tab, setTab] = useState('snippets'); // snippets | teams
     const [lang, setLang] = useState(null);
+
+    // Opened from search: a snippet to show, the Teams tab, or "new snippet".
+    useEffect(() => {
+        const st = location.state || {};
+        if (st.tab === 'teams') setTab('teams');
+        if (st.snippetId) { setTab('snippets'); setSelectedId(st.snippetId); }
+        if (st.create) setMode('create');
+    }, [location.state]);
 
     const fetchOrgs = useCallback(async () => {
         if (!user?.uid) return;
@@ -110,8 +119,18 @@ const Snippets = () => {
             const items = Array.isArray(data) ? data : Array.isArray(data.items) ? data.items : [];
             setSnippets(items);
             setTotal(Array.isArray(data) ? items.length : data.total ?? items.length);
+            // Saved copy for offline reading.
+            try { localStorage.setItem(`snip-cache-${user.uid}-${vault}`, JSON.stringify(items.slice(0, 200))); } catch { /* full or blocked */ }
         } catch (err) {
-            toast.error('Failed to load snippets');
+            let saved = null;
+            try { saved = JSON.parse(localStorage.getItem(`snip-cache-${user.uid}-${vault}`)); } catch { /* none */ }
+            if (Array.isArray(saved)) {
+                setSnippets(saved);
+                setTotal(saved.length);
+                toast("Offline: showing your saved snippets.", { id: 'snip-offline', icon: '📴' });
+            } else {
+                toast.error('Failed to load snippets');
+            }
         } finally {
             setLoading(false);
         }

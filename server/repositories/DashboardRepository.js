@@ -40,36 +40,53 @@ async function getUserDashboard(userId) {
     };
 }
 
+// Search everything a person can open: rooms, projects, files in their projects, snippets
+// and meetings. Matches anywhere (case-insensitive); names that start with the query first.
 async function searchAll(userId, query) {
-    const user = await sql`SELECT id FROM users WHERE auth_provider_id = ${userId}`;
-    if (!user.length) return { rooms: [], snippets: [], projects: [] };
+    const empty = { rooms: [], projects: [], files: [], snippets: [], meetings: [] };
+    const q = String(query || '').trim().slice(0, 100);
+    if (!q) return empty;
+    const user = await sql`SELECT id, email FROM users WHERE auth_provider_id = ${userId}`;
+    if (!user.length) return empty;
+    const uid = user[0].id;
+    const email = String(user[0].email || '').toLowerCase();
+    // LIKE patterns: the query's own % and _ are literal.
+    const lit = q.replace(/[\\%_]/g, (c) => `\\${c}`);
+    const any = `%${lit}%`;
+    const start = `${lit}%`;
 
-    const internalId = user[0].id;
-    const searchQuery = `%${query}%`;
-
-    const rooms = await sql`
-        SELECT r.room_id, r.name, r.language, r.updated_at
-        FROM rooms r
-        JOIN user_rooms ur ON r.id = ur.room_id
-        WHERE ur.user_id = ${internalId} AND (r.room_id ILIKE ${searchQuery} OR r.name ILIKE ${searchQuery})
-        LIMIT 5
-    `;
-
-    const snippets = await sql`
-        SELECT id, title, language, updated_at 
-        FROM snippets 
-        WHERE user_id = ${internalId} AND (title ILIKE ${searchQuery} OR code ILIKE ${searchQuery})
-        LIMIT 5
-    `;
-
-    const projects = await sql`
-        SELECT id, name, description, type, updated_at 
-        FROM projects 
-        WHERE user_id = ${internalId} AND (name ILIKE ${searchQuery} OR description ILIKE ${searchQuery})
-        LIMIT 5
-    `;
-
-    return { rooms, snippets, projects };
+    const [rooms, projects, files, snippets, meetings] = await Promise.all([
+        sql`
+            SELECT r.room_id, r.name, r.language, GREATEST(r.updated_at, COALESCE(ur.last_opened_at, r.updated_at)) AS updated_at
+            FROM rooms r JOIN user_rooms ur ON r.id = ur.room_id
+            WHERE ur.user_id = ${uid} AND (r.room_id ILIKE ${any} OR r.name ILIKE ${any})
+            ORDER BY (COALESCE(r.name, r.room_id) ILIKE ${start}) DESC, 4 DESC
+            LIMIT 6`,
+        sql`
+            SELECT id, name, description, type, updated_at FROM projects
+            WHERE user_id = ${uid} AND (name ILIKE ${any} OR description ILIKE ${any})
+            ORDER BY (name ILIKE ${start}) DESC, updated_at DESC
+            LIMIT 6`,
+        sql`
+            SELECT f.id, f.path, f.project_id, p.name AS project_name FROM project_files f JOIN projects p ON p.id = f.project_id
+            WHERE p.user_id = ${uid} AND f.is_directory = FALSE AND f.path ILIKE ${any}
+            ORDER BY (regexp_replace(f.path, '^.*/', '') ILIKE ${start}) DESC, f.updated_at DESC
+            LIMIT 8`,
+        sql`
+            SELECT id, title, language, tags, updated_at,
+                   (SELECT line FROM regexp_split_to_table(code, E'\\n') AS line WHERE line ILIKE ${any} LIMIT 1) AS match_line
+            FROM snippets
+            WHERE user_id = ${uid} AND (title ILIKE ${any} OR code ILIKE ${any} OR COALESCE(tags::text, '') ILIKE ${any})
+            ORDER BY (title ILIKE ${start}) DESC, updated_at DESC
+            LIMIT 6`,
+        sql`
+            SELECT id, title, starts_at, duration_min, room_id FROM meetings
+            WHERE cancelled_at IS NULL AND title ILIKE ${any}
+              AND (host_uid = ${userId} OR (${email} <> '' AND invitees ? ${email}))
+            ORDER BY starts_at DESC
+            LIMIT 5`.catch(() => []),
+    ]);
+    return { rooms, projects, files, snippets, meetings };
 }
 
 module.exports = {

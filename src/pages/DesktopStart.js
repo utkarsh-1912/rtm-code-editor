@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, Navigate, useNavigate } from "react-router-dom";
-import { ArrowRight, Link2, Plus, LogIn, Cpu, Globe, FolderOpen, Clock, X, Copy, Check, RefreshCw, Keyboard, SquareTerminal, ArrowUpRight } from "lucide-react";
+import { ArrowRight, Link2, Plus, LogIn, Cpu, Globe, FolderOpen, Clock, X, Copy, Check, RefreshCw, Keyboard, SquareTerminal, ArrowUpRight, WifiOff } from "lucide-react";
 import toast from "react-hot-toast";
 import Logo from "../components/Logo";
 import AiIcon from "../components/AiIcon";
@@ -50,13 +50,21 @@ export default function DesktopStart() {
         try { return localStorage.getItem("guest-name") || ""; } catch { return ""; }
     });
     const [local, setLocal] = useState(null);
+    const [chains, setChains] = useState(null);
     const [checking, setChecking] = useState(false);
     const [version, setVersion] = useState("");
     const [recent, setRecent] = useState(recentRooms);
 
     const check = useCallback(async () => {
         setChecking(true);
-        try { setLocal(await desktop()?.localStatus?.()); } catch { setLocal(null); } finally { setChecking(false); }
+        try {
+            const [status, list] = await Promise.all([
+                desktop()?.localStatus?.().catch(() => null),
+                desktop()?.toolchains?.({ fresh: true }).catch(() => null),
+            ]);
+            setLocal(status || null);
+            setChains(Array.isArray(list) ? list : null);
+        } finally { setChecking(false); }
     }, []);
     useEffect(() => {
         check();
@@ -90,10 +98,8 @@ export default function DesktopStart() {
             text: backendLabel(backend) + (backend.latency != null ? ` · ${backend.latency} ms` : ""),
         },
         {
-            id: "judge0", icon: <Cpu size={15} />, label: "Code runner", ok: local?.judge0, warn: true,
-            text: local ? (local.judge0 ? "Judge0 on this computer" : "Using the server") : "Checking",
-            fix: local && !local.judge0 ? "docker compose up -d" : null,
-            fixNote: "in a Judge0 CE folder",
+            id: "runner", icon: <Cpu size={15} />, label: "Code runner", ok: !!chains, warn: true,
+            text: chains ? `Built in · ${chains.filter((c) => c.ready).map((c) => c.label).join(", ")}` : "Checking",
         },
         {
             id: "llm", icon: <AiIcon size={15} />, label: "AI copilot", ok: local?.llm, warn: true,
@@ -138,6 +144,12 @@ export default function DesktopStart() {
                                 <button type="submit" disabled={!room.trim()} aria-label="Join"><ArrowRight size={15} /></button>
                             </div>
                         </form>
+
+                        <Link to="/offline" className="ds2-tile">
+                            <span className="ds2-tile-ico"><WifiOff size={20} /></span>
+                            <b>Work offline</b>
+                            <em>Write and run code on this computer, no internet needed.</em>
+                        </Link>
 
                         <Link to="/login" className="ds2-tile">
                             <span className="ds2-tile-ico"><FolderOpen size={20} /></span>

@@ -32,7 +32,7 @@ export default function Terms() {
 
             <h2>6. Plans, Trials and Billing</h2>
             <p>
-                Free is free. Team is billed in advance, monthly or yearly, through Stripe, and renews automatically until you cancel in Settings under Plan &amp; billing. The Team trial is 14 days and converts to a paid subscription at the end unless cancelled before then. When a paid plan ends you move to Free: your projects remain, but you cannot create new ones above the Free limit. Prices exclude applicable taxes. If a charge was a mistake, contact support within 14 days and we will make it right.
+                Free is free. Team is billed in advance, monthly or yearly, through our payment processor, and renews automatically until you cancel in Settings under Plan &amp; billing. The Team trial is 14 days and converts to a paid subscription at the end unless cancelled before then. When a paid plan ends you move to Free: your projects remain, but you cannot create new ones above the Free limit. Prices exclude applicable taxes. If a charge was a mistake, contact support within 14 days and we will make it right.
             </p>
 
             <h2>7. Persistent Data</h2>

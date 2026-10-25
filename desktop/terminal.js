@@ -5,7 +5,7 @@
 // No native PTY module is needed: each command line runs through the system shell
 // (cmd.exe / $SHELL, or COLABS_SHELL), stdin is forwarded while it runs, Ctrl+C stops it.
 // `cd`, `clear` and `exit` are handled by the terminal itself so the directory persists.
-const { BrowserWindow, ipcMain, nativeTheme } = require("electron");
+const { BrowserWindow, WebContentsView, ipcMain, nativeTheme } = require("electron");
 const { spawn } = require("child_process");
 const fs = require("fs");
 const os = require("os");
@@ -122,6 +122,12 @@ function registerIpc() {
         const s = from(event);
         if (s?.child?.stdin?.writable && typeof text === "string") s.child.stdin.write(text);
     });
+    ipcMain.on("term:dock", (event, action) => {
+        const s = from(event);
+        if (!s) return;
+        if (action === "close") s.win.close();
+        if (action === "popout" && s.onPopOut) s.onPopOut(s.cwd);
+    });
     ipcMain.on("term:interrupt", (event) => {
         const s = from(event);
         if (s?.child) {
@@ -162,4 +168,33 @@ function openTerminal({ cwd, title } = {}) {
     return { ok: true };
 }
 
-module.exports = { openTerminal, changeDir, _run: run };
+// A terminal inside the main window: the same terminal page (its own web contents, its own
+// preload) shown as a native view over a slot in the app's layout. The app decides where it
+// sits and whether it shows, but, exactly like the separate window, it cannot type into it.
+// `onExit` runs when the terminal ends itself ("exit").
+function createTerminalView({ cwd, title, onExit, onPopOut } = {}) {
+    registerIpc();
+    const view = new WebContentsView({
+        webPreferences: {
+            preload: path.join(__dirname, "terminal-preload.js"),
+            contextIsolation: true,
+            sandbox: true,
+            nodeIntegration: false,
+        },
+    });
+    view.setBackgroundColor(nativeTheme.shouldUseDarkColors ? "#0B0B0A" : "#F5F7FB");
+    const wc = view.webContents;
+    const id = wc.id;
+    sessions.set(id, { cwd, child: null, title, onPopOut, win: { close: () => onExit && onExit() } });
+    wc.setWindowOpenHandler(() => ({ action: "deny" }));
+    wc.on("will-navigate", (e) => e.preventDefault());
+    wc.on("destroyed", () => {
+        const s = sessions.get(id);
+        if (s?.child) kill(s.child);
+        sessions.delete(id);
+    });
+    wc.loadFile(path.join(__dirname, "terminal.html"), { query: { docked: "1" } });
+    return view;
+}
+
+module.exports = { openTerminal, createTerminalView, changeDir, _run: run };

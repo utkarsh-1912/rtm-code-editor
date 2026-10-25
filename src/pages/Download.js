@@ -6,7 +6,9 @@ import CtaBand from "../components/Site/CtaBand";
 import { pad2 } from "../components/ux/primitives";
 import { getBackendUrl } from "../utils/api";
 
-const REPO = "utkarsh-1912/rtm-code-editor";
+// Installers are published as GitHub releases of a PUBLIC repo. With closed source, point this
+// at a releases-only repo (REACT_APP_RELEASES_REPO, e.g. "your-org/colabs-releases").
+const REPO = process.env.REACT_APP_RELEASES_REPO || "utkarsh-1912/rtm-code-editor";
 const RELEASES = `https://github.com/${REPO}/releases`;
 
 const PLATFORMS = [
@@ -144,14 +146,13 @@ export default function Download() {
             <section className="u-section u-head">
                 <span className="u-label" data-rise>On your machine</span>
                 <div className="dl-local">
-                    <p className="u-lede" data-rise><b>The desktop app tries your machine first.</b> Code runs on a local Judge0 and the copilot uses a local model. If either isn't running, it falls back to the server.</p>
+                    <p className="u-lede" data-rise><b>The desktop app tries your machine first.</b> Code and the AI copilot can run on your own computer. If they aren't set up, it uses the cloud, exactly like the website.</p>
                     <div className="dl-steps">
                         <article className="u-card dl-step" data-rise>
                             <div className="f-cell-top"><span className="u-label">01 · Code runner</span><Cpu size={18} /></div>
-                            <h3>Judge0 CE</h3>
-                            <p className="u-muted">Open-source code execution in Docker, on port 2358. Follow the self-hosting steps in the Judge0 repo, then start it:</p>
-                            <CopyLine text="docker compose up -d db redis && docker compose up -d" />
-                            <a href="https://github.com/judge0/judge0/blob/master/CHANGELOG.md#deployment-procedure" target="_blank" rel="noreferrer" className="u-ul u-small">Judge0 deployment guide <ArrowUpRight size={15} /></a>
+                            <h3>Built in</h3>
+                            <p className="u-muted">Runs code with the languages already on your computer, like an IDE, and works offline. JavaScript works out of the box; install Python, Java, a C/C++ compiler, Go or Rust and they're picked up automatically. Settings › Desktop app shows what's ready.</p>
+                            <span className="u-small u-muted">No Docker or setup needed. A local Judge0 is still used if you run one.</span>
                         </article>
                         <article className="u-card dl-step" data-rise style={{ "--d": "80ms" }}>
                             <div className="f-cell-top"><span className="u-label">02 · AI copilot</span><Sparkles size={18} /></div>

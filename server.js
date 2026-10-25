@@ -73,6 +73,8 @@ app.use('/api', aiRoutes);
 app.use('/api', snapshotRoutes);
 app.use('/api', analyticsRoutes);
 app.use('/api', billingRoutes);
+app.use('/api', require('./server/routes/meetingRoutes'));
+app.use('/api', require('./server/routes/statusRoutes'));
 
 // Serve static React build files in production
 if (process.env.NODE_ENV === 'production') {
@@ -86,6 +88,8 @@ if (process.env.NODE_ENV === 'production') {
 initializeSockets(io);
 // Hourly housekeeping: idle guest rooms (after GUEST_ROOM_TTL_HOURS, default 6), old sessions.
 require("./server/jobs/cleanup").startCleanupJob(io, require("./server/sockets/SocketManager").roomState);
+// Meeting reminders: a nudge about 10 minutes before a scheduled call.
+require("./server/jobs/reminders").startReminderJob();
 
 // Server Entry Point: listen right away (so health checks, the runner and sockets work
 // on a cold start) and bring the database up in the background with retries.

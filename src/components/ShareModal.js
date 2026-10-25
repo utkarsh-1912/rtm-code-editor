@@ -3,6 +3,7 @@ import { Check, Copy, Share2, Pencil, Eye } from "lucide-react";
 import toast from "react-hot-toast";
 import { Modal } from "./ux/primitives";
 import { publicOrigin } from "../utils/api";
+import { AccessSettings, VISIBILITY_OPTIONS } from "./RoomAccess";
 
 function LinkRow({ icon: Icon, title, note, value }) {
     const [copied, setCopied] = useState(false);
@@ -33,7 +34,8 @@ function LinkRow({ icon: Icon, title, note, value }) {
 }
 
 // Share a room: editor and spectator links, room ID, and the OS share sheet when available.
-export default function ShareModal({ open, onClose, roomId, peopleOnline = 0 }) {
+export default function ShareModal({ open, onClose, roomId, peopleOnline = 0, access, onAccessChange }) {
+    const vis = VISIBILITY_OPTIONS.find((o) => o.id === access?.visibility) || VISIBILITY_OPTIONS[0];
     const base = `${publicOrigin()}/editor/${encodeURIComponent(roomId)}`;
     const editorLink = base;
     const viewerLink = `${base}?role=viewer`;
@@ -53,12 +55,13 @@ export default function ShareModal({ open, onClose, roomId, peopleOnline = 0 }) 
             onClose={onClose}
             label={`room/${roomId} · ${peopleOnline} online`}
             title="Invite people"
-            description="Rooms are private. Only people with a link can join, and guests just pick a name."
+            description={vis.id === "public" ? "Anyone with a link can join; guests just pick a name." : vis.id === "invite" ? "People with a link ask to join, and you let them in." : "Only signed-in people on the invite list can join."}
             footer={<>
                 {canShare && <button type="button" className="u-btn u-btn--ghost" onClick={nativeShare}><Share2 size={15} /> Share…</button>}
                 <button type="button" className="u-btn u-btn--solid" onClick={onClose}>Done</button>
             </>}
         >
+            {access && <AccessSettings meta={access} onSave={(v, allowed) => onAccessChange?.(v, allowed)} />}
             <LinkRow icon={Pencil} title="Editor link" note="Can type, run code, chat and join the call." value={editorLink} />
             <LinkRow icon={Eye} title="Spectator link" note="Read-only. Good for interviews and demos." value={viewerLink} />
             <LinkRow icon={Copy} title="Room ID" note="Paste it into “Join a room” on the home page." value={roomId} />

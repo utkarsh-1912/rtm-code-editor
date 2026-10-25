@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Plus, Search, MoreHorizontal, Pencil, Trash2, Folder, FolderOpen, FileUp, Terminal, Link2, ArrowUpRight, ArrowRight, Check, Sparkles, RotateCcw, X } from 'lucide-react';
+import { CalendarPlus, WifiOff, Plus, Search, MoreHorizontal, Pencil, Trash2, Folder, FolderOpen, FileUp, Terminal, Link2, ArrowUpRight, ArrowRight, Check, Sparkles, RotateCcw, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
 import AppLayout from '../components/AppLayout';
@@ -13,6 +13,7 @@ import Pager from '../components/ux/Pager';
 import { pickFolder, pickFiles, importProject, describeSkipped } from '../utils/localFiles';
 import { usePlan, isPlanLimit, showUpgradeToast, catalogue } from '../utils/billing';
 import { track } from '../utils/track';
+import { ScheduleModal, UpcomingMeetings } from '../components/Meetings';
 
 // Project templates: a web app (live preview) plus every runnable language.
 const TEMPLATES = [
@@ -69,7 +70,7 @@ const Dashboard = () => {
     const { user, loading, refreshProfile } = useAuth();
     const navigate = useNavigate();
     const location = useLocation();
-    const { rooms, projects, roomsTotal, projectsTotal, stats, loading: loadingData, error, reload, loadingMore, loadMoreRooms, loadMoreProjects } = useWorkspace(user);
+    const { rooms, projects, roomsTotal, projectsTotal, stats, loading: loadingData, error, reload, loadingMore, loadMoreRooms, loadMoreProjects, staleAt } = useWorkspace(user);
     const { plan: planInfo, reload: reloadPlan } = usePlan(user);
 
     const [view, setView] = useState('all'); // all | rooms | projects
@@ -82,6 +83,8 @@ const Dashboard = () => {
     const [deleteTarget, setDeleteTarget] = useState(null);
     const [newName, setNewName] = useState('');
     const [createOpen, setCreateOpen] = useState(false);
+    const [scheduleOpen, setScheduleOpen] = useState(false);
+    const [meetingsKey, setMeetingsKey] = useState(0);
     const [form, setForm] = useState({ name: '', description: '', type: 'web' });
     const [busy, setBusy] = useState(false);
     const [tplQuery, setTplQuery] = useState('');
@@ -128,6 +131,10 @@ const Dashboard = () => {
         if (location.state?.openCreateProject) {
             setCreateOpen(true);
             setView('projects');
+            window.history.replaceState({}, document.title, window.location.pathname + window.location.search);
+        }
+        if (location.state?.openSchedule) {
+            setScheduleOpen(true);
             window.history.replaceState({}, document.title, window.location.pathname + window.location.search);
         }
     }, [user, loading, navigate, location]);
@@ -342,6 +349,7 @@ const Dashboard = () => {
                 <div className="db-actions">
                     <button className="u-btn u-btn--ghost db-open" onClick={() => importFromDisk('folder')} disabled={busy} title="Open a folder from your computer as a project (Ctrl+Shift+O in the desktop app)"><FolderOpen size={16} /> Open folder</button>
                     <button className="u-btn u-btn--ghost db-open" onClick={() => importFromDisk('files')} disabled={busy} title="Open files from your computer as a project"><FileUp size={16} /> Open files</button>
+                    <button className="u-btn u-btn--ghost" onClick={() => setScheduleOpen(true)}><CalendarPlus size={16} /> Schedule</button>
                     <button className="u-btn u-btn--ghost" onClick={() => setCreateOpen(true)}><Folder size={16} /> New project</button>
                     <button className="u-btn u-btn--solid" onClick={() => enterRoom(newRoomId())}><Plus size={16} /> New room</button>
                 </div>
@@ -375,6 +383,18 @@ const Dashboard = () => {
                     </button>
                 )}
             </section>
+
+            {staleAt && (
+                <aside className="u-card db-offline" data-rise role="status">
+                    <WifiOff size={16} />
+                    <span><b>Offline.</b> Showing your workspace as of {timeAgo(new Date(staleAt))}. Rooms and projects open again when you're back online.</span>
+                    {window.colabsDesktop && <button className="u-btn u-btn--ghost u-btn--sm" onClick={() => navigate('/offline')}>Offline editor</button>}
+                    <button className="u-btn u-btn--ghost u-btn--sm" onClick={reload}>Retry</button>
+                </aside>
+            )}
+
+            <UpcomingMeetings user={user} onSchedule={() => setScheduleOpen(true)} refreshKey={meetingsKey} />
+            <ScheduleModal open={scheduleOpen} onClose={() => setScheduleOpen(false)} hostName={user?.name} onScheduled={() => setMeetingsKey((k) => k + 1)} />
 
             <div className="db-kpis" data-rise>
                 {kpis.map((k) => (

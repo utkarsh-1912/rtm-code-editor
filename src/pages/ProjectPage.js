@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { ReflexContainer, ReflexSplitter, ReflexElement } from "react-reflex";
 import "react-reflex/styles.css";
 import "./ProjectPage.css";
@@ -63,6 +63,7 @@ import {
 } from "lucide-react";
 import { bundleWebProject } from "../utils/webBundle";
 import AiIcon from "../components/AiIcon";
+import TerminalPanel from "../components/TerminalPanel";
 import { pickFiles, pickFolder, uploadFiles, describeSkipped, saveToDisk, openTerminal, rootFor, linkRoot, canWriteToDisk, canOpenTerminal } from "../utils/localFiles";
 
 const SIDE_TABS = [
@@ -79,6 +80,7 @@ const PROJECT_LAYOUT = {
         files: { label: 'Files' },
         code: { label: 'Editor' },
         output: { label: 'Output' },
+        terminal: { label: 'Terminal' },
         chat: { label: 'Chat' },
         people: { label: 'People' },
         call: { label: 'Call' },
@@ -92,15 +94,18 @@ const PROJECT_LAYOUT = {
         { id: 'focus', label: 'Focus', note: 'Just the code', layout: { left: [], right: ['code', 'output'] } },
     ],
     fallback: { left: ['files'], right: ['code', 'output'] },
-    toggles: ['files', 'chat', 'people', 'call'],
+    // The terminal card exists only in the desktop app (it runs commands on this computer).
+    toggles: ['files', 'chat', 'people', 'call', ...(typeof window !== 'undefined' && window.colabsDesktop?.terminalDock ? ['terminal'] : [])],
     below: { output: 'code' },
 };
 // Default card heights in a column, by weight (the editor gets most of it).
-const PROJECT_WEIGHT = { code: 3, output: 1.4, files: 1, chat: 1.2, people: 0.8, call: 1.4 };
+const PROJECT_WEIGHT = { code: 3, output: 1.4, terminal: 1.4, files: 1, chat: 1.2, people: 0.8, call: 1.4 };
 const projectFlex = (id, ids) => (PROJECT_WEIGHT[id] || 1) / ids.reduce((sum, x) => sum + (PROJECT_WEIGHT[x] || 1), 0);
 
 const ProjectPage = () => {
     const { projectId } = useParams();
+    const location = useLocation();
+    const openPathRef = useRef(location.state?.openPath || null); // a file to open (from search)
     const { user } = useAuth();
     const navigate = useNavigate();
     const [project, setProject] = useState(null);
@@ -165,6 +170,7 @@ const ProjectPage = () => {
         try { localStorage.setItem('project-layout-mode', layoutMode); } catch { /* storage blocked */ }
     }, [layoutMode]);
     const [showLayoutMenu, setShowLayoutMenu] = useState(false);
+    const [showTerminal, setShowTerminal] = useState(false); // classic layout's terminal pane (desktop app)
     const [setCallSlot, callRect] = useDockSlot();
     const cards = layoutMode === 'cards' && !isMobile && !isZenMode;
 
@@ -217,6 +223,15 @@ const ProjectPage = () => {
         }
         if (isMobile) setActiveTab('code');
     }, [openFiles, isMobile]);
+
+    // Opened from search with a file in mind: open it once the files are here.
+    useEffect(() => {
+        const want = openPathRef.current;
+        if (!want || !files.length) return;
+        const file = files.find((f) => !f.is_directory && relPath(f) === want);
+        openPathRef.current = null;
+        if (file) handleFileClick(file);
+    }, [files, handleFileClick]);
 
     // Live preview for web projects: rebuild shortly after any file changes (yours or a
     // teammate's), no Run needed. Run still forces a fresh reload.
@@ -343,7 +358,7 @@ const ProjectPage = () => {
         }
 
         try {
-            const result = await runCode({ language: runtime, source: sourceCode, stdin: programInput });
+            const result = await runCode({ language: runtime, source: sourceCode, stdin: programInput, sharedScope: clients.length > 1 ? `project:${projectId}` : null });
             setOutput(formatRun(result) + `
 
 — ${result.status} · ${result.timeMs ?? '?'} ms · ${result.engine}`);
@@ -352,7 +367,7 @@ const ProjectPage = () => {
         } finally {
             setIsExecuting(false);
         }
-    }, [project, activeFile, files, programInput]);
+    }, [project, activeFile, files, programInput, clients.length, projectId]);
 
     const isWebProject = (project?.type || 'web') === 'web';
 
@@ -394,6 +409,9 @@ const ProjectPage = () => {
         </div>
     ) : (
         <div className="ws-out ws-io">
+            {/* Input and output side by side (stacked on phones), with a draggable divider. */}
+            <ReflexContainer orientation={isMobile ? "horizontal" : "vertical"}>
+            <ReflexElement flex={0.4} minSize={120}>
             <div className="ws-io-col">
                 <div className="ws-pane-head"><span>Input</span><b>stdin</b></div>
                 <textarea
@@ -405,6 +423,9 @@ const ProjectPage = () => {
                     aria-label="Program input"
                 />
             </div>
+            </ReflexElement>
+            <ReflexSplitter />
+            <ReflexElement flex={0.6} minSize={160}>
             <div className="ws-io-col">
                 <div className="ws-pane-head">
                     <span>Output</span>
@@ -415,6 +436,8 @@ const ProjectPage = () => {
                 </div>
                 <pre className="ws-console">{isExecuting ? <span className="u-caret">Running</span> : (output || <span className="u-caret">No output yet. Press Run</span>)}</pre>
             </div>
+            </ReflexElement>
+            </ReflexContainer>
         </div>
     );
 
@@ -574,8 +597,15 @@ const ProjectPage = () => {
                     setIsOutputVisible(true);
                 }
 
-                const filesRes = await fetch(`${backendUrl}/api/projects/${projectId}/files`);
-                const filesData = await filesRes.json();
+                // The server can answer with an error object (e.g. while it reconnects to its
+                // database); never treat that as the file list.
+                let filesData = null;
+                for (let attempt = 0; attempt < 3 && !Array.isArray(filesData); attempt++) {
+                    if (attempt) await new Promise((r) => setTimeout(r, 1500));
+                    const filesRes = await fetch(`${backendUrl}/api/projects/${projectId}/files`).catch(() => null);
+                    filesData = filesRes?.ok ? await filesRes.json().catch(() => null) : null;
+                }
+                if (!Array.isArray(filesData)) throw new Error("Could not load the project's files");
                 setFiles(filesData);
 
                 // Open the entry file: index.html for web, the language's main file, else a main.*.
@@ -973,6 +1003,22 @@ const ProjectPage = () => {
         }
     };
 
+    const canDockTerminal = !!window.colabsDesktop?.terminalDock;
+    const terminalShown = cards ? projectLayout.has('terminal') : showTerminal;
+    const toggleTerminal = (on = !terminalShown) => {
+        if (cards) { if (on !== projectLayout.has('terminal')) projectLayout.toggle('terminal'); }
+        else setShowTerminal(on);
+        if (on && !rootFor(projectId)) toast('The terminal starts in your home folder. Use "Save to disk" to give this project a folder.', { icon: '›', id: 'term-home' });
+    };
+    const renderTerminal = () => (
+        <TerminalPanel
+            dockKey={`project-${projectId}`}
+            cwd={rootFor(projectId)}
+            title={project?.name}
+            onClose={() => toggleTerminal(false)}
+        />
+    );
+
     const handleOpenTerminal = async () => {
         try {
             await openTerminal(projectId, project?.name);
@@ -983,7 +1029,7 @@ const ProjectPage = () => {
     };
 
     const diskActions = [
-        ...(canOpenTerminal() ? [{ id: 'terminal', label: 'Open terminal', icon: <SquareTerminal size={18} />, onClick: handleOpenTerminal, pin: !isMobile }] : []),
+        ...(canOpenTerminal() ? [{ id: 'terminal', label: terminalShown ? 'Hide terminal' : 'Terminal', icon: <SquareTerminal size={18} />, onClick: () => (canDockTerminal && !isMobile ? toggleTerminal() : handleOpenTerminal()), active: terminalShown, pin: !isMobile }] : []),
         ...(canWriteToDisk() ? [
             { id: 'save-disk', label: rootFor(projectId) ? 'Save to disk' : 'Save to disk…', icon: <HardDriveDownload size={18} />, onClick: () => handleSaveToDisk(false), section: 'more' },
             ...(rootFor(projectId) ? [{ id: 'save-disk-as', label: 'Save to another folder…', icon: <HardDriveDownload size={18} />, onClick: () => handleSaveToDisk(true), section: 'more' }] : []),
@@ -1090,6 +1136,12 @@ const ProjectPage = () => {
                             {renderOutputPanel()}
                         </ReflexElement>
                     )}
+                    {showTerminal && !isMobile && <ReflexSplitter />}
+                    {showTerminal && !isMobile && (
+                        <ReflexElement flex={0.3} minSize={110}>
+                            {renderTerminal()}
+                        </ReflexElement>
+                    )}
                 </ReflexContainer>
             </div>
         </div>
@@ -1113,6 +1165,7 @@ const ProjectPage = () => {
             );
         }
         if (id === 'output') return renderOutputPanel();
+        if (id === 'terminal') return renderTerminal();
         if (id === 'chat') return <ChatWindow socketRef={socketRef} roomId={`project-${projectId}`} userName={me} isLightMode={isLightMode} isMobile={isMobile} messages={messages} setMessages={setMessages} />;
         if (id === 'people') return <div className="ws-card-scroll">{renderPeople()}</div>;
         if (id === 'call') {
@@ -1287,6 +1340,11 @@ const ProjectPage = () => {
                                 />
                             )}
                         </span>
+                        {canDockTerminal && (
+                            <button className={terminalShown ? 'on' : ''} onClick={() => toggleTerminal()} title="Toggle the terminal">
+                                <SquareTerminal size={12} /> terminal
+                            </button>
+                        )}
                         <button className={isOutputVisible ? 'on' : ''} onClick={() => setIsOutputVisible(!isOutputVisible)} title="Toggle output panel">
                             <Terminal size={12} /> output
                         </button>

@@ -2,7 +2,8 @@ import React from 'react';
 import { AlertTriangle, RefreshCw, Home, RotateCcw, Copy, Check, Bug } from 'lucide-react';
 
 const RELOAD_KEY = 'eb-chunk-reload';
-const ISSUES_URL = 'https://github.com/utkarsh-1912/rtm-code-editor/issues/new';
+// Crash reports go to Support (the source code isn't public).
+const SUPPORT_URL = '/support';
 
 // After a deploy, an open tab can ask for script files that no longer exist. One automatic
 // reload fixes that; the session flag stops a reload loop if it keeps failing.
@@ -69,7 +70,7 @@ class ErrorBoundary extends React.Component {
         const lede = stale
             ? 'The app was updated while this tab was open. Reload to get the latest version.'
             : 'Your work is safe: room code is saved on this device and synced to your room, and projects are saved as you type.';
-        const report = `${ISSUES_URL}?title=${encodeURIComponent(`Crash: ${String(error?.message || error).slice(0, 80)}`)}&body=${encodeURIComponent('Paste the copied error details here, and what you were doing.')}`;
+        const report = `${SUPPORT_URL}?topic=${encodeURIComponent(`Crash: ${String(error?.message || error).slice(0, 80)}`)}`;
 
         return (
             <div className={`eb${this.props.compact ? ' eb--compact' : ''}`} role="alert">

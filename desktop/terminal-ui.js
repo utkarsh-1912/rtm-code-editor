@@ -133,6 +133,15 @@
         if (!String(window.getSelection())) input.focus();
     });
     stopBtn.addEventListener("click", () => window.term.interrupt());
+    // Docked inside the app window: this header is the panel's only header, so it also
+    // carries the panel's actions.
+    if (new URLSearchParams(location.search).get("docked") === "1" && window.term.dock) {
+        for (const id of ["popout", "close"]) {
+            const b = $(id);
+            b.hidden = false;
+            b.addEventListener("click", () => window.term.dock(id));
+        }
+    }
     $("clear").addEventListener("click", () => {
         screen.textContent = "";
         input.focus();

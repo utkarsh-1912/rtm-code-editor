@@ -12,7 +12,11 @@ const NOTES = [
 ];
 
 export default function Support() {
-    const [form, setForm] = useState({ name: "", email: "", message: "" });
+    // Arriving from a crash screen: start the message with what happened.
+    const [form, setForm] = useState(() => {
+        const topic = new URLSearchParams(window.location.search).get("topic");
+        return { name: "", email: "", message: topic ? `${topic.slice(0, 200)}\n\nWhat I was doing:\n` : "" };
+    });
     const [busy, setBusy] = useState(false);
     const set = (k) => (e) => setForm({ ...form, [k]: e.target.value });
 

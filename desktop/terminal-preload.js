@@ -12,6 +12,8 @@ contextBridge.exposeInMainWorld("term", {
     run: (line) => ipcRenderer.send("term:run", line),
     input: (text) => ipcRenderer.send("term:input", text),
     interrupt: () => ipcRenderer.send("term:interrupt"),
+    // Docked terminal's own header buttons: "popout" or "close".
+    dock: (action) => ipcRenderer.send("term:dock", action),
     onData: on("term:data"),
     onExit: on("term:exit"),
     onClear: on("term:clear"),

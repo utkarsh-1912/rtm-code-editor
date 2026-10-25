@@ -3,6 +3,13 @@ import { RotateCcw } from 'lucide-react';
 import { Modal, timeAgo } from './ux/primitives';
 import toast from 'react-hot-toast';
 import { getBackendUrl } from '../utils/api';
+import { auth } from '../firebase';
+
+// Private rooms check who you are; send the sign-in token when there is one.
+const authHeaders = async (extra = {}) => {
+    const token = await auth.currentUser?.getIdToken().catch(() => null);
+    return token ? { ...extra, Authorization: `Bearer ${token}` } : extra;
+};
 
 function DiffViewerModal({ isOpen, onClose, roomId = null, projectId = null, currentCode = "", files = null, createdBy = "", onRestoreSnapshot }) {
     const [snapshots, setSnapshots] = useState([]);
@@ -13,7 +20,7 @@ function DiffViewerModal({ isOpen, onClose, roomId = null, projectId = null, cur
     const fetchSnapshots = useCallback(async () => {
         try {
             const query = projectId ? `projectId=${projectId}` : `roomId=${roomId}`;
-            const res = await fetch(`${getBackendUrl()}/api/snapshots?${query}`);
+            const res = await fetch(`${getBackendUrl()}/api/snapshots?${query}`, { headers: await authHeaders() });
             if (!res.ok) throw new Error(`Snapshot API error ${res.status}`);
             const data = await res.json();
 
@@ -39,7 +46,7 @@ function DiffViewerModal({ isOpen, onClose, roomId = null, projectId = null, cur
         try {
             const res = await fetch(`${getBackendUrl()}/api/snapshots`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: await authHeaders({ 'Content-Type': 'application/json' }),
                 body: JSON.stringify({ roomId, projectId, name, code: currentCode, files, createdBy }),
             });
             if (!res.ok) throw new Error(`Snapshot API error ${res.status}`);

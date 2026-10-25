@@ -4,6 +4,7 @@ const setupWhiteboardSocket = require('./WhiteboardSocket');
 const setupProblemSocket = require('./ProblemSocket');
 const setupMediaSocket = require('./MediaSocket');
 const { createPairingTracker } = require('./pairingTracker');
+const { createRoomAccess } = require('./RoomAccess');
 
 const userSocketMap = {};
 // socketId -> avatar URL for signed-in people (names stay in userSocketMap)
@@ -46,6 +47,18 @@ function initializeSockets(io) {
     }
 
     const pairing = createPairingTracker(io, socketMeta);
+    const access = createRoomAccess(io);
+    io.roomAccess = access; // routes that change a room's access drop its cached copy
+
+    // Events that act on a room only count from sockets that are in that room. Socket.IO lets
+    // any socket send to any room by name, so without this a private room is only private
+    // until someone guesses its id.
+    const ROOM_EVENTS = new Set([
+        ACTIONS.CODE_CHANGE, ACTIONS.SYNC_LANGUAGE, ACTIONS.SEND_MESSAGE, ACTIONS.EDIT_MESSAGE, ACTIONS.DELETE_MESSAGE,
+        ACTIONS.CURSOR_MOVE, ACTIONS.WHITEBOARD_DRAW, ACTIONS.WHITEBOARD_SYNC_REQUEST, ACTIONS.WHITEBOARD_CURSOR,
+        ACTIONS.PROBLEM_CHANGE, ACTIONS.PROBLEM_SYNC_REQUEST, ACTIONS.SYNC_EXECUTE, ACTIONS.SYNC_OUTPUT,
+    ]);
+    const inRoom = (socket, roomId) => typeof roomId === 'string' && socket.rooms.has(roomId);
 
     const context = {
         io,
@@ -56,10 +69,19 @@ function initializeSockets(io) {
         roomChatHistory,
         roomWhiteboardState,
         roomProblemState,
-        getAllClients
+        getAllClients,
+        access,
     };
 
     io.on("connection", (socket) => {
+        socket.use(([event, payload], next) => {
+            if (ROOM_EVENTS.has(event) && !inRoom(socket, payload?.roomId)) return; // dropped
+            if (event === 'join-video-chat' || event === 'rejoin-video-chat') {
+                const id = payload?.projectId;
+                if (id == null || !(inRoom(socket, String(id)) || inRoom(socket, `project-${id}`))) return;
+            }
+            next();
+        });
         setupEditorSocket(io, socket, safeSocket, context);
         setupWhiteboardSocket(io, socket, safeSocket, context);
         setupProblemSocket(io, socket, safeSocket, context);
@@ -82,6 +104,7 @@ function initializeSockets(io) {
                 // unused guest rooms after GUEST_ROOM_TTL_HOURS.
                 if (remaining.length <= 1) delete roomChatHistory[roomId];
             });
+            access.drop(socket);
             delete userSocketMap[socket.id];
             delete userPhotoMap[socket.id];
             delete socketMeta[socket.id];

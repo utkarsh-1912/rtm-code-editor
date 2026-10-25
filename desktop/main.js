@@ -6,8 +6,10 @@
 const { app, BrowserWindow, ipcMain, shell, nativeTheme, Menu, Notification, dialog } = require("electron");
 const path = require("path");
 const { runLocal, llmLocal, localStatus } = require("./local");
+const { runBuiltin, toolchains } = require("./runner");
+const packs = require("./packs");
 const { createFsAccess } = require("./fsAccess");
-const { openTerminal } = require("./terminal");
+const { openTerminal, createTerminalView } = require("./terminal");
 const { startLocalUi } = require("./localUi");
 
 const argUrl = process.argv.find((a) => a.startsWith("--url="));
@@ -80,6 +82,11 @@ function createWindow() {
     });
 
     // Same-origin pages and sign-in popups stay in the app; everything else opens in the browser.
+    // A full reload or navigation of the app page drops its docked terminals.
+    win.webContents.on("did-start-navigation", (details) => {
+        if (details?.isMainFrame && !details.isSameDocument) for (const k of [...docked.keys()]) closeDocked(k, { tell: false });
+    });
+
     win.webContents.setWindowOpenHandler(({ url }) => {
         if (isAuthUrl(url)) return { action: "allow", overrideBrowserWindowOptions: { width: 520, height: 680, autoHideMenuBar: true } };
         if (isAppUrl(url)) return { action: "allow" };
@@ -119,6 +126,76 @@ ipcMain.on("colabs:config", (event) => {
 });
 
 handle("colabs:runLocal", runLocal);
+// Built-in runner: this computer's own compilers and interpreters (works offline).
+handle("colabs:runBuiltin", async (p) => {
+    try {
+        return await runBuiltin(p);
+    } catch (err) {
+        return { error: err.message, code: err.code || null };
+    }
+});
+handle("colabs:toolchains", (p) => toolchains(p));
+// Language packs: official portable toolchains downloaded into the app's data folder.
+handle("colabs:packs", async () => ({ available: packs.available(), installed: packs.installed() }));
+handle("colabs:installPack", async ({ id }) => {
+    const send = (info) => { if (win && !win.isDestroyed()) win.webContents.send("colabs:packProgress", { id, ...info }); };
+    try {
+        const r = await packs.install(String(id || ""), send);
+        await toolchains({ fresh: true });
+        return r;
+    } catch (err) {
+        send({ phase: "error", message: err.message });
+        return { ok: false, error: err.message };
+    }
+});
+handle("colabs:removePack", async ({ id }) => {
+    const r = await packs.remove(String(id || ""));
+    await toolchains({ fresh: true });
+    return r;
+});
+handle("colabs:installAppleTools", async () => packs.installAppleTools());
+
+// Terminals docked inside the window (one per key, e.g. a project's panel). The page sends
+// the slot's position; it can show, move or close a terminal but never send it commands.
+const docked = new Map(); // key -> view
+function closeDocked(key, { tell = true } = {}) {
+    const view = docked.get(key);
+    if (!view) return;
+    docked.delete(key);
+    // Tell the page first: closing can be triggered from inside the terminal itself ("exit"),
+    // so the view is closed on the next tick, outside that terminal's own message handler.
+    if (tell && win && !win.isDestroyed()) win.webContents.send("colabs:terminalClosed", { key });
+    try { win?.contentView.removeChildView(view); } catch { /* window gone */ }
+    setImmediate(() => { try { if (!view.webContents.isDestroyed()) view.webContents.close(); } catch { /* already closed */ } });
+}
+handle("colabs:terminalDock", async ({ key = "main", cwd, title, rect, visible = true }) => {
+    if (!win || win.isDestroyed()) return { ok: false };
+    const k = String(key).slice(0, 80);
+    let view = docked.get(k);
+    const fresh = !view;
+    if (fresh) {
+        view = createTerminalView({
+            cwd: files.resolveCwd(cwd || lastRoot),
+            title,
+            onExit: () => closeDocked(k),
+            // Pop out: the same folder in its own window, and the panel closes.
+            onPopOut: (dir) => { openTerminal({ cwd: dir, title }); closeDocked(k); },
+        });
+        win.contentView.addChildView(view);
+        docked.set(k, view);
+    }
+    if (rect && [rect.x, rect.y, rect.width, rect.height].every(Number.isFinite)) {
+        const z = win.webContents.getZoomFactor();
+        view.setBounds({ x: Math.round(rect.x * z), y: Math.round(rect.y * z), width: Math.max(0, Math.round(rect.width * z)), height: Math.max(0, Math.round(rect.height * z)) });
+    }
+    view.setVisible(!!visible);
+    if (fresh && visible) view.webContents.focus();
+    return { ok: true };
+});
+handle("colabs:terminalClose", async ({ key = "main" }) => {
+    closeDocked(String(key).slice(0, 80), { tell: false });
+    return { ok: true };
+});
 handle("colabs:llmLocal", llmLocal);
 handle("colabs:localStatus", localStatus);
 handle("colabs:notify", async ({ title, body }) => {
@@ -129,7 +206,7 @@ handle("colabs:notify", async ({ title, body }) => {
     n.show();
     return true;
 });
-handle("colabs:info", async () => ({ version: app.getVersion(), platform: process.platform, appUrl: APP_URL, uiUrl: UI_URL, bundled, features: ["files", "terminal"] }));
+handle("colabs:info", async () => ({ version: app.getVersion(), platform: process.platform, appUrl: APP_URL, uiUrl: UI_URL, bundled, features: ["files", "terminal", "runner"] }));
 
 // Files and terminal. Reading needs a native dialog the user answers; writing and terminals
 // are limited to folders picked that way (see fsAccess.js).
@@ -187,6 +264,7 @@ function buildMenu() {
             { label: "Workspace", accelerator: "CmdOrCtrl+1", click: () => goTo("/dashboard") },
             { label: "Snippets", accelerator: "CmdOrCtrl+2", click: () => goTo("/snippets") },
             { label: "Settings", accelerator: "CmdOrCtrl+3", click: () => goTo("/settings") },
+            { label: "Offline Editor", accelerator: "CmdOrCtrl+4", click: () => goTo("/offline") },
             { type: "separator" },
             { label: "Back", accelerator: isMac ? "Cmd+[" : "Alt+Left", click: () => win?.webContents.navigationHistory?.canGoBack() && win.webContents.navigationHistory.goBack() },
             { label: "Forward", accelerator: isMac ? "Cmd+]" : "Alt+Right", click: () => win?.webContents.navigationHistory?.canGoForward() && win.webContents.navigationHistory.goForward() },
@@ -209,7 +287,8 @@ function buildMenu() {
             { label: "Help and Support", click: site("/support") },
             { label: "Service Status", click: site("/status") },
             { label: "Check for Updates", click: site("/download") },
-            { label: "Report an Issue", click: () => shell.openExternal("https://github.com/utkarsh-1912/rtm-code-editor/issues") },
+            { label: "Documentation", click: () => goTo("/docs") },
+            { label: "Report an Issue", click: site("/support") },
             { type: "separator" },
             { label: "Open Website", click: site("/") },
             ...(isMac ? [] : [{ type: "separator" }, {
@@ -247,6 +326,7 @@ if (!app.requestSingleInstanceLock()) {
     });
 
     app.whenReady().then(async () => {
+        packs.setRoot(path.join(app.getPath("userData"), "packs")); // language packs live with the app's data
         if (WANT_BUNDLED) {
             try {
                 const local = await startLocalUi();
