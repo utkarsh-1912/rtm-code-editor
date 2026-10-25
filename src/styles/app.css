@@ -1,6 +1,6 @@
 /* =====================================================================
    Signed-in app + workspaces design system.
-   Dark = night film (eddyrlora.com), light = paper/ink (reminous.com).
+   Dark = night film, light = paper/ink.
    Scoped to .ux (app pages) and .ws (room / project workspaces) so the
    marketing site keeps its own look. Legacy tokens (--bg-dark, --primary…)
    are remapped inside the scope so existing modals inherit the palette.
@@ -147,7 +147,7 @@
 }
 .u-ul:hover::after, .u-ul.on::after { transform: scaleX(1); transform-origin: left; }
 
-/* highlight sweep title (Reminous notes) */
+/* highlight sweep title (Modern notes) */
 .u-hl span {
   background: linear-gradient(var(--u-accent), var(--u-accent)) no-repeat 0 100% / 0 1px;
   transition: background-size .35s var(--u-curve);
@@ -211,7 +211,7 @@ button.u-chip:hover { border-color: var(--u-line-2); color: var(--u-ink); }
 .u-chip--mono { font-family: var(--u-mono); font-size: 11px; text-transform: uppercase; letter-spacing: .04em; height: 24px; padding: 0 9px; }
 .u-chip--accent { color: var(--u-accent); border-color: color-mix(in srgb, var(--u-accent) 35%, transparent); }
 
-/* breathing status dot (Reminous) */
+/* breathing status dot (Modern) */
 .u-dot { position: relative; width: 7px; height: 7px; border-radius: 50%; background: var(--u-ok); flex: none; display: inline-block; }
 .u-dot::after {
   content: ""; position: absolute; inset: 0; border-radius: 50%; background: inherit;
@@ -254,7 +254,7 @@ button.u-chip:hover { border-color: var(--u-line-2); color: var(--u-ink); }
 .u-tagbox .u-chip { height: 26px; background: var(--u-tint); color: var(--u-ink); }
 .u-tagbox .u-chip button { border: 0; background: none; color: var(--u-ink-3); cursor: pointer; display: flex; padding: 0; }
 
-/* toggle switch (Reminous lock switch) */
+/* toggle switch (Modern lock switch) */
 .u-switch {
   position: relative; width: 42px; height: 24px; border-radius: 999px; border: 0; padding: 0; flex: none; cursor: pointer;
   background: var(--u-line-2); transition: background-color .25s var(--u-curve);
@@ -381,7 +381,7 @@ button.u-chip:hover { border-color: var(--u-line-2); color: var(--u-ink); }
 .u-seg button.on { background: var(--u-solid); color: var(--u-on-solid); }
 .u-seg button em { font-style: normal; font-family: var(--u-mono); font-size: 11px; opacity: .6; }
 
-/* numbered step tabs with timed fill (Reminous bento / Eddy steps) */
+/* numbered step tabs with timed fill (Modern bento / Eddy steps) */
 .u-steps { display: grid; grid-template-columns: repeat(var(--n, 3), 1fr); gap: 8px; }
 .u-step {
   position: relative; overflow: hidden; text-align: left; padding: 12px 14px 14px; border-radius: 14px; border: 1px solid var(--u-line);
@@ -841,7 +841,7 @@ button.u-chip:hover { border-color: var(--u-line-2); color: var(--u-ink); }
   background: radial-gradient(circle at 30% 30%, color-mix(in srgb, var(--c) 70%, #fff), var(--c)); }
 .l-tile--you { background: color-mix(in srgb, var(--u-pane-ink) 8%, transparent); color: var(--u-pane-ink-2); border: 1px dashed var(--u-pane-line); }
 
-/* sentence join card (Reminous form) */
+/* sentence join card (Modern form) */
 .l-join {
   position: absolute; right: clamp(12px, 3vw, 36px); bottom: 0; width: min(440px, calc(100% - 24px));
   background: var(--u-raise); color: var(--u-ink); border: 1px solid var(--u-line); border-radius: 20px; box-shadow: var(--u-shadow);

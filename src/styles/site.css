@@ -1,4 +1,4 @@
-/* Marketing site design system: calm, single accent, big type (Pop / Reminous / Eddyr inspired) */
+/* Marketing site design system: calm, single accent, big type (Pop / Modern inspired) */
 .site {
   --site-max: 1160px;
   --site-gutter: clamp(20px, 5vw, 48px);
@@ -102,7 +102,7 @@
   background: rgba(59,130,246,.12); color: var(--primary); border: 1px solid rgba(59,130,246,.2);
 }
 
-/* numbered steps (Reminous style) */
+/* numbered steps (Modern style) */
 .steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0; border: 1px solid var(--line); border-radius: 20px; overflow: hidden; }
 .step { padding: 32px 28px; border-right: 1px solid var(--line); background: var(--surface); }
 .step:last-child { border-right: 0; }
