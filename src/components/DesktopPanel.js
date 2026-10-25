@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { RefreshCw, FolderOpen, SquareTerminal, Globe } from 'lucide-react';
+import { RefreshCw, FolderOpen, SquareTerminal, Globe, ArrowUpRight } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { pad2 } from './ux/primitives';
 import { desktop, openOnWebsite } from '../utils/desktop';
@@ -77,7 +77,7 @@ export default function DesktopPanel() {
                 <button className="u-btn u-btn--ghost u-btn--sm" onClick={check} disabled={checking}><RefreshCw size={14} /> {checking ? 'Checking…' : 'Check again'}</button>
                 <button className="u-btn u-btn--ghost u-btn--sm" onClick={() => navigate('/dashboard?import=folder')}><FolderOpen size={14} /> Open folder</button>
                 <button className="u-btn u-btn--ghost u-btn--sm" onClick={terminal}><SquareTerminal size={14} /> Terminal</button>
-                <button className="u-btn u-btn--ghost u-btn--sm" onClick={() => openOnWebsite('/')}><Globe size={14} /> Website ↗</button>
+                <button className="u-btn u-btn--ghost u-btn--sm" onClick={() => openOnWebsite('/')}><Globe size={14} /> Website <ArrowUpRight size={15} /></button>
             </div>
         </div>
     );

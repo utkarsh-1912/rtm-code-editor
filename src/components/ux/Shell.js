@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Link, NavLink, useLocation } from "react-router-dom";
-import { Menu, X, Sun, Moon } from "lucide-react";
+import { Menu, X, Sun, Moon, ArrowUpRight } from "lucide-react";
 import Logo from "../Logo";
 import { useReveal, useClock, localCity } from "./primitives";
 import { getThemePref, resolveTheme, setThemePref } from "../../utils/theme";
@@ -203,9 +203,9 @@ export default function Shell({
                             {backendLabel(backend)}{backend.latency != null && <span className="u-faint"> · {backend.latency} ms</span>}
                         </Link>
                         <span className="f-app-links">
-                            <button className="u-ul" onClick={() => openOnWebsite("/support")}>Help ↗</button>
-                            <button className="u-ul" onClick={() => openOnWebsite("/privacy")}>Privacy ↗</button>
-                            <button className="u-ul" onClick={() => openOnWebsite("/")}>Website ↗</button>
+                            <button className="u-ul" onClick={() => openOnWebsite("/support")}>Help <ArrowUpRight size={15} /></button>
+                            <button className="u-ul" onClick={() => openOnWebsite("/privacy")}>Privacy <ArrowUpRight size={15} /></button>
+                            <button className="u-ul" onClick={() => openOnWebsite("/")}>Website <ArrowUpRight size={15} /></button>
                         </span>
                         <ThemeSwitch />
                     </div>
@@ -226,9 +226,9 @@ export default function Shell({
                                         {col.links.map(([label, to]) => (
                                             <li key={to}>
                                                 {/^https?:/.test(to)
-                                                    ? <a href={to} target="_blank" rel="noreferrer" className="u-ul">{label} ↗</a>
+                                                    ? <a href={to} target="_blank" rel="noreferrer" className="u-ul">{label} <ArrowUpRight size={15} /></a>
                                                     : IS_DESKTOP && isWebOnly(to)
-                                                    ? <button className="u-ul" onClick={() => openOnWebsite(to)}>{label} ↗</button>
+                                                    ? <button className="u-ul" onClick={() => openOnWebsite(to)}>{label} <ArrowUpRight size={15} /></button>
                                                     : <NavLink to={to} className={({ isActive }) => `u-ul${isActive ? " on" : ""}`}>{label}</NavLink>}
                                             </li>
                                         ))}

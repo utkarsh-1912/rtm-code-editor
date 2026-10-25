@@ -136,7 +136,7 @@ export default function Download() {
                         </div>
                     )}
                     <p className="u-label" style={{ marginTop: 14 }}>
-                        The desktop app is free on every plan. Builds are not code-signed yet, so Windows SmartScreen and macOS Gatekeeper ask before the first launch. <a href={RELEASES} target="_blank" rel="noreferrer" className="u-ul">All releases ↗</a>
+                        The desktop app is free on every plan. Builds are not code-signed yet, so Windows SmartScreen and macOS Gatekeeper ask before the first launch. <a href={RELEASES} target="_blank" rel="noreferrer" className="u-ul">All releases <ArrowUpRight size={15} /></a>
                     </p>
                 </div>
             </div>
@@ -151,14 +151,14 @@ export default function Download() {
                             <h3>Judge0 CE</h3>
                             <p className="u-muted">Open-source code execution in Docker, on port 2358. Follow the self-hosting steps in the Judge0 repo, then start it:</p>
                             <CopyLine text="docker compose up -d db redis && docker compose up -d" />
-                            <a href="https://github.com/judge0/judge0/blob/master/CHANGELOG.md#deployment-procedure" target="_blank" rel="noreferrer" className="u-ul u-small">Judge0 deployment guide ↗</a>
+                            <a href="https://github.com/judge0/judge0/blob/master/CHANGELOG.md#deployment-procedure" target="_blank" rel="noreferrer" className="u-ul u-small">Judge0 deployment guide <ArrowUpRight size={15} /></a>
                         </article>
                         <article className="u-card dl-step" data-rise style={{ "--d": "80ms" }}>
                             <div className="f-cell-top"><span className="u-label">02 · AI copilot</span><Sparkles size={18} /></div>
                             <h3>Ollama + Qwen2.5-Coder</h3>
                             <p className="u-muted">A small open-weight code model that runs on a laptop CPU. Use the 7B model if you have 8 GB of free memory.</p>
                             <CopyLine text="ollama pull qwen2.5-coder:1.5b" />
-                            <a href="https://ollama.com/download" target="_blank" rel="noreferrer" className="u-ul u-small">Get Ollama ↗</a>
+                            <a href="https://ollama.com/download" target="_blank" rel="noreferrer" className="u-ul u-small">Get Ollama <ArrowUpRight size={15} /></a>
                         </article>
                         <article className="u-card dl-step" data-rise style={{ "--d": "160ms" }}>
                             <div className="f-cell-top"><span className="u-label">03 · Fallback</span><Server size={18} /></div>

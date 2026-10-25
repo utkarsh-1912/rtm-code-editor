@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, Navigate, useNavigate } from "react-router-dom";
-import { ArrowRight, Link2, Plus, LogIn, Cpu, Globe, FolderOpen, Clock, X, Copy, Check, RefreshCw, Keyboard, SquareTerminal } from "lucide-react";
+import { ArrowRight, Link2, Plus, LogIn, Cpu, Globe, FolderOpen, Clock, X, Copy, Check, RefreshCw, Keyboard, SquareTerminal, ArrowUpRight } from "lucide-react";
 import toast from "react-hot-toast";
 import Logo from "../components/Logo";
 import AiIcon from "../components/AiIcon";
@@ -109,7 +109,7 @@ export default function DesktopStart() {
                 <Logo size={26} />
                 <span className="ds2-ver">{version ? `Desktop v${version}` : "Desktop"}</span>
                 <span className="ds2-top-right">
-                    <button className="u-ul ds2-link" onClick={() => openOnWebsite("/support")}>Help ↗</button>
+                    <button className="u-ul ds2-link" onClick={() => openOnWebsite("/support")}>Help <ArrowUpRight size={15} /></button>
                     <ThemeButton />
                 </span>
             </header>
