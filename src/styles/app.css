@@ -2534,7 +2534,7 @@ button.dk-get { border: 0; background: transparent; padding: 0; font: inherit; f
 .dc-nav nav { display: flex; flex-direction: column; gap: 1px; }
 .dc-nav nav a { display: flex; align-items: center; gap: 9px; padding: 7px 10px; border-radius: 9px; color: var(--u-ink-2); font-size: 13.5px; text-decoration: none; }
 .dc-nav nav a:hover { background: var(--u-tint); color: var(--u-ink); }
-.dc-nav nav a.on { background: var(--u-tint); color: var(--u-ink); font-weight: 600; box-shadow: inset 2px 0 0 var(--u-accent, #9CC3FF); }
+.dc-nav nav a.on { background: var(--u-tint); color: var(--u-ink); font-weight: 600; }
 .dc-nav nav a svg { color: var(--u-ink-3); flex: none; }
 .dc-body { min-width: 0; max-width: 760px; }
 .dc-sec { padding: 4px 0 28px; margin-bottom: 28px; border-bottom: 1px solid var(--u-line); scroll-margin-top: 96px; }
