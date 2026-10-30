@@ -1,12 +1,18 @@
 import React, { useRef, useEffect, useState, useLayoutEffect, useCallback, useMemo } from "react";
 import {
     X, Eraser, Pencil, Trash2, Download, Square, Circle, Minus,
-    Hand, Undo2, Redo2, ZoomIn, ZoomOut, Type, MousePointer2, Shapes, Spline, Copy
+    Hand, Undo2, Redo2, ZoomIn, ZoomOut, Type, MousePointer2, Shapes, Spline, Copy,
+    Play, Pause, RotateCcw, Gauge, ALargeSmall, Bold, AlignLeft, AlignCenter, AlignRight,
+    AlignVerticalJustifyStart, AlignVerticalJustifyCenter, AlignVerticalJustifyEnd,
+    AlignStartVertical, AlignCenterVertical, AlignEndVertical, AlignStartHorizontal, AlignCenterHorizontal, AlignEndHorizontal,
+    AlignHorizontalDistributeCenter, AlignVerticalDistributeCenter
 } from "lucide-react";
 import {
     SHAPES, TEMPLATES, SHAPE_PREVIEW, makeNode, snap, nodeAt, connectorAt, onResizeHandle, labelPoint,
-    drawNode, drawConnector, drawNodeOutline,
+    drawNode, drawConnector, drawNodeOutline, drawSimFooter, TEXT_SIZES, retypeNode,
 } from "./whiteboard/diagram";
+import { toTopology, simKind, isSimNode, isClient, hasCapacity, fieldsFor, typicalSim } from "./whiteboard/sim/topology";
+import { explain, fmtRate, fmtMs } from "./whiteboard/sim/explain";
 import toast from "react-hot-toast";
 import ACTIONS from "../Action";
 import { resolveTheme } from "../utils/theme";
@@ -32,6 +38,27 @@ const inkColor = () => (resolveTheme() === "light" ? "#1B1A17" : "#F2F1EC");
 const boardBg = () => (resolveTheme() === "light" ? "#FAFAF7" : "#111110");
 const DIAGRAM_TOOLS = new Set(["select", "shape", "connector"]);
 const byIdOf = (els) => Object.fromEntries(els.filter((e) => e.type === "node").map((e) => [e.id, e]));
+
+// Simulate mode. The load slider is logarithmic so 1–50 req/s is as easy to pick as 1k–5k.
+const SIM_MAX_LOAD = 5000;
+const SIM_FRAME = 500; // board ms between the snapshots everyone shows
+const loadToPos = (v) => Math.round((Math.log10(Math.max(1, v)) / Math.log10(SIM_MAX_LOAD)) * 1000);
+const posToLoad = (p) => Math.max(1, Math.round(10 ** ((p / 1000) * Math.log10(SIM_MAX_LOAD))));
+const SIM_IDLE = { running: false, load: 200, seed: 1, elapsedMs: 0, at: 0 };
+
+// The strip under a block while simulating; measured numbers only.
+function simFooter(node, m) {
+    if (isClient(node)) {
+        if (!m) return null;
+        const ok = Math.round((1 - m.errors) * 100);
+        return { text: `${fmtRate(m.offered)}/s sent · ${ok}% ok · p99 ${fmtMs(m.p99)}`, level: m.errors >= 0.1 ? 2 : m.errors >= 0.01 ? 1 : 0 };
+    }
+    if (!hasCapacity(node)) return { text: "no capacity set", level: 0 };
+    if (!m) return null;
+    // A queue only holds messages (its busy % means nothing); its backlog is the number to watch.
+    if (simKind(node) === 'queue') return { text: `${m.waiting} waiting · ${fmtRate(m.offered)}/s in`, level: m.shed > 0 ? 2 : 0 };
+    return { text: `busy ${m.busy}% · p99 ${fmtMs(m.p99)} · ${m.waiting} waiting`, level: m.shed > 0 || m.busy >= 95 ? 2 : m.busy >= 80 ? 1 : 0 };
+}
 
 const WhiteboardModal = ({ isOpen, onClose, socketRef, roomId }) => {
     const canvasRef = useRef(null);
@@ -78,6 +105,23 @@ const WhiteboardModal = ({ isOpen, onClose, socketRef, roomId }) => {
     const nodesById = useMemo(() => byIdOf(elements), [elements]);
     const selectedEl = elements.find((e) => e.id === selectedId) || null;
 
+    // --- Simulate mode: only { running, load, seed } and the board clock are shared ---
+    const [sim, setSim] = useState(SIM_IDLE); // at: performance.now() when elapsedMs was read
+    const [loadDraft, setLoadDraft] = useState(null); // slider value before the room confirms it
+    const [simSnap, setSimSnap] = useState(null);
+    const [simCatchUp, setSimCatchUp] = useState(null); // { t, goal } while the engine replays
+    const [textMenu, setTextMenu] = useState(false); // text size / weight / alignment popover
+    const [shapeMenu, setShapeMenu] = useState(false); // change the selected shape's type
+    const [group, setGroup] = useState([]); // ids of several selected shapes (shift-click or drag a box)
+    const [marquee, setMarquee] = useState(null); // selection box being dragged: { x1, y1, x2, y2 }
+    const [propsOpen, setPropsOpen] = useState(false); // Properties popover in the selection toolbar
+    const [propsDraft, setPropsDraft] = useState({});
+    const workerRef = useRef(null);
+    const loadTimer = useRef(null);
+    const simActive = sim.running || sim.elapsedMs > 0;
+    const load = loadDraft ?? sim.load;
+    const topologyJson = useMemo(() => (simActive ? JSON.stringify(toTopology(elements, sim.load)) : ""), [simActive, elements, sim.load]);
+
     // "ink" strokes follow the theme, so redraw when it changes.
     const [themeTick, setThemeTick] = useState(0);
     useEffect(() => {
@@ -100,7 +144,8 @@ const WhiteboardModal = ({ isOpen, onClose, socketRef, roomId }) => {
 
         socket.emit(ACTIONS.WHITEBOARD_SYNC_REQUEST, { roomId });
 
-        const onSync = ({ elements: serverElements }) => {
+        const onSync = ({ elements: serverElements, sim: serverSim }) => {
+            if (serverSim) setSim({ ...serverSim, at: performance.now() });
             if (serverElements && serverElements.length > 0) {
                 setElements(serverElements);
                 const newHistory = [serverElements];
@@ -167,6 +212,11 @@ const WhiteboardModal = ({ isOpen, onClose, socketRef, roomId }) => {
                     return next;
                 });
                 setSelectedId((id) => (gone.has(id) ? null : id));
+            } else if (action === 'SIM') {
+                // The server echoes every change to the whole room, the sender included,
+                // with the board clock as of sending.
+                if (payload) setSim({ ...payload, at: performance.now() });
+                setLoadDraft((d) => (d === payload?.load ? null : d));
             } else if (action === 'UNDO' || action === 'REDO') {
                 if (payload && payload.elements) {
                     setElements(payload.elements);
@@ -301,6 +351,130 @@ const WhiteboardModal = ({ isOpen, onClose, socketRef, roomId }) => {
         if (selectedEl?.type === 'connector') applyUpdate([{ ...selectedEl, ...patch }]);
     };
 
+    // --- Simulate mode ---
+    const emitSim = (patch) => emitDraw('SIM', patch);
+    const toggleSim = () => emitSim({ running: !sim.running });
+    const resetSim = () => emitSim({ running: false, reset: true });
+    const chooseLoad = (v) => {
+        setLoadDraft(v);
+        clearTimeout(loadTimer.current);
+        loadTimer.current = setTimeout(() => emitSim({ load: v }), 150);
+    };
+    useEffect(() => () => clearTimeout(loadTimer.current), []);
+
+    // One engine per client, in a worker, while the board is open and simulating.
+    useEffect(() => {
+        if (!isOpen || !simActive) { setSimSnap(null); setSimCatchUp(null); return undefined; }
+        const worker = new Worker(new URL('./whiteboard/sim/sim.worker.js', import.meta.url));
+        worker.onmessage = ({ data }) => {
+            if (data.type === 'snapshot') { setSimSnap(data); setSimCatchUp(null); }
+            else if (data.type === 'progress') setSimCatchUp(data);
+        };
+        workerRef.current = worker;
+        return () => { worker.terminate(); workerRef.current = null; };
+    }, [isOpen, simActive]);
+
+    // New inputs (blocks, capacity, wiring, load or seed): the engine replays from zero.
+    useEffect(() => {
+        if (topologyJson) workerRef.current?.postMessage({ type: 'setup', topology: JSON.parse(topologyJson), seed: sim.seed });
+    }, [topologyJson, sim.seed, simActive]);
+
+    // Ask for the snapshot at the room's board time, in whole frames, so every client
+    // shows the same frame.
+    useEffect(() => {
+        if (!simActive) return undefined;
+        let last = -1;
+        const tick = () => {
+            const t = sim.running ? sim.elapsedMs + (performance.now() - sim.at) : sim.elapsedMs;
+            const frame = Math.floor(t / SIM_FRAME) * SIM_FRAME;
+            if (frame !== last) { last = frame; workerRef.current?.postMessage({ type: 'seek', t: frame }); }
+        };
+        tick();
+        if (!sim.running) return undefined;
+        const id = setInterval(tick, 50);
+        return () => clearInterval(id);
+    }, [simActive, sim, topologyJson]);
+
+    // Capacity edits from the Properties popover; a block without capacity starts from typical values.
+    const closeMenus = () => { setCtxPal(false); setPropsOpen(false); setTextMenu(false); setShapeMenu(false); };
+    useEffect(() => { closeMenus(); setPropsDraft({}); if (selectedId) setGroup([]); }, [selectedId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+    // --- Several shapes at once: align, distribute, move, delete ---
+    const groupNodes = group.map((id) => nodesById[id]).filter(Boolean);
+    const groupActive = groupNodes.length >= 2;
+    // A group of one is just a selection.
+    useEffect(() => {
+        if (group.length === 1) { setSelectedId(group[0]); setGroup([]); }
+    }, [group]);
+    const boxOf = (ns) => {
+        const minX = Math.min(...ns.map((n) => n.x)), minY = Math.min(...ns.map((n) => n.y));
+        const maxX = Math.max(...ns.map((n) => n.x + n.w)), maxY = Math.max(...ns.map((n) => n.y + n.h));
+        return { minX, minY, maxX, maxY };
+    };
+    const alignGroup = (how) => {
+        if (!groupActive) return;
+        const { minX, minY, maxX, maxY } = boxOf(groupNodes);
+        const cx = (minX + maxX) / 2, cy = (minY + maxY) / 2;
+        let changed;
+        if (how === 'hspace' || how === 'vspace') {
+            // Equal gaps between neighbours; the outermost shapes stay where they are.
+            const h = how === 'hspace';
+            const sorted = [...groupNodes].sort((a, b) => (h ? a.x + a.w / 2 - (b.x + b.w / 2) : a.y + a.h / 2 - (b.y + b.h / 2)));
+            const used = sorted.reduce((sum, n) => sum + (h ? n.w : n.h), 0);
+            const gap = ((h ? maxX - minX : maxY - minY) - used) / (sorted.length - 1);
+            let at = h ? minX : minY;
+            changed = sorted.map((n) => {
+                const next = h ? { ...n, x: Math.round(at) } : { ...n, y: Math.round(at) };
+                at += (h ? n.w : n.h) + gap;
+                return next;
+            });
+        } else {
+            const place = {
+                left: () => ({ x: minX }), center: (n) => ({ x: Math.round(cx - n.w / 2) }), right: (n) => ({ x: maxX - n.w }),
+                top: () => ({ y: minY }), middle: (n) => ({ y: Math.round(cy - n.h / 2) }), bottom: (n) => ({ y: maxY - n.h }),
+            }[how];
+            changed = groupNodes.map((n) => ({ ...n, ...place(n) }));
+        }
+        changed = changed.filter((n) => { const o = nodesById[n.id]; return o.x !== n.x || o.y !== n.y; });
+        if (changed.length) applyUpdate(changed);
+    };
+    const deleteGroup = () => { deleteIds(group); setGroup([]); };
+    const selectNodes = (ids) => {
+        if (ids.length === 1) { setGroup([]); setSelectedId(ids[0]); }
+        else { setSelectedId(null); setGroup(ids); }
+    };
+
+    // Swap the selected shape for another shape or block. Capacity only carries over to a
+    // block the simulator treats the same way.
+    const changeType = (choice) => {
+        if (selectedEl?.type !== 'node') return;
+        const next = retypeNode(selectedEl, choice);
+        if (simKind(next) !== simKind(selectedEl)) delete next.sim;
+        applyUpdate([next]);
+        setShapeMenu(false);
+    };
+    const commitSim = (patch) => {
+        const el = elementsRef.current.find((x) => x.id === selectedId);
+        if (!el) return;
+        const base = el.sim || (isClient(el) ? {} : typicalSim(el));
+        applyUpdate([{ ...el, sim: { ...base, ...patch } }]);
+    };
+    const commitSimField = (f) => {
+        const raw = propsDraft[f.key];
+        setPropsDraft((d) => { const next = { ...d }; delete next[f.key]; return next; });
+        if (raw === undefined || raw === '') return;
+        const v = Number(raw);
+        if (!Number.isFinite(v)) return;
+        const clamped = Math.min(f.max, Math.max(f.min, f.step >= 1 ? Math.round(v) : v));
+        if (selectedEl?.sim?.[f.key] !== clamped) commitSim({ [f.key]: clamped });
+    };
+    const clearSim = () => {
+        if (!selectedEl) return;
+        const { sim: _drop, ...rest } = selectedEl;
+        applyUpdate([rest]);
+        setPropsDraft({});
+    };
+
     // --- Rendering ---
     const drawElement = (ctx, el) => {
         ctx.globalCompositeOperation = el.type === 'eraser' ? 'destination-out' : 'source-over';
@@ -344,13 +518,24 @@ const WhiteboardModal = ({ isOpen, onClose, socketRef, roomId }) => {
         const ink = inkColor(), bg = boardBg();
         const map = byIdOf(elements);
         // Connectors under shapes, then shapes and freehand in the order they were made.
+        const edgeRate = (el) => {
+            const v = simSnap?.edges[el.id];
+            return v === undefined ? null : `${fmtRate(v)}/s`;
+        };
         elements.forEach(el => {
-            if (el.type === 'connector') drawConnector(ctx, el, map, { ink, bg, selected: el.id === selectedId, editing: editing?.id === el.id });
+            if (el.type === 'connector') drawConnector(ctx, el, map, { ink, bg, selected: el.id === selectedId, editing: editing?.id === el.id, rate: edgeRate(el) });
         });
         elements.forEach(el => {
             if (el.type === 'node') drawNode(ctx, el, { ink, editing: editing?.id === el.id });
             else if (el.type !== 'connector') drawElement(ctx, el);
         });
+        if (simSnap) {
+            elements.forEach(el => {
+                if (!isSimNode(el)) return;
+                const footer = simFooter(el, simSnap.nodes[el.id]);
+                if (footer) drawSimFooter(ctx, el, footer, { ink, bg });
+            });
+        }
         Object.values(remoteStreams).forEach(el => drawElement(ctx, el));
         if (currentElement) drawElement(ctx, currentElement);
         if (preview) {
@@ -358,8 +543,20 @@ const WhiteboardModal = ({ isOpen, onClose, socketRef, roomId }) => {
             if (preview.target && map[preview.target]) drawNodeOutline(ctx, map[preview.target], zoom, { handle: false, accent: '#4ADE80' });
         }
         if (selectedId && map[selectedId]) drawNodeOutline(ctx, map[selectedId], zoom, { handle: !editing });
+        group.forEach((id) => { if (map[id]) drawNodeOutline(ctx, map[id], zoom, { handle: false }); });
+        if (marquee) {
+            ctx.save();
+            ctx.fillStyle = 'rgba(122,162,255,0.10)';
+            ctx.strokeStyle = '#7AA2FF';
+            ctx.lineWidth = 1 / zoom;
+            const mx = Math.min(marquee.x1, marquee.x2), my = Math.min(marquee.y1, marquee.y2);
+            const mw = Math.abs(marquee.x2 - marquee.x1), mh = Math.abs(marquee.y2 - marquee.y1);
+            ctx.fillRect(mx, my, mw, mh);
+            ctx.strokeRect(mx, my, mw, mh);
+            ctx.restore();
+        }
         ctx.restore();
-    }, [elements, remoteStreams, currentElement, pan, zoom, themeTick, selectedId, editing, preview, connectStyle, color]); // eslint-disable-line
+    }, [elements, remoteStreams, currentElement, pan, zoom, themeTick, selectedId, editing, preview, connectStyle, color, simSnap, group, marquee]); // eslint-disable-line
 
     useEffect(() => { renderCanvas(); }, [renderCanvas]);
 
@@ -434,16 +631,32 @@ const WhiteboardModal = ({ isOpen, onClose, socketRef, roomId }) => {
                 }
                 return;
             }
+            const shift = e.shiftKey;
+            const under = nodeAt(els, pos.x, pos.y);
+            if (groupActive) {
+                if (under && shift) { setGroup((g) => (g.includes(under.id) ? g.filter((id) => id !== under.id) : [...g, under.id])); return; }
+                if (under && group.includes(under.id)) {
+                    dragRef.current = { mode: 'group', start: pos, origs: groupNodes.map((n) => ({ ...n })), moved: false };
+                    capturePointer(e);
+                    return;
+                }
+                setGroup([]);
+            }
+            // Shift-click a second shape: select both.
+            if (shift && under && tool === 'select' && map[selectedId] && selectedId !== under.id) {
+                selectNodes([selectedId, under.id]);
+                return;
+            }
             const sel = map[selectedId];
-            if (sel && onResizeHandle(sel, pos.x, pos.y, zoom)) {
-                dragRef.current = { mode: 'resize', id: sel.id, start: pos, orig: { ...sel }, moved: false };
+            const corner = sel?.type === 'node' && onResizeHandle(sel, pos.x, pos.y, zoom);
+            if (corner) {
+                dragRef.current = { mode: 'resize', corner, id: sel.id, start: pos, orig: { ...sel }, moved: false };
                 capturePointer(e);
                 return;
             }
-            const hitNode = nodeAt(els, pos.x, pos.y);
-            if (hitNode) {
-                setSelectedId(hitNode.id);
-                dragRef.current = { mode: 'move', id: hitNode.id, start: pos, orig: { ...hitNode }, moved: false };
+            if (under) {
+                setSelectedId(under.id);
+                dragRef.current = { mode: 'move', id: under.id, start: pos, orig: { ...under }, moved: false };
                 capturePointer(e);
                 return;
             }
@@ -457,7 +670,13 @@ const WhiteboardModal = ({ isOpen, onClose, socketRef, roomId }) => {
                 setEditing({ id: node.id, value: node.text || '' });
                 return;
             }
-            // Select tool on empty board: drag to pan.
+            // Select tool on empty board: drag a box to select shapes (touch drags pan).
+            if (e.pointerType !== 'touch') {
+                dragRef.current = { mode: 'marquee', start: pos };
+                setMarquee({ x1: pos.x, y1: pos.y, x2: pos.x, y2: pos.y });
+                capturePointer(e);
+                return;
+            }
             setIsPanning(true);
             lastMousePos.current = { x: e.clientX, y: e.clientY };
             return;
@@ -514,6 +733,12 @@ const WhiteboardModal = ({ isOpen, onClose, socketRef, roomId }) => {
             return;
         }
         const drag = dragRef.current;
+        // Resize cursor over a selected shape's corner handles.
+        if (!drag && canvasRef.current && DIAGRAM_TOOLS.has(tool)) {
+            const sel = selectedEl?.type === 'node' ? selectedEl : null;
+            const corner = sel && !editing && onResizeHandle(sel, x, y, zoom);
+            canvasRef.current.style.cursor = corner ? (corner === 'nw' || corner === 'se' ? 'nwse-resize' : 'nesw-resize') : '';
+        }
         if (drag) {
             if (drag.mode === 'connect') {
                 const over = nodeAt(elementsRef.current, x, y);
@@ -521,13 +746,35 @@ const WhiteboardModal = ({ isOpen, onClose, socketRef, roomId }) => {
                 setPreview({ from: drag.from, pointer: { x, y }, target: drag.target });
                 return;
             }
+            if (drag.mode === 'marquee') {
+                setMarquee({ x1: drag.start.x, y1: drag.start.y, x2: x, y2: y });
+                return;
+            }
             const dx = x - drag.start.x, dy = y - drag.start.y;
             if (!drag.moved && Math.hypot(dx, dy) < 3 / zoom) return;
             drag.moved = true;
+            if (drag.mode === 'group') {
+                const moved = new Map(drag.origs.map((o) => [o.id, { ...o, x: snap(o.x + dx), y: snap(o.y + dy) }]));
+                const next = elementsRef.current.map((el) => moved.get(el.id) || el);
+                elementsRef.current = next;
+                setElements(next);
+                const now = performance.now();
+                if (now - lastUpdateSent.current > 50) {
+                    lastUpdateSent.current = now;
+                    emitDraw('UPDATE', { elements: [...moved.values()], transient: true });
+                }
+                return;
+            }
             const o = drag.orig;
-            const moved = drag.mode === 'move'
-                ? { ...o, x: snap(o.x + dx), y: snap(o.y + dy) }
-                : { ...o, w: Math.max(48, snap(o.w + dx)), h: Math.max(36, snap(o.h + dy)) };
+            let moved;
+            if (drag.mode === 'move') moved = { ...o, x: snap(o.x + dx), y: snap(o.y + dy) };
+            else {
+                // Resize from the grabbed corner; the opposite corner stays put.
+                const c = drag.corner;
+                const w = Math.max(48, snap(c.includes('e') ? o.w + dx : o.w - dx));
+                const h = Math.max(36, snap(c.includes('s') ? o.h + dy : o.h - dy));
+                moved = { ...o, w, h, x: c.includes('w') ? o.x + o.w - w : o.x, y: c.includes('n') ? o.y + o.h - h : o.y };
+            }
             const next = elementsRef.current.map((el) => (el.id === moved.id ? moved : el));
             elementsRef.current = next;
             setElements(next);
@@ -564,6 +811,25 @@ const WhiteboardModal = ({ isOpen, onClose, socketRef, roomId }) => {
                     const conn = { id: generateId(), type: 'connector', from: drag.from, to: drag.target, label: '', color, ...connectStyle };
                     addElements([conn]);
                     setSelectedId(conn.id);
+                }
+                return;
+            }
+            if (drag.mode === 'marquee') {
+                setMarquee(null);
+                if (!marquee) return;
+                // Every shape the box touches.
+                const l = Math.min(marquee.x1, marquee.x2), r = Math.max(marquee.x1, marquee.x2);
+                const t = Math.min(marquee.y1, marquee.y2), b = Math.max(marquee.y1, marquee.y2);
+                if (r - l < 4 / zoom && b - t < 4 / zoom) return;
+                const ids = elementsRef.current.filter((n) => n.type === 'node' && n.x < r && n.x + n.w > l && n.y < b && n.y + n.h > t).map((n) => n.id);
+                if (ids.length) selectNodes(ids);
+                return;
+            }
+            if (drag.mode === 'group') {
+                if (drag.moved) {
+                    const ids = new Set(drag.origs.map((o) => o.id));
+                    commitAction(elementsRef.current);
+                    emitDraw('UPDATE', { elements: elementsRef.current.filter((el) => ids.has(el.id)) });
                 }
                 return;
             }
@@ -687,14 +953,20 @@ const WhiteboardModal = ({ isOpen, onClose, socketRef, roomId }) => {
             if ((e.ctrlKey || e.metaKey) && k === 'z') { e.preventDefault(); if (e.shiftKey) handleRedo(); else handleUndo(); return; }
             if ((e.ctrlKey || e.metaKey) && k === 'y') { e.preventDefault(); handleRedo(); return; }
             if ((e.ctrlKey || e.metaKey) && k === 'd' && selectedEl?.type === 'node') { e.preventDefault(); duplicateSelected(); return; }
+            if ((e.ctrlKey || e.metaKey) && k === 'a') {
+                const ids = elementsRef.current.filter((el) => el.type === 'node').map((el) => el.id);
+                if (ids.length) { e.preventDefault(); selectNodes(ids); }
+                return;
+            }
             if (e.ctrlKey || e.metaKey || e.altKey) return;
+            if ((k === 'delete' || k === 'backspace') && groupActive) { e.preventDefault(); deleteGroup(); return; }
             if ((k === 'delete' || k === 'backspace') && selectedEl) { e.preventDefault(); deleteIds([selectedEl.id]); return; }
             if (k === 'enter' && selectedEl && (selectedEl.type === 'node' || selectedEl.type === 'connector')) {
                 e.preventDefault();
                 setEditing({ id: selectedEl.id, value: (selectedEl.type === 'node' ? selectedEl.text : selectedEl.label) || '' });
                 return;
             }
-            if (k === 'escape') { if (selectedId) setSelectedId(null); else onClose(); return; }
+            if (k === 'escape') { if (groupActive) setGroup([]); else if (selectedId) setSelectedId(null); else onClose(); return; }
             const t = TOOLS.find((x) => x.key === k);
             if (t) setTool(t.id);
             if (k === '0') resetView();
@@ -716,6 +988,27 @@ const WhiteboardModal = ({ isOpen, onClose, socketRef, roomId }) => {
             <header className="wb-top">
                 <strong>Whiteboard</strong>
                 <span className="wb-meta">{people} {people === 1 ? 'person' : 'people'} · room {roomId}</span>
+                <span className="wb-sim" role="group" aria-label="Simulate">
+                    <button className={sim.running ? 'on' : ''} onClick={toggleSim} title={sim.running ? 'Pause the simulation for everyone' : 'Simulate traffic through the system-design blocks, for everyone'} aria-pressed={sim.running}>
+                        {sim.running ? <Pause size={15} /> : <Play size={15} />}
+                        <span className="wb-sim-label">{sim.running ? 'Pause' : simActive ? 'Resume' : 'Simulate'}</span>
+                    </button>
+                    <input
+                        type="range" min="0" max="1000" step="1"
+                        value={loadToPos(load)}
+                        onChange={(e) => chooseLoad(posToLoad(Number(e.target.value)))}
+                        aria-label="Load (requests per second)"
+                        aria-valuetext={`${load} requests per second`}
+                        title="Load: requests per second sent by the clients"
+                    />
+                    <output className="wb-sim-load">{fmtRate(load)} req/s</output>
+                    {simActive && (
+                        <>
+                            <span className="wb-sim-time" title="Simulated time since the run started">t {((simSnap?.t ?? 0) / 1000).toFixed(1)} s</span>
+                            <button onClick={resetSim} title="Stop and reset the run" aria-label="Reset simulation"><RotateCcw size={14} /></button>
+                        </>
+                    )}
+                </span>
                 <span className="wb-top-actions">
                     <button onClick={handleUndo} disabled={historyIndex === 0} title="Undo (Ctrl+Z)" aria-label="Undo"><Undo2 size={16} /></button>
                     <button onClick={handleRedo} disabled={historyIndex === history.length - 1} title="Redo (Ctrl+Shift+Z)" aria-label="Redo"><Redo2 size={16} /></button>
@@ -755,7 +1048,7 @@ const WhiteboardModal = ({ isOpen, onClose, socketRef, roomId }) => {
                     let style;
                     if (el.type === 'node') {
                         const box = el.shape === 'actor' ? { x: el.x - 50, y: el.y + el.h + 2, w: el.w + 100, h: 44 } : el;
-                        style = { left: box.x * zoom + pan.x, top: box.y * zoom + pan.y, width: box.w * zoom, height: box.h * zoom, fontSize: 13.5 * zoom };
+                        style = { left: box.x * zoom + pan.x, top: box.y * zoom + pan.y, width: box.w * zoom, height: box.h * zoom, fontSize: (el.fontSize || 13.5) * zoom, fontWeight: el.bold ? 700 : 500, textAlign: el.align || 'center' };
                     } else {
                         const m = labelPoint(el, nodesById);
                         if (!m) return null;
@@ -799,6 +1092,12 @@ const WhiteboardModal = ({ isOpen, onClose, socketRef, roomId }) => {
                         <span key={cur.ts} className="wb-cursor-tag">{cur.userName || 'Guest'}</span>
                     </div>
                 ))}
+
+                {simActive && (
+                    <div className="wb-simnote" role="status" aria-live="polite">
+                        {simCatchUp ? `Catching up to t ${(simCatchUp.goal / 1000).toFixed(1)} s…` : explain(elements, simSnap, sim.load)}
+                    </div>
+                )}
 
                 {!elements.length && !currentElement && (
                     <div className="wb-empty">Draw, sketch an idea, or build a flowchart or system design with shapes (S) and connectors (A). Everyone in the room sees it live.</div>
@@ -864,6 +1163,37 @@ const WhiteboardModal = ({ isOpen, onClose, socketRef, roomId }) => {
                     </div>
                 )}
 
+                {/* Several shapes selected: align and distribute */}
+                {groupActive && !editing && (() => {
+                    const { minX, minY, maxX } = boxOf(groupNodes);
+                    const aw = areaRef.current?.clientWidth || 800;
+                    const width = 330;
+                    const top = minY * zoom + pan.y - 52;
+                    const x = Math.max(8, Math.min(aw - width - 8, ((minX + maxX) / 2) * zoom + pan.x - width / 2));
+                    const few = groupNodes.length < 3;
+                    const btn = (how, I, label, disabled) => (
+                        <button key={how} onClick={() => alignGroup(how)} title={label} aria-label={label} disabled={disabled}><I size={15} /></button>
+                    );
+                    return (
+                        <div className="wb-ctx" style={{ left: x, top: Math.max(8, top) }} role="toolbar" aria-label={`${groupNodes.length} shapes`} onPointerDown={(e) => e.stopPropagation()}>
+                            <span className="wb-ctx-count">{groupNodes.length}</span>
+                            <span className="wb-ctx-sep" />
+                            {btn('left', AlignStartVertical, 'Align left edges')}
+                            {btn('center', AlignCenterVertical, 'Align centres horizontally')}
+                            {btn('right', AlignEndVertical, 'Align right edges')}
+                            <span className="wb-ctx-sep" />
+                            {btn('top', AlignStartHorizontal, 'Align top edges')}
+                            {btn('middle', AlignCenterHorizontal, 'Align centres vertically')}
+                            {btn('bottom', AlignEndHorizontal, 'Align bottom edges')}
+                            <span className="wb-ctx-sep" />
+                            {btn('hspace', AlignHorizontalDistributeCenter, few ? 'Distribute horizontally (select 3 or more)' : 'Distribute horizontally', few)}
+                            {btn('vspace', AlignVerticalDistributeCenter, few ? 'Distribute vertically (select 3 or more)' : 'Distribute vertically', few)}
+                            <span className="wb-ctx-sep" />
+                            <button className="wb-ctx-del" onClick={deleteGroup} title="Delete (Del)" aria-label="Delete selected shapes"><Trash2 size={15} /></button>
+                        </div>
+                    );
+                })()}
+
                 {/* Selection toolbar: floats just above the selected shape / connector */}
                 {selectedEl && !editing && (selectedEl.type === 'node' || selectedEl.type === 'connector') && (() => {
                     const area = areaRef.current;
@@ -881,14 +1211,15 @@ const WhiteboardModal = ({ isOpen, onClose, socketRef, roomId }) => {
                         bottom = m.y * zoom + pan.y + 14;
                     }
                     const isConn = selectedEl.type === 'connector';
-                    const width = isConn ? 300 : 196;
+                    const simmable = isSimNode(selectedEl);
+                    const width = isConn ? 300 : simmable ? 302 : 264;
                     const y = top - 52 >= 8 ? top - 52 : bottom + 12;
                     const x = Math.max(8, Math.min(aw - width - 8, cx - width / 2));
                     const cur = selectedEl.color || 'ink';
                     return (
                         <div className="wb-ctx" style={{ left: x, top: y }} role="toolbar" aria-label={isConn ? 'Connector' : 'Shape'} onPointerDown={(e) => e.stopPropagation()}>
                             <span className="wb-ctx-pal">
-                                <button className="wb-chip" style={{ '--sw': cur === 'ink' ? 'var(--wb-ink)' : cur }} onClick={() => setCtxPal((o) => !o)} title="Colour" aria-label="Colour" aria-expanded={ctxPal}><i /></button>
+                                <button className="wb-chip" style={{ '--sw': cur === 'ink' ? 'var(--wb-ink)' : cur }} onClick={() => { const open = !ctxPal; closeMenus(); setCtxPal(open); }} title="Colour" aria-label="Colour" aria-expanded={ctxPal}><i /></button>
                                 {ctxPal && (
                                     <span className="wb-ctx-swatches">
                                         {PALETTE.map((c, i) => (
@@ -911,10 +1242,102 @@ const WhiteboardModal = ({ isOpen, onClose, socketRef, roomId }) => {
                                     </button>
                                 </>
                             )}
+                            {!isConn && (
+                                <span className="wb-ctx-pal">
+                                    <button className={textMenu ? 'on' : ''} onClick={() => { const open = !textMenu; closeMenus(); setTextMenu(open); }} title="Text size and alignment" aria-label="Text style" aria-expanded={textMenu}><ALargeSmall size={16} /></button>
+                                    {textMenu && (
+                                        <span className="wb-ctx-swatches wb-textmenu" role="group" aria-label="Text style">
+                                            <span className="wb-seg">
+                                                {TEXT_SIZES.map((sz) => (
+                                                    <button key={sz.id} className={(selectedEl.fontSize || 13.5) === sz.px ? 'on' : ''} onClick={() => applyUpdate([{ ...selectedEl, fontSize: sz.px }])} title={`Text size ${sz.id}`}>{sz.id}</button>
+                                                ))}
+                                            </span>
+                                            <span className="wb-textmenu-row">
+                                                <button className={selectedEl.bold ? 'on' : ''} onClick={() => applyUpdate([{ ...selectedEl, bold: !selectedEl.bold }])} title="Bold" aria-label="Bold" aria-pressed={!!selectedEl.bold}><Bold size={15} /></button>
+                                                <i />
+                                                {[['left', AlignLeft], ['center', AlignCenter], ['right', AlignRight]].map(([a, I]) => (
+                                                    <button key={a} className={(selectedEl.align || 'center') === a ? 'on' : ''} onClick={() => applyUpdate([{ ...selectedEl, align: a }])} title={`Align ${a}`} aria-label={`Align text ${a}`}><I size={15} /></button>
+                                                ))}
+                                                <i />
+                                                {[['top', AlignVerticalJustifyStart], ['middle', AlignVerticalJustifyCenter], ['bottom', AlignVerticalJustifyEnd]].map(([a, I]) => (
+                                                    <button key={a} className={(selectedEl.valign || 'middle') === a ? 'on' : ''} onClick={() => applyUpdate([{ ...selectedEl, valign: a }])} title={`Text at ${a}`} aria-label={`Text at ${a}`}><I size={15} /></button>
+                                                ))}
+                                            </span>
+                                        </span>
+                                    )}
+                                </span>
+                            )}
+                            {!isConn && (
+                                <span className="wb-ctx-pal">
+                                    <button className={shapeMenu ? 'on' : ''} onClick={() => { const open = !shapeMenu; closeMenus(); setShapeMenu(open); }} title="Change shape" aria-label="Change shape" aria-expanded={shapeMenu}><Shapes size={15} /></button>
+                                    {shapeMenu && (
+                                        <span className="wb-ctx-swatches wb-shapemenu" role="menu" aria-label="Change to">
+                                            <span className="wb-lib-h">Flowchart</span>
+                                            <span className="wb-lib-shapes">
+                                                {SHAPES.map((sh) => (
+                                                    <button key={sh.id} className={!selectedEl.kind && selectedEl.shape === sh.id ? 'on' : ''} onClick={() => changeType({ shape: sh.id })} title={sh.label} role="menuitem">
+                                                        <svg width="32" height="26" viewBox="0 0 32 26" aria-hidden="true"><path d={SHAPE_PREVIEW[sh.id]} fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" strokeLinecap="round" /></svg>
+                                                        <span>{sh.label}</span>
+                                                    </button>
+                                                ))}
+                                            </span>
+                                            <span className="wb-lib-h">System design</span>
+                                            <span className="wb-lib-blocks">
+                                                {TEMPLATES.map((t) => (
+                                                    <button key={t.id} className={selectedEl.kind === t.id ? 'on' : ''} onClick={() => changeType({ template: t.id })} title={t.text} role="menuitem">
+                                                        <i style={{ background: t.color === 'ink' ? 'var(--wb-ink)' : t.color }} />
+                                                        {t.label}
+                                                    </button>
+                                                ))}
+                                            </span>
+                                        </span>
+                                    )}
+                                </span>
+                            )}
+                            {simmable && (
+                                <>
+                                    <span className="wb-ctx-sep" />
+                                    <button className={propsOpen ? 'on' : ''} onClick={() => { const open = !propsOpen; closeMenus(); setPropsOpen(open); }} title="Properties: capacity for simulate mode" aria-label="Properties" aria-expanded={propsOpen}><Gauge size={15} /></button>
+                                </>
+                            )}
                             <span className="wb-ctx-sep" />
                             <button onClick={() => startEdit(selectedEl)} title={isConn ? 'Edit label (Enter)' : 'Edit text (Enter)'} aria-label="Edit text"><Type size={15} /></button>
                             {!isConn && <button onClick={duplicateSelected} title="Duplicate (Ctrl+D)" aria-label="Duplicate"><Copy size={15} /></button>}
                             <button className="wb-ctx-del" onClick={() => deleteIds([selectedEl.id])} title="Delete (Del)" aria-label="Delete"><Trash2 size={15} /></button>
+                            {simmable && propsOpen && (() => {
+                                const client = isClient(selectedEl);
+                                const set = client || hasCapacity(selectedEl);
+                                const typical = typicalSim(selectedEl);
+                                return (
+                                    <div className={`wb-props${x + 280 > aw ? ' wb-props--end' : ''}${y + 380 > (area?.clientHeight || 600) && y > 380 ? ' wb-props--up' : ''}`} role="dialog" aria-label="Properties">
+                                        <strong className="wb-props-h">Properties</strong>
+                                        {client ? (
+                                            <p className="wb-pop-tip">Clients send the load set in the header, shared evenly between them.</p>
+                                        ) : !set && (
+                                            <div className="wb-props-empty">
+                                                <p className="wb-pop-tip">No capacity set. While simulating, traffic passes through this block instantly and it shows no numbers.</p>
+                                                <button onClick={() => commitSim({})}>Use typical values</button>
+                                            </div>
+                                        )}
+                                        <div className="wb-props-grid">
+                                            {fieldsFor(selectedEl).map((f) => (
+                                                <label key={f.key} title={f.hint}>
+                                                    <span>{f.label}</span>
+                                                    <input
+                                                        type="number" inputMode="decimal" min={f.min} max={f.max} step={f.step}
+                                                        value={propsDraft[f.key] ?? selectedEl.sim?.[f.key] ?? ''}
+                                                        placeholder={String(typical[f.key] ?? '')}
+                                                        onChange={(e) => setPropsDraft((d) => ({ ...d, [f.key]: e.target.value }))}
+                                                        onBlur={() => commitSimField(f)}
+                                                        onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); if (e.key === 'Escape') { setPropsDraft({}); setPropsOpen(false); } }}
+                                                    />
+                                                </label>
+                                            ))}
+                                        </div>
+                                        {selectedEl.sim && <button className="wb-props-clear" onClick={clearSim}>{client ? 'Reset to defaults' : 'Clear capacity'}</button>}
+                                    </div>
+                                );
+                            })()}
                         </div>
                     );
                 })()}

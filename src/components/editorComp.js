@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
-import { Download, Copy, Check, Sparkles, X } from "lucide-react";
+import Icon from "./icons/Icon";
 import CodeMirror from "@uiw/react-codemirror";
 import { esLint } from "@codemirror/lang-javascript";
 import { EditorView } from "@codemirror/view";
@@ -227,10 +227,10 @@ function EditorComp({
         </div>
         <div className="ec-tools">
           <button className="ec-icon" onClick={copyCode} title="Copy code" aria-label="Copy code" disabled={isEmpty}>
-            {copied ? <Check size={15} /> : <Copy size={15} />}
+            {copied ? <Icon name="check" size={16} /> : <Icon name="copy" size={16} />}
           </button>
           {onDownload && (
-            <button className="ec-icon" onClick={onDownload} title={`Download ${fileName}`} aria-label="Download code"><Download size={15} /></button>
+            <button className="ec-icon" onClick={onDownload} title={`Download ${fileName}`} aria-label="Download code"><Icon name="download" size={16} /></button>
           )}
           {!lockLanguage && <LangPicker value={language} onChange={onLanguageChange} disabled={isReadOnly} />}
         </div>
@@ -264,9 +264,9 @@ function EditorComp({
         {isEmpty && !isReadOnly && templateFor(language) && notchOff !== language && (
           <div className="ec-notch" role="note">
             <button className="ec-notch-main" onClick={insertTemplate} title={`Insert a ${lang?.label || language} starter into ${fileName}`}>
-              <Sparkles size={12} /> Insert {lang?.label || language} starter
+              <Icon name="starter" size={12} /> Insert {lang?.label || language} starter
             </button>
-            <button className="ec-notch-x" onClick={() => setNotchOff(language)} aria-label="Hide" title="Hide"><X size={12} /></button>
+            <button className="ec-notch-x" onClick={() => setNotchOff(language)} aria-label="Hide" title="Hide"><Icon name="close" size={12} /></button>
           </div>
         )}
       </div>

@@ -1,5 +1,6 @@
-import React from "react";
+import React, { useState } from "react";
 import { Modal, Slider } from "./ux/primitives";
+import { getCallPrefs, saveCallPrefs } from "../utils/callPrefs";
 
 const Seg = ({ value, options, onChange, label }) => (
     <div className="u-seg" role="radiogroup" aria-label={label} style={{ width: "100%" }}>
@@ -13,6 +14,12 @@ const Seg = ({ value, options, onChange, label }) => (
 
 export default function SettingsModal({ isOpen, onClose, settings, onSettingsChange }) {
     const set = (key, value) => onSettingsChange({ ...settings, [key]: value });
+    // Stored with the other call preferences, not the editor settings.
+    const [keepCall, setKeepCall] = useState(() => getCallPrefs().keepOnNavigate);
+    const toggleKeepCall = () => {
+        saveCallPrefs({ keepOnNavigate: !keepCall });
+        setKeepCall(!keepCall);
+    };
 
     return (
         <Modal
@@ -20,7 +27,7 @@ export default function SettingsModal({ isOpen, onClose, settings, onSettingsCha
             onClose={onClose}
             label="Editor"
             title="Editor settings"
-            description="Saved on this device and applied to every room."
+            description="Saved on this device and applied to every room and project."
             footer={<button type="button" className="u-btn u-btn--solid" onClick={onClose}>Done</button>}
         >
             <div className="u-field">
@@ -52,6 +59,13 @@ export default function SettingsModal({ isOpen, onClose, settings, onSettingsCha
                         <p>Underline problems as you type (JavaScript only).</p>
                     </div>
                     <button type="button" className="u-switch" role="switch" aria-checked={!!settings.enableLinting} aria-label="Lint JavaScript" onClick={() => set("enableLinting", !settings.enableLinting)} />
+                </li>
+                <li style={{ gridTemplateColumns: "minmax(0,1fr) auto", padding: "16px 24px" }}>
+                    <div>
+                        <h5>Keep calls on other pages</h5>
+                        <p>Stay in a call when you open the dashboard or another room or project. Off: leaving the page ends the call.</p>
+                    </div>
+                    <button type="button" className="u-switch" role="switch" aria-checked={keepCall} aria-label="Keep calls on other pages" onClick={toggleKeepCall} />
                 </li>
             </ul>
         </Modal>

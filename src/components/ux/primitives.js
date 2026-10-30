@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { X } from "lucide-react";
+import Icon from "../icons/Icon";
 import { createPortal } from "react-dom";
 
 const REVEAL = "[data-rise]:not(.is-in), .u-clip:not(.is-in), .u-roll:not(.is-in), .u-lines:not(.is-in), .d-bars:not(.is-in)";
@@ -110,7 +110,7 @@ export function Modal({ open, onClose, label, title, description, children, foot
                         <h3>{title}</h3>
                         {description && <p>{description}</p>}
                     </div>
-                    {onClose && <button type="button" className="u-icon" onClick={onClose} aria-label="Close"><X size={18} /></button>}
+                    {onClose && <button type="button" className="u-icon" onClick={onClose} aria-label="Close"><Icon name="close" size={20} /></button>}
                 </div>
                 {children && <div className="u-modal-body">{children}</div>}
                 {footer && <div className="u-modal-foot">{footer}</div>}

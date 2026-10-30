@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Sparkles, Code2, ShieldAlert, CheckCircle, Loader2, ArrowRight } from 'lucide-react';
+import Icon from "./icons/Icon";
 import { Modal } from './ux/primitives';
 import toast from 'react-hot-toast';
 import { askCopilot } from '../utils/copilot';
@@ -34,10 +34,10 @@ function AICopilotModal({ isOpen, onClose, code = "", language = "javascript", o
         <Modal open onClose={onClose} wide label={`AI copilot · ${language}`} title="Ask about this code" description="Pick a task or describe what you want. Results can be applied straight to the editor.">
             <div className="u-steps" style={{ '--n': 4 }}>
                 {[
-                    { id: 'explain', label: 'Explain', icon: <Code2 size={15} /> },
-                    { id: 'refactor', label: 'Refactor', icon: <Sparkles size={15} /> },
-                    { id: 'fix', label: 'Audit & fix', icon: <ShieldAlert size={15} /> },
-                    { id: 'test', label: 'Write tests', icon: <CheckCircle size={15} /> },
+                    { id: 'explain', label: 'Explain', icon: <Icon name="explain" size={16} /> },
+                    { id: 'refactor', label: 'Refactor', icon: <Icon name="refactor" size={16} /> },
+                    { id: 'fix', label: 'Audit & fix', icon: <Icon name="bug" size={16} /> },
+                    { id: 'test', label: 'Write tests', icon: <Icon name="tests" size={16} /> },
                 ].map((item) => (
                     <button key={item.id} type="button" className={`u-step${action === item.id ? ' on' : ''}`} onClick={() => handleRunAI(item.id)} disabled={loading}>
                         <span className="u-label" style={{ color: 'inherit' }}>{item.icon}</span>
@@ -49,13 +49,13 @@ function AICopilotModal({ isOpen, onClose, code = "", language = "javascript", o
             <form className="h-join" onSubmit={(e) => { e.preventDefault(); if (prompt.trim()) handleRunAI('prompt'); }}>
                 <input className="u-input" value={prompt} onChange={(e) => setPrompt(e.target.value)} placeholder="Or ask for something specific…" aria-label="Prompt" />
                 <button type="submit" className="u-btn u-btn--solid u-btn--lg" disabled={loading || !prompt.trim()} aria-label="Send prompt">
-                    {loading && action === 'prompt' ? <Loader2 size={16} className="u-spin" /> : <ArrowRight size={16} />}
+                    {loading && action === 'prompt' ? <Icon name="reload" size={16} className="u-spin" /> : <Icon name="send" size={16} />}
                 </button>
             </form>
 
             {loading && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                    <span className="u-label"><Loader2 size={12} className="u-spin" /> Thinking…</span>
+                    <span className="u-label"><Icon name="reload" size={12} className="u-spin" /> Thinking…</span>
                     <div className="u-skel" style={{ height: 14, width: '80%' }} />
                     <div className="u-skel" style={{ height: 14, width: '64%' }} />
                     <div className="u-skel" style={{ height: 90 }} />

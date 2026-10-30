@@ -1,18 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { 
-    Focus, 
-    Play, 
-    Pause, 
-    RotateCcw, 
-    X, 
-    CheckCircle2, 
-    Target,
-    Clock,
-    Zap,
-    Music,
-    FileCode,
-    ChevronDown
-} from 'lucide-react';
+import Icon from "./icons/Icon";
 import { editorLanguage } from '../utils/languages';
 import CodeMirror from '@uiw/react-codemirror';
 import { dracula } from '@uiw/codemirror-theme-dracula';
@@ -302,7 +289,7 @@ export default function FocusModeModal({
                             justifyContent: 'center',
                             color: 'var(--u-accent)'
                         }}>
-                            <Focus size={18} />
+                            <Icon name="focus" size={20} />
                         </div>
                         <div>
                             <span style={{ fontSize: '14px', fontWeight: '800', letterSpacing: '-0.02em', color: 'var(--u-ink)' }}>
@@ -325,9 +312,9 @@ export default function FocusModeModal({
                                     cursor: 'pointer'
                                 }}
                             >
-                                <FileCode size={14} color="var(--u-accent)" />
+                                <Icon name="file" size={14} style={{ color: "var(--u-accent)" }} />
                                 <span>{currentFileName}</span>
-                                <ChevronDown size={12} color="var(--text-muted)" />
+                                <Icon name="dropdown" size={12} style={{ color: "var(--text-muted)" }} />
                             </button>
 
                             {showFileDropdown && (
@@ -366,7 +353,7 @@ export default function FocusModeModal({
                                                     color: (f.name === currentFileName || f.id === activeFile?.id) ? 'var(--u-accent)' : 'var(--u-ink)'
                                                 }}
                                             >
-                                                <FileCode size={13} />
+                                                <Icon name="file" size={14} />
                                                 <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.name}</span>
                                             </div>
                                         ))
@@ -389,7 +376,7 @@ export default function FocusModeModal({
                         borderRadius: '20px',
                         border: '1px solid var(--u-line)'
                     }}>
-                        <Target size={14} color="var(--u-accent)" />
+                        <Icon name="goal" size={14} style={{ color: "var(--u-accent)" }} />
                         {isGoalEditing ? (
                             <input
                                 autoFocus
@@ -430,7 +417,7 @@ export default function FocusModeModal({
                 <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
                     {/* Timer */}
                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px', backgroundColor: 'rgba(0,0,0,0.4)', padding: '4px 12px', borderRadius: '20px', border: '1px solid var(--u-line)' }}>
-                        <Clock size={15} color={isTimerRunning ? 'var(--u-ok)' : 'var(--text-muted)'} />
+                        <Icon name="timer" size={16} style={{ color: isTimerRunning ? 'var(--u-ok)' : 'var(--text-muted)' }} />
                         <span style={{ fontSize: '16px', fontWeight: '800', fontFamily: 'monospace', color: isTimerRunning ? 'var(--u-ok)' : 'var(--u-ink)' }}>
                             {formatTime(timeLeft)}
                         </span>
@@ -449,13 +436,13 @@ export default function FocusModeModal({
                                 cursor: 'pointer'
                             }}
                         >
-                            {isTimerRunning ? <Pause size={12} /> : <Play size={12} style={{ marginLeft: '1px' }} />}
+                            {isTimerRunning ? <Icon name="pause" size={12} /> : <Icon name="run" size={12} style={{ marginLeft: '1px' }} />}
                         </button>
                         <button
                             onClick={() => { setTimeLeft(timerMode * 60); setIsTimerRunning(false); }}
                             style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', display: 'flex' }}
                         >
-                            <RotateCcw size={13} />
+                            <Icon name="reset" size={14} />
                         </button>
                     </div>
 
@@ -482,7 +469,7 @@ export default function FocusModeModal({
 
                     {/* Ambient Sound Generators */}
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', borderLeft: '1px solid var(--u-line)', paddingLeft: '16px' }}>
-                        <Music size={15} color="var(--text-muted)" />
+                        <Icon name="music" size={16} style={{ color: "var(--text-muted)" }} />
                         <select
                             value={soundMode}
                             onChange={(e) => setSoundMode(e.target.value)}
@@ -536,7 +523,7 @@ export default function FocusModeModal({
                             transition: 'all 0.2s'
                         }}
                     >
-                        <X size={14} /> Exit
+                        <Icon name="close" size={14} /> Exit
                     </button>
                 </div>
             </div>
@@ -576,7 +563,7 @@ export default function FocusModeModal({
                                             color: (f.name === currentFileName || f.id === activeFile?.id) ? 'var(--u-accent)' : 'white'
                                         }}
                                     >
-                                        <FileCode size={13} color={(f.name === currentFileName || f.id === activeFile?.id) ? 'var(--u-accent)' : 'var(--text-muted)'} />
+                                        <Icon name="file" size={14} style={{ color: (f.name === currentFileName || f.id === activeFile?.id) ? 'var(--u-accent)' : 'var(--text-muted)' }} />
                                         <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.name}</span>
                                     </div>
                                 ))}
@@ -630,7 +617,7 @@ export default function FocusModeModal({
                                     textDecoration: t.completed ? 'line-through' : 'none'
                                 }}
                             >
-                                <CheckCircle2 size={14} color={t.completed ? 'var(--u-ok)' : 'var(--text-muted)'} />
+                                <Icon name="success" size={14} style={{ color: t.completed ? 'var(--u-ok)' : 'var(--text-muted)' }} />
                                 <span style={{ flex: 1 }}>{t.text}</span>
                             </div>
                         ))}
@@ -677,7 +664,7 @@ export default function FocusModeModal({
                     <span>Characters: <strong style={{ color: 'var(--u-ink)' }}>{stats.chars}</strong></span>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <Zap size={12} color="var(--u-ok)" />
+                    <Icon name="focus" size={12} style={{ color: "var(--u-ok)" }} />
                     <span>Distraction-Free Environment Active</span>
                 </div>
             </div>

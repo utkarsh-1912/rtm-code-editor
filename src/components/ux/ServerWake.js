@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { RefreshCw, X } from "lucide-react";
+import Icon from "../icons/Icon";
 import { useBackend } from "../../context/BackendContext";
 
 const mmss = (ms) => `${Math.floor(ms / 60000)}:${String(Math.floor(ms / 1000) % 60).padStart(2, "0")}`;
@@ -19,8 +19,8 @@ export default function ServerWake() {
                 <span>{down ? "Retrying in the background. Rooms reconnect on their own." : "Free hosting sleeps when idle; the first load can take up to a minute."}</span>
             </div>
             <span className="u-label sw-time">{mmss(waitedMs)}</span>
-            <button className="u-icon" onClick={retry} title="Try again now" aria-label="Try again now"><RefreshCw size={15} /></button>
-            <button className="u-icon" onClick={() => setHidden(true)} title="Hide" aria-label="Hide notice"><X size={15} /></button>
+            <button className="u-icon" onClick={retry} title="Try again now" aria-label="Try again now"><Icon name="reload" size={16} /></button>
+            <button className="u-icon" onClick={() => setHidden(true)} title="Hide" aria-label="Hide notice"><Icon name="close" size={16} /></button>
             <div className="sw-track" aria-hidden="true"><i /></div>
         </div>
     );

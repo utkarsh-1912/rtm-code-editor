@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Search, X, Save } from 'lucide-react';
+import Icon from "./icons/Icon";
 import { Modal } from './ux/primitives';
 import { SNIPPET_LANGS } from '../utils/languages';
 import { getBackendUrl } from '../utils/api';
@@ -116,7 +116,7 @@ const SnippetModal = ({ isOpen, onClose, onImport, userId, code: currentCode, la
             onSubmit={activeTab === 'save' ? handleSave : undefined}
             footer={activeTab === 'save' ? <>
                 <button type="button" className="u-btn u-btn--ghost" onClick={() => setActiveTab('import')}>Back</button>
-                <button type="submit" className="u-btn u-btn--solid" disabled={isSaving || !currentCode}><Save size={15} /> {isSaving ? 'Saving…' : 'Save snippet'}</button>
+                <button type="submit" className="u-btn u-btn--solid" disabled={isSaving || !currentCode}><Icon name="save" size={16} /> {isSaving ? 'Saving…' : 'Save snippet'}</button>
             </> : null}
         >
             <div className="u-seg" role="tablist" style={{ alignSelf: 'flex-start' }}>
@@ -127,7 +127,7 @@ const SnippetModal = ({ isOpen, onClose, onImport, userId, code: currentCode, la
             {activeTab === 'import' ? (
                 <>
                     <label className="u-search">
-                        <Search size={15} />
+                        <Icon name="search" size={16} />
                         <input autoFocus placeholder="Search by title, language or tag" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} aria-label="Search snippets" />
                     </label>
                     {loading ? (
@@ -177,7 +177,7 @@ const SnippetModal = ({ isOpen, onClose, onImport, userId, code: currentCode, la
                         <div className="u-tagbox">
                             {tagList.map((tag) => (
                                 <span key={tag} className="u-chip u-chip--mono">#{tag}
-                                    <button type="button" aria-label={`Remove ${tag}`} onClick={() => setSaveData({ ...saveData, tags: tagList.filter((t) => t !== tag).join(',') })}><X size={11} /></button>
+                                    <button type="button" aria-label={`Remove ${tag}`} onClick={() => setSaveData({ ...saveData, tags: tagList.filter((t) => t !== tag).join(',') })}><Icon name="close" size={12} /></button>
                                 </span>
                             ))}
                             <input id="sm-tags" placeholder={tagList.length ? '' : 'react, hooks'}

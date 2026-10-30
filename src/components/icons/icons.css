@@ -1,0 +1,16 @@
+/* Shared box for every <Icon>. Colour comes from currentColor, so set `color` on the button. */
+.cl-icon {
+    display: inline-block;
+    flex-shrink: 0;
+    vertical-align: middle;
+    line-height: 0;
+}
+
+/* Busy indicator: <Icon name="reload" className="u-spin" /> */
+.cl-icon.u-spin { animation: cl-spin 1s linear infinite; }
+@keyframes cl-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .cl-icon.u-spin { animation: none; } }
+
+@media (forced-colors: active) {
+    .cl-icon { forced-color-adjust: auto; }
+}

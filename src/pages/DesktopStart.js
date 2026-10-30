@@ -3,7 +3,7 @@ import { Link, Navigate, useNavigate } from "react-router-dom";
 import { ArrowRight, Link2, Plus, LogIn, Cpu, Globe, FolderOpen, Clock, X, Copy, Check, RefreshCw, Keyboard, SquareTerminal } from "lucide-react";
 import toast from "react-hot-toast";
 import Logo from "../components/Logo";
-import AiIcon from "../components/AiIcon";
+import Icon from "../components/icons/Icon";
 import SpaceLoader from "../components/SpaceLoader";
 import { ThemeButton } from "../components/ux/Shell";
 import { newRoomId, extractRoomId, timeAgo, greeting } from "../components/ux/primitives";
@@ -96,7 +96,7 @@ export default function DesktopStart() {
             fixNote: "in a Judge0 CE folder",
         },
         {
-            id: "llm", icon: <AiIcon size={15} />, label: "AI copilot", ok: local?.llm, warn: true,
+            id: "llm", icon: <Icon name="ai" size={16} />, label: "AI copilot", ok: local?.llm, warn: true,
             text: local ? (local.llm ? local.model : "Using the server") : "Checking",
             fix: local && !local.llm ? `ollama pull ${local?.model || "qwen2.5-coder:1.5b"}` : null,
         },

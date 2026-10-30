@@ -1,7 +1,8 @@
 // Flowchart / system-design diagrams on the whiteboard canvas.
 //
 // Elements (stored and synced like any other whiteboard element):
-//   node:      { id, type: "node", shape, x, y, w, h, text, color, badge?, kind? }
+//   node:      { id, type: "node", shape, x, y, w, h, text, color, badge?, kind?, sim? }
+//              (sim: capacity for simulate mode, see whiteboard/sim/topology.js)
 //   connector: { id, type: "connector", from, to, label, color, route: "straight"|"elbow",
 //                dashed, arrows: "end"|"both"|"none" }
 // Connectors reference nodes by id, so they follow the nodes when those move.
@@ -57,6 +58,34 @@ export function makeNode({ shape = "process", template, x, y, color = "ink", id 
         h: size.h,
         text: t ? t.text : "",
         color: t ? t.color : color,
+    };
+}
+
+// The same node as another shape or block, keeping its id (so connectors stay attached),
+// centre, text style and, if it was resized, its size. Template text and colour follow the
+// new block unless they had been changed.
+export function retypeNode(n, { shape = "process", template }) {
+    const t = template ? TEMPLATES.find((tt) => tt.id === template) : null;
+    const prev = n.kind ? TEMPLATES.find((tt) => tt.id === n.kind) : null;
+    const s = t ? t.shape : shape;
+    const size = SIZE[s] || SIZE.process;
+    const prevSize = SIZE[n.shape] || SIZE.process;
+    const resized = n.w !== prevSize.w || n.h !== prevSize.h;
+    const w = resized ? n.w : size.w, h = resized ? n.h : size.h;
+    const cx = n.x + n.w / 2, cy = n.y + n.h / 2;
+    const defaultText = !n.text || (prev && n.text === prev.text);
+    const defaultColor = n.color === "ink" || (prev && n.color === prev.color);
+    return {
+        ...n,
+        shape: s,
+        kind: t?.id || null,
+        badge: t?.badge || "",
+        x: snap(cx - w / 2),
+        y: snap(cy - h / 2),
+        w,
+        h,
+        text: t && defaultText ? t.text : n.text,
+        color: t && defaultColor ? t.color : n.color,
     };
 }
 
@@ -162,8 +191,20 @@ export function connectorAt(elements, byId, x, y, tolerance) {
     return null;
 }
 
-// Bottom-right resize handle of a node.
-export const onResizeHandle = (n, x, y, zoom) => Math.abs(x - (n.x + n.w)) <= 9 / zoom && Math.abs(y - (n.y + n.h)) <= 9 / zoom;
+// Corner resize handles of a node: "nw" | "ne" | "sw" | "se", or null.
+const OUTLINE_PAD = 5;
+export function onResizeHandle(n, x, y, zoom) {
+    const tol = 9 / zoom;
+    const xs = { w: n.x - OUTLINE_PAD, e: n.x + n.w + OUTLINE_PAD };
+    const ys = { n: n.y - OUTLINE_PAD, s: n.y + n.h + OUTLINE_PAD };
+    for (const v of ["n", "s"]) for (const h of ["w", "e"]) {
+        if (Math.abs(x - xs[h]) <= tol && Math.abs(y - ys[v]) <= tol) return v + h;
+    }
+    return null;
+}
+
+// Text sizes offered in the selection toolbar (px at 100% zoom).
+export const TEXT_SIZES = [{ id: "S", px: 12 }, { id: "M", px: 13.5 }, { id: "L", px: 18 }, { id: "XL", px: 24 }];
 
 export const labelPoint = (conn, byId) => {
     const pts = connectorPath(conn, byId);
@@ -299,28 +340,71 @@ export function drawNode(ctx, n, { ink, editing }) {
         ctx.fillText(n.badge, bx + 5, by + 7.5);
     }
 
-    // Label text, wrapped and centred (below the figure for actors).
+    // Label text, wrapped (below the figure for actors). Size, weight and alignment come
+    // from the node (fontSize, bold, align: left|center|right, valign: top|middle|bottom).
     if (!editing && n.text) {
-        ctx.font = "500 13.5px Inter, Archivo, system-ui, sans-serif";
+        const fs = n.fontSize || 13.5;
+        ctx.font = `${n.bold ? 700 : 500} ${fs}px Inter, Archivo, system-ui, sans-serif`;
         ctx.fillStyle = ink;
-        ctx.textAlign = "center";
         ctx.textBaseline = "middle";
         const inset = n.shape === "decision" ? n.w * 0.22 : n.shape === "io" ? 24 : n.shape === "cloud" ? n.w * 0.18 : 12;
         const maxW = n.shape === "actor" ? 140 : Math.max(30, n.w - inset * 2);
-        const lines = wrapText(ctx, n.text, maxW).slice(0, 6);
-        const lh = 17;
+        const lines = wrapText(ctx, n.text, maxW).slice(0, 12);
+        const lh = Math.round(fs * 1.26);
         const badgeShift = n.badge && n.shape !== "decision" ? 7 : 0;
-        const cy = n.shape === "actor" ? n.y + n.h + 12 + ((lines.length - 1) * lh) / 2
-            : n.shape === "database" ? n.y + n.h / 2 + 6 + badgeShift
-                : n.shape === "cloud" ? n.y + n.h * 0.58
-                    : n.y + n.h / 2 + badgeShift;
-        lines.forEach((line, i) => ctx.fillText(line, n.x + n.w / 2, cy + (i - (lines.length - 1) / 2) * lh));
+        const actor = n.shape === "actor";
+        const align = actor ? "center" : n.align || "center";
+        const valign = actor ? "middle" : n.valign || "middle";
+        const span = (lines.length - 1) * lh;
+        const topPad = (n.badge && n.shape !== "decision" ? 26 : 10) + (n.shape === "database" ? 14 : 0);
+        const bottomPad = 10 + (n.shape === "database" ? 12 : n.shape === "document" ? 10 : 0);
+        const cy = actor ? n.y + n.h + 12 + span / 2
+            : valign === "top" ? n.y + topPad + lh / 2 + span / 2
+                : valign === "bottom" ? n.y + n.h - bottomPad - lh / 2 - span / 2
+                    : n.shape === "database" ? n.y + n.h / 2 + 6 + badgeShift
+                        : n.shape === "cloud" ? n.y + n.h * 0.58
+                            : n.y + n.h / 2 + badgeShift;
+        ctx.textAlign = align;
+        const tx = align === "left" ? n.x + inset : align === "right" ? n.x + n.w - inset : n.x + n.w / 2;
+        lines.forEach((line, i) => ctx.fillText(line, tx, cy + (i - (lines.length - 1) / 2) * lh));
         ctx.textAlign = "start";
     }
     ctx.restore();
 }
 
-export function drawConnector(ctx, conn, byId, { ink, bg, pointer, selected, editing }) {
+// ---- simulate mode ---------------------------------------------------------------------
+export const SIM_LEVEL_COLOR = ["", "#F5B544", "#F05252"]; // ok, busy, saturated / dropping
+
+// A strip under the node with its measured numbers; `level` tints it and rings the shape.
+export function drawSimFooter(ctx, n, { text, level = 0 }, { ink, bg }) {
+    ctx.save();
+    ctx.globalCompositeOperation = "source-over";
+    const tone = SIM_LEVEL_COLOR[level];
+    if (tone && n.shape !== "actor") {
+        ctx.strokeStyle = withAlpha(tone, 0.85);
+        ctx.lineWidth = 3;
+        shapePath(ctx, n);
+        ctx.stroke();
+    }
+    ctx.font = "600 10.5px ui-monospace, 'SF Mono', Menlo, Consolas, monospace";
+    const tw = ctx.measureText(text).width + 14;
+    const cx = n.x + n.w / 2;
+    const top = n.shape === "actor" ? n.y + n.h + 30 : n.y + n.h + 6;
+    ctx.fillStyle = bg;
+    ctx.strokeStyle = tone || withAlpha(ink === "#F2F1EC" ? "#F2F1EC" : "#1B1A17", 0.2);
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.roundRect ? ctx.roundRect(cx - tw / 2, top, tw, 18, 9) : ctx.rect(cx - tw / 2, top, tw, 18);
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = tone || ink;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(text, cx, top + 9.5);
+    ctx.restore();
+}
+
+export function drawConnector(ctx, conn, byId, { ink, bg, pointer, selected, editing, rate }) {
     const pts = connectorPath(conn, byId, pointer);
     if (!pts) return;
     const color = conn.color === "ink" || !conn.color ? ink : conn.color;
@@ -352,10 +436,12 @@ export function drawConnector(ctx, conn, byId, { ink, bg, pointer, selected, edi
     if (arrows !== "none") head(pts[pts.length - 2], pts[pts.length - 1]);
     if (arrows === "both") head(pts[1], pts[0]);
 
-    if (conn.label && !editing) {
+    // While simulating, the measured rate rides along with the label.
+    const label = rate ? (conn.label ? `${conn.label} · ${rate}` : rate) : conn.label;
+    if (label && !editing) {
         const m = midOfPath(pts);
-        ctx.font = "500 12px Inter, Archivo, system-ui, sans-serif";
-        const tw = ctx.measureText(conn.label).width + 12;
+        ctx.font = rate ? "600 11.5px ui-monospace, 'SF Mono', Menlo, Consolas, monospace" : "500 12px Inter, Archivo, system-ui, sans-serif";
+        const tw = ctx.measureText(label).width + 12;
         ctx.fillStyle = bg;
         ctx.beginPath();
         ctx.roundRect ? ctx.roundRect(m.x - tw / 2, m.y - 10, tw, 20, 6) : ctx.rect(m.x - tw / 2, m.y - 10, tw, 20);
@@ -363,7 +449,7 @@ export function drawConnector(ctx, conn, byId, { ink, bg, pointer, selected, edi
         ctx.fillStyle = ink;
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
-        ctx.fillText(conn.label, m.x, m.y + 0.5);
+        ctx.fillText(label, m.x, m.y + 0.5);
         ctx.textAlign = "start";
     }
     if (selected) {
@@ -379,15 +465,15 @@ export function drawNodeOutline(ctx, n, zoom, { handle = true, accent = "#7AA2FF
     ctx.globalCompositeOperation = "source-over";
     ctx.strokeStyle = accent;
     ctx.lineWidth = 1.5 / zoom;
-    ctx.setLineDash([5 / zoom, 4 / zoom]);
-    ctx.strokeRect(n.x - 5, n.y - 5, n.w + 10, n.h + 10);
-    ctx.setLineDash([]);
+    const p = OUTLINE_PAD;
+    ctx.strokeRect(n.x - p, n.y - p, n.w + p * 2, n.h + p * 2);
     if (handle) {
-        const s = 9 / zoom;
+        const s = 8 / zoom;
         ctx.fillStyle = "#fff";
-        ctx.strokeStyle = accent;
-        ctx.fillRect(n.x + n.w - s / 2, n.y + n.h - s / 2, s, s);
-        ctx.strokeRect(n.x + n.w - s / 2, n.y + n.h - s / 2, s, s);
+        [[n.x - p, n.y - p], [n.x + n.w + p, n.y - p], [n.x - p, n.y + n.h + p], [n.x + n.w + p, n.y + n.h + p]].forEach(([hx, hy]) => {
+            ctx.fillRect(hx - s / 2, hy - s / 2, s, s);
+            ctx.strokeRect(hx - s / 2, hy - s / 2, s, s);
+        });
     }
     ctx.restore();
 }

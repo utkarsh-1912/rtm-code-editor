@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { Search, Command } from 'lucide-react';
+import Icon from "./icons/Icon";
 
 const CommandPalette = ({ isOpen, onClose, actions = [], isLightMode }) => {
     const [search, setSearch] = useState('');
@@ -81,7 +81,7 @@ const CommandPalette = ({ isOpen, onClose, actions = [], isLightMode }) => {
             <div style={paletteContainerStyle} onClick={e => e.stopPropagation()}>
                 {/* Search Header */}
                 <div style={headerStyle}>
-                    <Search size={20} color="var(--primary)" style={{ opacity: 0.8 }} />
+                    <Icon name="search" size={20} style={{ color: "var(--primary)", opacity: 0.8 }} />
                     <input 
                         ref={inputRef}
                         type="text"
@@ -112,7 +112,7 @@ const CommandPalette = ({ isOpen, onClose, actions = [], isLightMode }) => {
                                         >
                                             <div style={actionLeftStyle}>
                                                 <div style={iconWrapperStyle(isSelected)}>
-                                                    {action.icon || <Command size={16} />}
+                                                    {action.icon || <Icon name="palette" size={16} />}
                                                 </div>
                                                 <div style={actionTextContainerStyle}>
                                                     <div style={actionLabelStyle}>{action.label}</div>
@@ -129,7 +129,7 @@ const CommandPalette = ({ isOpen, onClose, actions = [], isLightMode }) => {
                         ))
                     ) : (
                         <div style={emptyStateStyle}>
-                            <div style={{ opacity: 0.5, marginBottom: '12px' }}><Search size={40} /></div>
+                            <div style={{ opacity: 0.5, marginBottom: '12px' }}><Icon name="search" size={24} /></div>
                             <div style={{ fontSize: '14px', fontWeight: '600' }}>No results found for "{search}"</div>
                             <div style={{ fontSize: '12px', opacity: 0.6, marginTop: '4px' }}>Try searching for files, settings, or actions.</div>
                         </div>

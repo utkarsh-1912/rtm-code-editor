@@ -17,6 +17,7 @@ import { applyTheme, getThemePref } from "./utils/theme";
 
 import { AuthProvider } from "./context/AuthContext";
 import { BackendProvider } from "./context/BackendContext";
+import { CallCarryProvider } from "./context/CallCarry";
 import ServerWake from "./components/ux/ServerWake";
 import Login from "./pages/Login";
 import SignUp from "./pages/SignUp";
@@ -92,6 +93,7 @@ function App() {
         </div>
         <BrowserRouter>
           {IS_DESKTOP && <DesktopBridge />}
+          <CallCarryProvider>
           <PageBoundary>
           <Routes>
             <Route path="/" element={IS_DESKTOP ? <DesktopStart /> : <HomePage />} />
@@ -116,6 +118,7 @@ function App() {
             <Route path="*" element={<NotFound />} />
           </Routes>
           </PageBoundary>
+          </CallCarryProvider>
         </BrowserRouter>
       </AuthProvider>
       </BackendProvider>

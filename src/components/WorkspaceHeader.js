@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useMemo } from "react";
 import Logo from "./Logo";
-import { Play, Loader2, MoreHorizontal, Sun, Moon, Search, Check, PhoneOff } from "lucide-react";
+import Icon from "./icons/Icon";
 import Client from "./clients";
 import "../styles/site.css";
 import "../styles/app.css";
@@ -16,7 +16,7 @@ const GROUP_OF = {
 const GROUP_ORDER = ["Collaborate", "Tools", "Code", "Files", "Workspace", "More"];
 const SHORTCUT = { palette: "Ctrl K", search: "Ctrl K", focus: "Alt F", terminal: "Ctrl `", "save-disk": "Ctrl S" };
 // Shown as icons on large screens (unless an action sets pin explicitly); phones keep everything in ⋯.
-const PINNED = new Set(["call", "board", "ai", "share", "invite"]);
+const PINNED = new Set(["call", "board", "ai", "share", "invite", "settings"]);
 
 // Shared top bar for the room editor and the project workspace.
 // Large screens: view tabs, people, the key tools as icons, Run and a ⋯ menu for the rest.
@@ -38,7 +38,7 @@ export default function WorkspaceHeader({
         const list = actions
             .filter((a) => !(isMobile && a.desktopOnly))
             .filter((a) => isMobile || !(a.pin ?? PINNED.has(a.id)))
-            .concat(onToggleTheme ? [{ id: "theme", label: isLightMode ? "Dark theme" : "Light theme", icon: isLightMode ? <Moon size={16} /> : <Sun size={16} />, onClick: onToggleTheme }] : [])
+            .concat(onToggleTheme ? [{ id: "theme", label: isLightMode ? "Dark theme" : "Light theme", icon: <Icon name={isLightMode ? "theme-dark" : "theme-light"} size={16} />, onClick: onToggleTheme }] : [])
             .map((a) => ({ ...a, group: a.group || GROUP_OF[a.id] || "More" }));
         const q = query.trim().toLowerCase();
         return list
@@ -125,7 +125,7 @@ export default function WorkspaceHeader({
 
                 {call?.active && (
                     <button className="wsh-live" onClick={call.onClick} title="Leave call">
-                        <span className="u-dot" /> {!isMobile && "In call"} <PhoneOff size={14} />
+                        <span className="u-dot" /> {!isMobile && "In call"} <Icon name="call-leave" size={14} />
                     </button>
                 )}
 
@@ -141,19 +141,19 @@ export default function WorkspaceHeader({
 
                 {onRun && (
                     <button className="u-btn wsh-run" onClick={onRun} disabled={isExecuting} title="Run code (Ctrl Enter)">
-                        {isExecuting ? <Loader2 size={15} className="u-spin" /> : <Play size={13} fill="currentColor" />}
+                        {isExecuting ? <Icon name="reload" size={14} className="u-spin" /> : <Icon name="run" size={14} filled />}
                         {!isMobile && <span>{isExecuting ? "Running" : "Run"}</span>}
                     </button>
                 )}
 
                 <div className="wsh-menu-wrap" ref={menuRef}>
                     <button className={`u-icon wsh-dots${menuOpen ? " on" : ""}`} onClick={() => setMenuOpen((v) => !v)} title="All tools" aria-label="All tools" aria-haspopup="menu" aria-expanded={menuOpen}>
-                        <MoreHorizontal size={19} />
+                        <Icon name="more" size={20} />
                     </button>
                     {menuOpen && (
                         <div className="u-pop wsh-menu" role="menu" onKeyDown={onMenuKey}>
                             <label className="wsh-filter">
-                                <Search size={14} />
+                                <Icon name="search" size={14} />
                                 <input ref={inputRef} value={query} onChange={(e) => { setQuery(e.target.value); setCursor(0); }} placeholder="Find a tool" aria-label="Find a tool" />
                                 <kbd>Esc</kbd>
                             </label>
@@ -172,7 +172,7 @@ export default function WorkspaceHeader({
                                                 onClick={() => pick(a)}
                                             >
                                                 {a.icon}<span>{a.label}</span>
-                                                {a.active ? <Check size={14} className="wsh-check" /> : SHORTCUT[a.id] ? <kbd>{SHORTCUT[a.id]}</kbd> : null}
+                                                {a.active ? <Icon name="check" size={14} className="wsh-check" /> : SHORTCUT[a.id] ? <kbd>{SHORTCUT[a.id]}</kbd> : null}
                                             </button>
                                         </React.Fragment>
                                     );

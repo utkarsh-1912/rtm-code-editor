@@ -5,19 +5,6 @@ import {
   useParams,
 } from "react-router-dom";
 import toast from "react-hot-toast";
-import {
-  Download,
-  Copy,
-  LogOut,
-  MessageSquare,
-  Terminal,
-  Code,
-  Share2,
-  Settings,
-  Users,
-  LayoutDashboard,
-  Zap
-} from "lucide-react";
 import "react-reflex/styles.css";
 
 import ACTIONS from "../Action";
@@ -27,7 +14,6 @@ import ChatWindow from "../components/chatWindow";
 import OutputWindow from "../components/outputWindow";
 import SettingsModal from "../components/SettingsModal";
 import GistModal from "../components/GistModal";
-import { Github } from "lucide-react";
 import Client from "../components/clients";
 import { LANGUAGES, THEMES } from "../config";
 import { useAuth } from "../context/AuthContext";
@@ -40,18 +26,18 @@ import { resolveTheme, setThemePref } from "../utils/theme";
 import "../styles/app.css";
 import LoadingScreen from "../components/LoadingScreen";
 import SnippetModal from "../components/SnippetModal";
-import { ImportIcon, PencilLine } from "lucide-react";
 import WhiteboardModal from "../components/WhiteboardModal";
 import AICopilotModal from "../components/AICopilotModal";
 import DiffViewerModal from "../components/DiffViewerModal";
 import AnalyticsDashboardModal from "../components/AnalyticsDashboardModal";
 import FocusModeModal from "../components/FocusModeModal";
-import { History, Activity, Video as VideoIcon, LayoutTemplate, FileText } from "lucide-react";
-import RoomLayout, { useRoomLayout, LayoutMenu, CardHandle } from "../components/RoomLayout";
+import RoomLayout, { useRoomLayout, LayoutMenu, CardHandle, useDockSlot } from "../components/RoomLayout";
 import ProblemPane from "../components/ProblemPane";
 import { rememberRoom } from "../utils/recentRooms";
-import AiIcon from "../components/AiIcon";
+import Icon from "../components/icons/Icon";
 import VideoChat from "../components/VideoChat";
+import { useCallCarry } from "../context/CallCarry";
+import { getCallPrefs } from "../utils/callPrefs";
 import WorkspaceHeader from "../components/WorkspaceHeader";
 import CommandPalette from "../components/CommandPalette";
 import ShareModal from "../components/ShareModal";
@@ -138,24 +124,21 @@ function Editor() {
   const [isMeetingStarting, setIsMeetingStarting] = useState(false);
   // Call card in the layout: the card holds an empty slot and the (single) call window sits
   // exactly over it, so moving between docked and floating never restarts the call.
-  const [callSlot, setCallSlot] = useState(null);
-  const [callRect, setCallRect] = useState(null);
-  useEffect(() => {
-    if (!callSlot) { setCallRect(null); return undefined; }
-    const measure = () => {
-      const r = callSlot.getBoundingClientRect();
-      setCallRect((p) => (p && p.left === r.left && p.top === r.top && p.width === r.width && p.height === r.height
-        ? p : { left: r.left, top: r.top, width: r.width, height: r.height }));
-    };
-    measure();
-    const ro = new ResizeObserver(measure);
-    ro.observe(callSlot);
-    const area = callSlot.closest(".rl");
-    if (area) ro.observe(area);
-    window.addEventListener("resize", measure);
-    return () => { ro.disconnect(); window.removeEventListener("resize", measure); };
-  }, [callSlot]);
+  const [setCallSlot, callRect] = useDockSlot();
   const [mediaStates, setMediaStates] = useState({});
+
+  // "Keep calls on other pages": hand a running call to the app as this page closes, and
+  // take it back if it is still going when this room opens again.
+  const { carry: carryCall, claim: claimCall } = useCallCarry();
+  const leavingRef = useRef(false);
+  const carryRef = useRef(null);
+  carryRef.current = isMeetingActive ? { id: roomId, title: `room/${roomId}`, path: `/editor/${roomId}`, user: user || { name: userName || "Guest" } } : null;
+  useEffect(() => {
+    if (claimCall(roomId)) { setIsMeetingMinimized(false); setIsMeetingActive(true); }
+    return () => {
+      if (carryRef.current && !leavingRef.current && getCallPrefs().keepOnNavigate) carryCall(carryRef.current);
+    };
+  }, [roomId, carryCall, claimCall]);
 
   useEffect(() => {
     localStorage.setItem("app-editor-settings", JSON.stringify(settings));
@@ -492,6 +475,7 @@ function Editor() {
   };
 
   const leaveRoom = () => {
+    leavingRef.current = true; // leaving the room ends its call too
     socketRef.current?.emit(ACTIONS.LEAVE, { roomId });
     reactNavigator("/");
   };
@@ -591,10 +575,10 @@ function Editor() {
       if (isMeetingActive) return <div ref={setCallSlot} className="rl-call-slot" />;
       return (
         <div className="rl-call-empty">
-          <span className="rl-call-icon"><VideoIcon size={20} /></span>
+          <span className="rl-call-icon"><Icon name="call" size={20} /></span>
           <strong>No call running</strong>
           <span>Start a call and it plays here, next to your code.</span>
-          <button onClick={() => setIsMeetingActive(true)}><VideoIcon size={14} /> Start call</button>
+          <button onClick={() => setIsMeetingActive(true)}><Icon name="call" size={14} /> Start call</button>
         </div>
       );
     }
@@ -629,24 +613,24 @@ function Editor() {
         isExecuting={isExecuting}
         onToggleTheme={toggleTheme}
         actions={[
-          { id: "call", label: isMeetingActive ? "Leave call" : "Start voice & video call", icon: <VideoIcon size={18} />, onClick: () => setIsMeetingActive((v) => !v), active: isMeetingActive, tone: "green" },
-          { id: "board", label: "Whiteboard", icon: <PencilLine size={18} />, onClick: () => setShowWhiteboard(true) },
-          { id: "ai", label: "AI Copilot", icon: <AiIcon size={18} />, onClick: () => setShowAICopilot(true) },
-          { id: "share", label: "Invite people", icon: <Share2 size={18} />, onClick: () => setShowShare(true) },
-          { id: "history", label: "Version history", icon: <History size={18} />, onClick: () => setShowDiffViewer(true), section: "more" },
-          { id: "analytics", label: "Analytics", icon: <Activity size={18} />, onClick: () => setShowAnalytics(true), section: "more" },
+          { id: "call", label: isMeetingActive ? "Leave call" : "Start voice & video call", icon: <Icon name="call" size={20} filled={isMeetingActive} />, onClick: () => setIsMeetingActive((v) => !v), active: isMeetingActive, tone: "green" },
+          { id: "board", label: "Whiteboard", icon: <Icon name="whiteboard" size={20} />, onClick: () => setShowWhiteboard(true) },
+          { id: "ai", label: "AI Copilot", icon: <Icon name="ai" size={20} />, onClick: () => setShowAICopilot(true) },
+          { id: "share", label: "Invite people", icon: <Icon name="invite" size={20} />, onClick: () => setShowShare(true) },
+          { id: "history", label: "Version history", icon: <Icon name="history" size={20} />, onClick: () => setShowDiffViewer(true), section: "more" },
+          { id: "analytics", label: "Analytics", icon: <Icon name="analytics" size={20} />, onClick: () => setShowAnalytics(true), section: "more" },
           ...(user ? [
-            { id: "focus", label: "Focus mode", icon: <Zap size={18} />, onClick: () => setShowFocusModal(true), section: "more" },
-            { id: "snippet", label: "Import snippet", icon: <ImportIcon size={18} />, onClick: () => setShowSnippetModal(true), section: "more" },
+            { id: "focus", label: "Focus mode", icon: <Icon name="focus" size={20} />, onClick: () => setShowFocusModal(true), section: "more" },
+            { id: "snippet", label: "Import snippet", icon: <Icon name="snippet" size={20} />, onClick: () => setShowSnippetModal(true), section: "more" },
           ] : []),
-          { id: "gist", label: "Export to GitHub Gist", icon: <Github size={18} />, onClick: () => setShowGistModal(true), section: "more" },
-          { id: "download", label: "Download code", icon: <Download size={18} />, onClick: downloadCode, section: "more" },
-          { id: "copy", label: "Copy room ID", icon: <Copy size={18} />, onClick: copyRoomId, section: "more" },
-          { id: "viewer", label: "Copy spectator link", icon: <Users size={18} />, onClick: () => handleShare("viewer"), section: "more" },
-          { id: "palette", label: "Command palette", icon: <Zap size={18} />, onClick: () => setShowCommandPalette(true), section: "more", desktopOnly: true },
-          { id: "settings", label: "Editor settings", icon: <Settings size={18} />, onClick: () => setShowSettings(true), section: "more" },
-          ...(user ? [{ id: "dash", label: "Back to dashboard", icon: <LayoutDashboard size={18} />, onClick: () => reactNavigator("/dashboard"), section: "more" }] : []),
-          { id: "leave", label: "Leave room", icon: <LogOut size={18} />, onClick: leaveRoom, section: "more", tone: "red" },
+          { id: "gist", label: "Export to GitHub Gist", icon: <Icon name="github" size={20} />, onClick: () => setShowGistModal(true), section: "more" },
+          { id: "download", label: "Download code", icon: <Icon name="download" size={20} />, onClick: downloadCode, section: "more" },
+          { id: "copy", label: "Copy room ID", icon: <Icon name="copy" size={20} />, onClick: copyRoomId, section: "more" },
+          { id: "viewer", label: "Copy spectator link", icon: <Icon name="spectator" size={20} />, onClick: () => handleShare("viewer"), section: "more" },
+          { id: "palette", label: "Command palette", icon: <Icon name="palette" size={20} />, onClick: () => setShowCommandPalette(true), section: "more", desktopOnly: true },
+          { id: "settings", label: "Editor settings", icon: <Icon name="settings" size={20} />, onClick: () => setShowSettings(true), section: "more" },
+          ...(user ? [{ id: "dash", label: "Back to dashboard", icon: <Icon name="dashboard" size={20} />, onClick: () => reactNavigator("/dashboard"), section: "more" }] : []),
+          { id: "leave", label: "Leave room", icon: <Icon name="leave-room" size={20} />, onClick: leaveRoom, section: "more", tone: "red" },
         ]}
       />
 
@@ -711,19 +695,19 @@ function Editor() {
                 {/* MOBILE BOTTOM NAV */}
                 <nav className="ws-tabbar" aria-label="Room">
                   {[
-                    { id: "problem", icon: <FileText size={19} />, label: "Problem" },
-                    { id: "code", icon: <Code size={19} />, label: "Code" },
-                    { id: "output", icon: <Terminal size={19} />, label: "I/O" },
-                    { id: "chat", icon: <MessageSquare size={19} />, label: "Chat" },
-                    { id: "people", icon: <Users size={19} />, label: "People" }
+                    { id: "problem", icon: "problem", label: "Problem" },
+                    { id: "code", icon: "code", label: "Code" },
+                    { id: "output", icon: "terminal", label: "I/O" },
+                    { id: "chat", icon: "chat", label: "Chat" },
+                    { id: "people", icon: "people", label: "People" }
                   ].map((tab) => (
                     <button key={tab.id} className={activeTab === tab.id ? "on" : ""} onClick={() => setActiveTab(tab.id)}>
-                      {tab.icon}<span>{tab.label}</span>
+                      <Icon name={tab.icon} size={20} filled={activeTab === tab.id} /><span>{tab.label}</span>
                       {tab.id === "chat" && unreadChatCount > 0 && <span className="u-count">{unreadChatCount}</span>}
                     </button>
                   ))}
                   <button onClick={() => setShowSettings(true)}>
-                    <Settings size={19} /><span>Settings</span>
+                    <Icon name="settings" size={20} /><span>Settings</span>
                   </button>
                 </nav>
               </div>
@@ -753,17 +737,17 @@ function Editor() {
             <span>{clients.length} online</span>
             <span className="rl-anchor">
               <button className={showLayoutMenu ? "on" : ""} onClick={() => setShowLayoutMenu((v) => !v)} aria-expanded={showLayoutMenu}>
-                <LayoutTemplate size={12} /> layout
+                <Icon name="layout" size={12} filled={showLayoutMenu} /> layout
               </button>
               {showLayoutMenu && <LayoutMenu state={roomLayout} onClose={() => setShowLayoutMenu(false)} />}
             </span>
             <button className={roomLayout.has("problem") ? "on" : ""} onClick={() => roomLayout.toggle("problem")}>
-              <FileText size={12} /> problem
+              <Icon name="problem" size={12} filled={roomLayout.has("problem")} /> problem
             </button>
             <button className={!isChatCollapsed ? "on" : ""} onClick={() => setIsChatCollapsed(!isChatCollapsed)}>
-              <MessageSquare size={12} /> chat{isChatCollapsed && unreadChatCount > 0 ? ` (${unreadChatCount})` : ""}
+              <Icon name="chat" size={12} filled={!isChatCollapsed} /> chat{isChatCollapsed && unreadChatCount > 0 ? ` (${unreadChatCount})` : ""}
             </button>
-            <button onClick={() => setShowShare(true)}><Share2 size={12} /> invite</button>
+            <button onClick={() => setShowShare(true)}><Icon name="invite" size={12} /> invite</button>
           </div>
         </footer>
       )}
@@ -786,8 +770,6 @@ function Editor() {
             }}
             clients={clients}
             mediaStates={mediaStates}
-            initialAudioState={true}
-            initialVideoState={true}
             isMobile={isMobile}
           />
         </div>
@@ -863,19 +845,19 @@ function Editor() {
         onClose={() => setShowCommandPalette(false)}
         isLightMode={isLightMode}
         actions={[
-          { id: "run", label: "Run code", category: "Actions", shortcut: "Ctrl Enter", icon: <Terminal size={16} />, run: handleCompile },
-          { id: "share", label: "Invite people", category: "Collaboration", icon: <Share2 size={16} />, run: () => setShowShare(true) },
-          { id: "viewer", label: "Copy spectator link", category: "Collaboration", icon: <Users size={16} />, run: () => handleShare("viewer") },
-          { id: "call", label: isMeetingActive ? "Leave call" : "Start voice & video call", category: "Collaboration", icon: <VideoIcon size={16} />, run: () => setIsMeetingActive((v) => !v) },
-          { id: "board", label: "Open whiteboard", category: "Collaboration", icon: <PencilLine size={16} />, run: () => setShowWhiteboard(true) },
-          { id: "ai", label: "Ask AI copilot", category: "Actions", icon: <AiIcon size={16} />, run: () => setShowAICopilot(true) },
-          { id: "history", label: "Version history & snapshots", category: "Actions", icon: <History size={16} />, run: () => setShowDiffViewer(true) },
-          { id: "focus", label: "Focus mode", category: "Actions", shortcut: "Alt F", icon: <Zap size={16} />, run: () => setShowFocusModal(true) },
-          { id: "download", label: "Download code", category: "Actions", icon: <Download size={16} />, run: downloadCode },
-          { id: "gist", label: "Export to GitHub gist", category: "Actions", icon: <Github size={16} />, run: () => setShowGistModal(true) },
-          { id: "settings", label: "Editor settings", category: "Settings", icon: <Settings size={16} />, run: () => setShowSettings(true) },
-          { id: "theme", label: isLightMode ? "Switch to dark theme" : "Switch to light theme", category: "Settings", icon: <Settings size={16} />, run: toggleTheme },
-          { id: "leave", label: "Leave room", category: "Actions", icon: <LogOut size={16} />, run: leaveRoom },
+          { id: "run", label: "Run code", category: "Actions", shortcut: "Ctrl Enter", icon: <Icon name="run" size={16} />, run: handleCompile },
+          { id: "share", label: "Invite people", category: "Collaboration", icon: <Icon name="invite" size={16} />, run: () => setShowShare(true) },
+          { id: "viewer", label: "Copy spectator link", category: "Collaboration", icon: <Icon name="spectator" size={16} />, run: () => handleShare("viewer") },
+          { id: "call", label: isMeetingActive ? "Leave call" : "Start voice & video call", category: "Collaboration", icon: <Icon name="call" size={16} />, run: () => setIsMeetingActive((v) => !v) },
+          { id: "board", label: "Open whiteboard", category: "Collaboration", icon: <Icon name="whiteboard" size={16} />, run: () => setShowWhiteboard(true) },
+          { id: "ai", label: "Ask AI copilot", category: "Actions", icon: <Icon name="ai" size={16} />, run: () => setShowAICopilot(true) },
+          { id: "history", label: "Version history & snapshots", category: "Actions", icon: <Icon name="history" size={16} />, run: () => setShowDiffViewer(true) },
+          { id: "focus", label: "Focus mode", category: "Actions", shortcut: "Alt F", icon: <Icon name="focus" size={16} />, run: () => setShowFocusModal(true) },
+          { id: "download", label: "Download code", category: "Actions", icon: <Icon name="download" size={16} />, run: downloadCode },
+          { id: "gist", label: "Export to GitHub gist", category: "Actions", icon: <Icon name="github" size={16} />, run: () => setShowGistModal(true) },
+          { id: "settings", label: "Editor settings", category: "Settings", icon: <Icon name="settings" size={16} />, run: () => setShowSettings(true) },
+          { id: "theme", label: isLightMode ? "Switch to dark theme" : "Switch to light theme", category: "Settings", icon: <Icon name={isLightMode ? "theme-dark" : "theme-light"} size={16} />, run: toggleTheme },
+          { id: "leave", label: "Leave room", category: "Actions", icon: <Icon name="leave-room" size={16} />, run: leaveRoom },
         ]}
       />
 

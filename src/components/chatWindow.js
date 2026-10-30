@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
-import { Send, Smile, Edit2, Trash2, X, Check } from "lucide-react";
+import Icon from "./icons/Icon";
 import { v4 as uuidv4 } from "uuid";
 import EmojiPicker, { SuggestionMode } from "emoji-picker-react";
 import ACTIONS from "../Action";
@@ -106,8 +106,8 @@ export default function ChatWindow({ socketRef, roomId, userName, isLightMode, i
                                             onKeyDown={(e) => { if (e.key === 'Enter') handleEditMessage(msg.id); if (e.key === 'Escape') setEditingMsgId(null); }}
                                             aria-label="Edit message"
                                         />
-                                        <button className="u-icon" onClick={() => handleEditMessage(msg.id)} aria-label="Save edit"><Check size={15} /></button>
-                                        <button className="u-icon" onClick={() => setEditingMsgId(null)} aria-label="Cancel edit"><X size={15} /></button>
+                                        <button className="u-icon" onClick={() => handleEditMessage(msg.id)} aria-label="Save edit"><Icon name="check" size={16} /></button>
+                                        <button className="u-icon" onClick={() => setEditingMsgId(null)} aria-label="Cancel edit"><Icon name="close" size={16} /></button>
                                     </div>
                                 ) : (
                                     <div className="cw-row">
@@ -117,8 +117,8 @@ export default function ChatWindow({ socketRef, roomId, userName, isLightMode, i
                                         </div>
                                         {isMe && (
                                             <div className="cw-actions">
-                                                <button className="u-icon" onClick={() => { setEditingMsgId(msg.id); setEditMsgText(msg.text); }} aria-label="Edit message" title="Edit"><Edit2 size={13} /></button>
-                                                <button className="u-icon u-icon--danger" onClick={() => handleDeleteMessage(msg.id)} aria-label="Delete message" title="Delete"><Trash2 size={13} /></button>
+                                                <button className="u-icon" onClick={() => { setEditingMsgId(msg.id); setEditMsgText(msg.text); }} aria-label="Edit message" title="Edit"><Icon name="edit" size={14} /></button>
+                                                <button className="u-icon u-icon--danger" onClick={() => handleDeleteMessage(msg.id)} aria-label="Delete message" title="Delete"><Icon name="delete" size={14} /></button>
                                             </div>
                                         )}
                                     </div>
@@ -144,7 +144,7 @@ export default function ChatWindow({ socketRef, roomId, userName, isLightMode, i
                 )}
                 <div className="cw-input">
                     <button className={`u-icon${showEmojiPicker ? " on" : ""}`} onClick={() => setShowEmojiPicker(!showEmojiPicker)} aria-label="Insert emoji" title="Emoji">
-                        <Smile size={18} />
+                        <Icon name="emoji" size={20} />
                     </button>
                     <input
                         type="text"
@@ -155,7 +155,7 @@ export default function ChatWindow({ socketRef, roomId, userName, isLightMode, i
                         aria-label="Message"
                     />
                     <button className="cw-send" onClick={sendMessage} disabled={!inputMsg.trim()} aria-label="Send message" title="Send (Enter)">
-                        <Send size={15} />
+                        <Icon name="send" size={16} />
                     </button>
                 </div>
             </div>
