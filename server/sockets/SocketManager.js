@@ -1,6 +1,7 @@
 const ACTIONS = require('../../src/Action');
 const setupEditorSocket = require('./EditorSocket');
 const setupWhiteboardSocket = require('./WhiteboardSocket');
+const { pauseWhiteboardSim } = setupWhiteboardSocket;
 const setupProblemSocket = require('./ProblemSocket');
 const setupMediaSocket = require('./MediaSocket');
 const { createPairingTracker } = require('./pairingTracker');
@@ -13,6 +14,7 @@ const userPhotoMap = {};
 const socketMeta = {};
 const roomChatHistory = {};
 const roomWhiteboardState = {};
+const roomWhiteboardSim = {}; // roomId -> simulate-mode inputs and clock
 const roomProblemState = {}; // roomId -> { text, by, at }
 
 function safeSocket(handler) {
@@ -68,6 +70,7 @@ function initializeSockets(io) {
         userPhotoMap,
         roomChatHistory,
         roomWhiteboardState,
+        roomWhiteboardSim,
         roomProblemState,
         getAllClients,
         access,
@@ -102,7 +105,10 @@ function initializeSockets(io) {
                 // Last person out: free the in-memory chat (it's in the database). Guest rooms
                 // are not deleted here; a refresh would wipe them. jobs/cleanup.js removes
                 // unused guest rooms after GUEST_ROOM_TTL_HOURS.
-                if (remaining.length <= 1) delete roomChatHistory[roomId];
+                if (remaining.length <= 1) {
+                    delete roomChatHistory[roomId];
+                    pauseWhiteboardSim(roomWhiteboardSim, roomId);
+                }
             });
             access.drop(socket);
             delete userSocketMap[socket.id];

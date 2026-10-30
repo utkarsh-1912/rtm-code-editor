@@ -2094,6 +2094,44 @@ a.an-link:hover .an-text { color: var(--u-ink); }
 .wb-ctx-swatches button { width: 22px; height: 22px; border-radius: 50%; border: 2px solid transparent; background: var(--sw); cursor: pointer; padding: 0; box-shadow: inset 0 0 0 1px rgba(0,0,0,.15); }
 .wb-ctx-swatches button.on { box-shadow: 0 0 0 2px var(--wb-accent); }
 
+/* Properties popover (capacity for simulate mode) */
+.wb-props { position: absolute; left: 0; top: calc(100% + 8px); width: 272px; display: flex; flex-direction: column; gap: 10px; padding: 12px; border: 1px solid var(--wb-line); border-radius: 12px; background: var(--wb-panel); box-shadow: 0 10px 28px rgba(0,0,0,.28); }
+.wb-props--end { left: auto; right: 0; }
+.wb-props--up { top: auto; bottom: calc(100% + 8px); }
+.wb-props { max-height: min(70vh, 420px); overflow-y: auto; }
+.wb-props-h { font-size: 12.5px; font-weight: 600; }
+.wb-props-empty { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
+.wb-props-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.wb-props-grid label { display: flex; flex-direction: column; gap: 3px; font-size: 11px; color: var(--wb-ink-2); }
+.wb-props-grid input { width: 100%; height: 28px; padding: 0 8px; border: 1px solid var(--wb-line); border-radius: 7px; background: var(--wb-bg); color: var(--wb-ink); font: 12px/1 ui-monospace, "SF Mono", Menlo, monospace; }
+.wb-props-grid input:focus { outline: none; border-color: var(--wb-accent); }
+.wb-props-grid input::placeholder { color: var(--wb-ink-2); opacity: .6; }
+.wb-props-empty button, .wb-props-clear { height: 28px; padding: 0 10px; border: 1px solid var(--wb-line); border-radius: 8px; background: transparent; color: var(--wb-ink); font: inherit; font-size: 12px; cursor: pointer; }
+.wb-props-empty button { background: var(--wb-accent); border-color: transparent; color: #fff; }
+.wb-props-clear { align-self: flex-start; color: var(--wb-ink-2); }
+.wb-props-empty button:hover, .wb-props-clear:hover { filter: brightness(1.1); background-color: var(--wb-line); }
+.wb-props-empty button:hover { background-color: var(--wb-accent); }
+
+/* Simulate controls in the header, and the bottleneck line under them */
+.wb-sim { display: flex; align-items: center; gap: 8px; min-width: 0; margin-left: 8px; }
+.wb-sim > button { height: 30px; min-width: 30px; padding: 0 9px; display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--wb-line); border-radius: 8px; background: transparent; color: var(--wb-ink); font: inherit; font-size: 12.5px; cursor: pointer; }
+.wb-sim > button:hover { background: var(--wb-line); }
+.wb-sim > button.on { background: color-mix(in srgb, var(--wb-accent) 18%, transparent); border-color: transparent; color: var(--wb-accent); }
+.wb-sim input[type="range"] { width: 140px; min-width: 60px; accent-color: var(--wb-accent); }
+.wb-sim-load, .wb-sim-time { font: 11.5px/1 ui-monospace, "SF Mono", Menlo, monospace; color: var(--wb-ink-2); white-space: nowrap; }
+.wb-sim-load { min-width: 74px; color: var(--wb-ink); }
+.wb-simnote { position: absolute; left: 16px; top: 12px; z-index: 14; max-width: min(560px, calc(100% - 296px)); padding: 7px 12px; border: 1px solid var(--wb-line); border-radius: 10px; background: var(--wb-panel); box-shadow: 0 6px 18px rgba(0,0,0,.18); font-size: 12.5px; line-height: 1.4; color: var(--wb-ink); }
+@media (max-width: 700px) {
+  /* Their own row under the title, so they never run into the header buttons */
+  .wb-top { flex-wrap: wrap; height: auto; flex: 0 0 auto; min-height: 48px; row-gap: 0; padding-bottom: 6px; }
+  .wb-top > strong, .wb-top-actions { height: 42px; display: flex; align-items: center; }
+  .wb-sim { order: 3; flex: 1 0 100%; gap: 8px; margin-left: 0; }
+  .wb-sim-label { display: none; }
+  .wb-sim input[type="range"] { flex: 1; width: auto; }
+  .wb-sim-load { min-width: 0; }
+  .wb-simnote { left: 10px; top: 10px; max-width: calc(100% - 20px); font-size: 12px; }
+}
+
 /* Shape library sits under the header on the right, clear of the dock */
 .wb-lib { top: 12px; }
 @media (max-width: 700px) {
@@ -2558,3 +2596,25 @@ button.dk-get { border: 0; background: transparent; padding: 0; font: inherit; f
 }
 .term-note { display: flex; align-items: center; gap: 8px; }
 .term-note .u-icon { margin-left: auto; }
+
+/* Text style popover in the selection toolbar */
+.wb-textmenu { flex-direction: column; gap: 8px; }
+.wb-textmenu-row { display: flex; align-items: center; gap: 2px; }
+.wb-textmenu-row > i { width: 1px; height: 18px; margin: 0 4px; background: var(--wb-line); }
+.wb-textmenu-row button, .wb-textmenu .wb-seg button { width: auto; min-width: 28px; height: 28px; display: grid; place-items: center; border: 0; border-radius: 7px; background: transparent; color: var(--wb-ink); box-shadow: none; cursor: pointer; }
+.wb-textmenu-row button.on { background: color-mix(in srgb, var(--wb-accent) 18%, transparent); color: var(--wb-accent); }
+.wb-textmenu .wb-seg button.on { background: var(--wb-panel); color: var(--wb-ink); box-shadow: 0 1px 3px rgba(0,0,0,.18); }
+
+/* "Change shape" menu in the selection toolbar (reuses the shape library's rows) */
+.wb-shapemenu { flex-direction: column; gap: 6px; width: 264px; max-height: min(60vh, 420px); overflow-y: auto; }
+.wb-shapemenu .wb-lib-h { margin: 2px 2px 0; }
+.wb-shapemenu .wb-lib-shapes { margin-bottom: 4px; }
+.wb-shapemenu .wb-lib-shapes button, .wb-shapemenu .wb-lib-blocks button { width: auto; border-radius: 9px; background: transparent; box-shadow: none; }
+.wb-shapemenu .wb-lib-shapes button { height: auto; padding: 6px 2px 5px; border: 1px solid transparent; }
+.wb-shapemenu .wb-lib-blocks button { height: 28px; padding: 0 9px; border: 1px solid var(--wb-line); border-radius: 999px; }
+.wb-shapemenu .wb-lib-shapes button:hover, .wb-shapemenu .wb-lib-blocks button:hover { background: var(--wb-line); }
+.wb-shapemenu button.on { border-color: var(--wb-accent); background: color-mix(in srgb, var(--wb-accent) 12%, transparent); box-shadow: none; }
+
+/* Group toolbar */
+.wb-ctx-count { min-width: 22px; padding: 0 4px; text-align: center; font: 600 11.5px/1 ui-monospace, "SF Mono", Menlo, monospace; color: var(--wb-ink-2); }
+.wb-ctx > button:disabled { opacity: .35; cursor: default; background: transparent; }

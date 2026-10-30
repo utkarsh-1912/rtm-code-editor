@@ -1,0 +1,4 @@
+The simulation engine in ./engine is from Breakscale (https://github.com/xevrion/breakscale),
+src/sim/ at commit c58de51, MIT License, Copyright (c) 2026 Breakscale contributors.
+It is compiled from TypeScript to JavaScript; the presets, annotations and challenges are not included,
+and defaults.js holds only the per-kind default configuration from presets.ts. See ./engine/LICENSE.
