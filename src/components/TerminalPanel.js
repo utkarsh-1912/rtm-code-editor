@@ -17,7 +17,9 @@ export default function TerminalPanel({ dockKey, cwd, title, onClose }) {
         if (!supported) return undefined;
         let frame = 0;
         let last = "";
+        let ended = false; // the terminal closed itself ("exit"): never re-dock a new one
         const place = () => {
+            if (ended) return;
             cancelAnimationFrame(frame);
             frame = requestAnimationFrame(() => {
                 const el = slotRef.current;
@@ -40,7 +42,7 @@ export default function TerminalPanel({ dockKey, cwd, title, onClose }) {
         const poll = setInterval(place, 700);
         window.addEventListener("resize", place);
         document.addEventListener("visibilitychange", place);
-        const off = bridge.onTerminalClosed?.(({ key }) => { if (key === dockKey) onClose?.(); });
+        const off = bridge.onTerminalClosed?.(({ key }) => { if (key === dockKey) { ended = true; onClose?.(); } });
         return () => {
             cancelAnimationFrame(frame);
             ro.disconnect();
