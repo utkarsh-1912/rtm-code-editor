@@ -26,8 +26,8 @@ import EditorComp, { roomFileName } from "../components/editorComp";
 import ChatWindow from "../components/chatWindow";
 import OutputWindow from "../components/outputWindow";
 import SettingsModal from "../components/SettingsModal";
-import GistModal from "../components/GistModal";
-import { Github } from "lucide-react";
+import GitHubModal from "../components/GitHubModal";
+import GitHubIcon from "../components/GitHubIcon";
 import Client from "../components/clients";
 import { LANGUAGES, THEMES } from "../config";
 import { useAuth } from "../context/AuthContext";
@@ -129,7 +129,7 @@ function Editor() {
 
   // Editor Settings State
   const [showSettings, setShowSettings] = useState(false);
-  const [showGistModal, setShowGistModal] = useState(false);
+  const [showGitHub, setShowGitHub] = useState(false);
   const [settings, setSettings] = useState(() => {
     try {
       const saved = localStorage.getItem("app-editor-settings");
@@ -665,7 +665,7 @@ function Editor() {
             { id: "focus", label: "Focus mode", icon: <Zap size={18} />, onClick: () => setShowFocusModal(true), section: "more" },
             { id: "snippet", label: "Import snippet", icon: <ImportIcon size={18} />, onClick: () => setShowSnippetModal(true), section: "more" },
           ] : []),
-          { id: "gist", label: "Export to GitHub Gist", icon: <Github size={18} />, onClick: () => setShowGistModal(true), section: "more" },
+          { id: "github", label: "GitHub", icon: <GitHubIcon size={18} />, onClick: () => setShowGitHub(true), section: "more" },
           { id: "download", label: "Download code", icon: <Download size={18} />, onClick: downloadCode, section: "more" },
           { id: "copy", label: "Copy room ID", icon: <Copy size={18} />, onClick: copyRoomId, section: "more" },
           { id: "viewer", label: "Copy spectator link", icon: <Users size={18} />, onClick: () => handleShare("viewer"), section: "more" },
@@ -833,13 +833,13 @@ function Editor() {
         roomId={roomId}
         user={user}
       />
-      {showGistModal && (
-        <GistModal
-          isOpen={showGistModal}
-          onClose={() => setShowGistModal(false)}
-          code={codeRef.current}
-          language={language}
-          fileName={roomFileName(language)}
+      {showGitHub && (
+        <GitHubModal
+          isOpen={showGitHub}
+          onClose={() => setShowGitHub(false)}
+          source="room"
+          projectName={`room-${roomId}`}
+          currentFile={{ path: roomFileName(language), content: codeRef.current }}
         />
       )}
 
@@ -921,7 +921,7 @@ function Editor() {
           { id: "history", label: "Version history & snapshots", category: "Actions", icon: <History size={16} />, run: () => setShowDiffViewer(true) },
           { id: "focus", label: "Focus mode", category: "Actions", shortcut: "Alt F", icon: <Zap size={16} />, run: () => setShowFocusModal(true) },
           { id: "download", label: "Download code", category: "Actions", icon: <Download size={16} />, run: downloadCode },
-          { id: "gist", label: "Export to GitHub gist", category: "Actions", icon: <Github size={16} />, run: () => setShowGistModal(true) },
+          { id: "github", label: "GitHub: push, import or share as gist", category: "Actions", icon: <GitHubIcon size={16} />, run: () => setShowGitHub(true) },
           { id: "settings", label: "Editor settings", category: "Settings", icon: <Settings size={16} />, run: () => setShowSettings(true) },
           { id: "theme", label: isLightMode ? "Switch to dark theme" : "Switch to light theme", category: "Settings", icon: <Settings size={16} />, run: toggleTheme },
           { id: "leave", label: "Leave room", category: "Actions", icon: <LogOut size={16} />, run: leaveRoom },

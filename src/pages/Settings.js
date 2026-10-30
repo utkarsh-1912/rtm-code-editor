@@ -13,12 +13,15 @@ import { useSearchParams } from 'react-router-dom';
 import DesktopPanel from '../components/DesktopPanel';
 import DeviceList from '../components/DeviceList';
 import { IS_DESKTOP } from '../utils/desktop';
+import GitHubIcon from '../components/GitHubIcon';
+import { useGitHubStatus, connectGitHub, disconnectGitHub, CONNECTED_MESSAGE } from '../utils/github';
 
 const SECTIONS = [
     { id: 'profile', title: 'Profile' },
     { id: 'appearance', title: 'Appearance' },
     { id: 'billing', title: 'Plan & billing' },
     { id: 'notifications', title: 'Notifications' },
+    { id: 'connections', title: 'Connections' },
     { id: 'security', title: 'Security' },
     ...(IS_DESKTOP ? [{ id: 'desktop', title: 'Desktop app' }] : []),
 ];
@@ -68,6 +71,38 @@ const Settings = () => {
         const timers = [2500, 6000, 12000].map((ms) => setTimeout(reloadPlan, ms));
         return () => timers.forEach(clearTimeout);
     }, [params, reloadPlan]);
+    const github = useGitHubStatus(user, active === 'connections');
+    const [githubBusy, setGithubBusy] = useState(false);
+    useEffect(() => {
+        // Back from GitHub. In a popup opened by a room or project: tell it and close.
+        const result = params.get('github');
+        if (!result) return;
+        if (window.opener && !window.opener.closed) {
+            try {
+                window.opener.postMessage({ type: CONNECTED_MESSAGE, status: result }, window.location.origin);
+                window.close();
+                return;
+            } catch { /* opener on another origin: stay here */ }
+        }
+        if (result === 'connected') toast.success('GitHub connected');
+        else toast.error(params.get('reason') || 'Could not connect GitHub');
+    }, [params]);
+    const connectGithub = async () => {
+        setGithubBusy(true);
+        try { await connectGitHub({ popup: false }); } catch (err) { toast.error(err.message); setGithubBusy(false); }
+    };
+    const disconnectGithub = async () => {
+        setGithubBusy(true);
+        try {
+            await disconnectGitHub();
+            toast.success('GitHub disconnected');
+            await github.reload();
+        } catch (err) {
+            toast.error(err.message);
+        } finally {
+            setGithubBusy(false);
+        }
+    };
     const [saving, setSaving] = useState(false);
     const [profile, setProfile] = useState({ name: user?.name || '', bio: '', socials: { twitter: '', github: '' } });
     const [theme, setTheme] = useState(getThemePref);
@@ -315,6 +350,30 @@ const Settings = () => {
                                     </li>
                                 </ul>
                             )}
+                        </div>
+                    )}
+
+                    {active === 'connections' && (
+                        <div className="u-card u-enter">
+                            <div className="g-panel-head"><strong>Accounts</strong><span className="u-label">{github.status?.connected ? 'Connected' : 'Not connected'}</span></div>
+                            <ul className="g-rules">
+                                <li>
+                                    <span><GitHubIcon size={16} filled={!!github.status?.connected} /></span>
+                                    <div>
+                                        <h5>GitHub{github.status?.connected ? ` · @${github.status.login}` : ''}</h5>
+                                        <p>
+                                            {!github.status && (github.error || 'Checking…')}
+                                            {github.status && !github.status.configured && 'GitHub is not set up on this server yet.'}
+                                            {github.status?.configured && !github.status.connected && 'Push rooms and projects to repositories, import repositories, keep projects in sync and share gists.'}
+                                            {github.status?.connected && 'Used for push, import, sync and gists from rooms and projects. Your token stays on the CoLabs server.'}
+                                        </p>
+                                        {github.status?.connected && <div className="g-cap">scopes: {github.status.scopes || 'none'}</div>}
+                                    </div>
+                                    {github.status?.configured && (github.status.connected
+                                        ? <button className="u-btn u-btn--ghost u-btn--sm" onClick={disconnectGithub} disabled={githubBusy}>Disconnect</button>
+                                        : <button className="u-btn u-btn--solid u-btn--sm" onClick={connectGithub} disabled={githubBusy}>Connect</button>)}
+                                </li>
+                            </ul>
                         </div>
                     )}
 
