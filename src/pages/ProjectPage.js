@@ -61,6 +61,8 @@ import {
 } from "lucide-react";
 import { bundleWebProject } from "../utils/webBundle";
 import AiIcon from "../components/AiIcon";
+import GitHubIcon from "../components/GitHubIcon";
+import GitHubModal from "../components/GitHubModal";
 import { pickFiles, pickFolder, uploadFiles, describeSkipped, saveToDisk, openTerminal, rootFor, linkRoot, canWriteToDisk, canOpenTerminal } from "../utils/localFiles";
 
 const SIDE_TABS = [
@@ -104,6 +106,8 @@ const ProjectPage = () => {
     const [showDiffViewer, setShowDiffViewer] = useState(false);
     const [showAnalytics, setShowAnalytics] = useState(false);
     const [showFocusModal, setShowFocusModal] = useState(false);
+    const [showGitHub, setShowGitHub] = useState(false);
+    const reloadFilesRef = useRef(null);
 
 
     // New Lobby States
@@ -563,6 +567,9 @@ const ProjectPage = () => {
                     setMediaStates(prev => ({ ...prev, [userId]: { ...prev[userId], ...state } }));
                 });
 
+                // A teammate pulled from GitHub: the files changed on the server.
+                socketRef.current.on('project-files-synced', () => reloadFilesRef.current?.());
+
                 socketRef.current.on('project-renamed', ({ name }) => {
                     if (name) setProject((p) => (p ? { ...p, name } : p));
                 });
@@ -910,6 +917,17 @@ const ProjectPage = () => {
         { id: 'add-folder', label: 'Add folder from disk', icon: <FolderOpen size={18} />, onClick: () => handleAddFromDisk('folder'), section: 'more' },
     ];
     compileRef.current = handleCompile;
+
+    // Re-read files after a GitHub import or pull wrote them on the server.
+    reloadFilesRef.current = async () => {
+        const res = await fetch(`${getBackendUrl()}/api/projects/${projectId}/files`);
+        if (!res.ok) return;
+        const fresh = await res.json();
+        const byId = new Map(fresh.map((f) => [f.id, f]));
+        setFiles(fresh);
+        setOpenFiles((prev) => prev.filter((f) => byId.has(f.id)).map((f) => byId.get(f.id)));
+        setActiveFile((prev) => (prev && byId.get(prev.id)) || fresh.find((f) => !f.is_directory) || null);
+    };
     saveDiskRef.current = () => handleSaveToDisk(false);
 
 
@@ -1036,6 +1054,7 @@ const ProjectPage = () => {
                         { id: 'search', label: 'Command palette', icon: <Search size={18} />, onClick: () => setShowCommandPalette(true), section: 'more' },
                         { id: 'focus', label: 'Focus mode', icon: <Zap size={18} />, onClick: () => setShowFocusModal(true), section: 'more' },
                         { id: 'history', label: 'Version history', icon: <History size={18} />, onClick: () => setShowDiffViewer(true), section: 'more' },
+                        { id: 'github', label: 'GitHub', icon: <GitHubIcon size={18} />, onClick: () => setShowGitHub(true), section: 'more' },
                         { id: 'analytics', label: 'Analytics', icon: <Activity size={18} />, onClick: () => setShowAnalytics(true), section: 'more' },
                         { id: 'dash', label: 'Back to dashboard', icon: <Layout size={18} />, onClick: () => navigate('/dashboard'), section: 'more' },
                     ]}
@@ -1239,6 +1258,19 @@ const ProjectPage = () => {
                 fileName={activeFile?.name || 'main.js'}
                 isLightMode={isLightMode}
             />
+
+            {showGitHub && (
+                <GitHubModal
+                    isOpen={showGitHub}
+                    onClose={() => setShowGitHub(false)}
+                    source="project"
+                    projectId={projectId}
+                    projectName={project?.name}
+                    getFiles={() => filesRef.current.filter((f) => !f.is_directory).map((f) => ({ path: f.path || f.name, content: f.content || '' }))}
+                    currentFile={activeFile ? { path: activeFile.path || activeFile.name, content: activeFile.content || '' } : null}
+                    onFilesChanged={() => reloadFilesRef.current?.()}
+                />
+            )}
 
             <InviteModal
                 isOpen={showInviteModal}

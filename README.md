@@ -61,6 +61,12 @@ REACT_APP_ONESIGNAL_APP_ID=…         # same app id, for the web build
 SUPPORT_EMAIL=you@yourdomain.com
 APP_URL=http://localhost:3000
 
+# GitHub integration (optional; see docs/GITHUB_INTEGRATION.md)
+GITHUB_CLIENT_ID=…                   # GitHub OAuth app
+GITHUB_CLIENT_SECRET=…
+GITHUB_TOKEN_ENCRYPTION_KEY=…        # any long random string: openssl rand -base64 32
+# GITHUB_CALLBACK_URL=http://localhost:5000/api/github/callback   # defaults to <this server>/api/github/callback
+
 # Web app
 REACT_APP_BACKEND_URL=http://localhost:5000
 # REACT_APP_RUNNER_URL=http://localhost:5050/api   # only if the runner runs as its own service
@@ -153,6 +159,8 @@ npm run dist              # bundle-web + installers for the current OS into desk
 **Releases:** `npm run release -- 1.2.0` bumps the web and desktop versions, commits and tags `v1.2.0`; `git push --follow-tags` then runs [`.github/workflows/release.yml`](.github/workflows/release.yml): it checks the server, builds the web app (with the `REACT_APP_FIREBASE_*`, `REACT_APP_TURN_*` and `REACT_APP_RUNNER_URL` repository secrets or variables) and bundles it into the installers, builds `Utkristi-CoLabs-win-x64.exe`, `Utkristi-CoLabs-mac-universal.dmg`, `Utkristi-CoLabs-linux-x64.AppImage` and `.deb`, publishes one GitHub release with `SHA256SUMS.txt`, and (if the `RENDER_DEPLOY_HOOK` secret is set) redeploys the site. The [download page](https://utkristi-colabs.onrender.com/download) reads the latest release through `/api/release/latest` (cached, with a direct GitHub fallback) and links to the right file for your OS. Without the Firebase settings the installers skip the bundled UI and open the hosted site instead. Builds are unsigned until signing certificates are added as repository secrets, so SmartScreen and Gatekeeper ask once before the first launch.
 
 **Plans and billing:** prices and limits live in [`src/shared/plans.json`](src/shared/plans.json), used by both the server and the pricing page. Upgrades use Stripe Checkout (14-day trial), changes and cancellations use the Stripe customer portal, and the webhook is the only thing that writes a user's plan. Set `STRIPE_SECRET_KEY` and `STRIPE_WEBHOOK_SECRET` on the server, `APP_URL` to the public site URL, and point a Stripe webhook at `/api/billing/webhook` for `checkout.session.completed` and `customer.subscription.created|updated|deleted`. Prices are created inline, so there are no Stripe products to set up. Billing endpoints verify the caller's Firebase ID token with `FIREBASE_API_KEY` (falls back to `REACT_APP_FIREBASE_API_KEY`). Without Stripe keys the app runs normally and checkout answers "Billing is not configured". The go-to-market plan is in [`docs/MARKETING_PLAN.md`](docs/MARKETING_PLAN.md).
+
+**GitHub:** connect a GitHub account in Settings > Connections (an OAuth app with the `repo` and `gist` scopes), then use **GitHub** in a room's or project's ⋯ menu to push files as one commit to a new or existing repository, import a repository folder into a project, keep a project in two-way sync with a branch (changes on each side, pull with a conflict notice, commit and push), or share code as a gist. Tokens are stored encrypted on the server and every GitHub call goes through `/api/github/*`. Setup is in [`docs/GITHUB_INTEGRATION.md`](docs/GITHUB_INTEGRATION.md).
 
 **Notifications and email fallback:** set `ONESIGNAL_APP_ID` and `ONESIGNAL_REST_API_KEY` (server) plus `REACT_APP_ONESIGNAL_APP_ID` (web build) to enable push. Users are linked by their Firebase uid, and Settings > Notifications has the opt-in switch and a test button. The installed desktop app shows native notifications instead. Email goes Brevo first, then OneSignal email (`ONESIGNAL_FROM_EMAIL`, `ONESIGNAL_FROM_NAME`; the sender domain must be verified in OneSignal), then Resend if `RESEND_API_KEY` is set.
 

@@ -19,6 +19,7 @@ const aiRoutes = require("./server/routes/aiRoutes");
 const snapshotRoutes = require("./server/routes/snapshotRoutes");
 const analyticsRoutes = require("./server/routes/analyticsRoutes");
 const billingRoutes = require("./server/routes/billingRoutes");
+const githubRoutes = require("./server/routes/githubRoutes");
 const { createRunnerRouter } = require("./server/runner/router");
 const health = require("./server/health");
 
@@ -37,10 +38,10 @@ app.set('io', io); // routes can notify rooms (e.g. a rename)
 
 // Middleware
 app.use(cors());
-// Bulk file imports parse their own (larger) bodies; everything else gets 2 MB.
+// Bulk file imports and GitHub pushes parse their own (larger) bodies; everything else gets 2 MB.
 const jsonBody = express.json({ limit: '2mb' });
 // The Stripe webhook needs the untouched raw body to verify its signature.
-app.use((req, res, next) => (req.path.endsWith('/files/bulk') || req.path === '/api/billing/webhook' ? next() : jsonBody(req, res, next)));
+app.use((req, res, next) => (req.path.endsWith('/files/bulk') || req.path.startsWith('/api/github/') || req.path === '/api/billing/webhook' ? next() : jsonBody(req, res, next)));
 
 // Request Logging Middleware
 app.use((req, res, next) => {
@@ -73,6 +74,7 @@ app.use('/api', aiRoutes);
 app.use('/api', snapshotRoutes);
 app.use('/api', analyticsRoutes);
 app.use('/api', billingRoutes);
+app.use('/api', githubRoutes);
 
 // Serve static React build files in production
 if (process.env.NODE_ENV === 'production') {

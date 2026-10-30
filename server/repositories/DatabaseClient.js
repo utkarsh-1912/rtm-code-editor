@@ -165,6 +165,33 @@ async function initializeSchema() {
         );
         `;
 
+        // GitHub integration: one encrypted OAuth token per user, and project <-> repo links.
+        await sql`
+        CREATE TABLE IF NOT EXISTS github_connections (
+            user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+            gh_login VARCHAR(100) NOT NULL,
+            token_encrypted TEXT NOT NULL,
+            scopes VARCHAR(255) DEFAULT '',
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+        );
+        `;
+        // A project synced with a repo: the folder `path` on `branch` maps to the project root,
+        // `base_sha` is the commit both sides last agreed on, and `skipped` lists repo files the
+        // project can't hold (binary, over 1 MB), so their absence is not read as a deletion.
+        await sql`
+        CREATE TABLE IF NOT EXISTS github_links (
+            project_id INTEGER PRIMARY KEY REFERENCES projects(id) ON DELETE CASCADE,
+            owner VARCHAR(100) NOT NULL,
+            repo VARCHAR(100) NOT NULL,
+            branch VARCHAR(255) NOT NULL,
+            path VARCHAR(500) DEFAULT '',
+            base_sha VARCHAR(40) NOT NULL,
+            skipped JSONB DEFAULT '[]'::jsonb,
+            linked_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+            updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+        );
+        `;
+
         // Ensure missing columns exist for backward compatibility with existing databases
         await sql`ALTER TABLE sessions ADD COLUMN IF NOT EXISTS session_id VARCHAR(255);`;
         // Device list: a custom name per device, and soft revocation so a removed device

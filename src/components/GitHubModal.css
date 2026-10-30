@@ -1,0 +1,51 @@
+/* GitHub modal: push, import, sync, gist. Built on the .u-* primitives in styles/app.css. */
+.gh-form { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.gh-two { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.gh-lede { margin: 0; font-size: 13.5px; line-height: 1.5; }
+.gh-empty { margin: 0; font-size: 14px; }
+
+.gh-tabs { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.gh-login { font-size: 12px; }
+
+.gh-actions { display: flex; align-items: center; justify-content: flex-end; gap: 10px; flex-wrap: wrap; }
+.gh-actions > .u-hint:first-child { margin-right: auto; }
+.gh-actions--start { justify-content: flex-start; }
+.gh-actions--start > .u-hint:first-child { margin-right: 0; }
+
+.gh-check { display: flex; align-items: flex-start; gap: 10px; font-size: 13.5px; color: var(--u-ink); cursor: pointer; }
+.gh-check input { margin-top: 3px; accent-color: var(--u-accent); }
+
+.gh-connect { display: flex; flex-direction: column; align-items: flex-start; gap: 14px; }
+.gh-connect p { margin: 0; font-size: 14px; line-height: 1.55; color: var(--u-ink-2); }
+.gh-connect-mark { width: 44px; height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center; background: var(--u-tint); color: var(--u-ink); }
+
+.gh-done { display: flex; flex-direction: column; align-items: flex-start; gap: 12px; }
+.gh-done p { margin: 0; font-size: 14px; line-height: 1.55; }
+
+.gh-linkbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 12px; border: 1px solid var(--u-line); border-radius: 12px; font-size: 13.5px; min-width: 0; }
+.gh-linkbar > div:first-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gh-linkbar .u-mono { font-size: 12px; }
+.gh-linkbar-actions { display: flex; gap: 6px; flex: none; }
+
+.gh-changes { list-style: none; margin: 0; padding: 0; max-height: 240px; overflow: auto; border-top: 1px solid var(--u-line); }
+.gh-changes li { display: flex; align-items: center; gap: 8px; padding: 7px 2px; border-bottom: 1px solid var(--u-line); font-size: 12.5px; }
+.gh-changes li.is-conflict { background: color-mix(in srgb, var(--u-warn) 8%, transparent); }
+.gh-path { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gh-badge { flex: none; font-family: var(--u-mono); font-size: 10.5px; padding: 2px 6px; border-radius: 6px; border: 1px solid var(--u-line); color: var(--u-ink-2); }
+.gh-badge.is-added { color: var(--u-ok); border-color: color-mix(in srgb, var(--u-ok) 40%, transparent); }
+.gh-badge.is-modified { color: var(--u-warn); border-color: color-mix(in srgb, var(--u-warn) 40%, transparent); }
+.gh-badge.is-deleted, .gh-badge.is-conflict { color: var(--u-bad); border-color: color-mix(in srgb, var(--u-bad) 40%, transparent); }
+
+.gh-notice { display: flex; gap: 10px; padding: 12px 14px; border-radius: 12px; border: 1px solid color-mix(in srgb, var(--u-warn) 45%, transparent); background: color-mix(in srgb, var(--u-warn) 8%, transparent); font-size: 13.5px; }
+.gh-notice > svg { color: var(--u-warn); flex: none; margin-top: 2px; }
+.gh-notice p { margin: 6px 0 0; color: var(--u-ink-2); }
+.gh-notice .u-mono { font-size: 12px; word-break: break-all; }
+.gh-notice-actions { display: flex; align-items: center; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+.gh-warn { color: var(--u-bad); }
+
+.gh-spin { animation: gh-spin 1s linear infinite; }
+@keyframes gh-spin { to { transform: rotate(360deg); } }
+
+@media (max-width: 560px) {
+  .gh-two { grid-template-columns: minmax(0, 1fr); }
+}
