@@ -106,7 +106,7 @@ function ProjectEditor({
     const getLanguageExtension = (lang) => editorLanguage(String(lang || "").toLowerCase());
 
     return (
-        <div style={{ height: "100%", backgroundColor: "var(--u-bg, #282a36)", overflow: "hidden", position: 'relative' }}>
+        <div style={{ height: "100%", backgroundColor: "var(--u-bg, #282a36)", overflow: "hidden", position: 'relative', fontSize: settings?.fontSize ? `${settings.fontSize}px` : undefined }}>
             <CodeMirror
                 value={editorCode}
                 height="100%"

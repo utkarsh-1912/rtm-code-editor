@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { Pencil, BookOpen, Copy, Check, Trash2, ClipboardPaste } from "lucide-react";
+import Icon from "./icons/Icon";
 import ACTIONS from "../Action";
 
 const MAX = 20 * 1024;
@@ -117,14 +117,14 @@ export default function ProblemPane({ socketRef, roomId, userName, isReadOnly })
             <div className="pb-bar">
                 {!isReadOnly && text.trim() && (
                     <div className="u-seg pb-seg" role="tablist" aria-label="Problem view">
-                        <button className={!editing ? "on" : ""} onClick={() => setEditing(false)}><BookOpen size={12} /> Read</button>
-                        <button className={editing ? "on" : ""} onClick={() => setEditing(true)}><Pencil size={12} /> Edit</button>
+                        <button className={!editing ? "on" : ""} onClick={() => setEditing(false)}><Icon name="read" size={12} /> Read</button>
+                        <button className={editing ? "on" : ""} onClick={() => setEditing(true)}><Icon name="edit" size={12} /> Edit</button>
                     </div>
                 )}
                 <span className="pb-meta">{meta?.by ? `edited by ${meta.by}` : text.trim() ? `${text.length.toLocaleString()} chars` : "shared with the room"}</span>
                 <span className="pb-tools">
-                    {text.trim() && <button className="ec-icon" onClick={copy} title="Copy problem" aria-label="Copy problem">{copied ? <Check size={14} /> : <Copy size={14} />}</button>}
-                    {!isReadOnly && text.trim() && <button className="ec-icon" onClick={() => { update(""); setEditing(true); }} title="Clear for everyone" aria-label="Clear problem"><Trash2 size={14} /></button>}
+                    {text.trim() && <button className="ec-icon" onClick={copy} title="Copy problem" aria-label="Copy problem">{copied ? <Icon name="check" size={14} /> : <Icon name="copy" size={14} />}</button>}
+                    {!isReadOnly && text.trim() && <button className="ec-icon" onClick={() => { update(""); setEditing(true); }} title="Clear for everyone" aria-label="Clear problem"><Icon name="delete" size={14} /></button>}
                 </span>
             </div>
 
@@ -140,7 +140,7 @@ export default function ProblemPane({ socketRef, roomId, userName, isReadOnly })
                         autoFocus={editing}
                     />
                     {!text.trim() && (
-                        <button className="pb-paste" onClick={pasteFromClipboard}><ClipboardPaste size={13} /> Paste from clipboard</button>
+                        <button className="pb-paste" onClick={pasteFromClipboard}><Icon name="paste" size={14} /> Paste from clipboard</button>
                     )}
                 </div>
             ) : (

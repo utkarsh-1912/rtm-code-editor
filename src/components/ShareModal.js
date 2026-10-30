@@ -1,11 +1,11 @@
 import React, { useState } from "react";
-import { Check, Copy, Share2, Pencil, Eye } from "lucide-react";
+import Icon from "./icons/Icon";
 import toast from "react-hot-toast";
 import { Modal } from "./ux/primitives";
 import { publicOrigin } from "../utils/api";
 import { AccessSettings, VISIBILITY_OPTIONS } from "./RoomAccess";
 
-function LinkRow({ icon: Icon, title, note, value }) {
+function LinkRow({ icon, title, note, value }) {
     const [copied, setCopied] = useState(false);
     const copy = async () => {
         try {
@@ -18,14 +18,14 @@ function LinkRow({ icon: Icon, title, note, value }) {
     };
     return (
         <div className="sh-row">
-            <span className="d-ico"><Icon size={16} /></span>
+            <span className="d-ico"><Icon name={icon} size={16} /></span>
             <div className="sh-body">
                 <b>{title}</b>
                 <span className="u-small u-muted">{note}</span>
                 <div className="dl-cmd">
                     <code title={value}>{value}</code>
                     <button type="button" className={`u-btn u-btn--sm ${copied ? "u-btn--quiet" : "u-btn--solid"}`} onClick={copy} aria-label={`Copy ${title.toLowerCase()}`}>
-                        {copied ? <><Check size={14} /> Copied</> : <><Copy size={14} /> Copy</>}
+                        {copied ? <><Icon name="check" size={14} /> Copied</> : <><Icon name="copy" size={14} /> Copy</>}
                     </button>
                 </div>
             </div>
@@ -57,14 +57,14 @@ export default function ShareModal({ open, onClose, roomId, peopleOnline = 0, ac
             title="Invite people"
             description={vis.id === "public" ? "Anyone with a link can join; guests just pick a name." : vis.id === "invite" ? "People with a link ask to join, and you let them in." : "Only signed-in people on the invite list can join."}
             footer={<>
-                {canShare && <button type="button" className="u-btn u-btn--ghost" onClick={nativeShare}><Share2 size={15} /> Share…</button>}
+                {canShare && <button type="button" className="u-btn u-btn--ghost" onClick={nativeShare}><Icon name="share" size={16} /> Share…</button>}
                 <button type="button" className="u-btn u-btn--solid" onClick={onClose}>Done</button>
             </>}
         >
             {access && <AccessSettings meta={access} onSave={(v, allowed) => onAccessChange?.(v, allowed)} />}
-            <LinkRow icon={Pencil} title="Editor link" note="Can type, run code, chat and join the call." value={editorLink} />
-            <LinkRow icon={Eye} title="Spectator link" note="Read-only. Good for interviews and demos." value={viewerLink} />
-            <LinkRow icon={Copy} title="Room ID" note="Paste it into “Join a room” on the home page." value={roomId} />
+            <LinkRow icon="edit" title="Editor link" note="Can type, run code, chat and join the call." value={editorLink} />
+            <LinkRow icon="show" title="Spectator link" note="Read-only. Good for interviews and demos." value={viewerLink} />
+            <LinkRow icon="room-id" title="Room ID" note="Paste it into “Join a room” on the home page." value={roomId} />
         </Modal>
     );
 }

@@ -1,9 +1,6 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import {
-    Video, VideoOff, Mic, MicOff, Maximize2, Maximize, Minimize, Minus,
-    ScreenShare, ScreenShareOff, PhoneOff, Pencil, Eraser, Expand, Shrink,
-    Pin, PinOff, LayoutGrid, PanelTop, GripHorizontal, PictureInPicture2, LayoutPanelLeft, ChevronDown
-} from 'lucide-react';
+import Icon from './icons/Icon';
+import { getCallPrefs, saveCallPrefs } from '../utils/callPrefs';
 import { Avatar } from './clients';
 import CallAnnotations from './CallAnnotations';
 import toast from 'react-hot-toast';
@@ -39,9 +36,10 @@ const VideoChat = ({
     onCallStateChange,
     clients = [],
     mediaStates = {},
-    initialAudioState = true,
-    initialVideoState = true,
-    isMobile = false
+    initialAudioState, // omit to use the remembered choice (off the first time)
+    initialVideoState,
+    isMobile = false,
+    returnTo = null, // { label, onClick }: shown when the call carries on away from its page
 }) => {
     // Docked: the window covers the layout's Call card instead of floating. It is the same
     // component either way, so docking or popping out never restarts the call.
@@ -56,8 +54,11 @@ const VideoChat = ({
     // --- State Management ---
     const [localStream, setLocalStream] = useState(null);
     const [remoteUsers, setRemoteUsers] = useState({}); // { socketId: { stream, name, isMuted, isVideoOff, isScreenSharing } }
-    const [isMuted, setIsMuted] = useState(!initialAudioState);
-    const [isVideoOff, setIsVideoOff] = useState(!initialVideoState);
+    const [prefs] = useState(getCallPrefs);
+    const startAudio = initialAudioState ?? prefs.mic;
+    const startVideo = initialVideoState ?? prefs.cam;
+    const [isMuted, setIsMuted] = useState(!startAudio);
+    const [isVideoOff, setIsVideoOff] = useState(!startVideo);
     const [isScreenSharing, setIsScreenSharing] = useState(false);
     const [inCall, setInCall] = useState(false);
     const [activeSpeaker, setActiveSpeaker] = useState(null); // who is talking right now (tile ring)
@@ -235,13 +236,13 @@ const VideoChat = ({
                 stream = new MediaStream();
                 setIsMuted(true);
                 setIsVideoOff(true);
-            } else if (!initialVideoState && !initialAudioState) {
+            } else if (!startVideo && !startAudio) {
                 // If both are false, avoid getUserMedia throwing an error. Create an empty stream.
                 stream = new MediaStream();
             } else {
                 stream = await navigator.mediaDevices.getUserMedia({
-                    video: initialVideoState ? CAM : false,
-                    audio: initialAudioState ? MIC : false
+                    video: startVideo ? CAM : false,
+                    audio: startAudio ? MIC : false
                 });
             }
 
@@ -250,7 +251,7 @@ const VideoChat = ({
             setInCall(true);
             onCallStateChange(true);
 
-            if (initialAudioState && !noDevices) {
+            if (startAudio && !noDevices) {
                 setupAudioAnalysis(stream, 'local');
             }
 
@@ -274,7 +275,12 @@ const VideoChat = ({
                             : 'Could not start your camera or microphone.'
             );
         }
-    }, [projectId, socketRef, user, setupAudioAnalysis, initialAudioState, initialVideoState, onCallStateChange, inCall, broadcastMediaState, isMuted, isVideoOff]);
+    }, [projectId, socketRef, user, setupAudioAnalysis, startAudio, startVideo, onCallStateChange, inCall, broadcastMediaState, isMuted, isVideoOff]);
+
+    // Remember mic and camera so the next call (this page or another) starts the same way.
+    useEffect(() => {
+        if (inCall) saveCallPrefs({ mic: !isMuted, cam: !isVideoOff });
+    }, [inCall, isMuted, isVideoOff]);
 
     const handleToggleVideo = useCallback(async (e) => {
         if (e) e.stopPropagation();
@@ -494,12 +500,14 @@ const VideoChat = ({
 
     const hasAutoJoinedRef = useRef(false);
 
+    // Join as soon as the page's socket exists; it may still be connecting when the call opens.
+    // No dependency list: the socket lives in a ref, so check again on every render.
     useEffect(() => {
-        if (!inCall && !hasAutoJoinedRef.current) {
+        if (!inCall && !hasAutoJoinedRef.current && socketRef.current) {
             hasAutoJoinedRef.current = true;
             handleJoinCall();
         }
-    }, [inCall, handleJoinCall]);
+    });
 
     useEffect(() => {
         if (externalInCall && !inCall && hasAutoJoinedRef.current) {
@@ -867,17 +875,17 @@ const VideoChat = ({
                     </div>
                 )}
                 <div className="vc-tag">
-                    {mutedOf(p) ? <MicOff size={12} className="vc-red" /> : <Mic size={12} />}
+                    {mutedOf(p) ? <Icon name="mic-off" size={12} className="vc-red" /> : <Icon name="mic" size={12} />}
                     <span>{label}</span>
                 </div>
                 {variant === 'stage' && pinned === p.id && (
                     <button className="vc-unpin" onClick={() => togglePin(p.id)} title="Unpin" aria-label={`Unpin ${name}`}>
-                        <PinOff size={13} /> Unpin
+                        <Icon name="unpin" size={14} /> Unpin
                     </button>
                 )}
                 {variant === 'grid' && count > 1 && (
                     <button className="vc-pin" onClick={() => togglePin(p.id)} title={pinned === p.id ? 'Unpin' : 'Pin to spotlight'} aria-label={pinned === p.id ? `Unpin ${name}` : `Pin ${name}`}>
-                        {pinned === p.id ? <PinOff size={13} /> : <Pin size={13} />}
+                        <Icon name="pin" size={14} filled={pinned === p.id} />
                     </button>
                 )}
                 {presenting && (
@@ -903,13 +911,13 @@ const VideoChat = ({
                                 <span>{spotlight.isLocal ? "You're presenting" : `${nameFor(spotlight)} is presenting`}</span>
                                 <span className="vc-banner-actions">
                                     <button className={isDrawing ? 'on' : ''} onClick={() => setIsDrawing((d) => !d)} title="Draw on the shared screen. Everyone sees it; strokes fade.">
-                                        <Pencil size={13} /> {isDrawing ? 'Drawing' : 'Draw'}
+                                        <Icon name="draw" size={14} filled={isDrawing} /> {isDrawing ? 'Drawing' : 'Draw'}
                                     </button>
-                                    {isDrawing && <button onClick={() => setClearKey((k) => k + 1)} title="Clear drawings for everyone"><Eraser size={13} /> Clear</button>}
+                                    {isDrawing && <button onClick={() => setClearKey((k) => k + 1)} title="Clear drawings for everyone"><Icon name="erase" size={14} /> Clear</button>}
                                     <button onClick={() => setFitStage((f) => !f)} title={fitStage ? 'Fill the stage' : 'Fit the whole screen'}>
-                                        {fitStage ? <Maximize size={13} /> : <Minimize size={13} />} {fitStage ? 'Fill' : 'Fit'}
+                                        <Icon name={fitStage ? 'scale-fill' : 'scale-fit'} size={14} /> {fitStage ? 'Fill' : 'Fit'}
                                     </button>
-                                    {spotlight.isLocal && <button className="vc-stop" onClick={toggleScreenShare}><ScreenShareOff size={13} /> Stop presenting</button>}
+                                    {spotlight.isLocal && <button className="vc-stop" onClick={toggleScreenShare}><Icon name="screen-share-stop" size={14} /> Stop presenting</button>}
                                 </span>
                             </div>
                         )}
@@ -918,7 +926,7 @@ const VideoChat = ({
                                 <span className="vc-live-dot" />
                                 <span>{sharer.isLocal ? "You're presenting" : `${nameFor(sharer)} is presenting`}</span>
                                 <span className="vc-banner-actions">
-                                    <button className="vc-back" onClick={() => togglePin(pinned)}><ScreenShare size={13} /> Back to shared screen</button>
+                                    <button className="vc-back" onClick={() => togglePin(pinned)}><Icon name="screen-share" size={14} /> Back to shared screen</button>
                                 </span>
                             </div>
                         )}
@@ -956,7 +964,7 @@ const VideoChat = ({
             <div className={`vc vc--joining${isMobile ? ' vc--mobile' : ''}${docked ? ' vc--docked' : ''}`} style={isMobile ? undefined : dockStyle || { left: Math.max(8, Math.min(pipPosition.x, viewport.w - 300)), top: Math.max(8, Math.min(pipPosition.y, viewport.h - 190)) }}>
                 {joinError ? (
                     <div className="vc-joining">
-                        <VideoOff size={22} className="vc-red" aria-hidden="true" />
+                        <Icon name="video-off" size={24} className="vc-red" />
                         <strong>Can't use your camera</strong>
                         <span className="vc-sub">{joinError} You can still join, listen and watch, and turn devices on later.</span>
                         <div className="vc-join-actions">
@@ -998,29 +1006,32 @@ const VideoChat = ({
         >
             {!isMinimized && (
                 <header className="vc-head" onPointerDown={startDragging}>
-                    {docked ? dockHandle : !isMobile && <GripHorizontal size={14} className="vc-grip" aria-hidden="true" />}
+                    {docked ? dockHandle : !isMobile && <Icon name="grip" size={14} className="vc-grip" />}
                     <span className="vc-live-dot" />
                     <strong>Call</strong>
                     <span className="vc-meta">{count} {count === 1 ? 'person' : 'people'} · {clock}</span>
                     <span className="vc-head-actions">
+                        {returnTo && (
+                            <button onClick={returnTo.onClick} title={returnTo.label} aria-label={returnTo.label}><Icon name="back" size={16} /></button>
+                        )}
                         {count > 1 && !sharer && (
                             <button onClick={() => { setLayout((l) => (l === 'grid' ? 'speaker' : 'grid')); setPinned(null); }} title={layout === 'grid' ? 'Spotlight view' : 'Grid view'} aria-label={layout === 'grid' ? 'Spotlight view' : 'Grid view'}>
-                                {layout === 'grid' ? <PanelTop size={15} /> : <LayoutGrid size={15} />}
+                                <Icon name={layout === 'grid' ? 'layout-speaker' : 'layout-grid'} size={16} />
                             </button>
                         )}
                         {!isMobile && onDockToggle && (
                             <button onClick={onDockToggle} title={docked ? 'Pop out (floating window)' : 'Dock in the layout'} aria-label={docked ? 'Pop out call' : 'Dock call in the layout'}>
-                                {docked ? <PictureInPicture2 size={15} /> : <LayoutPanelLeft size={15} />}
+                                <Icon name={docked ? 'pop-out' : 'dock'} size={16} />
                             </button>
                         )}
                         {!isMobile && !docked && (
                             <button onClick={() => setIsLarge((l) => !l)} title={isLarge ? 'Smaller' : 'Larger'} aria-label={isLarge ? 'Smaller window' : 'Larger window'}>
-                                {isLarge ? <Shrink size={15} /> : <Expand size={15} />}
+                                <Icon name={isLarge ? 'shrink' : 'enlarge'} size={16} />
                             </button>
                         )}
-                        <button onClick={toggleFullscreen} title="Full screen" aria-label="Full screen"><Maximize2 size={15} /></button>
+                        <button onClick={toggleFullscreen} title="Full screen" aria-label="Full screen"><Icon name="full-screen" size={16} /></button>
                         {!docked && onMinimizeToggle && (
-                            <button onClick={() => onMinimizeToggle(true)} title={isMobile ? 'Back to the room (call keeps going)' : 'Minimise'} aria-label={isMobile ? 'Back to the room' : 'Minimise call'}>{isMobile ? <ChevronDown size={18} /> : <Minus size={15} />}</button>
+                            <button onClick={() => onMinimizeToggle(true)} title={isMobile ? 'Back to the room (call keeps going)' : 'Minimise'} aria-label={isMobile ? 'Back to the room' : 'Minimise call'}>{isMobile ? <Icon name="collapse" size={20} /> : <Icon name="minimize" size={16} />}</button>
                         )}
                     </span>
                 </header>
@@ -1034,7 +1045,8 @@ const VideoChat = ({
             {isMinimized && (
                 <div className="vc-mini-top" onPointerDown={startDragging}>
                     <span className="vc-live-dot" /> <span>{clock}</span>
-                    <button onClick={() => onMinimizeToggle(false)} title="Expand" aria-label="Expand call"><Maximize2 size={13} /></button>
+                    {returnTo && <button onClick={returnTo.onClick} title={returnTo.label} aria-label={returnTo.label}><Icon name="back" size={14} /></button>}
+                    <button onClick={() => onMinimizeToggle(false)} title="Expand" aria-label="Expand call"><Icon name="enlarge" size={14} /></button>
                 </div>
             )}
 
@@ -1043,17 +1055,17 @@ const VideoChat = ({
                     <span className="vc-watching">Watching as a guest</span>
                 ) : (
                     <>
-                        <Btn on={!isMuted} warn={isMuted} onClick={handleToggleAudio} label={isMuted ? 'Unmute' : 'Mute'}>{isMuted ? <MicOff size={16} /> : <Mic size={16} />}</Btn>
-                        <Btn on={!isVideoOff} warn={isVideoOff} onClick={handleToggleVideo} label={isVideoOff ? 'Start video' : 'Stop video'}>{isVideoOff ? <VideoOff size={16} /> : <Video size={16} />}</Btn>
+                        <Btn on={!isMuted} warn={isMuted} onClick={handleToggleAudio} label={isMuted ? 'Unmute' : 'Mute'}>{isMuted ? <Icon name="mic-off" size={16} /> : <Icon name="mic" size={16} filled />}</Btn>
+                        <Btn on={!isVideoOff} warn={isVideoOff} onClick={handleToggleVideo} label={isVideoOff ? 'Start video' : 'Stop video'}>{isVideoOff ? <Icon name="video-off" size={16} /> : <Icon name="video" size={16} filled />}</Btn>
                         {canShareScreen && (
-                            <Btn on={isScreenSharing} onClick={toggleScreenShare} label={isScreenSharing ? 'Stop presenting' : 'Present'}>{isScreenSharing ? <ScreenShareOff size={16} /> : <ScreenShare size={16} />}</Btn>
+                            <Btn on={isScreenSharing} onClick={toggleScreenShare} label={isScreenSharing ? 'Stop presenting' : 'Present'}>{isScreenSharing ? <Icon name="screen-share-stop" size={16} filled /> : <Icon name="screen-share" size={16} />}</Btn>
                         )}
                         {sharer && !isMinimized && (
-                            <Btn on={isDrawing} onClick={() => setIsDrawing((d) => !d)} label="Draw">{<Pencil size={16} />}</Btn>
+                            <Btn on={isDrawing} onClick={() => setIsDrawing((d) => !d)} label="Draw"><Icon name="draw" size={16} filled={isDrawing} /></Btn>
                         )}
                     </>
                 )}
-                <Btn danger wide onClick={handleLeaveCall} label="Leave"><PhoneOff size={16} /></Btn>
+                <Btn danger wide onClick={handleLeaveCall} label="Leave"><Icon name="call-leave" size={16} /></Btn>
             </footer>
         </div>
     );

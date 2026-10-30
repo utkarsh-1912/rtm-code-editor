@@ -12,6 +12,9 @@ function setupMediaSocket(io, socket, safeSocket, context) {
     socket.on('join-video-chat', safeSocket(({ projectId, name, isSpectator }) => {
         const roomId = callRoom(projectId);
         socket.join(roomId);
+        // A call can run on its own socket (kept going after leaving its page), which never
+        // joined the room, so remember its name here for the participant lists.
+        if (name && !userSocketMap[socket.id]) userSocketMap[socket.id] = name;
         const clients = Array.from(io.sockets.adapter.rooms.get(roomId) || []).filter(id => id !== socket.id).map(id => ({
             userId: id, name: userSocketMap[id] || "Guest", isSpectator: false
         }));

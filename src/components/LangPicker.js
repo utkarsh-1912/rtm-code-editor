@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { ChevronDown, Search, Check } from "lucide-react";
+import Icon from "./icons/Icon";
 import { LANGS } from "../utils/languages";
 
 // Searchable language menu for the editor bar: label, runtime and file extension.
@@ -50,12 +50,12 @@ export default function LangPicker({ value, onChange, disabled }) {
                 <span className="lp-badge">{current?.short || value}</span>
                 <span className="lp-name">{current?.label || value}</span>
                 {current?.runtime && current.runtime !== current.label && <span className="lp-rt">{current.runtime}</span>}
-                <ChevronDown size={13} />
+                <Icon name="dropdown" size={14} />
             </button>
             {open && (
                 <div className="lp-pop" role="dialog" aria-label="Choose a language">
                     <label className="lp-search">
-                        <Search size={13} />
+                        <Icon name="search" size={14} />
                         <input ref={inputRef} value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={onKey} placeholder="Search languages" aria-label="Search languages" />
                     </label>
                     <ul role="listbox" aria-label="Languages">
@@ -72,7 +72,7 @@ export default function LangPicker({ value, onChange, disabled }) {
                                 <span className="lp-badge">{l.short}</span>
                                 <span className="lp-name">{l.label}</span>
                                 <span className="lp-rt">{l.runtime} · .{l.ext[0]}</span>
-                                {l.id === value && <Check size={13} />}
+                                {l.id === value && <Icon name="check" size={14} />}
                             </li>
                         ))}
                         {!list.length && <li className="lp-none">No language matches “{q}”</li>}

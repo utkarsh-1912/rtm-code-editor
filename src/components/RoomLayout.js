@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { ReflexContainer, ReflexSplitter, ReflexElement } from "react-reflex";
-import { GripVertical, X, LayoutTemplate, Check, RotateCcw, PanelLeft } from "lucide-react";
+import Icon from "./icons/Icon";
 
 // Workspace as rearrangeable cards (LeetCode style): two columns of stacked panels.
 // Drag a card by its handle onto another card's top or bottom half to move it there.
@@ -145,7 +145,7 @@ export function CardHandle({ id, state, label, onDragStart, onDragEnd }) {
             title={`Drag to move ${name}`}
             aria-label={`Move ${name}`}
         >
-            <GripVertical size={14} />
+            <Icon name="grip-vertical" size={14} />
         </span>
     );
 }
@@ -161,7 +161,7 @@ function Card({ id, label, render, dragging, onDragStart, onDragEnd, onDropAt, o
                 <div className="rl-tab">
                     {handle}
                     <span className="rl-title">{label}</span>
-                    {onHide && <button className="rl-hide" onClick={onHide} title={`Hide ${label}`} aria-label={`Hide ${label}`}><X size={13} /></button>}
+                    {onHide && <button className="rl-hide" onClick={onHide} title={`Hide ${label}`} aria-label={`Hide ${label}`}><Icon name="close" size={14} /></button>}
                 </div>
             )}
             <div className="rl-body">{render(inlineHandle ? handle : null)}</div>
@@ -275,11 +275,11 @@ export function LayoutMenu({ state, onClose, classic }) {
 
     return (
         <div className="rl-menu" ref={ref} role="dialog" aria-label="Layout">
-            <div className="rl-menu-head"><LayoutTemplate size={14} /> Layout <span>{cardsOn ? "Drag a card's grip to rearrange" : "Pick a card layout to rearrange panels"}</span></div>
+            <div className="rl-menu-head"><Icon name="layout" size={14} /> Layout <span>{cardsOn ? "Drag a card's grip to rearrange" : "Pick a card layout to rearrange panels"}</span></div>
             <div className="rl-presets">
                 {classic && (
                     <button className={classic.on ? "on" : ""} onClick={classic.onPick}>
-                        <span className="rl-mini rl-mini--classic" aria-hidden="true"><PanelLeft size={18} /></span>
+                        <span className="rl-mini rl-mini--classic" aria-hidden="true"><Icon name="layout-classic" size={20} /></span>
                         <b>Classic</b>
                         <em>Sidebar and editor</em>
                     </button>
@@ -296,11 +296,11 @@ export function LayoutMenu({ state, onClose, classic }) {
                 <div className="rl-toggles">
                     {state.toggles.map((id) => (
                         <button key={id} onClick={() => state.toggle(id)} aria-pressed={state.has(id)}>
-                            <span className={`rl-check${state.has(id) ? " on" : ""}`}>{state.has(id) && <Check size={11} />}</span>
+                            <span className={`rl-check${state.has(id) ? " on" : ""}`}>{state.has(id) && <Icon name="check" size={12} />}</span>
                             {state.panels[id].label}
                         </button>
                     ))}
-                    <button className="rl-reset" onClick={state.reset}><RotateCcw size={12} /> Reset</button>
+                    <button className="rl-reset" onClick={state.reset}><Icon name="reset" size={12} /> Reset</button>
                 </div>
             )}
         </div>

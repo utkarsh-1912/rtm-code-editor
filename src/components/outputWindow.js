@@ -1,7 +1,7 @@
 import React from "react";
 import { ReflexContainer, ReflexSplitter, ReflexElement } from "react-reflex";
 import "react-reflex/styles.css";
-import { Upload, Table2, Trash2, Eye } from "lucide-react";
+import Icon from "./icons/Icon";
 import toast from "react-hot-toast";
 import { parseDataFile, MAX_FILE_BYTES } from "../utils/sqlData";
 
@@ -30,7 +30,7 @@ function TablesPanel({ tables, setTables }) {
             <div className="ws-pane-head">
                 <span>Tables</span>
                 <b>
-                    <button type="button" className="ws-tbl-btn" onClick={() => fileRef.current?.click()}><Upload size={12} /> Import</button>
+                    <button type="button" className="ws-tbl-btn" onClick={() => fileRef.current?.click()}><Icon name="upload" size={12} /> Import</button>
                 </b>
             </div>
             <input ref={fileRef} type="file" accept=".csv,.tsv,.json,.txt" multiple hidden onChange={onFiles} />
@@ -39,9 +39,9 @@ function TablesPanel({ tables, setTables }) {
                 {tables.map((t) => (
                     <div key={t.name} className="ws-tbl">
                         <div className="ws-tbl-row">
-                            <Table2 size={13} /> <b>{t.name}</b> <span>{t.rows.length} rows</span>
-                            <button type="button" title="Preview" onClick={() => setPreview(preview === t.name ? null : t.name)}><Eye size={13} /></button>
-                            <button type="button" title="Remove" onClick={() => setTables((prev) => prev.filter((x) => x.name !== t.name))}><Trash2 size={13} /></button>
+                            <Icon name="table" size={14} /> <b>{t.name}</b> <span>{t.rows.length} rows</span>
+                            <button type="button" title="Preview" onClick={() => setPreview(preview === t.name ? null : t.name)}><Icon name="show" size={14} /></button>
+                            <button type="button" title="Remove" onClick={() => setTables((prev) => prev.filter((x) => x.name !== t.name))}><Icon name="delete" size={14} /></button>
                         </div>
                         <div className="ws-tbl-cols">{t.columns.map((c) => <i key={c.name}>{c.name}<em>{c.type.toLowerCase()}</em></i>)}</div>
                         {preview === t.name && (

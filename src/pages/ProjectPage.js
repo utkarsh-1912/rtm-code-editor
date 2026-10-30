@@ -3,24 +3,6 @@ import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { ReflexContainer, ReflexSplitter, ReflexElement } from "react-reflex";
 import "react-reflex/styles.css";
 import "./ProjectPage.css";
-import {
-    Folder,
-    Plus,
-    X,
-    MessageSquare,
-    Sun,
-    Video,
-    Terminal,
-    FileCode,
-    Moon,
-    Users,
-    Play,
-    Globe,
-    RotateCcw,
-    Trash2,
-    Zap,
-    ExternalLink
-} from "lucide-react";
 import toast from "react-hot-toast";
 import ProjectEditor from "../components/ProjectEditor";
 import ProjectFileTree, { FileIcon, relPath } from "../components/ProjectFileTree";
@@ -38,41 +20,32 @@ import "../styles/app.css";
 import ACTIONS from "../Action";
 import { initSocket } from "../socket";
 import VideoChat from "../components/VideoChat";
+import { useCallCarry } from "../context/CallCarry";
+import { getCallPrefs } from "../utils/callPrefs";
 import WhiteboardModal from "../components/WhiteboardModal";
 import ChatWindow from "../components/chatWindow";
 import InviteModal from "../components/InviteModal";
 import CommandPalette from "../components/CommandPalette";
+import SettingsModal from "../components/SettingsModal";
 import AICopilotModal from "../components/AICopilotModal";
 import DiffViewerModal from "../components/DiffViewerModal";
 import AnalyticsDashboardModal from "../components/AnalyticsDashboardModal";
 import FocusModeModal from "../components/FocusModeModal";
-import { 
-    Eye, 
-    EyeOff, 
-    Search, 
-    Layout,
-    User,
-    History,
-    Activity,
-    PanelLeftClose,
-    SquareTerminal,
-    HardDriveDownload,
-    FileUp,
-    FolderOpen,
-    LayoutTemplate
-} from "lucide-react";
 import { bundleWebProject } from "../utils/webBundle";
-import AiIcon from "../components/AiIcon";
+import Icon from "../components/icons/Icon";
+import WebPreview from "../components/WebPreview";
 import TerminalPanel from "../components/TerminalPanel";
-import GitHubIcon from "../components/GitHubIcon";
 import GitHubModal from "../components/GitHubModal";
 import { pickFiles, pickFolder, uploadFiles, describeSkipped, saveToDisk, openTerminal, rootFor, linkRoot, canWriteToDisk, canOpenTerminal } from "../utils/localFiles";
 
 const SIDE_TABS = [
-    { id: 'files', label: 'Files', Icon: Folder },
-    { id: 'chat', label: 'Chat', Icon: MessageSquare },
-    { id: 'users', label: 'People', Icon: Users },
+    { id: 'files', label: 'Files', icon: 'files' },
+    { id: 'chat', label: 'Chat', icon: 'chat' },
+    { id: 'users', label: 'People', icon: 'people' },
 ];
+
+// Used until someone changes a setting (in a room or a project; both share the saved copy).
+const PROJECT_EDITOR_DEFAULTS = { fontSize: 16, tabSize: 4, keybinding: "default", enableLinting: true, wordWrap: true };
 
 // Optional card layout (same machinery as rooms, project cards). Classic, the sidebar layout,
 // stays the default; cards are opt-in from the status bar's layout menu.
@@ -117,20 +90,16 @@ const ProjectPage = () => {
     const [loading, setLoading] = useState(true);
     const [messages, setMessages] = useState([]);
     const [showWhiteboard, setShowWhiteboard] = useState(false);
-    const [settings] = useState({
-        fontSize: 16,
-        lineNumbers: true,
-        indentOnInput: true,
-        bracketMatching: true,
-        closeBrackets: true,
-        autocompletion: true,
-        foldGutter: true,
-        highlightActiveLine: true,
-        tabSize: 4,
-        keybinding: "default",
-        enableLinting: true,
-        wordWrap: true
+    // Editor settings are shared with rooms (same storage key), so one change applies everywhere.
+    const [showSettings, setShowSettings] = useState(false);
+    const [settings, setSettings] = useState(() => {
+        let saved = {};
+        try { saved = JSON.parse(localStorage.getItem("app-editor-settings") || "{}"); } catch { /* use the defaults */ }
+        return { ...PROJECT_EDITOR_DEFAULTS, ...saved };
     });
+    useEffect(() => {
+        try { localStorage.setItem("app-editor-settings", JSON.stringify(settings)); } catch { /* storage blocked */ }
+    }, [settings]);
 
 
     const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
@@ -146,8 +115,6 @@ const ProjectPage = () => {
 
     // New Lobby States
     const [showGuestModal, setShowGuestModal] = useState(!user && !localStorage.getItem("guest-name"));
-    const initialAudio = true;
-    const initialVideo = true;
 
     const [sidebarTab, setSidebarTab] = useState('files');
     const [isSidebarOpen, setIsSidebarOpen] = useState(true);
@@ -155,14 +122,27 @@ const ProjectPage = () => {
     const [theme, setTheme] = useState(resolveTheme);
     const [isExecuting, setIsExecuting] = useState(false);
     const [output, setOutput] = useState("");
+    const [runMeta, setRunMeta] = useState(null); // { ok, status, timeMs, engine } of the last run, shown in the Output header
     const [mediaStates, setMediaStates] = useState({});
     const [isOutputVisible, setIsOutputVisible] = useState(true);
     const [webSrcDoc, setWebSrcDoc] = useState("");
     const [outputTab, setOutputTab] = useState("preview"); // "preview" | "terminal"
     const [programInput, setProgramInput] = useState("");
-    const [activeTab, setActiveTab] = useState('code'); // 'code', 'files', 'chat', 'users', 'video'
+    const [activeTab, setActiveTab] = useState('code'); // 'code', 'output', 'files', 'chat', 'users'
     const [isMeetingMinimized, setIsMeetingMinimized] = useState(true); // default true for floating overlay
     const [isMeetingStarting, setIsMeetingStarting] = useState(false);
+
+    // "Keep calls on other pages": hand a running call to the app as this page closes, and
+    // take it back if it is still going when this project opens again.
+    const { carry: carryCall, claim: claimCall } = useCallCarry();
+    const carryRef = useRef(null);
+    carryRef.current = isMeetingActive ? { id: projectId, title: project?.name || 'project', path: `/project/${projectId}`, user: user || { name: guestName || 'Guest', isGuest: true } } : null;
+    useEffect(() => {
+        if (claimCall(projectId)) { setIsMeetingMinimized(window.innerWidth >= 768); setIsMeetingActive(true); }
+        return () => {
+            if (carryRef.current && getCallPrefs().keepOnNavigate) carryCall(carryRef.current);
+        };
+    }, [projectId, carryCall, claimCall]);
     const [isZenMode, setIsZenMode] = useState(false);
     const [showCommandPalette, setShowCommandPalette] = useState(false);
     const projectLayout = useRoomLayout(PROJECT_LAYOUT);
@@ -257,6 +237,7 @@ const ProjectPage = () => {
         if (projectType === "web" || fileExt === "html" || fileExt === "css") {
             setIsOutputVisible(true);
             setOutputTab("preview");
+            if (isMobile) setActiveTab('output');
 
             // Same doc twice would not reload the frame; the comment makes it unique.
             const src = bundleWebProject(files, { activeFile }) + `<!-- run ${Date.now()} -->`;
@@ -274,6 +255,8 @@ const ProjectPage = () => {
         setIsExecuting(true);
         setIsOutputVisible(true);
         setOutputTab("terminal");
+        if (isMobile) setActiveTab('output');
+        setRunMeta(null);
         setOutput("Running…");
 
         const language = activeFile.name.split('.').pop();
@@ -362,54 +345,32 @@ const ProjectPage = () => {
 
         try {
             const result = await runCode({ language: runtime, source: sourceCode, stdin: programInput, sharedScope: clients.length > 1 ? `project:${projectId}` : null });
-            setOutput(formatRun(result) + `
-
-— ${result.status} · ${result.timeMs ?? '?'} ms · ${result.engine}`);
+            setOutput(formatRun(result));
+            setRunMeta({ ok: result.ok, status: result.status, timeMs: result.timeMs, engine: result.engine });
         } catch (error) {
             setOutput(`Could not run the code: ${error.message}`);
+            setRunMeta({ ok: false, status: 'Runner unavailable' });
         } finally {
             setIsExecuting(false);
         }
-    }, [project, activeFile, files, programInput, clients.length, projectId]);
+    }, [project, activeFile, files, programInput, isMobile, clients.length, projectId]);
 
     const isWebProject = (project?.type || 'web') === 'web';
 
     // Web projects get a live preview + console; compiled/scripted languages get stdin + output.
     const renderOutputPanel = () => isWebProject ? (
-        <div className="ws-out">
-            <div className="ws-pane-head">
-                <div className="u-seg" role="tablist" aria-label="Output">
-                    <button className={outputTab === 'preview' ? 'on' : ''} onClick={() => setOutputTab('preview')}><Globe size={12} /> Preview</button>
-                    <button className={outputTab === 'terminal' ? 'on' : ''} onClick={() => setOutputTab('terminal')}><Terminal size={12} /> Console</button>
-                </div>
-                <div className="ws-out-actions">
-                    {outputTab === 'terminal' && (
-                        <button className="u-icon" onClick={() => setOutput("")} title="Clear console" aria-label="Clear console"><Trash2 size={14} /></button>
-                    )}
-                    {outputTab === 'preview' && (
-                        <>
-                            <button className="u-icon" onClick={handleCompile} title="Rebuild preview" aria-label="Rebuild preview"><RotateCcw size={14} /></button>
-                            <button className="u-icon" onClick={() => window.open(`/render/${projectId}`, '_blank')} title="Open preview in a new tab" aria-label="Open preview in a new tab"><ExternalLink size={14} /></button>
-                        </>
-                    )}
-                    {!cards && <button className="u-icon" onClick={() => setIsOutputVisible(false)} title="Hide panel" aria-label="Hide panel"><X size={14} /></button>}
-                </div>
-            </div>
-            <div style={{ flex: 1, position: 'relative', overflow: 'hidden', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
-                {outputTab === 'preview' ? (
-                    <div className="ws-browser">
-                        <div className="ws-browser-bar"><i /><i /><i /><span>{(project?.name || 'app').toLowerCase().replace(/\s+/g, '-')}.preview</span></div>
-                        <iframe
-                            srcDoc={webSrcDoc || '<!DOCTYPE html><html><body style="margin:0;height:100vh;display:flex;align-items:center;justify-content:center;font-family:system-ui,sans-serif;color:#8E8C85;background:#fff">Building preview…</body></html>'}
-                            title="Web Preview"
-                            sandbox="allow-scripts allow-modals allow-forms allow-popups"
-                        />
-                    </div>
-                ) : (
-                    <pre className="ws-console">{output || <span className="u-caret">No console output yet.</span>}</pre>
-                )}
-            </div>
-        </div>
+        <WebPreview
+            srcDoc={webSrcDoc}
+            consoleText={output}
+            tab={outputTab}
+            onTab={setOutputTab}
+            onReload={handleCompile}
+            onClearConsole={() => setOutput("")}
+            onOpenInTab={() => window.open(`/render/${projectId}`, "_blank")}
+            onHide={!cards && !isMobile ? () => setIsOutputVisible(false) : null}
+            address={`${(project?.name || "app").toLowerCase().replace(/\s+/g, "-")}.preview/${activeHtml || "index.html"}`}
+            isMobile={isMobile}
+        />
     ) : (
         <div className="ws-out ws-io">
             {/* Input and output side by side (stacked on phones), with a draggable divider. */}
@@ -432,12 +393,17 @@ const ProjectPage = () => {
             <div className="ws-io-col">
                 <div className="ws-pane-head">
                     <span>Output</span>
+                    {runMeta && !isExecuting && (
+                        <b className={runMeta.ok ? 'io-ok' : 'io-bad'} title={runMeta.engine ? `Ran on ${runMeta.engine}` : undefined}>
+                            {runMeta.status}{runMeta.timeMs != null ? ` · ${runMeta.timeMs} ms` : ''}
+                        </b>
+                    )}
                     <div className="ws-out-actions">
-                        <button className="u-icon" onClick={() => setOutput("")} title="Clear output" aria-label="Clear output"><Trash2 size={14} /></button>
-                        {!cards && <button className="u-icon" onClick={() => setIsOutputVisible(false)} title="Hide panel" aria-label="Hide panel"><X size={14} /></button>}
+                        <button className="u-icon" onClick={() => { setOutput(""); setRunMeta(null); }} title="Clear output" aria-label="Clear output"><Icon name="delete" size={16} /></button>
+                        {!cards && !isMobile && <button className="u-icon" onClick={() => setIsOutputVisible(false)} title="Hide panel" aria-label="Hide panel"><Icon name="close" size={16} /></button>}
                     </div>
                 </div>
-                <pre className="ws-console">{isExecuting ? <span className="u-caret">Running</span> : (output || <span className="u-caret">No output yet. Press Run</span>)}</pre>
+                <pre className={`ws-console${runMeta && !runMeta.ok && !isExecuting ? ' is-error' : ''}`}>{isExecuting ? <span className="u-caret">Running</span> : (output || <span className="u-caret">No output yet. Press Run</span>)}</pre>
             </div>
             </ReflexElement>
             </ReflexContainer>
@@ -450,7 +416,7 @@ const ProjectPage = () => {
             { 
                 id: 'zen-toggle', 
                 label: isZenMode ? 'Exit Zen Mode' : 'Enter Zen Mode', 
-                icon: isZenMode ? <Eye size={18} /> : <EyeOff size={18} />, 
+                icon: <Icon name={isZenMode ? 'show' : 'hide'} size={16} />, 
                 category: 'Actions',
                 description: 'Focus on code without distractions.',
                 shortcut: 'ALT + Z',
@@ -459,7 +425,7 @@ const ProjectPage = () => {
             { 
                 id: 'terminal-toggle', 
                 label: isOutputVisible ? 'Hide Terminal' : 'Show Terminal', 
-                icon: <Terminal size={18} />, 
+                icon: <Icon name="terminal" size={16} />, 
                 category: 'Actions',
                 description: 'Toggle the system terminal/output panel.',
                 run: () => setIsOutputVisible(prev => !prev) 
@@ -467,7 +433,7 @@ const ProjectPage = () => {
             { 
                 id: 'theme-toggle', 
                 label: isLightMode ? 'Switch to Dark Mode' : 'Switch to Light Mode', 
-                icon: isLightMode ? <Moon size={18} /> : <Sun size={18} />, 
+                icon: <Icon name={isLightMode ? 'theme-dark' : 'theme-light'} size={16} />, 
                 category: 'Settings',
                 description: 'Switch between light and dark IDE themes.',
                 run: () => toggleTheme() 
@@ -475,7 +441,7 @@ const ProjectPage = () => {
             { 
                 id: 'run-project', 
                 label: 'Run Project', 
-                icon: <Play size={18} fill="currentColor" />, 
+                icon: <Icon name="run" size={16} />, 
                 category: 'Actions',
                 description: 'Compile and execute the current project.',
                 shortcut: 'CTRL + ENTER',
@@ -484,7 +450,7 @@ const ProjectPage = () => {
             { 
                 id: 'whiteboard', 
                 label: 'Open Whiteboard', 
-                icon: <Layout size={18} />, 
+                icon: <Icon name="whiteboard" size={16} />, 
                 category: 'Collaboration',
                 description: 'Collaborate on an infinite digital canvas.',
                 run: () => setShowWhiteboard(true) 
@@ -492,7 +458,7 @@ const ProjectPage = () => {
             { 
                 id: 'invite', 
                 label: 'Invite Team', 
-                icon: <Plus size={18} />, 
+                icon: <Icon name="invite" size={16} />, 
                 category: 'Collaboration',
                 description: 'Share project access with others.',
                 run: () => setShowInviteModal(true) 
@@ -500,7 +466,7 @@ const ProjectPage = () => {
             { 
                 id: 'dashboard', 
                 label: 'Go to Dashboard', 
-                icon: <Folder size={18} />, 
+                icon: <Icon name="dashboard" size={16} />, 
                 category: 'Navigation',
                 description: 'Exit to the main project management hub.',
                 run: () => navigate('/dashboard') 
@@ -510,7 +476,7 @@ const ProjectPage = () => {
         const fileActions = files.filter(file => !file.is_directory).map(file => ({
             id: `file-${file.id}`,
             label: file.name,
-            icon: <FileCode size={18} />,
+            icon: <Icon name="file" size={16} />,
             category: 'Files',
             description: `Open ${file.name}`,
             run: () => handleFileClick(file)
@@ -519,7 +485,7 @@ const ProjectPage = () => {
         const teamActions = clients.map(client => ({
             id: `user-${client.socketId}`,
             label: client.userName || 'Guest',
-            icon: <User size={18} />,
+            icon: <Icon name="person" size={16} />,
             category: 'Collaboration',
             description: 'Connected team member.',
             run: () => toast(`Jumping to ${client.userName}'s cursor coming soon!`)
@@ -1034,13 +1000,13 @@ const ProjectPage = () => {
     };
 
     const diskActions = [
-        ...(canOpenTerminal() ? [{ id: 'terminal', label: terminalShown ? 'Hide terminal' : 'Terminal', icon: <SquareTerminal size={18} />, onClick: () => (canDockTerminal && !isMobile ? toggleTerminal() : handleOpenTerminal()), active: terminalShown, pin: !isMobile }] : []),
+        ...(canOpenTerminal() ? [{ id: 'terminal', label: terminalShown ? 'Hide terminal' : 'Terminal', icon: <Icon name="terminal" size={20} filled={terminalShown} />, onClick: () => (canDockTerminal && !isMobile ? toggleTerminal() : handleOpenTerminal()), active: terminalShown, pin: !isMobile }] : []),
         ...(canWriteToDisk() ? [
-            { id: 'save-disk', label: rootFor(projectId) ? 'Save to disk' : 'Save to disk…', icon: <HardDriveDownload size={18} />, onClick: () => handleSaveToDisk(false), section: 'more' },
-            ...(rootFor(projectId) ? [{ id: 'save-disk-as', label: 'Save to another folder…', icon: <HardDriveDownload size={18} />, onClick: () => handleSaveToDisk(true), section: 'more' }] : []),
+            { id: 'save-disk', label: rootFor(projectId) ? 'Save to disk' : 'Save to disk…', icon: <Icon name="save-disk" size={20} />, onClick: () => handleSaveToDisk(false), section: 'more' },
+            ...(rootFor(projectId) ? [{ id: 'save-disk-as', label: 'Save to another folder…', icon: <Icon name="save-disk" size={20} />, onClick: () => handleSaveToDisk(true), section: 'more' }] : []),
         ] : []),
-        { id: 'add-files', label: 'Add files from disk', icon: <FileUp size={18} />, onClick: () => handleAddFromDisk('files'), section: 'more' },
-        { id: 'add-folder', label: 'Add folder from disk', icon: <FolderOpen size={18} />, onClick: () => handleAddFromDisk('folder'), section: 'more' },
+        { id: 'add-files', label: 'Add files from disk', icon: <Icon name="add-files" size={20} />, onClick: () => handleAddFromDisk('files'), section: 'more' },
+        { id: 'add-folder', label: 'Add folder from disk', icon: <Icon name="add-folder" size={20} />, onClick: () => handleAddFromDisk('folder'), section: 'more' },
     ];
     compileRef.current = handleCompile;
 
@@ -1073,13 +1039,13 @@ const ProjectPage = () => {
         <div className="ws-side-tabs">
             <div className="u-seg" role="tablist" aria-label="Sidebar">
                 {SIDE_TABS.map((t) => (
-                    <button key={t.id} role="tab" aria-selected={sidebarTab === t.id} className={sidebarTab === t.id ? 'on' : ''} onClick={() => setSidebarTab(t.id)}>
-                        <t.Icon size={13} /> {t.label}
+                    <button key={t.id} role="tab" aria-selected={sidebarTab === t.id} aria-label={t.label} title={t.label} className={sidebarTab === t.id ? 'on' : ''} onClick={() => setSidebarTab(t.id)}>
+                        <Icon name={t.icon} size={14} filled={sidebarTab === t.id} /><span>{t.label}</span>
                         {t.id === 'chat' && messages.length > 0 && sidebarTab !== 'chat' && <i className="ws-rail-dot" />}
                     </button>
                 ))}
             </div>
-            <button className="ws-side-close" onClick={() => setIsSidebarOpen(false)} title="Hide sidebar" aria-label="Hide sidebar"><PanelLeftClose size={15} /></button>
+            <button className="ws-side-close" onClick={() => setIsSidebarOpen(false)} title="Hide sidebar" aria-label="Hide sidebar"><Icon name="sidebar-close" size={16} /></button>
         </div>
     );
 
@@ -1090,7 +1056,7 @@ const ProjectPage = () => {
                 <div key={file.id} role="tab" aria-selected={activeFile?.id === file.id} className={`ws-tab${activeFile?.id === file.id ? ' on' : ''}`} onClick={() => handleFileClick(file)}>
                     <FileIcon name={file.name} size={13} />
                     <span title={relPath(file)}>{relPath(file).split('/').pop()}</span>
-                    <button onClick={(e) => handleCloseTab(e, file.id)} aria-label={`Close ${file.name}`}><X size={12} /></button>
+                    <button onClick={(e) => handleCloseTab(e, file.id)} aria-label={`Close ${file.name}`}><Icon name="close" size={12} /></button>
                 </div>
             ))}
         </div>
@@ -1114,7 +1080,7 @@ const ProjectPage = () => {
         <div className="ws-empty">
             <span className="u-display">No file open</span>
             <p style={{ margin: 0 }}>Pick a file from the tree, or create one.</p>
-            <button className="u-btn u-btn--ghost u-btn--sm" onClick={() => { setSidebarTab('files'); setIsSidebarOpen(true); setActiveTab('files'); }}><Folder size={14} /> Show files</button>
+            <button className="u-btn u-btn--ghost u-btn--sm" onClick={() => { setSidebarTab('files'); setIsSidebarOpen(true); setActiveTab('files'); }}><Icon name="files" size={14} /> Show files</button>
         </div>
     ));
 
@@ -1179,10 +1145,10 @@ const ProjectPage = () => {
             if (isMeetingActive) return <div ref={setCallSlot} className="rl-call-slot" />;
             return (
                 <div className="rl-call-empty">
-                    <span className="rl-call-icon"><Video size={20} /></span>
+                    <span className="rl-call-icon"><Icon name="call" size={20} /></span>
                     <strong>No call running</strong>
                     <span>Start a call and it plays here, next to your code.</span>
-                    <button onClick={() => setIsMeetingActive(true)}><Video size={14} /> Start call</button>
+                    <button onClick={() => setIsMeetingActive(true)}><Icon name="call" size={14} /> Start call</button>
                 </div>
             );
         }
@@ -1205,17 +1171,18 @@ const ProjectPage = () => {
                     isExecuting={isExecuting}
                     onToggleTheme={toggleTheme}
                     actions={[
-                        { id: 'call', label: isMeetingActive ? 'Leave call' : 'Start voice & video call', icon: <Video size={18} />, onClick: () => setIsMeetingActive(!isMeetingActive), active: isMeetingActive, tone: 'green' },
-                        { id: 'board', label: 'Whiteboard', icon: <Layout size={18} />, onClick: () => setShowWhiteboard(true) },
-                        { id: 'ai', label: 'AI Copilot', icon: <AiIcon size={18} />, onClick: () => setShowAICopilot(true) },
-                        { id: 'invite', label: 'Invite team', icon: <Plus size={18} />, onClick: () => setShowInviteModal(true) },
+                        { id: 'call', label: isMeetingActive ? 'Leave call' : 'Start voice & video call', icon: <Icon name="call" size={20} filled={isMeetingActive} />, onClick: () => { if (isMobile && !isMeetingActive) setIsMeetingMinimized(false); setIsMeetingActive(!isMeetingActive); }, active: isMeetingActive, tone: 'green' },
+                        { id: 'board', label: 'Whiteboard', icon: <Icon name="whiteboard" size={20} />, onClick: () => setShowWhiteboard(true) },
+                        { id: 'ai', label: 'AI Copilot', icon: <Icon name="ai" size={20} />, onClick: () => setShowAICopilot(true) },
+                        { id: 'invite', label: 'Invite team', icon: <Icon name="invite" size={20} />, onClick: () => setShowInviteModal(true) },
                         ...diskActions,
-                        { id: 'search', label: 'Command palette', icon: <Search size={18} />, onClick: () => setShowCommandPalette(true), section: 'more' },
-                        { id: 'focus', label: 'Focus mode', icon: <Zap size={18} />, onClick: () => setShowFocusModal(true), section: 'more' },
-                        { id: 'history', label: 'Version history', icon: <History size={18} />, onClick: () => setShowDiffViewer(true), section: 'more' },
-                        { id: 'github', label: 'GitHub', icon: <GitHubIcon size={18} />, onClick: () => setShowGitHub(true), section: 'more' },
-                        { id: 'analytics', label: 'Analytics', icon: <Activity size={18} />, onClick: () => setShowAnalytics(true), section: 'more' },
-                        { id: 'dash', label: 'Back to dashboard', icon: <Layout size={18} />, onClick: () => navigate('/dashboard'), section: 'more' },
+                        { id: 'settings', label: 'Editor settings', icon: <Icon name="settings" size={20} />, onClick: () => setShowSettings(true) },
+                        { id: 'search', label: 'Command palette', icon: <Icon name="palette" size={20} />, onClick: () => setShowCommandPalette(true), section: 'more' },
+                        { id: 'focus', label: 'Focus mode', icon: <Icon name="focus" size={20} />, onClick: () => setShowFocusModal(true), section: 'more' },
+                        { id: 'history', label: 'Version history', icon: <Icon name="history" size={20} />, onClick: () => setShowDiffViewer(true), section: 'more' },
+                        { id: 'github', label: 'GitHub', icon: <Icon name="github" size={20} />, onClick: () => setShowGitHub(true), section: 'more' },
+                        { id: 'analytics', label: 'Analytics', icon: <Icon name="analytics" size={20} />, onClick: () => setShowAnalytics(true), section: 'more' },
+                        { id: 'dash', label: 'Back to dashboard', icon: <Icon name="dashboard" size={20} />, onClick: () => navigate('/dashboard'), section: 'more' },
                     ]}
                 />
             )}
@@ -1223,7 +1190,16 @@ const ProjectPage = () => {
             <div className="ws-body">
                 {isMobile ? (
                     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-                        {activeTab === 'code' && renderWorkArea(0.4)}
+                        {/* Phones get the editor and the output as separate tabs, like rooms do. */}
+                        {activeTab === 'code' && (
+                            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+                                {renderTabs()}
+                                <div style={{ flex: 1, position: 'relative', minHeight: 0 }}>{renderEditor()}</div>
+                            </div>
+                        )}
+                        {activeTab === 'output' && (
+                            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>{renderOutputPanel()}</div>
+                        )}
                         {activeTab === 'files' && (
                             <div style={{ flex: 1, background: 'var(--u-bg-2)', overflow: 'hidden' }}>
                                 <ProjectFileTree files={files} activeFile={activeFile} project={project} onSelect={(f) => { handleFileClick(f); setActiveTab('code'); }} onCreate={handleAddFile} onDelete={handleDeleteFile} onImport={handleImportFile} onMove={handleMoveFile} />
@@ -1240,23 +1216,17 @@ const ProjectPage = () => {
                                 {renderPeople()}
                             </div>
                         )}
-                        {activeTab === 'video' && (
-                            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', position: 'relative' }}>
-                                <VideoChat
-                                    socketRef={socketRef}
-                                    projectId={projectId}
-                                    user={user || { name: guestName || 'Guest', isGuest: true }}
-                                    isMinimized={false}
-                                    externalInCall={isMeetingStarting}
-                                    onCallStateChange={setIsMeetingStarting}
-                                    clients={clients}
-                                    mediaStates={mediaStates}
-                                    initialAudioState={initialAudio}
-                                    initialVideoState={initialVideo}
-                                    isMobile={isMobile}
-                                />
-                            </div>
-                        )}
+                    </div>
+                ) : cards ? (
+                    <div style={{ flex: 1, position: 'relative', minHeight: 0 }}>
+                        <RoomLayout
+                            state={projectLayout}
+                            renderPanel={renderProjectPanel}
+                            inlineHandles={isMeetingActive ? ['call'] : []}
+                            flexOf={projectFlex}
+                            hidden={isOutputVisible ? [] : ['output']}
+                            onHideCard={(id) => { if (id !== 'output') return false; setIsOutputVisible(false); return true; }}
+                        />
                     </div>
                 ) : cards ? (
                     <div style={{ flex: 1, position: 'relative', minHeight: 0 }}>
@@ -1289,7 +1259,7 @@ const ProjectPage = () => {
                                 <nav className="ws-rail" aria-label="Sidebar">
                                     {SIDE_TABS.map((t) => (
                                         <button key={t.id} onClick={() => toggleSidebarTab(t.id)} title={t.label} aria-label={`Show ${t.label}`}>
-                                            <t.Icon size={16} />
+                                            <Icon name={t.icon} size={16} />
                                             {t.id === 'chat' && messages.length > 0 && <i className="ws-rail-dot" />}
                                         </button>
                                     ))}
@@ -1303,27 +1273,29 @@ const ProjectPage = () => {
                 )}
             </div>
 
-            {isMeetingActive && !isMobile && (
-                <VideoChat
-                    socketRef={socketRef}
-                    projectId={projectId}
-                    user={user || { name: guestName || 'Guest', isGuest: true }}
-                    isMinimized={isMeetingMinimized}
-                    onMinimizeToggle={(val) => setIsMeetingMinimized(val)}
-                    dock={cards && projectLayout.has('call') ? callRect : null}
-                    onDockToggle={cards ? () => projectLayout.toggle('call') : undefined}
-                    dockHandle={<CardHandle id="call" state={projectLayout} />}
-                    externalInCall={isMeetingStarting}
-                    onCallStateChange={(active) => {
-                        setIsMeetingStarting(active);
-                        if (!active) setIsMeetingActive(false);
-                    }}
-                    clients={clients}
-                    mediaStates={mediaStates}
-                    initialAudioState={initialAudio}
-                    initialVideoState={initialVideo}
-                    isMobile={isMobile}
-                />
+            {/* One call for the whole page, so switching tabs or layouts never restarts it.
+                On phones it fills the screen until minimised, as in rooms. */}
+            {isMeetingActive && (
+                <div style={isMobile && !isMeetingMinimized ? { position: 'fixed', inset: 0, zIndex: 9998, backgroundColor: '#000' } : undefined}>
+                    <VideoChat
+                        socketRef={socketRef}
+                        projectId={projectId}
+                        user={user || { name: guestName || 'Guest', isGuest: true }}
+                        isMinimized={isMeetingMinimized}
+                        onMinimizeToggle={(val) => setIsMeetingMinimized(val)}
+                        dock={cards && projectLayout.has('call') ? callRect : null}
+                        onDockToggle={cards ? () => projectLayout.toggle('call') : undefined}
+                        dockHandle={<CardHandle id="call" state={projectLayout} />}
+                        externalInCall={isMeetingStarting}
+                        onCallStateChange={(active) => {
+                            setIsMeetingStarting(active);
+                            if (!active) setIsMeetingActive(false);
+                        }}
+                        clients={clients}
+                        mediaStates={mediaStates}
+                        isMobile={isMobile}
+                    />
+                </div>
             )}
 
             {!isMobile && (
@@ -1338,7 +1310,7 @@ const ProjectPage = () => {
                         <span>{clients.length} online</span>
                         <span className="rl-anchor">
                             <button className={showLayoutMenu ? 'on' : ''} onClick={() => setShowLayoutMenu((v) => !v)} aria-expanded={showLayoutMenu} title="Layout: classic sidebar or rearrangeable cards">
-                                <LayoutTemplate size={12} /> layout
+                                <Icon name="layout" size={12} filled={showLayoutMenu} /> layout
                             </button>
                             {showLayoutMenu && (
                                 <LayoutMenu
@@ -1350,13 +1322,13 @@ const ProjectPage = () => {
                         </span>
                         {canDockTerminal && (
                             <button className={terminalShown ? 'on' : ''} onClick={() => toggleTerminal()} title="Toggle the terminal">
-                                <SquareTerminal size={12} /> terminal
+                                <Icon name="terminal" size={12} filled={terminalShown} /> terminal
                             </button>
                         )}
                         <button className={isOutputVisible ? 'on' : ''} onClick={() => setIsOutputVisible(!isOutputVisible)} title="Toggle output panel">
-                            <Terminal size={12} /> output
+                            <Icon name="terminal" size={12} filled={isOutputVisible} /> output
                         </button>
-                        <button onClick={handleCompile} disabled={isExecuting}><Play size={10} fill="currentColor" /> {isExecuting ? 'running…' : 'run'}</button>
+                        <button onClick={handleCompile} disabled={isExecuting}><Icon name="run" size={12} /> {isExecuting ? 'running…' : 'run'}</button>
                     </div>
                 </footer>
             )}
@@ -1364,17 +1336,22 @@ const ProjectPage = () => {
             {isMobile && (
                 <nav className="ws-tabbar" aria-label="Workspace">
                     {[
-                        { id: 'code', icon: <FileCode size={19} />, label: 'Code' },
-                        { id: 'files', icon: <Folder size={19} />, label: 'Files' },
-                        { id: 'chat', icon: <MessageSquare size={19} />, label: 'Chat', dot: messages.length > 0 },
-                        { id: 'users', icon: <Users size={19} />, label: 'People' },
-                        { id: 'video', icon: <Video size={19} />, label: 'Meet' },
+                        { id: 'code', icon: 'code', label: 'Code' },
+                        isWebProject ? { id: 'output', icon: 'preview', label: 'Preview' } : { id: 'output', icon: 'terminal', label: 'I/O' },
+                        { id: 'files', icon: 'files', label: 'Files' },
+                        { id: 'chat', icon: 'chat', label: 'Chat', dot: messages.length > 0 },
+                        { id: 'users', icon: 'people', label: 'People' },
+                        // Meet opens the page's one call full screen instead of switching tabs.
+                        { id: 'video', icon: 'call', label: 'Meet', on: isMeetingActive, onClick: () => { setIsMeetingMinimized(false); setIsMeetingActive(true); } },
                     ].map((t) => (
-                        <button key={t.id} className={activeTab === t.id ? 'on' : ''} onClick={() => setActiveTab(t.id)}>
-                            {t.icon}<span>{t.label}</span>
+                        <button key={t.id} className={(t.onClick ? t.on : activeTab === t.id) ? 'on' : ''} onClick={t.onClick || (() => setActiveTab(t.id))}>
+                            <Icon name={t.icon} size={20} filled={t.onClick ? t.on : activeTab === t.id} /><span>{t.label}</span>
                             {t.dot && <span className="u-count" style={{ minWidth: 8, height: 8, padding: 0 }} />}
                         </button>
                     ))}
+                    <button className={showSettings ? 'on' : ''} onClick={() => setShowSettings(true)}>
+                        <Icon name="settings" size={20} filled={showSettings} /><span>Settings</span>
+                    </button>
                 </nav>
             )}
 
@@ -1478,6 +1455,8 @@ const ProjectPage = () => {
                 user={user || { name: guestName || 'Guest' }}
             />
 
+            <SettingsModal isOpen={showSettings} onClose={() => setShowSettings(false)} settings={settings} onSettingsChange={setSettings} />
+
             <CommandPalette
                 isOpen={showCommandPalette}
                 onClose={() => setShowCommandPalette(false)}
@@ -1487,7 +1466,7 @@ const ProjectPage = () => {
 
             {isZenMode && (
                 <button className="u-btn u-btn--solid ws-zen-exit" onClick={() => setIsZenMode(false)}>
-                    <Eye size={15} /> Exit zen mode
+                    <Icon name="show" size={16} /> Exit zen mode
                 </button>
             )}
         </div>

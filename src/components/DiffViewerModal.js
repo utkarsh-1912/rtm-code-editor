@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { RotateCcw } from 'lucide-react';
+import Icon from "./icons/Icon";
 import { Modal, timeAgo } from './ux/primitives';
 import toast from 'react-hot-toast';
 import { getBackendUrl } from '../utils/api';
@@ -72,7 +72,7 @@ function DiffViewerModal({ isOpen, onClose, roomId = null, projectId = null, cur
             footer={selectedSnapshot && onRestoreSnapshot ? <>
                 <button type="button" className="u-btn u-btn--ghost" onClick={onClose}>Close</button>
                 <button type="button" className="u-btn u-btn--solid" onClick={() => { onRestoreSnapshot(selectedSnapshot); toast.success(`Restored “${selectedSnapshot.name}”`); onClose(); }}>
-                    <RotateCcw size={15} /> Restore this version
+                    <Icon name="reset" size={16} /> Restore this version
                 </button>
             </> : null}
         >
