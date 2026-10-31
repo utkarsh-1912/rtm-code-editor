@@ -5,7 +5,7 @@ import { CalendarPlus, CalendarDays, Clock, Copy, X, Video, Download, MoreHorizo
 import { Modal } from "./ux/primitives";
 import { VISIBILITY_OPTIONS } from "./RoomAccess";
 import {
-    scheduleMeeting, updateMeeting, deleteMeeting, listMeetings, meetingLink, icsUrl, googleCalendarUrl, outlookCalendarUrl,
+    scheduleMeeting, updateMeeting, deleteMeeting, listMeetings, listPastMeetings, meetingLink, icsUrl, googleCalendarUrl, outlookCalendarUrl,
     formatWhen, isJoinable, startsIn,
 } from "../utils/meetings";
 
@@ -216,7 +216,16 @@ export function UpcomingMeetings({ user, onSchedule, refreshKey = 0 }) {
     const [items, setItems] = useState(null);
     const [menu, setMenu] = useState(null);
     const [editing, setEditing] = useState(null);
+    const [tab, setTab] = useState("upcoming"); // upcoming | past (meetings you organised, to review)
+    const [past, setPast] = useState(null);
     const [, tick] = useState(0);
+
+    useEffect(() => {
+        if (tab !== "past" || !user?.uid) return undefined;
+        let live = true;
+        listPastMeetings().then((list) => live && setPast(list)).catch(() => live && setPast([]));
+        return () => { live = false; };
+    }, [tab, user?.uid, refreshKey]);
 
     useEffect(() => {
         if (!user?.uid) return undefined;
@@ -236,10 +245,33 @@ export function UpcomingMeetings({ user, onSchedule, refreshKey = 0 }) {
     return (
         <section className="u-card mt-upcoming" data-rise aria-label="Upcoming calls">
             <div className="mt-upcoming-head">
-                <span className="u-label"><CalendarDays size={13} /> Upcoming calls{items.length ? ` · ${items.length}` : ""}</span>
+                <span className="mt-tabs" role="tablist" aria-label="Calls">
+                    <button role="tab" aria-selected={tab === "upcoming"} className={tab === "upcoming" ? "on" : ""} onClick={() => setTab("upcoming")}><CalendarDays size={13} /> Upcoming{items.length ? ` · ${items.length}` : ""}</button>
+                    <button role="tab" aria-selected={tab === "past"} className={tab === "past" ? "on" : ""} onClick={() => setTab("past")}>Past</button>
+                </span>
                 <button className="u-btn u-btn--ghost u-btn--sm" onClick={onSchedule}><CalendarPlus size={14} /> Schedule</button>
             </div>
-            {items.length === 0 ? (
+            {tab === "past" ? (
+                past === null ? <div className="u-skel" style={{ height: 56 }} />
+                    : past.length === 0 ? <p className="mt-empty">Meetings you organise show up here afterwards, with your notes and code snapshots.</p>
+                        : (
+                            <ul className="mt-list">
+                                {past.slice(0, 8).map((m) => (
+                                    <li key={m.id}>
+                                        <span className="mt-date">
+                                            <b>{new Date(m.startsAt).toLocaleDateString([], { day: "numeric" })}</b>
+                                            <span>{new Date(m.startsAt).toLocaleDateString([], { month: "short" })}</span>
+                                        </span>
+                                        <span className="mt-main">
+                                            <b className="u-ellipsis">{m.title}</b>
+                                            <span className="u-mono">{m.endedAt ? "Ended" : "Past"} · {m.snapshotCount} snapshot{m.snapshotCount === 1 ? "" : "s"}{m.notes ? " · notes" : ""}</span>
+                                        </span>
+                                        <button className="u-btn u-btn--sm u-btn--ghost" onClick={() => navigate(`/meet/${m.id}`)}>Review</button>
+                                    </li>
+                                ))}
+                            </ul>
+                        )
+            ) : items.length === 0 ? (
                 <p className="mt-empty">Nothing scheduled. Plan an interview or a pairing session, and everyone gets a calendar invite.</p>
             ) : (
                 <ul className="mt-list">

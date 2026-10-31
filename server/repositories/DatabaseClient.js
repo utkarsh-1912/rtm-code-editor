@@ -222,6 +222,26 @@ async function initializeSchema() {
         );
         `;
         await sql`CREATE INDEX IF NOT EXISTS meetings_starts_at ON meetings (starts_at);`;
+        // Organisers: co-organisers (emails), private notes, when the organiser ended it.
+        await sql`ALTER TABLE meetings ADD COLUMN IF NOT EXISTS co_hosts JSONB DEFAULT '[]'::jsonb;`;
+        await sql`ALTER TABLE meetings ADD COLUMN IF NOT EXISTS host_notes TEXT DEFAULT '';`;
+        await sql`ALTER TABLE meetings ADD COLUMN IF NOT EXISTS ended_at TIMESTAMP WITH TIME ZONE;`;
+        // Code snapshots taken during a meeting (by an organiser, and one when it ends), each
+        // with a private comment. Only organisers see them.
+        await sql`
+        CREATE TABLE IF NOT EXISTS meeting_snapshots (
+            id SERIAL PRIMARY KEY,
+            meeting_id VARCHAR(32) NOT NULL REFERENCES meetings(id) ON DELETE CASCADE,
+            kind VARCHAR(16) DEFAULT 'manual',
+            label VARCHAR(200) DEFAULT '',
+            code TEXT DEFAULT '',
+            language VARCHAR(40),
+            taken_by VARCHAR(120),
+            note TEXT DEFAULT '',
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+        );
+        `;
+        await sql`CREATE INDEX IF NOT EXISTS meeting_snapshots_meeting ON meeting_snapshots (meeting_id, created_at);`;
         // Room access: who owns a room, who may join it (public link, invite-only, private).
         await sql`ALTER TABLE rooms ADD COLUMN IF NOT EXISTS owner_uid VARCHAR(128);`;
         await sql`ALTER TABLE rooms ADD COLUMN IF NOT EXISTS visibility VARCHAR(16) DEFAULT 'public';`;

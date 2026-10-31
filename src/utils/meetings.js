@@ -24,6 +24,17 @@ export const listMeetings = () => call("/meetings");
 export const getMeeting = (id) => call(`/meetings/${encodeURIComponent(id)}`);
 export const updateMeeting = (id, body) => call(`/meetings/${encodeURIComponent(id)}`, { method: "PATCH", body });
 export const deleteMeeting = (id) => call(`/meetings/${encodeURIComponent(id)}`, { method: "DELETE" });
+export const listPastMeetings = () => call("/meetings?past=1");
+// Organisers only: the room's meeting, private notes, co-organisers, snapshots, ending it.
+const mid = (id) => `/meetings/${encodeURIComponent(id)}`;
+export const roomMeeting = (roomId) => call(`/meetings/room/${encodeURIComponent(roomId)}`);
+export const saveMeetingNotes = (id, notes) => call(`${mid(id)}/notes`, { method: "PUT", body: { notes } });
+export const saveCoHosts = (id, coHosts) => call(`${mid(id)}/co-hosts`, { method: "PUT", body: { coHosts } });
+export const listSnapshots = (id) => call(`${mid(id)}/snapshots`);
+export const takeSnapshot = (id, body = {}) => call(`${mid(id)}/snapshots`, { method: "POST", body });
+export const updateSnapshot = (id, sid, body) => call(`${mid(id)}/snapshots/${sid}`, { method: "PATCH", body });
+export const deleteSnapshot = (id, sid) => call(`${mid(id)}/snapshots/${sid}`, { method: "DELETE" });
+export const endMeeting = (id, body = {}) => call(`${mid(id)}/end`, { method: "POST", body });
 
 export const meetingLink = (m) => `${publicOrigin()}/meet/${m.id}`;
 export const icsUrl = (m) => `${getBackendUrl()}/api/meetings/${encodeURIComponent(m.id)}/ics`;
@@ -68,8 +79,8 @@ export function formatWhen(startsAt) {
 }
 
 // Joinable from 10 minutes before the start until it ends.
-export const isJoinable = (m, now = Date.now()) => !m.cancelled && now >= new Date(m.startsAt).getTime() - 10 * 60000 && now <= endOf(m).getTime();
-export const isOver = (m, now = Date.now()) => now > endOf(m).getTime();
+export const isJoinable = (m, now = Date.now()) => !m.cancelled && !m.endedAt && now >= new Date(m.startsAt).getTime() - 10 * 60000 && now <= endOf(m).getTime();
+export const isOver = (m, now = Date.now()) => !!m.endedAt || now > endOf(m).getTime();
 
 export function startsIn(startsAt, now = Date.now()) {
     const mins = Math.round((new Date(startsAt).getTime() - now) / 60000);

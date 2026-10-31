@@ -37,6 +37,8 @@ import { rememberRoom } from "../utils/recentRooms";
 import Icon from "../components/icons/Icon";
 import VideoChat from "../components/VideoChat";
 import useCallStartedAlert from "../components/useCallStartedAlert";
+import useRoomMeeting from "../components/useRoomMeeting";
+import { EndMeetingModal } from "../components/MeetingOrganiser";
 import { useCallCarry } from "../context/CallCarry";
 import { getCallPrefs } from "../utils/callPrefs";
 import WorkspaceHeader from "../components/WorkspaceHeader";
@@ -161,6 +163,18 @@ function Editor() {
 
   // Someone else opened a call here: offer to join it.
   useCallStartedAlert(socketRef, { inCall: isMeetingActive, onJoin: () => { setIsMeetingMinimized(false); setIsMeetingActive(true); } });
+  // A scheduled meeting you organise here: snapshot, notes, end it. When an organiser ends it,
+  // everyone else is shown out to the meeting page.
+  const [endMeetingOpen, setEndMeetingOpen] = useState(false);
+  const roomMeetingState = useRoomMeeting({
+    roomId, user, socketRef,
+    onShownOut: (meetingId) => {
+      leavingRef.current = true;
+      setIsMeetingActive(false);
+      reactNavigator(meetingId ? `/meet/${meetingId}` : "/", { replace: true });
+    },
+  });
+  const orgMeeting = roomMeetingState.meeting;
   // Arrived from a meeting page (camera and mic already checked there): open the call now.
   useEffect(() => {
     if (location.state?.startCall) { setIsMeetingMinimized(false); setIsMeetingActive(true); }
@@ -662,6 +676,11 @@ function Editor() {
         onToggleTheme={toggleTheme}
         actions={[
           { id: "call", label: isMeetingActive ? "Leave call" : "Start voice & video call", icon: <Icon name="call" size={20} filled={isMeetingActive} />, onClick: () => setIsMeetingActive((v) => !v), active: isMeetingActive, tone: "green" },
+          ...(orgMeeting ? [
+            { id: "snapshot", label: `Snapshot the code (${orgMeeting.title})`, icon: <Icon name="snapshot" size={20} />, onClick: () => roomMeetingState.snapshot({ code: codeRef.current, language, takenBy: user?.name || userName }) },
+            { id: "meet-notes", label: "Meeting notes & snapshots", icon: <Icon name="meeting-notes" size={20} />, onClick: () => window.open(`/meet/${orgMeeting.id}`, "_blank", "noopener"), section: "more" },
+            { id: "meet-end", label: "End meeting for everyone", icon: <Icon name="meeting-end" size={20} />, onClick: () => setEndMeetingOpen(true), section: "more", tone: "red" },
+          ] : []),
           ...(user?.uid ? [{ id: "schedule", label: "Schedule a call in this room", icon: <Icon name="calendar-add" size={20} />, onClick: () => setScheduleOpen(true), section: "more" }] : []),
           { id: "board", label: "Whiteboard", icon: <Icon name="whiteboard" size={20} />, onClick: () => setShowWhiteboard(true) },
           { id: "ai", label: "AI Copilot", icon: <Icon name="ai" size={20} />, onClick: () => setShowAICopilot(true) },
@@ -897,6 +916,11 @@ function Editor() {
       />
 
       <ScheduleModal open={scheduleOpen} onClose={() => setScheduleOpen(false)} roomId={roomId} hostName={user?.name || userName} />
+      {orgMeeting && (
+        <EndMeetingModal open={endMeetingOpen} meeting={orgMeeting} onClose={() => setEndMeetingOpen(false)}
+          code={codeRef.current} language={language} takenBy={user?.name || userName}
+          onEnded={() => roomMeetingState.setMeeting(null)} />
+      )}
 
       <KnockList
         knocks={knocks}

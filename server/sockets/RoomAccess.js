@@ -87,7 +87,14 @@ function createRoomAccess(io) {
         delete identity[socket.id];
     }
 
-    return { load, set, forget, identify, whoIs, isOwner, mayEnter, knock, pendingFor, answer, drop };
+    // Access was taken away (a meeting ended): forget one-off approvals and open knocks.
+    function revoke(roomId) {
+        grants.delete(roomId);
+        knocks.delete(roomId);
+        cache.delete(roomId);
+    }
+
+    return { load, set, forget, identify, whoIs, isOwner, mayEnter, knock, pendingFor, answer, drop, revoke };
 }
 
 module.exports = { createRoomAccess };

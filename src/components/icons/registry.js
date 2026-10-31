@@ -3,6 +3,9 @@ import React from "react";
 // the headless build, so the bundle only carries the icons listed here and no CSS-in-JS runtime.
 // The unsized `…Regular` / `…Filled` exports are drawn on the 20px grid and scale with width/height.
 import { AddFilled, AddRegular } from "@fluentui/react-icons/headless/svg/add";
+import { CameraFilled, CameraRegular } from "@fluentui/react-icons/headless/svg/camera";
+import { NoteFilled, NoteRegular } from "@fluentui/react-icons/headless/svg/note";
+import { PowerFilled, PowerRegular } from "@fluentui/react-icons/headless/svg/power";
 import { ArrowLeftFilled, ArrowLeftRegular } from "@fluentui/react-icons/headless/svg/arrow-left";
 import { ArrowDownloadFilled, ArrowDownloadRegular } from "@fluentui/react-icons/headless/svg/arrow-download";
 import { ArrowMaximizeFilled, ArrowMaximizeRegular } from "@fluentui/react-icons/headless/svg/arrow-maximize";
@@ -118,6 +121,9 @@ const ICONS = {
     video: pair(VideoRegular, VideoFilled),
     "video-off": pair(VideoOffRegular, VideoOffFilled),
     "screen-share": pair(ShareScreenStartRegular, ShareScreenStartFilled),
+    snapshot: pair(CameraRegular, CameraFilled),
+    "meeting-notes": pair(NoteRegular, NoteFilled),
+    "meeting-end": pair(PowerRegular, PowerFilled),
     "screen-share-stop": pair(ShareScreenStopRegular, ShareScreenStopFilled),
     pin: pair(PinRegular, PinFilled),
     unpin: pair(PinOffRegular, PinOffFilled),

@@ -6,6 +6,7 @@ import AppLayout from "../components/AppLayout";
 import { CalendarLinks, ScheduleModal, confirmDeleteMeeting } from "../components/Meetings";
 import { useAuth } from "../context/AuthContext";
 import DeviceCheck from "../components/DeviceCheck";
+import MeetingOrganiser from "../components/MeetingOrganiser";
 import { getMeeting, meetingLink, isJoinable, isOver, startsIn } from "../utils/meetings";
 
 const ACCESS = {
@@ -76,7 +77,7 @@ export default function MeetPage() {
         body = (
             <div className="mt-page-card">
                 <span className={`mt-page-ico${m.cancelled ? " is-bad" : joinable ? " is-live" : ""}`}>{m.cancelled ? <CalendarX size={22} /> : <CalendarDays size={22} />}</span>
-                <span className="u-label">{m.cancelled ? "Cancelled" : over ? "This meeting has ended" : joinable ? "Happening now" : `Starts ${startsIn(m.startsAt)}`}</span>
+                <span className="u-label">{m.cancelled ? "Cancelled" : m.endedAt ? "Ended by the organiser" : over ? "This meeting has ended" : joinable ? "Happening now" : `Starts ${startsIn(m.startsAt)}`}</span>
                 <h1>{m.title}</h1>
                 <div className="mt-page-facts">
                     <span><CalendarDays size={14} /> {start.toLocaleDateString([], { weekday: "long", day: "numeric", month: "long", year: "numeric" })}</span>
@@ -112,16 +113,33 @@ export default function MeetPage() {
                         {m.isHost && (
                             <div className="mt-page-host">
                                 <button className="u-btn u-btn--ghost u-btn--sm" onClick={() => setEditing(true)}><Pencil size={14} /> Edit or reschedule</button>
-                                <button className="u-btn u-btn--ghost u-btn--sm danger" onClick={remove}><Trash2 size={14} /> Delete</button>
+                                {m.isOwner && <button className="u-btn u-btn--ghost u-btn--sm danger" onClick={remove}><Trash2 size={14} /> Delete</button>}
                             </div>
                         )}
                         <span className="u-label">Add to calendar</span>
                         <CalendarLinks meeting={m} />
                     </>
                 )}
-                {m.isHost && over && <button className="u-btn u-btn--ghost u-btn--sm danger" onClick={remove}><Trash2 size={14} /> Delete</button>}
+                {!m.isHost && m.endedAt && <p className="u-small u-muted">The room is closed now. Thanks for joining.</p>}
+                {m.isHost && over && (
+                    <div className="mt-page-host">
+                        <button className="u-btn u-btn--ghost u-btn--sm" onClick={() => navigate(`/editor/${m.roomId}`)}><Video size={14} /> Open the room</button>
+                        {m.isOwner && <button className="u-btn u-btn--ghost u-btn--sm danger" onClick={remove}><Trash2 size={14} /> Delete</button>}
+                    </div>
+                )}
                 {m.isHost && <ScheduleModal open={editing} meeting={m} onClose={() => setEditing(false)} onScheduled={(next) => setM(next)} />}
             </div>
+        );
+    }
+    // Organisers get the review side: private notes, snapshots, co-organisers, End meeting.
+    if (m?.isHost && !m.cancelled) {
+        return (
+            <AppLayout>
+                <div className="mt-page mt-page--org">
+                    {body}
+                    <MeetingOrganiser meeting={m} onChange={(next) => setM(next)} userName={user?.name || user?.email} />
+                </div>
+            </AppLayout>
         );
     }
     return <AppLayout><div className="mt-page">{body}</div></AppLayout>;
