@@ -9,15 +9,10 @@ const MINUTE = 60 * 1000;
 
 async function runReminders() {
     if (health.db !== 'ready') return 0;
-    const { tellInvitees, when } = require('../routes/meetingRoutes');
+    const { tellInvitees } = require('../routes/meetingRoutes');
     const due = await MeetingRepository.takeDueReminders(10);
     for (const m of due) {
-        await tellInvitees(m, {
-            subject: `Starting soon: ${m.title}`,
-            title: `Starting soon: ${m.title}`,
-            message: `${when(m)}\n\nJoin from the link when you're ready.`,
-            ctaText: 'Join meeting',
-        }).catch(() => { });
+        await tellInvitees(m, { kind: 'reminder' }).catch(() => { });
         const host = await UserRepository.getUser(m.host_uid).catch(() => null);
         if (host) NotificationRepository.notifyUser(m.host_uid, { type: 'meeting', message: `Starting soon: ${m.title}`, url: `/meet/${m.id}`, data: { meetingId: m.id } }).catch(() => { });
     }

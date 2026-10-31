@@ -36,6 +36,7 @@ import ProblemPane from "../components/ProblemPane";
 import { rememberRoom } from "../utils/recentRooms";
 import Icon from "../components/icons/Icon";
 import VideoChat from "../components/VideoChat";
+import useCallStartedAlert from "../components/useCallStartedAlert";
 import { useCallCarry } from "../context/CallCarry";
 import { getCallPrefs } from "../utils/callPrefs";
 import WorkspaceHeader from "../components/WorkspaceHeader";
@@ -157,6 +158,13 @@ function Editor() {
       if (carryRef.current && !leavingRef.current && getCallPrefs().keepOnNavigate) carryCall(carryRef.current);
     };
   }, [roomId, carryCall, claimCall]);
+
+  // Someone else opened a call here: offer to join it.
+  useCallStartedAlert(socketRef, { inCall: isMeetingActive, onJoin: () => { setIsMeetingMinimized(false); setIsMeetingActive(true); } });
+  // Arrived from a meeting page (camera and mic already checked there): open the call now.
+  useEffect(() => {
+    if (location.state?.startCall) { setIsMeetingMinimized(false); setIsMeetingActive(true); }
+  }, [location.state]);
 
   useEffect(() => {
     localStorage.setItem("app-editor-settings", JSON.stringify(settings));

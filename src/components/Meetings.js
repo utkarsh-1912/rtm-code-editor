@@ -1,11 +1,11 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
-import { CalendarPlus, CalendarDays, Clock, Copy, X, Video, Download, MoreHorizontal, Mail, Check } from "lucide-react";
+import { CalendarPlus, CalendarDays, Clock, Copy, X, Video, Download, MoreHorizontal, Mail, Check, Pencil, Trash2 } from "lucide-react";
 import { Modal } from "./ux/primitives";
 import { VISIBILITY_OPTIONS } from "./RoomAccess";
 import {
-    scheduleMeeting, listMeetings, cancelMeeting, meetingLink, icsUrl, googleCalendarUrl, outlookCalendarUrl,
+    scheduleMeeting, updateMeeting, deleteMeeting, listMeetings, meetingLink, icsUrl, googleCalendarUrl, outlookCalendarUrl,
     formatWhen, isJoinable, startsIn,
 } from "../utils/meetings";
 
@@ -32,8 +32,27 @@ export function CalendarLinks({ meeting, compact = false }) {
     );
 }
 
+const lengthLabel = (d) => (d < 60 ? `${d} min` : `${Math.floor(d / 60)} h${d % 60 ? ` ${d % 60} min` : ""}`);
+
+// Host removes a meeting (asks first). Resolves true when it's gone.
+export async function confirmDeleteMeeting(m) {
+    const upcoming = new Date(m.startsAt).getTime() > Date.now();
+    const told = upcoming && m.invitees?.length ? " Everyone invited gets a cancellation email." : "";
+    if (!window.confirm(`Delete “${m.title}”?${told}`)) return false;
+    try {
+        await deleteMeeting(m.id);
+        toast.success("Meeting deleted");
+        return true;
+    } catch (err) {
+        toast.error(err.message);
+        return false;
+    }
+}
+
 // Schedule a call in a new room, or in `roomId` when given (from inside a room).
-export function ScheduleModal({ open, onClose, roomId = null, hostName, onScheduled }) {
+// With `meeting`, edits that meeting instead: a new time reschedules it and everyone is told.
+export function ScheduleModal({ open, onClose, roomId = null, hostName, onScheduled, meeting = null }) {
+    const editing = !!meeting;
     const slot = useMemo(nextSlot, [open]); // eslint-disable-line react-hooks/exhaustive-deps
     const [title, setTitle] = useState("");
     const [date, setDate] = useState(localDate(slot));
@@ -48,9 +67,17 @@ export function ScheduleModal({ open, onClose, roomId = null, hostName, onSchedu
 
     useEffect(() => {
         if (!open) return;
-        setTitle(""); setDate(localDate(slot)); setTime(localTime(slot)); setDuration(30); setAccess("invite");
-        setEmails([]); setDraft(""); setDescription(""); setDone(null);
-    }, [open, slot]);
+        if (meeting) {
+            const at = new Date(meeting.startsAt);
+            setTitle(meeting.title || ""); setDate(localDate(at)); setTime(localTime(at)); setDuration(meeting.durationMin || 30);
+            setAccess(meeting.access || "invite"); setEmails(meeting.invitees || []); setDescription(meeting.description || "");
+        } else {
+            setTitle(""); setDate(localDate(slot)); setTime(localTime(slot)); setDuration(30); setAccess("invite");
+            setEmails([]); setDescription("");
+        }
+        setDraft(""); setDone(null);
+    }, [open, slot, meeting]);
+    const durations = DURATIONS.includes(duration) ? DURATIONS : [...DURATIONS, duration].sort((a, b) => a - b);
 
     const addDraft = () => {
         const parts = draft.split(/[\s,;]+/).map((e) => e.trim().toLowerCase()).filter(Boolean);
@@ -67,10 +94,18 @@ export function ScheduleModal({ open, onClose, roomId = null, hostName, onSchedu
         const all = draft.trim() ? [...emails, ...draft.split(/[\s,;]+/).filter((e) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e))] : emails;
         setBusy(true);
         try {
-            const res = await scheduleMeeting({
+            const fields = {
                 title: title.trim(), description, startsAt: startsAt.toISOString(), durationMin: duration,
-                timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone, invitees: all, access, roomId, hostName,
-            });
+                timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone, invitees: [...new Set(all.map((e) => e.toLowerCase()))], access,
+            };
+            const res = editing ? await updateMeeting(meeting.id, fields) : await scheduleMeeting({ ...fields, roomId, hostName });
+            if (editing) {
+                // Nothing to show after an edit: close and say who was told.
+                toast.success(res.emailed ? `Saved. ${res.emailed} ${res.emailed === 1 ? "person was" : "people were"} emailed.` : "Saved");
+                onScheduled?.(res.meeting);
+                onClose?.();
+                return;
+            }
             setDone(res);
             onScheduled?.(res.meeting);
         } catch (err) {
@@ -105,13 +140,15 @@ export function ScheduleModal({ open, onClose, roomId = null, hostName, onSchedu
             open={open}
             onClose={onClose}
             wide
-            label={roomId ? `room/${roomId}` : "New room"}
-            title="Schedule a call"
-            description="Pick a time, invite people, and everyone gets a link and a calendar invite."
+            label={editing ? "Edit meeting" : roomId ? `room/${roomId}` : "New room"}
+            title={editing ? "Edit call" : "Schedule a call"}
+            description={editing
+                ? "Change the time, people or details. Invitees are emailed: a new time counts as a reschedule, new people get an invite, removed people are told."
+                : "Pick a time, invite people, and everyone gets a link and a calendar invite."}
             onSubmit={submit}
             footer={<>
                 <button type="button" className="u-btn u-btn--ghost" onClick={onClose}>Cancel</button>
-                <button type="submit" className="u-btn u-btn--solid" disabled={busy}><CalendarPlus size={15} /> {busy ? "Scheduling…" : "Schedule"}</button>
+                <button type="submit" className="u-btn u-btn--solid" disabled={busy}>{editing ? <Check size={15} /> : <CalendarPlus size={15} />} {busy ? (editing ? "Saving…" : "Scheduling…") : editing ? "Save changes" : "Schedule"}</button>
             </>}
         >
             <div className="u-field">
@@ -130,7 +167,7 @@ export function ScheduleModal({ open, onClose, roomId = null, hostName, onSchedu
                 <div className="u-field">
                     <label htmlFor="mt-dur">Length</label>
                     <select id="mt-dur" className="u-select" value={duration} onChange={(e) => setDuration(Number(e.target.value))}>
-                        {DURATIONS.map((d) => <option key={d} value={d}>{d < 60 ? `${d} min` : `${d / 60} h${d % 60 ? ` ${d % 60} min` : ""}`}</option>)}
+                        {durations.map((d) => <option key={d} value={d}>{lengthLabel(d)}</option>)}
                     </select>
                 </div>
             </div>
@@ -178,6 +215,7 @@ export function UpcomingMeetings({ user, onSchedule, refreshKey = 0 }) {
     const navigate = useNavigate();
     const [items, setItems] = useState(null);
     const [menu, setMenu] = useState(null);
+    const [editing, setEditing] = useState(null);
     const [, tick] = useState(0);
 
     useEffect(() => {
@@ -190,14 +228,10 @@ export function UpcomingMeetings({ user, onSchedule, refreshKey = 0 }) {
 
     if (!user?.uid || items === null) return null;
 
-    const cancel = async (m) => {
-        if (!window.confirm(`Cancel “${m.title}”? Invitees will be told.`)) return;
-        try {
-            await cancelMeeting(m.id);
-            setItems((prev) => prev.filter((x) => x.id !== m.id));
-            toast.success("Meeting cancelled");
-        } catch (err) { toast.error(err.message); }
+    const remove = async (m) => {
+        if (await confirmDeleteMeeting(m)) setItems((prev) => prev.filter((x) => x.id !== m.id));
     };
+    const saved = (next) => setItems((prev) => prev.map((x) => (x.id === next.id ? next : x)).sort((a, b) => new Date(a.startsAt) - new Date(b.startsAt)));
 
     return (
         <section className="u-card mt-upcoming" data-rise aria-label="Upcoming calls">
@@ -233,7 +267,11 @@ export function UpcomingMeetings({ user, onSchedule, refreshKey = 0 }) {
                                             <a href={outlookCalendarUrl(m)} target="_blank" rel="noreferrer"><CalendarPlus size={15} /> Outlook</a>
                                             <a href={icsUrl(m)}><Download size={15} /> Calendar file (.ics)</a>
                                             <button onClick={() => { navigator.clipboard?.writeText(meetingLink(m)); toast.success("Link copied"); setMenu(null); }}><Copy size={15} /> Copy link</button>
-                                            {m.isHost && <button className="danger" onClick={() => { setMenu(null); cancel(m); }}><X size={15} /> Cancel meeting</button>}
+                                            {m.isHost && <>
+                                                <div className="u-pop-sep" role="separator" />
+                                                <button onClick={() => { setMenu(null); setEditing(m); }}><Pencil size={15} /> Edit or reschedule</button>
+                                                <button className="danger" onClick={() => { setMenu(null); remove(m); }}><Trash2 size={15} /> Delete meeting</button>
+                                            </>}
                                         </div>
                                     )}
                                 </span>
@@ -242,6 +280,7 @@ export function UpcomingMeetings({ user, onSchedule, refreshKey = 0 }) {
                     })}
                 </ul>
             )}
+            <ScheduleModal open={!!editing} meeting={editing} onClose={() => setEditing(null)} onScheduled={saved} />
         </section>
     );
 }

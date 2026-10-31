@@ -39,6 +39,25 @@ async function cancelMeeting(id, hostUid) {
     return rows[0] || null;
 }
 
+// Host edits a meeting. A new start time re-arms the reminder.
+async function updateMeeting(id, hostUid, f) {
+    const rows = await sql`
+        UPDATE meetings SET
+            title = ${f.title}, description = ${f.description || ''}, starts_at = ${f.startsAt}, duration_min = ${f.durationMin},
+            time_zone = ${f.timeZone || 'UTC'}, invitees = ${JSON.stringify(f.invitees || [])}::jsonb, access = ${f.access || 'public'},
+            reminded_at = CASE WHEN starts_at = ${f.startsAt}::timestamptz THEN reminded_at ELSE NULL END
+        WHERE id = ${id} AND host_uid = ${hostUid} AND cancelled_at IS NULL
+        RETURNING *
+    `;
+    return rows[0] || null;
+}
+
+// Removes the meeting for good; returns what it was so invitees can be told.
+async function deleteMeeting(id, hostUid) {
+    const rows = await sql`DELETE FROM meetings WHERE id = ${id} AND host_uid = ${hostUid} RETURNING *`;
+    return rows[0] || null;
+}
+
 // Meetings starting within `minutes` that haven't had their reminder; marks them as reminded.
 async function takeDueReminders(minutes = 10) {
     return await sql`
@@ -50,4 +69,4 @@ async function takeDueReminders(minutes = 10) {
     `;
 }
 
-module.exports = { createMeeting, getMeeting, listForUser, cancelMeeting, takeDueReminders };
+module.exports = { createMeeting, getMeeting, listForUser, cancelMeeting, updateMeeting, deleteMeeting, takeDueReminders };

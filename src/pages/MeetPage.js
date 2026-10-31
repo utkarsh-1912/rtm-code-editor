@@ -1,9 +1,11 @@
-import React, { useEffect, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
-import { CalendarDays, Clock, Video, Lock, DoorOpen, Globe, Copy, CalendarX } from "lucide-react";
+import React, { useEffect, useRef, useState } from "react";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { CalendarDays, Clock, Video, Lock, DoorOpen, Globe, Copy, CalendarX, Pencil, Trash2, UserRound } from "lucide-react";
 import toast from "react-hot-toast";
 import AppLayout from "../components/AppLayout";
-import { CalendarLinks } from "../components/Meetings";
+import { CalendarLinks, ScheduleModal, confirmDeleteMeeting } from "../components/Meetings";
+import { useAuth } from "../context/AuthContext";
+import DeviceCheck from "../components/DeviceCheck";
 import { getMeeting, meetingLink, isJoinable, isOver, startsIn } from "../utils/meetings";
 
 const ACCESS = {
@@ -16,9 +18,33 @@ const ACCESS = {
 export default function MeetPage() {
     const { meetingId } = useParams();
     const navigate = useNavigate();
+    const { user } = useAuth();
+    const [params] = useSearchParams();
     const [m, setM] = useState(null);
     const [error, setError] = useState(null);
+    const [editing, setEditing] = useState(false);
     const [, tick] = useState(0);
+    // The invite email carries the person's name (?as=), so guests join without being asked.
+    const [guestName, setGuestName] = useState(() => {
+        const fromLink = (params.get("as") || "").replace(/\s+/g, " ").trim().slice(0, 60);
+        try { return fromLink || localStorage.getItem("guest-name") || ""; } catch { return fromLink; }
+    });
+    const [renaming, setRenaming] = useState(() => !guestName);
+
+    useEffect(() => {
+        if (user || !guestName.trim()) return;
+        try { localStorage.setItem("guest-name", guestName.trim()); } catch { /* storage blocked */ }
+    }, [guestName, user]);
+
+    // Join: ask for camera and mic here (with a preview), then open the room with the call starting.
+    const devicesRef = useRef(null);
+    const [joining, setJoining] = useState(false);
+    const join = async () => {
+        setJoining(true);
+        await devicesRef.current?.prepare().catch(() => false);
+        navigate(`/editor/${m.roomId}`, { state: { userName: user?.name || guestName.trim() || undefined, startCall: true } });
+    };
+    const remove = async () => { if (await confirmDeleteMeeting(m)) navigate(user ? "/dashboard" : "/"); };
 
     useEffect(() => {
         getMeeting(meetingId).then(setM).catch((err) => setError(err.message));
@@ -58,19 +84,43 @@ export default function MeetPage() {
                     <span><acc.Icon size={14} /> {acc.text}</span>
                 </div>
                 {m.description && <p className="mt-page-notes">{m.description}</p>}
-                <span className="u-small u-muted">Hosted by {m.hostName || "the host"}</span>
+                <span className="u-small u-muted">Hosted by {m.isHost ? "you" : m.hostName || "the host"}</span>
+                {!user && !m.cancelled && !over && (
+                    <div className="mt-page-who">
+                        <UserRound size={14} />
+                        {renaming ? (
+                            <input className="u-input" autoFocus={renaming} value={guestName} maxLength={60} placeholder="Your name"
+                                onChange={(e) => setGuestName(e.target.value)} onBlur={() => guestName.trim() && setRenaming(false)}
+                                onKeyDown={(e) => e.key === "Enter" && guestName.trim() && setRenaming(false)} aria-label="Your name" />
+                        ) : (
+                            <>
+                                <span>You'll join as <b>{guestName}</b></span>
+                                <button type="button" className="u-btn u-btn--ghost u-btn--sm" onClick={() => setRenaming(true)}>Change</button>
+                            </>
+                        )}
+                    </div>
+                )}
                 {!m.cancelled && !over && (
                     <>
+                        {(joinable || m.isHost) && <DeviceCheck ref={devicesRef} name={user?.name || guestName.trim()} />}
                         <div className="mt-page-actions">
-                            <button className="u-btn u-btn--solid u-btn--lg" onClick={() => navigate(`/editor/${m.roomId}`)} disabled={!joinable && !m.isHost} title={joinable || m.isHost ? "" : "You can join 10 minutes before it starts"}>
+                            <button className="u-btn u-btn--solid u-btn--lg" onClick={join} disabled={joining || (!joinable && !m.isHost)} title={joinable || m.isHost ? "" : "You can join 10 minutes before it starts"}>
                                 <Video size={16} /> {joinable ? "Join now" : m.isHost ? "Open the room" : "Join opens 10 min before"}
                             </button>
-                            <button className="u-btn u-btn--ghost" onClick={copy}><Copy size={15} /> Copy link</button>
+                            <button className="u-btn u-btn--ghost u-btn--lg" onClick={copy}><Copy size={16} /> Copy link</button>
                         </div>
+                        {m.isHost && (
+                            <div className="mt-page-host">
+                                <button className="u-btn u-btn--ghost u-btn--sm" onClick={() => setEditing(true)}><Pencil size={14} /> Edit or reschedule</button>
+                                <button className="u-btn u-btn--ghost u-btn--sm danger" onClick={remove}><Trash2 size={14} /> Delete</button>
+                            </div>
+                        )}
                         <span className="u-label">Add to calendar</span>
                         <CalendarLinks meeting={m} />
                     </>
                 )}
+                {m.isHost && over && <button className="u-btn u-btn--ghost u-btn--sm danger" onClick={remove}><Trash2 size={14} /> Delete</button>}
+                {m.isHost && <ScheduleModal open={editing} meeting={m} onClose={() => setEditing(false)} onScheduled={(next) => setM(next)} />}
             </div>
         );
     }

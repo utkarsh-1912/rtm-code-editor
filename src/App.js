@@ -27,6 +27,7 @@ import Snippets from "./pages/Snippets";
 import MeetPage from "./pages/MeetPage";
 import OfflinePage from "./pages/OfflinePage";
 import Docs from "./pages/Docs";
+import RequireAuth from "./components/RequireAuth";
 import Settings from "./pages/Settings";
 import ProjectPage from "./pages/ProjectPage";
 import WebRenderPage from "./pages/WebRenderPage";
@@ -114,12 +115,12 @@ function App() {
             <Route path="/support" element={page(<Support />)} />
             <Route path="/login" element={<Login />} />
             <Route path="/signup" element={<SignUp />} />
-            <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/snippets" element={<Snippets />} />
+            <Route path="/dashboard" element={<RequireAuth><Dashboard /></RequireAuth>} />
+            <Route path="/snippets" element={<RequireAuth><Snippets /></RequireAuth>} />
             <Route path="/meet/:meetingId" element={<MeetPage />} />
             <Route path="/offline" element={<OfflinePage />} />
             <Route path="/docs" element={<Docs />} />
-            <Route path="/settings" element={<Settings />} />
+            <Route path="/settings" element={<RequireAuth allowGuest={IS_DESKTOP}><Settings /></RequireAuth>} />
             <Route path="/project/:projectId" element={<ProjectPage />} />
             <Route path="/render/:projectId" element={<WebRenderPage />} />
             <Route path="/unsubscribe" element={<Unsubscribe />} />

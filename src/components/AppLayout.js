@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Bell, Sun, Moon, LogOut, LifeBuoy, Settings as SettingsIcon, LayoutGrid, Code2, Plus, UserRound, ShieldCheck, CreditCard } from 'lucide-react';
+import { Search, Bell, Sun, Moon, LogOut, LogIn, LifeBuoy, Settings as SettingsIcon, LayoutGrid, Code2, Plus, UserRound, ShieldCheck, CreditCard } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
 import { getBackendUrl } from '../utils/api';
@@ -119,19 +119,25 @@ const AppLayout = ({ children }) => {
             stripRight={<button onClick={() => setHelpOpen(true)} title="Help, what's new and shortcuts (?)"><LifeBuoy size={12} style={{ verticalAlign: '-2px' }} /> Help</button>}
             right={<>
                 <button className="u-icon" onClick={() => setSearchOpen(true)} aria-label="Search (Ctrl K)" title="Search (Ctrl K)"><Search size={18} /></button>
-                <div style={{ position: 'relative' }}>
+                {user && <div style={{ position: 'relative' }}>
                     <button className={`u-icon${notifOpen ? ' on' : ''}`} onClick={() => { setNotifOpen((v) => !v); setHasUnread(false); }} aria-label="Notifications">
                         <Bell size={18} />
                         {hasUnread && <span className="u-badge" />}
                     </button>
                     <NotificationCenter isOpen={notifOpen} onClose={() => setNotifOpen(false)} />
-                </div>
+                </div>}
                 <button className="u-icon u-icon--hide" onClick={toggleTheme} aria-label="Toggle theme">
                     {isLight ? <Moon size={18} /> : <Sun size={18} />}
                 </button>
                 <button className="u-btn u-btn--solid u-nav-new" style={{ marginLeft: 6 }} onClick={startRoom}>
                     <Plus size={16} /> New room
                 </button>
+                {!user ? (
+                    // Guests (public pages like a meeting link) have no account menu.
+                    <button className="u-btn u-btn--ghost" onClick={() => navigate('/login', { state: { from: window.location.pathname + window.location.search } })}>
+                        <LogIn size={15} /> Sign in
+                    </button>
+                ) : (
                 <div ref={userRef} style={{ position: 'relative' }}>
                     <button className="u-avatar" onClick={() => setUserMenu((v) => !v)} aria-label="Account menu" aria-expanded={userMenu}>
                         <Avatar name={user?.name || user?.email || ''} photoURL={user?.photoURL} size={34} title="" />
@@ -154,6 +160,7 @@ const AppLayout = ({ children }) => {
                         </div>
                     )}
                 </div>
+                )}
             </>}
             sheetFoot={<>
                 <button className="u-btn u-btn--solid" onClick={startRoom}><Plus size={16} /> New room</button>

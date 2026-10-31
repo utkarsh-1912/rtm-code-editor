@@ -20,6 +20,11 @@ function setupMediaSocket(io, socket, safeSocket, context) {
         }));
         socket.emit('video-participants', { clients });
         socket.to(roomId).emit('user-joined-video', { userId: socket.id, name: name || "Guest", isSpectator });
+        // First one in: tell everyone in the room or project (not yet in the call) so they can join.
+        if (!clients.length && !isSpectator) {
+            const by = { projectId, userId: socket.id, name: name || userSocketMap[socket.id] || "Someone" };
+            socket.to(String(projectId)).to(`project-${projectId}`).emit('call-started', by);
+        }
     }));
 
     // After a reconnect (e.g. server restart) a socket that is still in a call re-enters the

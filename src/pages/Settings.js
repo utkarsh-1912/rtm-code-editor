@@ -52,12 +52,14 @@ const Settings = () => {
         navigate('/');
     };
     const [params] = useSearchParams();
-    const [active, setActive] = useState(() => (SECTIONS.some((x) => x.id === params.get('section')) ? params.get('section') : 'profile'));
+    // Guests only get here in the desktop app, and only for the Desktop app section.
+    const sections = user ? SECTIONS : SECTIONS.filter((x) => x.id === 'desktop');
+    const [active, setActive] = useState(() => (sections.some((x) => x.id === params.get('section')) ? params.get('section') : sections[0]?.id || 'profile'));
     // Follow ?section= when it changes while this page is open (e.g. from the account menu).
     const sectionParam = params.get('section');
     useEffect(() => {
-        if (sectionParam && SECTIONS.some((x) => x.id === sectionParam)) setActive(sectionParam);
-    }, [sectionParam]);
+        if (sectionParam && sections.some((x) => x.id === sectionParam)) setActive(sectionParam);
+    }, [sectionParam, sections]);
     const { plan, error: planError, reload: reloadPlan } = usePlan(user);
     const [busyBilling, setBusyBilling] = useState(false);
     const manageBilling = async () => {
@@ -187,7 +189,7 @@ const Settings = () => {
     };
 
     const avatar = user?.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.name || 'U')}&background=1C1C19&color=E8E6DF`;
-    const idx = SECTIONS.findIndex((s) => s.id === active);
+    const idx = Math.max(0, sections.findIndex((s) => s.id === active));
 
     return (
         <AppLayout>
@@ -202,7 +204,7 @@ const Settings = () => {
 
             <div className="g-layout">
                 <nav className="g-index" aria-label="Settings sections" data-rise>
-                    {SECTIONS.map((s, i) => (
+                    {sections.map((s, i) => (
                         <button key={s.id} className={active === s.id ? 'on' : ''} onClick={() => setActive(s.id)} aria-current={active === s.id ? 'page' : undefined}>
                             <span>{pad2(i + 1)}</span><span>{s.title}</span>
                         </button>
@@ -211,7 +213,7 @@ const Settings = () => {
 
                 <div className="g-content" key={active}>
                     <h2 className="u-display u-lg u-lines is-in" style={{ marginBottom: 8 }}>
-                        <span><span>{SECTIONS[idx].title}</span></span>
+                        <span><span>{sections[idx]?.title}</span></span>
                     </h2>
 
                     {active === 'profile' && (

@@ -20,6 +20,7 @@ import "../styles/app.css";
 import ACTIONS from "../Action";
 import { initSocket } from "../socket";
 import VideoChat from "../components/VideoChat";
+import useCallStartedAlert from "../components/useCallStartedAlert";
 import { useCallCarry } from "../context/CallCarry";
 import { getCallPrefs } from "../utils/callPrefs";
 import WhiteboardModal from "../components/WhiteboardModal";
@@ -158,6 +159,8 @@ const ProjectPage = () => {
     const cards = layoutMode === 'cards' && !isMobile && !isZenMode;
 
     const socketRef = useRef(null);
+    // Someone else opened a call here: offer to join it.
+    useCallStartedAlert(socketRef, { inCall: isMeetingActive, onJoin: () => { setIsMeetingMinimized(false); setIsMeetingActive(true); } });
     const hasJoinedRef = useRef(false);
     const filesRef = useRef([]);
     const openFilesRef = useRef([]);

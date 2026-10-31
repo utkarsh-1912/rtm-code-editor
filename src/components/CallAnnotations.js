@@ -9,8 +9,21 @@ const colorFor = (id = "") => {
     return `hsl(${h}, 85%, 58%)`;
 };
 
+// Where the shared screen's picture sits inside a w x h box. The video is letterboxed
+// ("fit") or cropped ("fill"), and every viewer's window has its own shape, so pointers and
+// strokes are stored relative to the picture itself, not the box around it.
+function pictureBox(canvas, w, h) {
+    const video = canvas?.parentElement?.querySelector("video");
+    const vw = video?.videoWidth, vh = video?.videoHeight;
+    if (!vw || !vh || !w || !h) return { x: 0, y: 0, w, h };
+    const fill = getComputedStyle(video).objectFit === "cover";
+    const scale = fill ? Math.max(w / vw, h / vh) : Math.min(w / vw, h / vh);
+    const pw = vw * scale, ph = vh * scale;
+    return { x: (w - pw) / 2, y: (h - ph) / 2, w: pw, h: ph };
+}
+
 // Transparent layer over a shared screen: everyone can draw (strokes fade out, like Pop)
-// and see each other's labelled pointers. Coordinates are normalised to 0..1.
+// and see each other's labelled pointers. Coordinates are 0..1 of the shared picture.
 export default function CallAnnotations({ socketRef, projectId, drawing, userName, clearKey = 0 }) {
     const canvasRef = useRef(null);
     const segsRef = useRef([]);       // { a:[x,y], b:[x,y], color, ts }
@@ -41,6 +54,8 @@ export default function CallAnnotations({ socketRef, projectId, drawing, userNam
                 if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
                 const ctx = canvas.getContext("2d");
                 ctx.clearRect(0, 0, w, h);
+                const box = pictureBox(canvas, w, h);
+                const X = (v) => box.x + v * box.w, Y = (v) => box.y + v * box.h;
                 const now = performance.now();
                 segsRef.current = segsRef.current.filter((s) => now - s.ts < FADE_MS);
                 ctx.lineCap = "round";
@@ -49,8 +64,8 @@ export default function CallAnnotations({ socketRef, projectId, drawing, userNam
                     ctx.globalAlpha = 1 - (now - s.ts) / FADE_MS;
                     ctx.strokeStyle = s.color;
                     ctx.beginPath();
-                    ctx.moveTo(s.a[0] * w, s.a[1] * h);
-                    ctx.lineTo(s.b[0] * w, s.b[1] * h);
+                    ctx.moveTo(X(s.a[0]), Y(s.a[1]));
+                    ctx.lineTo(X(s.b[0]), Y(s.b[1]));
                     ctx.stroke();
                 }
                 ctx.globalAlpha = 1;
@@ -59,7 +74,7 @@ export default function CallAnnotations({ socketRef, projectId, drawing, userNam
                 for (const [id, p] of Object.entries(ptrsRef.current)) {
                     const age = now - p.ts;
                     if (age > PTR_TTL) { delete ptrsRef.current[id]; continue; }
-                    const x = p.x * w, y = p.y * h, c = colorFor(id);
+                    const x = X(p.x), y = Y(p.y), c = colorFor(id);
                     // Pointer fades out over its last second instead of vanishing.
                     const life = Math.min(1, (PTR_TTL - age) / 1000);
                     // The name tag fades faster (after ~2s still), like editor cursor tags.
@@ -98,14 +113,18 @@ export default function CallAnnotations({ socketRef, projectId, drawing, userNam
         socketRef.current?.emit("call-annotate", { projectId, event: { t: "clear" } });
     }, [clearKey, socketRef, projectId]);
 
-    const norm = (e) => {
+    // 0..1 inside the shared picture; `inside` is false over the black bars around it.
+    const locate = (e) => {
         const r = canvasRef.current.getBoundingClientRect();
-        return [Math.min(1, Math.max(0, (e.clientX - r.left) / r.width)), Math.min(1, Math.max(0, (e.clientY - r.top) / r.height))];
+        const box = pictureBox(canvasRef.current, r.width, r.height);
+        const x = (e.clientX - r.left - box.x) / box.w, y = (e.clientY - r.top - box.y) / box.h;
+        return { pt: [Math.min(1, Math.max(0, x)), Math.min(1, Math.max(0, y))], inside: x >= 0 && x <= 1 && y >= 0 && y <= 1 };
     };
+    const norm = (e) => locate(e).pt;
     const send = (event) => socketRef.current?.emit("call-annotate", { projectId, event });
 
     const onMove = (e) => {
-        const pt = norm(e);
+        const { pt, inside } = locate(e);
         const now = performance.now();
         if (drawing && downRef.current && lastRef.current) {
             const seg = { a: lastRef.current, b: pt };
@@ -113,7 +132,7 @@ export default function CallAnnotations({ socketRef, projectId, drawing, userNam
             send({ t: "seg", ...seg });
             lastRef.current = pt;
         }
-        if (now - lastPtrSent.current > 40) {
+        if (inside && now - lastPtrSent.current > 40) {
             lastPtrSent.current = now;
             send({ t: "ptr", x: pt[0], y: pt[1] });
         }

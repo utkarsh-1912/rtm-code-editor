@@ -22,7 +22,8 @@ async function call(path, { method = "GET", body } = {}) {
 export const scheduleMeeting = (body) => call("/meetings", { method: "POST", body });
 export const listMeetings = () => call("/meetings");
 export const getMeeting = (id) => call(`/meetings/${encodeURIComponent(id)}`);
-export const cancelMeeting = (id) => call(`/meetings/${encodeURIComponent(id)}`, { method: "DELETE" });
+export const updateMeeting = (id, body) => call(`/meetings/${encodeURIComponent(id)}`, { method: "PATCH", body });
+export const deleteMeeting = (id) => call(`/meetings/${encodeURIComponent(id)}`, { method: "DELETE" });
 
 export const meetingLink = (m) => `${publicOrigin()}/meet/${m.id}`;
 export const icsUrl = (m) => `${getBackendUrl()}/api/meetings/${encodeURIComponent(m.id)}/ics`;

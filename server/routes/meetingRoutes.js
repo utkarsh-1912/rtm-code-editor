@@ -6,7 +6,8 @@ const RoomRepository = require('../repositories/RoomRepository');
 const UserRepository = require('../repositories/UserRepository');
 const NotificationRepository = require('../repositories/NotificationRepository');
 const { verifyToken } = require('../services/Identity');
-const { deliver, getEmailTemplate } = require('../services/MailService');
+const { deliver } = require('../services/MailService');
+const { meetingEmail, nameFromEmail } = require('../services/MeetingMail');
 
 const APP = () => process.env.APP_URL || 'http://localhost:5000';
 const ACCESS = new Set(['public', 'invite', 'private']);
@@ -17,12 +18,6 @@ const newRoomId = () => Array.from(crypto.randomBytes(8), (b) => 'abcdefghijklmn
 
 const validZone = (tz) => {
     try { new Intl.DateTimeFormat('en-US', { timeZone: tz }); return tz; } catch { return 'UTC'; }
-};
-const when = (m) => {
-    const tz = validZone(m.time_zone);
-    const start = new Date(m.starts_at);
-    const text = new Intl.DateTimeFormat('en-US', { timeZone: tz, weekday: 'long', month: 'long', day: 'numeric', hour: 'numeric', minute: '2-digit' }).format(start);
-    return `${text} (${tz.replace(/_/g, ' ')}) · ${m.duration_min} min`;
 };
 const meetingUrl = (m) => `${APP()}/meet/${m.id}`;
 
@@ -56,23 +51,43 @@ function ics(m) {
     ].join('\r\n');
 }
 
-// User text goes into email HTML: escape it, keep line breaks.
-const escapeHtml = (v) => String(v || '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
-const asHtml = (v) => escapeHtml(v).replace(/\n/g, '<br>');
-
-// Email + in-app notification to everyone invited (best effort; never fails the request).
-async function tellInvitees(m, { subject, title, message, ctaText }) {
-    const invitees = (m.invitees || []).filter((e) => e !== (m.host_email || '').toLowerCase());
-    if (!invitees.length) return { emailed: 0 };
-    const html = getEmailTemplate({ title: escapeHtml(title), message: asHtml(message), ctaText, ctaUrl: meetingUrl(m), inviterName: escapeHtml(m.host_name || 'A teammate') });
-    const mail = await deliver({ to: invitees, subject, html }).catch(() => ({ success: false }));
-    for (const email of invitees) {
+// Email (one each, greeting them by name) + in-app notification. Best effort; never fails the request.
+// `kind`: invite | updated | rescheduled | cancelled | removed | reminder (see MeetingMail).
+async function tellPeople(m, emails, { kind, previous = null }) {
+    const host = (m.host_email || '').toLowerCase();
+    const people = [...new Set(emails || [])].filter((e) => e && e !== host);
+    let emailed = 0;
+    for (const email of people) {
         const user = await UserRepository.getUserByEmail(email).catch(() => null);
+        const name = user?.name && user.name !== 'Developer' ? user.name : nameFromEmail(email);
+        const { subject, html } = meetingEmail(m, { to: { email, name }, kind, previous });
+        const mail = await deliver({ to: [email], subject, html }).catch(() => ({ success: false }));
+        if (mail.success) emailed += 1;
         if (user?.auth_provider_id) {
-            NotificationRepository.notifyUser(user.auth_provider_id, { type: 'meeting', message: `${subject}`, url: `/meet/${m.id}`, data: { meetingId: m.id } }).catch(() => { });
+            const gone = kind === 'cancelled' || kind === 'removed';
+            NotificationRepository.notifyUser(user.auth_provider_id, { type: 'meeting', message: subject, url: gone ? '/dashboard' : `/meet/${m.id}`, data: { meetingId: m.id } }).catch(() => { });
         }
     }
-    return { emailed: mail.success ? invitees.length : 0 };
+    return { emailed };
+}
+const tellInvitees = (m, opts) => tellPeople(m, m.invitees || [], opts);
+
+// Title, time, length, invitees, access from a request body; `base` fills in what's left out (edits).
+function readFields(b, base = {}) {
+    const pick = (k, fallback) => (b[k] !== undefined ? b[k] : fallback);
+    const title = String(pick('title', base.title) || '').replace(/\s+/g, ' ').trim().slice(0, 200);
+    const startsAt = new Date(pick('startsAt', base.starts_at));
+    const durationMin = Math.round(Number(pick('durationMin', base.duration_min)) || 30);
+    const list = pick('invitees', base.invitees);
+    const invitees = [...new Set((Array.isArray(list) ? list : []).map((e) => String(e || '').trim().toLowerCase()).filter((e) => EMAIL.test(e)))].slice(0, 50);
+    const access = ACCESS.has(pick('access', base.access)) ? pick('access', base.access) : 'public';
+    const description = String(pick('description', base.description) || '').slice(0, 2000);
+    const timeZone = validZone(String(pick('timeZone', base.time_zone) || 'UTC'));
+    let error = null;
+    if (!title) error = 'Give the meeting a title.';
+    else if (Number.isNaN(startsAt.getTime())) error = 'Pick a date and time.';
+    else if (durationMin < 5 || durationMin > 8 * 60) error = 'Meetings last 5 minutes to 8 hours.';
+    return { title, startsAt, durationMin, invitees, access, description, timeZone, error };
 }
 
 // Schedule a meeting (signed in). Uses an existing room you may use, or makes a new one.
@@ -81,15 +96,9 @@ router.post('/meetings', async (req, res) => {
         const who = await caller(req);
         if (!who) return res.status(401).json({ error: 'Sign in to schedule meetings.' });
         const b = req.body || {};
-        const title = String(b.title || '').replace(/\s+/g, ' ').trim().slice(0, 200);
-        const startsAt = new Date(b.startsAt);
-        const durationMin = Math.round(Number(b.durationMin) || 30);
-        const invitees = [...new Set((Array.isArray(b.invitees) ? b.invitees : []).map((e) => String(e || '').trim().toLowerCase()).filter((e) => EMAIL.test(e)))].slice(0, 50);
-        const access = ACCESS.has(b.access) ? b.access : 'public';
-        if (!title) return res.status(400).json({ error: 'Give the meeting a title.' });
-        if (Number.isNaN(startsAt.getTime())) return res.status(400).json({ error: 'Pick a date and time.' });
+        const { title, startsAt, durationMin, invitees, access, description, timeZone, error } = readFields(b);
+        if (error) return res.status(400).json({ error });
         if (startsAt.getTime() < Date.now() - 5 * 60000) return res.status(400).json({ error: 'That time has already passed.' });
-        if (durationMin < 5 || durationMin > 8 * 60) return res.status(400).json({ error: 'Meetings last 5 minutes to 8 hours.' });
 
         // The room: existing (you must own it, or it must be open) or a fresh one you own.
         let roomId = String(b.roomId || '').trim().slice(0, 255);
@@ -116,16 +125,11 @@ router.post('/meetings', async (req, res) => {
         if (b.roomName && !b.roomId) await RoomRepository.updateRoomName(roomId, String(b.roomName)).catch(() => { });
 
         const meeting = await MeetingRepository.createMeeting({
-            roomId, title, description: String(b.description || '').slice(0, 2000), startsAt: startsAt.toISOString(), durationMin,
-            timeZone: validZone(String(b.timeZone || 'UTC')), hostUid: who.uid, hostName: String(b.hostName || hostUser?.name || who.email || 'Host').slice(0, 120),
+            roomId, title, description, startsAt: startsAt.toISOString(), durationMin,
+            timeZone, hostUid: who.uid, hostName: String(b.hostName || hostUser?.name || who.email || 'Host').slice(0, 120),
             hostEmail: who.email, invitees, access,
         });
-        const sent = await tellInvitees(meeting, {
-            subject: `Invitation: ${meeting.title}`,
-            title: meeting.title,
-            message: `${meeting.host_name} invited you to a call on Utkristi CoLabs.\n${when(meeting)}${meeting.description ? `\n\n${meeting.description}` : ''}\n\nOpen the link to add it to your calendar or join when it starts.`,
-            ctaText: 'Open meeting',
-        });
+        const sent = await tellInvitees(meeting, { kind: 'invite' });
         res.json({ meeting: hostView(meeting), ...sent });
     } catch (err) {
         console.error('Schedule meeting failed:', err);
@@ -169,26 +173,64 @@ router.get('/meetings/:id/ics', async (req, res) => {
     }
 });
 
-// Host cancels; invitees are told.
+// Host edits: a new time is a reschedule, other changes an update. New invitees get an
+// invitation; removed ones are told the meeting no longer includes them.
+router.patch('/meetings/:id', async (req, res) => {
+    try {
+        const who = await caller(req);
+        if (!who) return res.status(401).json({ error: 'Sign in first.' });
+        const before = await MeetingRepository.getMeeting(req.params.id);
+        if (!before || before.host_uid !== who.uid) return res.status(404).json({ error: 'Meeting not found, or not yours.' });
+        if (before.cancelled_at) return res.status(400).json({ error: 'This meeting was cancelled.' });
+        const f = readFields(req.body || {}, before);
+        if (f.error) return res.status(400).json({ error: f.error });
+        const moved = f.startsAt.getTime() !== new Date(before.starts_at).getTime() || f.durationMin !== before.duration_min;
+        if (moved && f.startsAt.getTime() < Date.now() - 5 * 60000) return res.status(400).json({ error: 'That time has already passed.' });
+
+        const m = await MeetingRepository.updateMeeting(before.id, who.uid, { ...f, startsAt: f.startsAt.toISOString() });
+        if (!m) return res.status(404).json({ error: 'Meeting not found, or not yours.' });
+
+        const was = new Set(before.invitees || []);
+        const now = new Set(m.invitees || []);
+        const kept = [...now].filter((e) => was.has(e));
+        const added = [...now].filter((e) => !was.has(e));
+        const removed = [...was].filter((e) => !now.has(e));
+
+        // The room follows the guest list and who can join.
+        const acc = await RoomRepository.getRoomAccess(m.room_id).catch(() => null);
+        if (acc?.ownerUid === who.uid) {
+            const allowed = (acc.allowed || []).filter((e) => !removed.includes(e)).concat(added);
+            await RoomRepository.setRoomAccess(m.room_id, who.uid, { visibility: m.access, allowed });
+            req.app.get('io')?.roomAccess?.forget(m.room_id);
+        }
+
+        const changed = moved || m.title !== before.title || m.description !== before.description || m.access !== before.access;
+        let emailed = 0;
+        if (changed && kept.length) emailed += (await tellPeople(m, kept, { kind: moved ? 'rescheduled' : 'updated', previous: before })).emailed;
+        if (added.length) emailed += (await tellPeople(m, added, { kind: 'invite' })).emailed;
+        if (removed.length) emailed += (await tellPeople(m, removed, { kind: 'removed' })).emailed;
+        res.json({ meeting: { ...hostView(m), isHost: true }, emailed });
+    } catch (err) {
+        console.error('Edit meeting failed:', err);
+        res.status(500).json({ error: 'Could not save the meeting.' });
+    }
+});
+
+// Host deletes the meeting. If it hadn't happened yet, invitees are told it's cancelled.
 router.delete('/meetings/:id', async (req, res) => {
     try {
         const who = await caller(req);
         if (!who) return res.status(401).json({ error: 'Sign in first.' });
-        const m = await MeetingRepository.cancelMeeting(req.params.id, who.uid);
+        const m = await MeetingRepository.deleteMeeting(req.params.id, who.uid);
         if (!m) return res.status(404).json({ error: 'Meeting not found, or not yours.' });
-        await tellInvitees(m, {
-            subject: `Cancelled: ${m.title}`,
-            title: `Cancelled: ${m.title}`,
-            message: `${m.host_name} cancelled this meeting.\n${when(m)}`,
-            ctaText: 'View meeting',
-        });
-        res.json({ success: true });
+        const upcoming = !m.cancelled_at && new Date(m.starts_at).getTime() + m.duration_min * 60000 > Date.now();
+        const sent = upcoming ? await tellInvitees(m, { kind: 'cancelled' }) : { emailed: 0 };
+        res.json({ success: true, ...sent });
     } catch (err) {
-        res.status(500).json({ error: 'Could not cancel the meeting.' });
+        res.status(500).json({ error: 'Could not delete the meeting.' });
     }
 });
 
 module.exports = router;
 module.exports.ics = ics;
-module.exports.when = when;
 module.exports.tellInvitees = tellInvitees;

@@ -9,7 +9,8 @@ import ACTIONS from '../Action';
 // Camera sized for a mesh call: plenty for a tile, a fraction of 720p30's bandwidth.
 const CAM = { width: { ideal: 640 }, height: { ideal: 360 }, frameRate: { ideal: 24, max: 30 } };
 const MIC = { echoCancellation: true, noiseSuppression: true, autoGainControl: true };
-const SCREEN = { video: { frameRate: { ideal: 15, max: 30 } }, audio: true };
+// cursor: show the presenter's mouse in the shared screen (where the browser supports it).
+const SCREEN = { video: { frameRate: { ideal: 15, max: 30 }, cursor: 'always' }, audio: true };
 
 // STUN plus TURN. Set REACT_APP_TURN_URL / _USERNAME / _CREDENTIAL for your own relay;
 // the public Open Relay is only a fallback.
@@ -60,6 +61,7 @@ const VideoChat = ({
     const [isMuted, setIsMuted] = useState(!startAudio);
     const [isVideoOff, setIsVideoOff] = useState(!startVideo);
     const [isScreenSharing, setIsScreenSharing] = useState(false);
+    const [screenStream, setScreenStream] = useState(null); // our shared screen (sent beside the camera)
     const [inCall, setInCall] = useState(false);
     const [activeSpeaker, setActiveSpeaker] = useState(null); // who is talking right now (tile ring)
     // Who holds the stage in spotlight view: the last remote person who talked. Like Meet/Zoom it
@@ -81,7 +83,10 @@ const VideoChat = ({
 
     // --- Refs for WebRTC & Audio ---
     const peersRef = useRef({}); // { socketId: RTCPeerConnection }
-    const remoteMediaRef = useRef({}); // { socketId: MediaStream } one stream per person, all their tracks
+    // { socketId: { cam: MediaStream, screen: MediaStream, sids: { trackId: streamId } } }: each
+    // person's camera + mic, and their shared screen, kept apart by the stream they arrive in.
+    const remoteMediaRef = useRef({});
+    const remoteScreenIdRef = useRef({}); // { socketId: id of the stream that carries their screen }
     const screenStreamRef = useRef(null);
     const audioContextRef = useRef(null);
     const analysersRef = useRef({}); // { socketId: AnalyserNode }
@@ -89,107 +94,97 @@ const VideoChat = ({
     const localStreamRef = useRef(null);
     useEffect(() => { localStreamRef.current = localStream; }, [localStream]);
 
-    // Cap each video sender's bitrate for the current call size and content.
+    // Senders per peer: camera and mic (`__videoSender`, `__audioSender`) and the shared screen
+    // (`__screenSenders`). Camera and screen are separate tracks, so people see the presenter's
+    // face next to their screen, and the camera can be turned off without touching the share.
+    const senderFor = (peer, kind) => peer[`__${kind}Sender`]
+        || peer.getSenders().find((x) => x.track?.kind === kind && !(peer.__screenSenders || []).includes(x));
+    // Put our camera or mic track (or null: send nothing) on every connection.
+    const putTrack = (kind, track, stream) => {
+        Object.values(peersRef.current).forEach((peer) => {
+            const sender = senderFor(peer, kind);
+            if (sender) sender.replaceTrack(track).catch(() => { });
+            else if (track) peer[`__${kind}Sender`] = peer.addTrack(track, stream);
+        });
+    };
+    const addScreenTo = (peer) => {
+        const screen = screenStreamRef.current;
+        if (!screen || peer.__screenSenders) return;
+        peer.__screenSenders = screen.getTracks().map((t) => peer.addTrack(t, screen));
+    };
+
+    // Cap each video sender's bitrate for the call size and content. While presenting, the
+    // screen gets the bandwidth and the camera drops to a thumbnail.
     const tuneSenders = useCallback((screen = mediaStateRef.current.isScreenSharing) => {
         const peers = Object.values(peersRef.current);
-        const max = videoBitrate(peers.length, screen);
         peers.forEach((peer) => {
             peer.getSenders().forEach((sender) => {
                 if (!sender.track || sender.track.kind !== 'video' || !sender.getParameters) return;
+                const isScreen = (peer.__screenSenders || []).includes(sender);
                 const params = sender.getParameters();
                 if (!params.encodings || !params.encodings.length) params.encodings = [{}];
-                params.encodings[0].maxBitrate = max;
-                params.encodings[0].maxFramerate = screen ? 15 : 24;
-                params.degradationPreference = screen ? 'maintain-resolution' : 'balanced';
+                params.encodings[0].maxBitrate = isScreen ? videoBitrate(peers.length, true) : screen ? 250000 : videoBitrate(peers.length, false);
+                params.encodings[0].maxFramerate = isScreen ? 15 : 24;
+                params.degradationPreference = isScreen ? 'maintain-resolution' : 'balanced';
                 sender.setParameters(params).catch(() => { });
             });
         });
     }, []);
 
-    const mediaStateRef = useRef({ isMuted, isVideoOff, isScreenSharing });
+    const mediaStateRef = useRef({ isMuted, isVideoOff, isScreenSharing, screenStreamId: null });
     const remoteUsersRef = useRef({});
     useEffect(() => { remoteUsersRef.current = remoteUsers; }, [remoteUsers]);
     useEffect(() => {
-        mediaStateRef.current = { isMuted, isVideoOff, isScreenSharing };
+        mediaStateRef.current = { ...mediaStateRef.current, isMuted, isVideoOff, isScreenSharing };
     }, [isMuted, isVideoOff, isScreenSharing]);
 
     // --- Media Action Helper ---
     const broadcastMediaState = useCallback((state) => {
+        mediaStateRef.current = { ...mediaStateRef.current, ...state };
         if (!socketRef.current) return;
         socketRef.current.emit(ACTIONS.MEDIA_STATE_CHANGE, {
             roomId: `call:${projectId}`,
-            state
+            state: mediaStateRef.current,
         });
     }, [projectId, socketRef]);
 
     // --- Screen Sharing Logic ---
-    const stopScreenShare = useCallback(async () => {
-        if (screenStreamRef.current) {
-            screenStreamRef.current.getTracks().forEach(track => track.stop());
-            screenStreamRef.current = null;
-        }
-
-        try {
-            if (!isVideoOff) {
-                const newStream = await navigator.mediaDevices.getUserMedia({
-                    video: CAM
-                });
-                const camTrack = newStream.getVideoTracks()[0];
-                if ('contentHint' in camTrack) camTrack.contentHint = 'motion';
-
-                Object.values(peersRef.current).forEach(peer => {
-                    const sender = peer.getSenders().find(s => s.track && s.track.kind === 'video');
-                    if (sender) sender.replaceTrack(camTrack);
-                });
-
-                const currentAudio = localStream?.getAudioTracks()[0];
-                const displayStream = new MediaStream([camTrack]);
-                if (currentAudio) displayStream.addTrack(currentAudio);
-                setLocalStream(displayStream);
-            }
-            setIsScreenSharing(false);
-            tuneSenders(false);
-            broadcastMediaState({ ...mediaStateRef.current, isScreenSharing: false });
-        } catch (err) {
-            console.error("Return to camera failed", err);
-            toast.error("Could not restore camera");
-            setIsScreenSharing(false);
-            broadcastMediaState({ ...mediaStateRef.current, isScreenSharing: false });
-        }
-    }, [isVideoOff, localStream, broadcastMediaState, tuneSenders]);
+    // Stopping ends the capture (the browser's "sharing" bar goes away) and removes it from
+    // every connection; the camera carries on as it was.
+    const stopScreenShare = useCallback(() => {
+        const screen = screenStreamRef.current;
+        screenStreamRef.current = null;
+        if (screen) screen.getTracks().forEach((t) => { t.onended = null; t.stop(); });
+        Object.values(peersRef.current).forEach((peer) => {
+            (peer.__screenSenders || []).forEach((sender) => { try { peer.removeTrack(sender); } catch { /* closed */ } });
+            peer.__screenSenders = null;
+        });
+        setScreenStream(null);
+        setIsScreenSharing(false);
+        broadcastMediaState({ isScreenSharing: false, screenStreamId: null });
+        tuneSenders(false);
+    }, [broadcastMediaState, tuneSenders]);
 
     const toggleScreenShare = useCallback(async () => {
-        if (!isScreenSharing) {
-            try {
-                const screenStream = await navigator.mediaDevices.getDisplayMedia(SCREEN);
-                const screenTrack = screenStream.getVideoTracks()[0];
-                if ('contentHint' in screenTrack) screenTrack.contentHint = 'detail';
-                screenStreamRef.current = screenStream;
-
-                screenTrack.onended = () => {
-                    stopScreenShare();
-                };
-
-                Object.values(peersRef.current).forEach(peer => {
-                    const sender = peer.getSenders().find(s => s.track && s.track.kind === 'video');
-                    if (sender) sender.replaceTrack(screenTrack);
-                });
-
-                const currentAudio = localStream?.getAudioTracks()[0];
-                const displayStream = new MediaStream([screenTrack]);
-                if (currentAudio) displayStream.addTrack(currentAudio);
-                setLocalStream(displayStream);
-                setIsScreenSharing(true);
-                tuneSenders(true);
-                broadcastMediaState({ ...mediaStateRef.current, isScreenSharing: true });
-
-            } catch (err) {
-                console.error("Screen share failed", err);
-            }
-        } else {
-            await stopScreenShare();
+        if (screenStreamRef.current) { stopScreenShare(); return; }
+        let screen;
+        try {
+            screen = await navigator.mediaDevices.getDisplayMedia(SCREEN);
+        } catch (err) {
+            return; // picker closed
         }
-    }, [isScreenSharing, localStream, stopScreenShare, broadcastMediaState, tuneSenders]);
+        const track = screen.getVideoTracks()[0];
+        if (track && 'contentHint' in track) track.contentHint = 'detail';
+        // "Stop sharing" in the browser's own bar.
+        if (track) track.onended = () => stopScreenShare();
+        screenStreamRef.current = screen;
+        setScreenStream(screen);
+        setIsScreenSharing(true);
+        // Say which stream is the screen before it arrives, so others place it on the stage.
+        broadcastMediaState({ isScreenSharing: true, screenStreamId: screen.id });
+        Object.values(peersRef.current).forEach(addScreenTo);
+        setTimeout(() => tuneSenders(true), 0);
+    }, [stopScreenShare, broadcastMediaState, tuneSenders]);
 
     // --- Core Media Logic (Defined first for hoisting) ---
     const setupAudioAnalysis = useCallback((stream, id) => {
@@ -282,66 +277,48 @@ const VideoChat = ({
         if (inCall) saveCallPrefs({ mic: !isMuted, cam: !isVideoOff });
     }, [inCall, isMuted, isVideoOff]);
 
+    // Camera off stops the camera itself (the light goes out and the browser stops showing it
+    // in use); turning it on asks for it again.
     const handleToggleVideo = useCallback(async (e) => {
         if (e) e.stopPropagation();
-
-        const videoTrack = localStream?.getVideoTracks()[0];
+        const current = localStreamRef.current;
 
         if (!isVideoOff) {
-            // Turning OFF
-            if (videoTrack) {
-                videoTrack.enabled = false;
-                videoTrack.stop();
-            }
+            current?.getVideoTracks().forEach((t) => t.stop());
+            const rest = new MediaStream((current?.getTracks() || []).filter((t) => t.kind !== 'video'));
+            localStreamRef.current = rest;
+            setLocalStream(rest);
+            putTrack('video', null);
             setIsVideoOff(true);
             broadcastMediaState({ isVideoOff: true });
-        } else {
-            // Turning ON
-            if (!inCall) {
-                handleJoinCall();
-                return;
-            }
-            try {
-                const newStream = await navigator.mediaDevices.getUserMedia({
-                    video: CAM
-                });
-                const newTrack = newStream.getVideoTracks()[0];
-
-                let updatedStream = localStream;
-                if (!updatedStream) {
-                    updatedStream = new MediaStream();
-                }
-
-                if (videoTrack) {
-                    updatedStream.removeTrack(videoTrack);
-                }
-                updatedStream.addTrack(newTrack);
-
-                setLocalStream(new MediaStream(updatedStream.getTracks()));
-
-                Object.values(peersRef.current).forEach(peer => {
-                    const sender = peer.getSenders().find(s => s.track && s.track.kind === 'video');
-                    if (sender) {
-                        sender.replaceTrack(newTrack);
-                    } else {
-                        peer.addTrack(newTrack, updatedStream);
-                    }
-                });
-
-                setIsVideoOff(false);
-                broadcastMediaState({ isVideoOff: false });
-            } catch (err) {
-                console.error("Failed to restart camera", err);
-                toast.error("Could not restart camera");
-            }
+            return;
         }
-    }, [isVideoOff, localStream, broadcastMediaState, inCall, handleJoinCall]);
+        if (!inCall) {
+            handleJoinCall();
+            return;
+        }
+        try {
+            const camStream = await navigator.mediaDevices.getUserMedia({ video: CAM });
+            const camTrack = camStream.getVideoTracks()[0];
+            if ('contentHint' in camTrack) camTrack.contentHint = 'motion';
+            const next = new MediaStream([...(localStreamRef.current?.getTracks() || []).filter((t) => t.kind !== 'video'), camTrack]);
+            localStreamRef.current = next;
+            setLocalStream(next);
+            putTrack('video', camTrack, next);
+            setIsVideoOff(false);
+            broadcastMediaState({ isVideoOff: false });
+            setTimeout(() => tuneSenders(), 0);
+        } catch (err) {
+            console.error("Failed to restart camera", err);
+            toast.error(err?.name === 'NotAllowedError' ? 'Camera is blocked for this site. Allow it in the address bar.' : 'Could not start your camera');
+        }
+    }, [isVideoOff, broadcastMediaState, inCall, handleJoinCall, tuneSenders]); // eslint-disable-line react-hooks/exhaustive-deps
 
 
     const handleToggleAudio = useCallback(async (e) => {
         if (e) e.stopPropagation();
 
-        let audioTrack = localStream?.getAudioTracks()[0];
+        let audioTrack = localStreamRef.current?.getAudioTracks()[0];
 
         if (!isMuted) {
             // Muting
@@ -362,21 +339,10 @@ const VideoChat = ({
                     const newAudioStream = await navigator.mediaDevices.getUserMedia({ audio: MIC });
                     audioTrack = newAudioStream.getAudioTracks()[0];
 
-                    let updatedStream = localStream;
-                    if (!updatedStream) {
-                        updatedStream = new MediaStream();
-                    }
-                    updatedStream.addTrack(audioTrack);
-                    setLocalStream(new MediaStream(updatedStream.getTracks()));
-
-                    Object.values(peersRef.current).forEach(peer => {
-                        const sender = peer.getSenders().find(s => s.track && s.track.kind === 'audio');
-                        if (sender) {
-                            sender.replaceTrack(audioTrack);
-                        } else {
-                            peer.addTrack(audioTrack, updatedStream);
-                        }
-                    });
+                    const updatedStream = new MediaStream([...(localStreamRef.current?.getTracks() || []).filter((t) => t.kind !== 'audio'), audioTrack]);
+                    localStreamRef.current = updatedStream;
+                    setLocalStream(updatedStream);
+                    putTrack('audio', audioTrack, updatedStream);
 
                     setupAudioAnalysis(updatedStream, 'local');
                 } catch (err) {
@@ -391,9 +357,28 @@ const VideoChat = ({
             setIsMuted(false);
             broadcastMediaState({ isMuted: false });
         }
-    }, [isMuted, localStream, broadcastMediaState, setupAudioAnalysis, inCall, handleJoinCall]);
+    }, [isMuted, broadcastMediaState, setupAudioAnalysis, inCall, handleJoinCall]); // eslint-disable-line react-hooks/exhaustive-deps
 
     // --- WebRTC Core Functions ---
+    const remoteMedia = (id) => {
+        if (!remoteMediaRef.current[id]) remoteMediaRef.current[id] = { cam: new MediaStream(), screen: new MediaStream(), sids: {} };
+        return remoteMediaRef.current[id];
+    };
+    const placeTrack = (media, track, toScreen) => {
+        const into = toScreen ? media.screen : media.cam;
+        const other = toScreen ? media.cam : media.screen;
+        if (other.getTracks().includes(track)) other.removeTrack(track);
+        into.getTracks().filter((t) => t.kind === track.kind && t !== track).forEach((t) => into.removeTrack(t));
+        if (!into.getTracks().includes(track)) into.addTrack(track);
+    };
+    const publishRemote = (id, name) => {
+        const media = remoteMediaRef.current[id];
+        if (!media) return;
+        setRemoteUsers((prev) => ({
+            ...prev,
+            [id]: { ...prev[id], stream: media.cam, screen: media.screen, name: prev[id]?.name || name, tracks: media.cam.getTracks().length + media.screen.getTracks().length * 10 },
+        }));
+    };
 
 
     const createPeer = useCallback((targetSocketId, name, stream, { offerer = false } = {}) => {
@@ -429,8 +414,9 @@ const VideoChat = ({
         }
 
         if (stream) {
-            stream.getTracks().forEach(track => peer.addTrack(track, stream));
+            stream.getTracks().forEach((track) => { peer[`__${track.kind}Sender`] = peer.addTrack(track, stream); });
         }
+        addScreenTo(peer); // joining while someone here presents
         // The side making the offer always asks to receive audio and video, even with no
         // camera or mic of its own; turning ours on later reuses these slots (addTrack) and
         // renegotiates. The answering side gets its slots from that offer.
@@ -450,43 +436,44 @@ const VideoChat = ({
             }
         };
 
-        // Collect every incoming track into one stream per person (tracks can arrive in
-        // separate events and, after renegotiation, under different stream ids).
+        // Sort incoming tracks: the stream they came in tells camera + mic apart from a shared
+        // screen (its id is announced in the media state). Each kind keeps one track per stream.
         peer.ontrack = (event) => {
-            let remoteStream = remoteMediaRef.current[targetSocketId];
-            if (!remoteStream) {
-                remoteStream = new MediaStream();
-                remoteMediaRef.current[targetSocketId] = remoteStream;
-            }
-            remoteStream.getTracks()
-                .filter((t) => t.kind === event.track.kind && t !== event.track)
-                .forEach((t) => remoteStream.removeTrack(t));
-            if (!remoteStream.getTracks().includes(event.track)) remoteStream.addTrack(event.track);
-            setRemoteUsers(prev => ({
-                ...prev,
-                [targetSocketId]: { ...prev[targetSocketId], stream: remoteStream, name: prev[targetSocketId]?.name || name, tracks: remoteStream.getTracks().length }
-            }));
-            if (event.track.kind === 'audio') setupAudioAnalysis(new MediaStream([event.track]), targetSocketId);
+            const media = remoteMedia(targetSocketId);
+            media.sids[event.track.id] = event.streams[0]?.id || '';
+            const toScreen = !!media.sids[event.track.id] && media.sids[event.track.id] === remoteScreenIdRef.current[targetSocketId];
+            placeTrack(media, event.track, toScreen);
+            publishRemote(targetSocketId, name);
+            if (event.track.kind === 'audio' && !toScreen) setupAudioAnalysis(new MediaStream([event.track]), targetSocketId);
         };
 
         return peer;
-    }, [socketRef, setupAudioAnalysis, tuneSenders]);
+    }, [socketRef, setupAudioAnalysis, tuneSenders]); // eslint-disable-line react-hooks/exhaustive-deps
 
 
+    // Leave always works, presenting or not: the share and the camera stop with the call.
     const handleLeaveCall = useCallback(() => {
-        if (localStream) localStream.getTracks().forEach(t => t.stop());
-        if (screenStreamRef.current) screenStreamRef.current.getTracks().forEach(t => t.stop());
+        localStreamRef.current?.getTracks().forEach((t) => t.stop());
+        localStreamRef.current = null;
+        const screen = screenStreamRef.current;
+        screenStreamRef.current = null;
+        screen?.getTracks().forEach((t) => { t.onended = null; t.stop(); });
 
         Object.values(peersRef.current).forEach(p => p.close());
         peersRef.current = {};
         analysersRef.current = {};
+        remoteMediaRef.current = {};
+        remoteScreenIdRef.current = {};
 
         setLocalStream(null);
+        setScreenStream(null);
         setRemoteUsers({});
         setInCall(false);
         onCallStateChange(false);
         setIsScreenSharing(false);
+        setIsDrawing(false);
         setActiveSpeaker(null);
+        mediaStateRef.current = { ...mediaStateRef.current, isScreenSharing: false, screenStreamId: null };
 
         if (audioContextRef.current) {
             audioContextRef.current.close().catch(() => { });
@@ -496,7 +483,7 @@ const VideoChat = ({
         if (socketRef.current) {
             socketRef.current.emit('leave-video-chat', { projectId });
         }
-    }, [localStream, projectId, socketRef, onCallStateChange]);
+    }, [projectId, socketRef, onCallStateChange]);
 
     const hasAutoJoinedRef = useRef(false);
 
@@ -648,6 +635,7 @@ const VideoChat = ({
             }
             delete analysersRef.current[userId];
             delete remoteMediaRef.current[userId];
+            delete remoteScreenIdRef.current[userId];
             delete pendingCandidatesRef.current[userId];
             setRemoteUsers(prev => {
                 const next = { ...prev };
@@ -658,6 +646,17 @@ const VideoChat = ({
 
         const onMediaStateChange = ({ userId, state }) => {
             if (userId === socket.id) return;
+            // Their screen stream id: move any tracks that already arrived to the right place.
+            if (state && 'screenStreamId' in state) {
+                remoteScreenIdRef.current[userId] = state.screenStreamId || null;
+                const media = remoteMediaRef.current[userId];
+                if (media) {
+                    [...media.cam.getTracks(), ...media.screen.getTracks()].forEach((t) => {
+                        placeTrack(media, t, !!state.screenStreamId && media.sids[t.id] === state.screenStreamId);
+                    });
+                    publishRemote(userId);
+                }
+            }
             setRemoteUsers(prev => ({
                 ...prev,
                 [userId]: { ...prev[userId], ...state }
@@ -683,7 +682,7 @@ const VideoChat = ({
             socket.off('user-left-video', onUserLeft);
             socket.off(ACTIONS.MEDIA_STATE_CHANGE, onMediaStateChange);
         };
-    }, [socketRef, createPeer, projectId, tuneSenders]);
+    }, [socketRef, createPeer, projectId, tuneSenders]); // eslint-disable-line react-hooks/exhaustive-deps
 
     // --- Active Speaker Detection ---
     useEffect(() => {
@@ -824,32 +823,45 @@ const VideoChat = ({
     const photoFor = (id) => (id === 'local' ? user?.photoURL : clients.find((c) => c.socketId === id)?.photoURL) || null;
     const nameFor = (p) => (p.isLocal ? myName : p.name || clients.find((c) => c.socketId === p.id)?.userName || 'Participant');
 
-    const allParticipants = [
+    const people = [
         ...(!spectator ? [{ id: 'local', isLocal: true }] : []),
         ...Object.entries(remoteUsers).map(([id, data]) => ({ id, ...data })),
     ];
-    const count = allParticipants.length;
+    const count = people.length;
+    // A shared screen is a tile of its own; the presenter keeps their own tile (camera or
+    // avatar) in the strip, so you see who is presenting as well as what.
+    const screens = [
+        ...(isScreenSharing && screenStream ? [{ id: 'local:screen', owner: 'local', isLocal: true, isScreen: true, stream: screenStream }] : []),
+        ...people.filter((p) => !p.isLocal && p.isScreenSharing && p.screen?.getVideoTracks().length)
+            .map((p) => ({ id: `${p.id}:screen`, owner: p.id, isScreen: true, name: p.name, stream: p.screen })),
+    ];
+    const allParticipants = [...screens, ...people];
 
-    // Stage: the person you picked (pin, or a click in the strip), else a shared screen, else
+    // Stage: the tile you picked (pin, or a click in the strip), else a shared screen, else
     // whoever is talking. Picking someone during a share keeps the screen in the strip, one
     // click away ("Back to shared screen").
-    const sharer = allParticipants.find((p) => (p.isLocal ? isScreenSharing : p.isScreenSharing));
-    const pinnedP = count > 1 ? allParticipants.find((p) => p.id === pinned) : null;
+    const sharer = screens[0] || null;
+    const pinnedP = allParticipants.length > 1 ? allParticipants.find((p) => p.id === pinned) : null;
     const spotlight = pinnedP
         || sharer
         || (layout === 'speaker' && count > 1
-            ? allParticipants.find((p) => p.id === pinned) || allParticipants.find((p) => p.id === stageSpeaker && !p.isLocal) || allParticipants.find((p) => !p.isLocal)
+            ? people.find((p) => p.id === stageSpeaker && !p.isLocal) || people.find((p) => !p.isLocal)
             : null);
     const strip = spotlight ? allParticipants.filter((p) => p.id !== spotlight.id) : [];
+    const ownerName = (p) => nameFor(p.owner === 'local' ? { isLocal: true } : people.find((x) => x.id === p.owner) || p);
 
     const mutedOf = (p) => (p.isLocal ? isMuted : !!p.isMuted);
-    const cameraOn = (p) => (p.isLocal ? (!isVideoOff || isScreenSharing) && !!localStream : (!p.isVideoOff || p.isScreenSharing) && !!p.stream);
+    const cameraOn = (p) => {
+        if (p.isScreen) return !!p.stream;
+        if (p.isLocal) return !isVideoOff && !!localStream?.getVideoTracks().some((t) => t.readyState === 'live');
+        return !p.isVideoOff && !!p.stream?.getVideoTracks().length;
+    };
 
     const renderTile = (p, variant, style) => {
         const stage = variant === 'stage';
-        const isScreen = p.id === sharer?.id;
+        const isScreen = !!p.isScreen;
         const presenting = stage && isScreen;
-        const name = nameFor(p);
+        const name = isScreen ? ownerName(p) : nameFor(p);
         const label = isScreen ? (p.isLocal ? 'Your screen' : `${name}'s screen`) : p.isLocal ? `${name} (you)` : name;
         const avatarSize = variant === 'strip' || variant === 'mini' ? 34 : stage ? 84 : count > 4 ? 44 : 64;
         return (
@@ -858,24 +870,24 @@ const VideoChat = ({
                 className={`vc-tile vc-tile--${variant}${activeSpeaker === p.id && !mutedOf(p) ? ' is-speaking' : ''}${pinned === p.id ? ' is-pinned' : ''}`}
                 style={style}
                 onDoubleClick={() => !presenting && variant !== 'strip' && togglePin(p.id)}
-                onClick={variant === 'strip' ? () => (isScreen ? pinned && togglePin(pinned) : togglePin(p.id)) : undefined}
+                onClick={variant === 'strip' ? () => (isScreen && sharer?.id === p.id ? pinned && togglePin(pinned) : togglePin(p.id)) : undefined}
                 title={variant === 'strip' ? (isScreen ? 'Back to the shared screen' : `Show ${name} on the stage`) : undefined}
             >
                 {cameraOn(p) ? (
                     <StreamVideo
-                        stream={p.isLocal ? localStream : p.stream}
+                        stream={isScreen ? p.stream : p.isLocal ? localStream : p.stream}
                         muted
-                        mirror={p.isLocal && !isScreenSharing}
+                        mirror={p.isLocal && !isScreen}
                         fit={presenting ? (fitStage ? 'contain' : 'cover') : 'cover'}
                     />
                 ) : (
                     <div className="vc-off">
-                        <Avatar name={name} photoURL={photoFor(p.id)} size={avatarSize} />
+                        <Avatar name={name} photoURL={photoFor(isScreen ? p.owner : p.id)} size={avatarSize} />
                         {!p.isLocal && !p.stream && p.isVideoOff === undefined && variant !== 'strip' && <span className="vc-sub">Connecting…</span>}
                     </div>
                 )}
                 <div className="vc-tag">
-                    {mutedOf(p) ? <Icon name="mic-off" size={12} className="vc-red" /> : <Icon name="mic" size={12} />}
+                    {isScreen ? <Icon name="screen-share" size={12} /> : mutedOf(p) ? <Icon name="mic-off" size={12} className="vc-red" /> : <Icon name="mic" size={12} />}
                     <span>{label}</span>
                 </div>
                 {variant === 'stage' && pinned === p.id && (
@@ -883,7 +895,7 @@ const VideoChat = ({
                         <Icon name="unpin" size={14} /> Unpin
                     </button>
                 )}
-                {variant === 'grid' && count > 1 && (
+                {variant === 'grid' && allParticipants.length > 1 && (
                     <button className="vc-pin" onClick={() => togglePin(p.id)} title={pinned === p.id ? 'Unpin' : 'Pin to spotlight'} aria-label={pinned === p.id ? `Unpin ${name}` : `Pin ${name}`}>
                         <Icon name="pin" size={14} filled={pinned === p.id} />
                     </button>
@@ -897,7 +909,7 @@ const VideoChat = ({
 
     const renderBody = () => {
         if (isMinimized) {
-            const p = allParticipants.find((x) => x.id === (sharer?.id || stageSpeaker)) || allParticipants.find((x) => !x.isLocal) || allParticipants[0];
+            const p = sharer || people.find((x) => x.id === stageSpeaker) || people.find((x) => !x.isLocal) || people[0];
             return <div className="vc-body vc-body--mini">{p && renderTile(p, 'mini')}</div>;
         }
         if (spotlight) {
@@ -908,7 +920,7 @@ const VideoChat = ({
                         {presenting && (
                             <div className="vc-banner">
                                 <span className="vc-live-dot" />
-                                <span>{spotlight.isLocal ? "You're presenting" : `${nameFor(spotlight)} is presenting`}</span>
+                                <span>{spotlight.isLocal ? "You're presenting" : `${ownerName(spotlight)} is presenting`}</span>
                                 <span className="vc-banner-actions">
                                     <button className={isDrawing ? 'on' : ''} onClick={() => setIsDrawing((d) => !d)} title="Draw on the shared screen. Everyone sees it; strokes fade.">
                                         <Icon name="draw" size={14} filled={isDrawing} /> {isDrawing ? 'Drawing' : 'Draw'}
@@ -924,7 +936,7 @@ const VideoChat = ({
                         {sharer && !presenting && (
                             <div className="vc-banner">
                                 <span className="vc-live-dot" />
-                                <span>{sharer.isLocal ? "You're presenting" : `${nameFor(sharer)} is presenting`}</span>
+                                <span>{sharer.isLocal ? "You're presenting" : `${ownerName(sharer)} is presenting`}</span>
                                 <span className="vc-banner-actions">
                                     <button className="vc-back" onClick={() => togglePin(pinned)}><Icon name="screen-share" size={14} /> Back to shared screen</button>
                                 </span>
@@ -950,7 +962,7 @@ const VideoChat = ({
         const tileStyle = best.w ? { width: best.w, height: best.h } : undefined;
         return (
             <div className="vc-body vc-body--grid" ref={gridRef}>
-                {allParticipants.map((p) => renderTile(p, 'grid', tileStyle))}
+                {people.map((p) => renderTile(p, 'grid', tileStyle))}
                 {count === 1 && !spectator && (
                     <div className="vc-alone" title="Others join from the call button in this room">Waiting for others to join…</div>
                 )}
@@ -1040,6 +1052,7 @@ const VideoChat = ({
             {renderBody()}
             <div className="vc-audio" aria-hidden="true">
                 {Object.entries(remoteUsers).map(([id, u]) => (u.stream ? <RemoteAudio key={id} stream={u.stream} /> : null))}
+                {Object.entries(remoteUsers).map(([id, u]) => (u.isScreenSharing && u.screen?.getAudioTracks().length ? <RemoteAudio key={`${id}-screen`} stream={u.screen} /> : null))}
             </div>
 
             {isMinimized && (
