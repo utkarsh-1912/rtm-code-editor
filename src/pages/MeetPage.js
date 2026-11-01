@@ -1,25 +1,25 @@
 import React, { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { CalendarDays, Clock, Video, Lock, DoorOpen, Globe, Copy, CalendarX, Pencil, Trash2, UserRound } from "lucide-react";
+import { Video, Lock, DoorOpen, Globe, Copy, Pencil, Trash2 } from "lucide-react";
 import toast from "react-hot-toast";
 import AppLayout from "../components/AppLayout";
 import { CalendarLinks, ScheduleModal, confirmDeleteMeeting } from "../components/Meetings";
 import { useAuth } from "../context/AuthContext";
 import DeviceCheck from "../components/DeviceCheck";
 import MeetingOrganiser from "../components/MeetingOrganiser";
-import { getMeeting, meetingLink, isJoinable, isOver, startsIn } from "../utils/meetings";
+import { getMeeting, meetingLink, isJoinable, isOver, startsIn, rsvpMeeting } from "../utils/meetings";
 
 const ACCESS = {
-    public: { Icon: Globe, text: "Anyone with the link can join." },
-    invite: { Icon: DoorOpen, text: "Invited people join directly; others ask the host to let them in." },
-    private: { Icon: Lock, text: "Only invited people can join, signed in with the invited email." },
+    public: { Icon: Globe, short: "Anyone", text: "Anyone with the link" },
+    invite: { Icon: DoorOpen, short: "Invited", text: "Others knock to come in" },
+    private: { Icon: Lock, short: "Invitees only", text: "Signed in with the invited email" },
 };
 
 // The page an invite links to: when, who, add to calendar, and Join once it's time.
 export default function MeetPage() {
     const { meetingId } = useParams();
     const navigate = useNavigate();
-    const { user } = useAuth();
+    const { user, loading: authLoading } = useAuth();
     const [params] = useSearchParams();
     const [m, setM] = useState(null);
     const [error, setError] = useState(null);
@@ -47,100 +47,161 @@ export default function MeetPage() {
     };
     const remove = async () => { if (await confirmDeleteMeeting(m)) navigate(user ? "/dashboard" : "/"); };
 
+    // Wait for sign-in to be restored: the organiser's view (notes, guests, snapshots) depends on it.
     useEffect(() => {
-        getMeeting(meetingId).then(setM).catch((err) => setError(err.message));
+        if (authLoading) return undefined;
+        let live = true;
+        getMeeting(meetingId).then((x) => live && setM(x)).catch((err) => live && setError(err.message));
+        return () => { live = false; };
+    }, [meetingId, authLoading, user?.uid]);
+    useEffect(() => {
         const t = setInterval(() => tick((n) => n + 1), 15000);
         return () => clearInterval(t);
-    }, [meetingId]);
+    }, []);
+
+    // Arrived from the email's Yes / No buttons (?rsvp=yes|no|invalid): say it was recorded, once.
+    const rsvpParam = params.get("rsvp");
+    useEffect(() => {
+        if (!rsvpParam) return;
+        if (rsvpParam === "yes") toast.success("Thanks, the organiser knows you're coming.", { id: "rsvp" });
+        else if (rsvpParam === "no") toast("Thanks for letting the organiser know.", { id: "rsvp" });
+        else toast.error("That answer link isn't valid any more. Open the latest email for this meeting.", { id: "rsvp" });
+        const next = new URLSearchParams(params);
+        next.delete("rsvp");
+        navigate({ search: next.toString() ? `?${next}` : "" }, { replace: true });
+    }, [rsvpParam]); // eslint-disable-line react-hooks/exhaustive-deps
+    const answer = async (value) => {
+        try { setM(await rsvpMeeting(m.id, value)); toast.success(value === "yes" ? "See you there" : "The organiser will know"); } catch (err) { toast.error(err.message); }
+    };
 
     const copy = async () => {
         try { await navigator.clipboard.writeText(meetingLink(m)); toast.success("Link copied"); } catch { toast.error("Couldn't copy the link"); }
     };
 
-    let body;
+    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone.replace(/_/g, " ");
+
     if (error) {
-        body = (
-            <div className="mt-page-card">
-                <span className="mt-page-ico is-bad"><CalendarX size={22} /></span>
-                <h1>Meeting not found</h1>
-                <p>The link may be wrong, or the meeting was removed.</p>
-                <button className="u-btn u-btn--ghost" onClick={() => navigate("/")}>Go home</button>
-            </div>
-        );
-    } else if (!m) {
-        body = <div className="mt-page-card"><div className="u-skel" style={{ height: 180, width: "100%" }} /></div>;
-    } else {
-        const start = new Date(m.startsAt);
-        const joinable = isJoinable(m);
-        const over = isOver(m);
-        const acc = ACCESS[m.access] || ACCESS.public;
-        body = (
-            <div className="mt-page-card">
-                <span className={`mt-page-ico${m.cancelled ? " is-bad" : joinable ? " is-live" : ""}`}>{m.cancelled ? <CalendarX size={22} /> : <CalendarDays size={22} />}</span>
-                <span className="u-label">{m.cancelled ? "Cancelled" : m.endedAt ? "Ended by the organiser" : over ? "This meeting has ended" : joinable ? "Happening now" : `Starts ${startsIn(m.startsAt)}`}</span>
-                <h1>{m.title}</h1>
-                <div className="mt-page-facts">
-                    <span><CalendarDays size={14} /> {start.toLocaleDateString([], { weekday: "long", day: "numeric", month: "long", year: "numeric" })}</span>
-                    <span><Clock size={14} /> {start.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })} · {m.durationMin} min <em>({Intl.DateTimeFormat().resolvedOptions().timeZone.replace(/_/g, " ")})</em></span>
-                    <span><acc.Icon size={14} /> {acc.text}</span>
-                </div>
-                {m.description && <p className="mt-page-notes">{m.description}</p>}
-                <span className="u-small u-muted">Hosted by {m.isHost ? "you" : m.hostName || "the host"}</span>
-                {!user && !m.cancelled && !over && (
-                    <div className="mt-page-who">
-                        <UserRound size={14} />
-                        {renaming ? (
-                            <input className="u-input" autoFocus={renaming} value={guestName} maxLength={60} placeholder="Your name"
-                                onChange={(e) => setGuestName(e.target.value)} onBlur={() => guestName.trim() && setRenaming(false)}
-                                onKeyDown={(e) => e.key === "Enter" && guestName.trim() && setRenaming(false)} aria-label="Your name" />
-                        ) : (
-                            <>
-                                <span>You'll join as <b>{guestName}</b></span>
-                                <button type="button" className="u-btn u-btn--ghost u-btn--sm" onClick={() => setRenaming(true)}>Change</button>
-                            </>
-                        )}
-                    </div>
-                )}
-                {!m.cancelled && !over && (
-                    <>
-                        {(joinable || m.isHost) && <DeviceCheck ref={devicesRef} name={user?.name || guestName.trim()} />}
-                        <div className="mt-page-actions">
-                            <button className="u-btn u-btn--solid u-btn--lg" onClick={join} disabled={joining || (!joinable && !m.isHost)} title={joinable || m.isHost ? "" : "You can join 10 minutes before it starts"}>
-                                <Video size={16} /> {joinable ? "Join now" : m.isHost ? "Open the room" : "Join opens 10 min before"}
-                            </button>
-                            <button className="u-btn u-btn--ghost u-btn--lg" onClick={copy}><Copy size={16} /> Copy link</button>
-                        </div>
-                        {m.isHost && (
-                            <div className="mt-page-host">
-                                <button className="u-btn u-btn--ghost u-btn--sm" onClick={() => setEditing(true)}><Pencil size={14} /> Edit or reschedule</button>
-                                {m.isOwner && <button className="u-btn u-btn--ghost u-btn--sm danger" onClick={remove}><Trash2 size={14} /> Delete</button>}
-                            </div>
-                        )}
-                        <span className="u-label">Add to calendar</span>
-                        <CalendarLinks meeting={m} />
-                    </>
-                )}
-                {!m.isHost && m.endedAt && <p className="u-small u-muted">The room is closed now. Thanks for joining.</p>}
-                {m.isHost && over && (
-                    <div className="mt-page-host">
-                        <button className="u-btn u-btn--ghost u-btn--sm" onClick={() => navigate(`/editor/${m.roomId}`)}><Video size={14} /> Open the room</button>
-                        {m.isOwner && <button className="u-btn u-btn--ghost u-btn--sm danger" onClick={remove}><Trash2 size={14} /> Delete</button>}
-                    </div>
-                )}
-                {m.isHost && <ScheduleModal open={editing} meeting={m} onClose={() => setEditing(false)} onScheduled={(next) => setM(next)} />}
-            </div>
-        );
-    }
-    // Organisers get the review side: private notes, snapshots, co-organisers, End meeting.
-    if (m?.isHost && !m.cancelled) {
         return (
             <AppLayout>
-                <div className="mt-page mt-page--org">
-                    {body}
-                    <MeetingOrganiser meeting={m} onChange={(next) => setM(next)} userName={user?.name || user?.email} />
-                </div>
+                <header className="db-head" data-rise>
+                    <div>
+                        <span className="u-label"><span className="u-dot u-dot--bad" /> Meeting</span>
+                        <h1 className="db-title">Meeting not found</h1>
+                    </div>
+                    <div className="db-actions"><button className="u-btn u-btn--ghost" onClick={() => navigate("/")}>Go home</button></div>
+                </header>
+                <p className="mp-lead">The link may be wrong, or the meeting was removed.</p>
             </AppLayout>
         );
     }
-    return <AppLayout><div className="mt-page">{body}</div></AppLayout>;
+    if (!m) {
+        return (
+            <AppLayout>
+                <div className="db-head"><div className="u-skel" style={{ height: 64, width: 420, maxWidth: "100%" }} /></div>
+                <div className="u-skel" style={{ height: 104 }} />
+            </AppLayout>
+        );
+    }
+
+    const start = new Date(m.startsAt);
+    const end = new Date(start.getTime() + m.durationMin * 60000);
+    const joinable = isJoinable(m);
+    const over = isOver(m);
+    const live = !m.cancelled && !over;
+    const acc = ACCESS[m.access] || ACCESS.public;
+    const status = m.cancelled ? { text: "Cancelled", dot: "u-dot--bad" }
+        : m.endedAt ? { text: "Ended by the organiser", dot: "u-dot--off" }
+            : over ? { text: "Ended", dot: "u-dot--off" }
+                : joinable ? { text: "Happening now", dot: "" }
+                    : { text: `Starts ${startsIn(m.startsAt)}`, dot: "u-dot--warn" };
+    const organiser = m.isHost && !m.cancelled;
+
+    const tiles = [
+        { label: "Date", value: start.toLocaleDateString([], { day: "numeric" }), small: start.toLocaleDateString([], { month: "short" }), sub: start.toLocaleDateString([], { weekday: "long", year: "numeric" }) },
+        { label: "Time", value: start.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }).replace(/\s?[AP]M$/i, ""), small: start.toLocaleTimeString([], { hour: "numeric" }).match(/[AP]M/i)?.[0] || "", sub: `to ${end.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })} · ${tz}` },
+        { label: "Length", value: m.durationMin >= 60 && m.durationMin % 60 === 0 ? m.durationMin / 60 : m.durationMin, small: m.durationMin >= 60 && m.durationMin % 60 === 0 ? "h" : "m", sub: `${m.durationMin} minutes` },
+        { label: "Who can join", text: acc.short, sub: acc.text, Icon: acc.Icon },
+    ];
+
+    const joinCard = live ? (
+        <section className="u-card mp-card" data-rise aria-label="Join">
+            {m.invited && (
+                <div className="mp-rsvp" role="group" aria-label="Will you join?">
+                    <span className="u-label">Will you join?</span>
+                    <button type="button" className={m.rsvp === "yes" ? "on" : ""} aria-pressed={m.rsvp === "yes"} onClick={() => answer("yes")}>Yes</button>
+                    <button type="button" className={m.rsvp === "no" ? "on is-no" : ""} aria-pressed={m.rsvp === "no"} onClick={() => answer("no")}>Can't make it</button>
+                </div>
+            )}
+            <div className="mp-card-head">
+                <span className="u-label">Before you join</span>
+                {!user && (
+                    <span className="mp-who">
+                        {renaming ? (
+                            <input className="u-input" autoFocus value={guestName} maxLength={60} placeholder="Your name"
+                                onChange={(e) => setGuestName(e.target.value)} onBlur={() => guestName.trim() && setRenaming(false)}
+                                onKeyDown={(e) => e.key === "Enter" && guestName.trim() && setRenaming(false)} aria-label="Your name" />
+                        ) : (
+                            <>Joining as <b>{guestName}</b><button type="button" className="u-btn u-btn--quiet u-btn--sm" onClick={() => setRenaming(true)}>Change</button></>
+                        )}
+                    </span>
+                )}
+            </div>
+            {(joinable || m.isHost) ? <DeviceCheck ref={devicesRef} name={user?.name || guestName.trim()} />
+                : <p className="mp-lead">The room opens 10 minutes before the start. Add it to your calendar so you don't miss it.</p>}
+            <div className="mp-join">
+                <button className="u-btn u-btn--solid u-btn--lg" onClick={join} disabled={joining || (!joinable && !m.isHost)}>
+                    <Video size={16} /> {joinable ? "Join now" : m.isHost ? "Open the room" : "Join opens 10 min before"}
+                </button>
+                <span className="mp-cal"><span className="u-label">Add to calendar</span><CalendarLinks meeting={m} /></span>
+            </div>
+        </section>
+    ) : (
+        <section className="u-card mp-card mp-card--done" data-rise>
+            <span className="u-label">{m.cancelled ? "Cancelled" : "Finished"}</span>
+            <p className="mp-lead">{m.cancelled ? "The organiser cancelled this meeting." : organiser ? "Your notes, snapshots and comments are kept here to review." : "The room is closed now. Thanks for joining."}</p>
+        </section>
+    );
+
+    return (
+        <AppLayout>
+            <header className="db-head" data-rise>
+                <div>
+                    <span className="u-label"><span className={`u-dot ${status.dot}`} /> Meeting · {status.text}</span>
+                    <h1 className="db-title">{m.title}</h1>
+                    <p className="mp-host">Hosted by {m.isOwner ? "you" : m.hostName || "the host"}{m.coHosts?.length ? ` · ${m.coHosts.length} co-organiser${m.coHosts.length === 1 ? "" : "s"}` : ""}</p>
+                </div>
+                <div className="db-actions">
+                    <button className="u-btn u-btn--ghost" onClick={copy}><Copy size={16} /> Copy link</button>
+                    {organiser && live && <button className="u-btn u-btn--ghost" onClick={() => setEditing(true)}><Pencil size={16} /> Edit</button>}
+                    {m.isOwner && <button className="u-btn u-btn--ghost mp-danger" onClick={remove} title="Delete meeting" aria-label="Delete meeting"><Trash2 size={16} /></button>}
+                    {organiser && over && <button className="u-btn u-btn--solid" onClick={() => navigate(`/editor/${m.roomId}`)}><Video size={16} /> Open the room</button>}
+                </div>
+            </header>
+
+            <div className="db-kpis mp-kpis" data-rise>
+                {tiles.map((t) => (
+                    <div key={t.label} className="db-kpi" aria-label={`${t.label}: ${t.sub}`}>
+                        <span className="u-label">{t.label}</span>
+                        {t.text
+                            ? <span className="mp-kpi-text">{t.Icon && <t.Icon size={18} />}{t.text}</span>
+                            : <span className="u-num">{t.value}<small>{t.small}</small></span>}
+                        <span className="mp-kpi-sub">{t.sub}</span>
+                    </div>
+                ))}
+            </div>
+
+            {m.description && (
+                <section className="u-card mp-agenda" data-rise>
+                    <span className="u-label">Agenda</span>
+                    <p>{m.description}</p>
+                </section>
+            )}
+
+            <div className={organiser ? "mp-grid" : "mp-single"}>
+                {joinCard}
+                {organiser && <MeetingOrganiser meeting={m} onChange={(next) => setM(next)} />}
+            </div>
+            {organiser && <ScheduleModal open={editing} meeting={m} onClose={() => setEditing(false)} onScheduled={(next) => setM(next)} />}
+        </AppLayout>
+    );
 }

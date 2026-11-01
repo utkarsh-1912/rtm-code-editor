@@ -1,9 +1,11 @@
-import React, { useEffect } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { ArrowUpRight } from "lucide-react";
+import { ArrowUpRight, Search, LifeBuoy } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import Shell, { ThemeButton, useThemeToggle } from "../ux/Shell";
 import Announcements from "../ux/Announcements";
+import SearchModal from "../SearchModal";
+import HelpModal from "../HelpModal";
 
 const LINKS = [
     { to: "/features", label: "Features" },
@@ -25,6 +27,20 @@ export default function SiteLayout({ children }) {
     const { user } = useAuth();
     const navigate = useNavigate();
     const [isLight, toggleTheme] = useThemeToggle();
+    const [searchOpen, setSearchOpen] = useState(false);
+    const [helpOpen, setHelpOpen] = useState(false);
+    const closeSearch = useCallback(() => setSearchOpen(false), []);
+
+    // Same keys as the app: Ctrl/Cmd K searches, "?" opens help (unless you're typing).
+    useEffect(() => {
+        const onKey = (e) => {
+            if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") { e.preventDefault(); setSearchOpen(true); }
+            const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(e.target?.tagName || "") || e.target?.isContentEditable;
+            if (e.key === "?" && !typing && !e.metaKey && !e.ctrlKey) { e.preventDefault(); setHelpOpen(true); }
+        };
+        window.addEventListener("keydown", onKey);
+        return () => window.removeEventListener("keydown", onKey);
+    }, []);
 
     return (
         <Shell
@@ -35,8 +51,12 @@ export default function SiteLayout({ children }) {
                 : <Link to="/signup" className="u-btn u-btn--solid u-btn--lg">Try it free <ArrowUpRight size={15} /></Link>}
             mainClass="u-main u-main--site"
             stripLeft={<Announcements audience="site" />}
-            stripRight={<Link to="/status">Status</Link>}
+            stripRight={<>
+                <Link to="/status">Status</Link>
+                <button onClick={() => setHelpOpen(true)} title="Help, what's new and shortcuts (?)"><LifeBuoy size={12} style={{ verticalAlign: "-2px" }} /> Help</button>
+            </>}
             right={<>
+                <button className="u-icon" onClick={() => setSearchOpen(true)} aria-label="Search (Ctrl K)" title="Search (Ctrl K)"><Search size={18} /></button>
                 <ThemeButton className="u-icon u-icon--hide" />
                 {user ? (
                     <button className="u-btn u-btn--solid u-nav-cta" onClick={() => navigate("/dashboard")} aria-label="Open workspace">
@@ -58,6 +78,10 @@ export default function SiteLayout({ children }) {
                     <button className="u-btn u-btn--ghost" onClick={toggleTheme}>{isLight ? "Dark" : "Light"} theme</button>
                     {!user && <Link to="/login" className="u-btn u-btn--ghost">Sign in</Link>}
                 </div>
+            </>}
+            after={<>
+                <SearchModal isOpen={searchOpen} onClose={closeSearch} onOpenHelp={() => setHelpOpen(true)} onToggleTheme={toggleTheme} />
+                <HelpModal open={helpOpen} onClose={() => setHelpOpen(false)} />
             </>}
         >
             {children}

@@ -35,6 +35,43 @@ export const takeSnapshot = (id, body = {}) => call(`${mid(id)}/snapshots`, { me
 export const updateSnapshot = (id, sid, body) => call(`${mid(id)}/snapshots/${sid}`, { method: "PATCH", body });
 export const deleteSnapshot = (id, sid) => call(`${mid(id)}/snapshots/${sid}`, { method: "DELETE" });
 export const endMeeting = (id, body = {}) => call(`${mid(id)}/end`, { method: "POST", body });
+// Invitees answer "yes" / "no" (signed in with the invited address).
+export const rsvpMeeting = (id, answer) => call(`${mid(id)}/rsvp`, { method: "POST", body: { answer } });
+
+// --- Time zones --------------------------------------------------------------------------------
+export const localZone = () => Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+export const allZones = () => {
+    try { return Intl.supportedValuesOf("timeZone"); } catch { return [localZone(), "UTC"]; }
+};
+const zoneParts = (t, tz) => Object.fromEntries(new Intl.DateTimeFormat("en-US", {
+    timeZone: tz, hourCycle: "h23", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit",
+}).formatToParts(new Date(t)).map((p) => [p.type, p.value]));
+// How far `tz` is ahead of UTC at instant `t`, in ms.
+const zoneOffset = (t, tz) => {
+    const p = zoneParts(t, tz);
+    return Date.UTC(+p.year, +p.month - 1, +p.day, +p.hour % 24, +p.minute, +p.second) - Math.floor(t / 1000) * 1000;
+};
+// "2026-11-03" + "16:30" on the clock in `tz` -> the real instant.
+export function zonedToDate(date, time, tz) {
+    const [y, mo, d] = date.split("-").map(Number);
+    const [h, mi] = time.split(":").map(Number);
+    const wall = Date.UTC(y, mo - 1, d, h, mi);
+    let t = wall - zoneOffset(wall, tz);
+    t = wall - zoneOffset(t, tz); // second pass settles daylight-saving edges
+    return new Date(t);
+}
+// An instant as date + time strings on the clock in `tz` (for the date and time inputs).
+export function dateInZone(at, tz) {
+    const p = zoneParts(new Date(at).getTime(), tz);
+    return { date: `${p.year}-${p.month}-${p.day}`, time: `${String(+p.hour % 24).padStart(2, "0")}:${p.minute}` };
+}
+// "GMT+5:30" style label for a zone right now.
+export function zoneLabel(tz, at = Date.now()) {
+    const off = Math.round(zoneOffset(new Date(at).getTime(), tz) / 60000);
+    const sign = off < 0 ? "-" : "+";
+    const a = Math.abs(off);
+    return `GMT${sign}${Math.floor(a / 60)}${a % 60 ? `:${String(a % 60).padStart(2, "0")}` : ""}`;
+}
 
 export const meetingLink = (m) => `${publicOrigin()}/meet/${m.id}`;
 export const icsUrl = (m) => `${getBackendUrl()}/api/meetings/${encodeURIComponent(m.id)}/ics`;

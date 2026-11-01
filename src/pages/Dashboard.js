@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { CalendarPlus, WifiOff, Plus, Search, MoreHorizontal, Pencil, Trash2, Folder, FolderOpen, FileUp, Terminal, Link2, ArrowUpRight, ArrowRight, Check, Sparkles, RotateCcw, X } from 'lucide-react';
+import { CalendarPlus, WifiOff, ServerOff, Plus, Search, MoreHorizontal, Pencil, Trash2, Folder, FolderOpen, FileUp, Terminal, Link2, ArrowUpRight, ArrowRight, Check, Sparkles, RotateCcw, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
 import AppLayout from '../components/AppLayout';
@@ -14,6 +14,8 @@ import { pickFolder, pickFiles, importProject, describeSkipped } from '../utils/
 import { usePlan, isPlanLimit, showUpgradeToast, catalogue } from '../utils/billing';
 import { track } from '../utils/track';
 import { ScheduleModal, UpcomingMeetings } from '../components/Meetings';
+import { useOnline } from '../components/ux/Shell';
+import { useBackend } from '../context/BackendContext';
 
 // Project templates: a web app (live preview) plus every runnable language.
 const TEMPLATES = [
@@ -71,6 +73,16 @@ const Dashboard = () => {
     const navigate = useNavigate();
     const location = useLocation();
     const { rooms, projects, roomsTotal, projectsTotal, stats, loading: loadingData, error, reload, loadingMore, loadMoreRooms, loadMoreProjects, staleAt } = useWorkspace(user);
+    const online = useOnline();
+    const backend = useBackend();
+    // Showing the saved copy because the server didn't answer: load again once it's back.
+    useEffect(() => {
+        if (!staleAt || !online || backend.status !== 'up') return undefined;
+        reload();
+        const t = setInterval(reload, 15000);
+        return () => clearInterval(t);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [backend.status, online, !!staleAt]);
     const { plan: planInfo, reload: reloadPlan } = usePlan(user);
 
     const [view, setView] = useState('all'); // all | rooms | projects
@@ -386,8 +398,10 @@ const Dashboard = () => {
 
             {staleAt && (
                 <aside className="u-card db-offline" data-rise role="status">
-                    <WifiOff size={16} />
-                    <span><b>Offline.</b> Showing your workspace as of {timeAgo(new Date(staleAt))}. Rooms and projects open again when you're back online.</span>
+                    {online ? <ServerOff size={16} /> : <WifiOff size={16} />}
+                    {online
+                        ? <span><b>{backend.status === 'up' ? 'Reconnecting.' : 'Server restarting.'}</b> Showing your workspace as of {timeAgo(new Date(staleAt))}. It refreshes by itself when the server is back.</span>
+                        : <span><b>Offline.</b> Showing your workspace as of {timeAgo(new Date(staleAt))}. Rooms and projects open again when you're back online.</span>}
                     {window.colabsDesktop && <button className="u-btn u-btn--ghost u-btn--sm" onClick={() => navigate('/offline')}>Offline editor</button>}
                     <button className="u-btn u-btn--ghost u-btn--sm" onClick={reload}>Retry</button>
                 </aside>

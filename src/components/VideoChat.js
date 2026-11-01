@@ -5,6 +5,10 @@ import { Avatar } from './clients';
 import CallAnnotations from './CallAnnotations';
 import toast from 'react-hot-toast';
 import ACTIONS from '../Action';
+import { auth } from '../firebase';
+
+// Sign-in for the call's own socket (a call kept going after leaving its page).
+const idToken = () => (auth.currentUser ? auth.currentUser.getIdToken().catch(() => undefined) : Promise.resolve(undefined));
 
 // Camera sized for a mesh call: plenty for a tile, a fraction of 720p30's bandwidth.
 const CAM = { width: { ideal: 640 }, height: { ideal: 360 }, frameRate: { ideal: 24, max: 30 } };
@@ -254,7 +258,8 @@ const VideoChat = ({
                 projectId,
                 userId: socketRef.current.id,
                 name: user?.name || socketRef.current.userName,
-                isSpectator: false
+                isSpectator: false,
+                idToken: await idToken(),
             });
 
             // Immediate broadcast of current state
@@ -526,8 +531,8 @@ const VideoChat = ({
     useEffect(() => {
         const socket = socketRef.current;
         if (!socket) return undefined;
-        const onReconnect = () => {
-            if (inCallRef.current) socket.emit('rejoin-video-chat', { projectId });
+        const onReconnect = async () => {
+            if (inCallRef.current) socket.emit('rejoin-video-chat', { projectId, idToken: await idToken() });
         };
         socket.on('connect', onReconnect);
         return () => socket.off('connect', onReconnect);

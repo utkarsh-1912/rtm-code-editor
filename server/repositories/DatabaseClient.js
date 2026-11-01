@@ -226,6 +226,9 @@ async function initializeSchema() {
         await sql`ALTER TABLE meetings ADD COLUMN IF NOT EXISTS co_hosts JSONB DEFAULT '[]'::jsonb;`;
         await sql`ALTER TABLE meetings ADD COLUMN IF NOT EXISTS host_notes TEXT DEFAULT '';`;
         await sql`ALTER TABLE meetings ADD COLUMN IF NOT EXISTS ended_at TIMESTAMP WITH TIME ZONE;`;
+        // Invitees' answers ({ email: "yes" | "no" }) and when the organiser was told it ran over.
+        await sql`ALTER TABLE meetings ADD COLUMN IF NOT EXISTS rsvps JSONB DEFAULT '{}'::jsonb;`;
+        await sql`ALTER TABLE meetings ADD COLUMN IF NOT EXISTS nudged_at TIMESTAMP WITH TIME ZONE;`;
         // Code snapshots taken during a meeting (by an organiser, and one when it ends), each
         // with a private comment. Only organisers see them.
         await sql`
@@ -242,6 +245,15 @@ async function initializeSchema() {
         );
         `;
         await sql`CREATE INDEX IF NOT EXISTS meeting_snapshots_meeting ON meeting_snapshots (meeting_id, created_at);`;
+        // Meeting emails sent per account per day (a cap, so invites can't be used to spam).
+        await sql`
+        CREATE TABLE IF NOT EXISTS mail_quota (
+            uid VARCHAR(128) NOT NULL,
+            day DATE NOT NULL DEFAULT CURRENT_DATE,
+            sent INTEGER NOT NULL DEFAULT 0,
+            PRIMARY KEY (uid, day)
+        );
+        `;
         // Room access: who owns a room, who may join it (public link, invite-only, private).
         await sql`ALTER TABLE rooms ADD COLUMN IF NOT EXISTS owner_uid VARCHAR(128);`;
         await sql`ALTER TABLE rooms ADD COLUMN IF NOT EXISTS visibility VARCHAR(16) DEFAULT 'public';`;

@@ -1,9 +1,10 @@
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import toast from "react-hot-toast";
 import { Camera, Copy, ChevronDown, ChevronRight, Lock, Mail, Power, Trash2, UserPlus, X, Flag } from "lucide-react";
 import { Modal } from "./ux/primitives";
+import { lineDiff, withContext } from "../utils/lineDiff";
 import {
-    saveMeetingNotes, saveCoHosts, listSnapshots, takeSnapshot, updateSnapshot, deleteSnapshot, endMeeting,
+    saveMeetingNotes, saveCoHosts, listSnapshots, updateSnapshot, deleteSnapshot, endMeeting,
 } from "../utils/meetings";
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -13,18 +14,25 @@ const day = (d) => new Date(d).toLocaleDateString([], { weekday: "short", day: "
 // Saves after typing stops; reports "saving" / "saved" / "error".
 function useAutosave(value, save, delay = 800) {
     const [state, setState] = useState("idle");
-    const first = useRef(true);
+    const saved = useRef(value); // last value known to be on the server
     const saveRef = useRef(save);
     saveRef.current = save;
+    const pending = useRef(null); // { value } typed but not sent yet
     useEffect(() => {
-        if (first.current) { first.current = false; return undefined; }
+        if (value === saved.current) { pending.current = null; return undefined; }
         setState("dirty");
+        pending.current = { value };
         const t = setTimeout(async () => {
+            pending.current = null;
             setState("saving");
-            try { await saveRef.current(value); setState("saved"); } catch { setState("error"); }
+            try { await saveRef.current(value); saved.current = value; setState("saved"); } catch { setState("error"); }
         }, delay);
         return () => clearTimeout(t);
     }, [value, delay]);
+    // Leaving the page (or this card) before the pause: send what was typed anyway.
+    useEffect(() => () => {
+        if (pending.current) Promise.resolve(saveRef.current(pending.current.value)).catch(() => { });
+    }, []);
     return state;
 }
 
@@ -41,7 +49,7 @@ export function EndMeetingModal({ open, meeting, onClose, onEnded, code, languag
         setBusy(true);
         try {
             const res = await endMeeting(meeting.id, { code, language, takenBy });
-            toast.success(res.removed ? `Meeting ended. ${res.removed} ${res.removed === 1 ? "person was" : "people were"} removed from the room.` : "Meeting ended. The room is now organisers only.");
+            toast.success(res.removed ? `Meeting ended. ${res.removed} ${res.removed === 1 ? "person was" : "people were"} removed from the room.` : "Meeting ended. The room is now organisers only.", { id: "meeting-ended" });
             onEnded?.(res.meeting);
             onClose();
         } catch (err) {
@@ -59,15 +67,34 @@ export function EndMeetingModal({ open, meeting, onClose, onEnded, code, languag
             </>}>
             <ul className="mo-list-plain">
                 <li><Camera size={14} /> A final snapshot of the code is saved for review.</li>
-                <li><Lock size={14} /> The room becomes private: only you{meeting?.coHosts?.length ? " and co-organisers" : ""} can open it.</li>
+                <li><Lock size={14} /> The room becomes private: this meeting's guests lose access; you{meeting?.coHosts?.length ? " and co-organisers" : ""} keep it.</li>
                 <li><Flag size={14} /> Invitees see that the meeting has ended.</li>
             </ul>
         </Modal>
     );
 }
 
-function SnapshotCard({ meetingId, snap, index, onChange, onDelete }) {
+// What changed since the snapshot before: added and removed lines, with a little context.
+function SnapshotDiff({ before, after }) {
+    const rows = useMemo(() => lineDiff(before.code || "", after.code || ""), [before.code, after.code]);
+    const added = rows.filter((r) => r.type === "add").length;
+    const removed = rows.filter((r) => r.type === "del").length;
+    if (!added && !removed) return <pre><em>No changes since the snapshot before.</em></pre>;
+    return (
+        <>
+            <div className="mo-diff-sum"><span className="is-add">+{added}</span><span className="is-del">−{removed}</span> since {before.label || "the snapshot before"} ({clock(before.createdAt)})</div>
+            <pre className="mo-diff">
+                {withContext(rows).map((r, i) => (r.type === "gap"
+                    ? <span key={i} className="is-gap"><i /><i />⋯ {r.count} unchanged line{r.count === 1 ? "" : "s"}{"\n"}</span>
+                    : <span key={i} className={`is-${r.type}`}><i>{r.a ?? ""}</i><i>{r.b ?? ""}</i>{r.type === "add" ? "+ " : r.type === "del" ? "− " : "  "}{r.text || " "}{"\n"}</span>))}
+            </pre>
+        </>
+    );
+}
+
+function SnapshotCard({ meetingId, snap, prev, index, onChange, onDelete }) {
     const [open, setOpen] = useState(false);
+    const [view, setView] = useState(prev ? "changes" : "code"); // changes | code
     const [note, setNote] = useState(snap.note || "");
     const state = useAutosave(note, (v) => updateSnapshot(meetingId, snap.id, { note: v }).then(onChange));
     const lines = (snap.code || "").split("\n");
@@ -90,13 +117,19 @@ function SnapshotCard({ meetingId, snap, index, onChange, onDelete }) {
             {open && (
                 <div className="mo-code">
                     <div className="mo-code-bar">
-                        <span>{snap.takenBy ? `Taken by ${snap.takenBy}` : ""}</span>
+                        <span className="mo-views">
+                            {prev && <button type="button" className={view === "changes" ? "on" : ""} onClick={() => setView("changes")}>Changes</button>}
+                            <button type="button" className={view === "code" ? "on" : ""} onClick={() => setView("code")}>Code</button>
+                            {snap.takenBy && <span className="mo-by">by {snap.takenBy}</span>}
+                        </span>
                         <span>
                             <button type="button" className="u-icon" onClick={copy} title="Copy code" aria-label="Copy code"><Copy size={14} /></button>
                             {snap.kind !== "end" && <button type="button" className="u-icon" onClick={() => onDelete(snap)} title="Delete snapshot" aria-label="Delete snapshot"><Trash2 size={14} /></button>}
                         </span>
                     </div>
-                    <pre>{snap.code ? lines.map((l, i) => <span key={i}><i>{i + 1}</i>{l || " "}{"\n"}</span>) : <em>The editor was empty.</em>}</pre>
+                    {view === "changes" && prev
+                        ? <SnapshotDiff before={prev} after={snap} />
+                        : <pre>{snap.code ? lines.map((l, i) => <span key={i}><i>{i + 1}</i>{l || " "}{"\n"}</span>) : <em>The editor was empty.</em>}</pre>}
                 </div>
             )}
             <div className="mo-note">
@@ -107,13 +140,12 @@ function SnapshotCard({ meetingId, snap, index, onChange, onDelete }) {
     );
 }
 
-// The organiser's side of a meeting page: private notes, code snapshots with comments,
-// co-organisers, and ending the meeting.
+// The organiser's side of a meeting page, to prepare before and review after: private notes,
+// the code snapshots taken in the room (with comments), co-organisers, and ending the meeting.
 export default function MeetingOrganiser({ meeting, onChange, userName }) {
     const [notes, setNotes] = useState(meeting.notes || "");
     const notesState = useAutosave(notes, (v) => saveMeetingNotes(meeting.id, v));
     const [snaps, setSnaps] = useState(null);
-    const [taking, setTaking] = useState(false);
     const [ending, setEnding] = useState(false);
     const [coHosts, setCoHosts] = useState(meeting.coHosts || []);
     const [draft, setDraft] = useState("");
@@ -123,14 +155,6 @@ export default function MeetingOrganiser({ meeting, onChange, userName }) {
     const load = useCallback(() => listSnapshots(meeting.id).then(setSnaps).catch(() => setSnaps([])), [meeting.id]);
     useEffect(() => { load(); }, [load, meeting.endedAt]);
 
-    const snapshot = async () => {
-        setTaking(true);
-        try {
-            const s = await takeSnapshot(meeting.id, { takenBy: userName });
-            setSnaps((prev) => [...(prev || []), s]);
-            toast.success("Snapshot saved");
-        } catch (err) { toast.error(err.message); } finally { setTaking(false); }
-    };
     const removeSnap = async (s) => {
         if (!window.confirm("Delete this snapshot and its comment?")) return;
         try { await deleteSnapshot(meeting.id, s.id); setSnaps((prev) => prev.filter((x) => x.id !== s.id)); } catch (err) { toast.error(err.message); }
@@ -164,6 +188,30 @@ export default function MeetingOrganiser({ meeting, onChange, userName }) {
 
             <section className="mo-sec">
                 <div className="mo-sec-head">
+                    <h2>Guests{meeting.invitees?.length ? ` · ${meeting.invitees.length}` : ""}</h2>
+                    {meeting.invitees?.length > 0 && (
+                        <span className="mo-save">
+                            {Object.values(meeting.rsvps || {}).filter((v) => v === "yes").length} going · {Object.values(meeting.rsvps || {}).filter((v) => v === "no").length} not
+                        </span>
+                    )}
+                </div>
+                {meeting.invitees?.length ? (
+                    <ul className="mo-guests">
+                        {meeting.invitees.map((e) => {
+                            const a = (meeting.rsvps || {})[e];
+                            return (
+                                <li key={e}>
+                                    <span className="u-ellipsis">{e}</span>
+                                    <span className={`mo-rsvp${a === "yes" ? " is-yes" : a === "no" ? " is-no" : ""}`}>{a === "yes" ? "Going" : a === "no" ? "Not going" : "No answer"}</span>
+                                </li>
+                            );
+                        })}
+                    </ul>
+                ) : <p className="mo-empty">No one invited by email. Anyone with the link can still come, depending on who can join.</p>}
+            </section>
+
+            <section className="mo-sec">
+                <div className="mo-sec-head">
                     <h2>Private notes</h2>
                     <SaveState state={notesState} />
                 </div>
@@ -174,11 +222,11 @@ export default function MeetingOrganiser({ meeting, onChange, userName }) {
             <section className="mo-sec">
                 <div className="mo-sec-head">
                     <h2>Code snapshots{snaps?.length ? ` · ${snaps.length}` : ""}</h2>
-                    {!ended && <button type="button" className="u-btn u-btn--ghost u-btn--sm" onClick={snapshot} disabled={taking}><Camera size={14} /> {taking ? "Saving…" : "Take snapshot"}</button>}
+                    {!ended && <button type="button" className="u-btn u-btn--quiet u-btn--sm" onClick={load} title="Snapshots are taken in the room; refresh to see new ones">Refresh</button>}
                 </div>
                 {snaps === null ? <div className="u-skel" style={{ height: 60 }} />
-                    : snaps.length === 0 ? <p className="mo-empty">No snapshots yet. Take one any time during the call; a final one is saved when you end the meeting.</p>
-                        : <ol className="mo-snaps">{snaps.map((s, i) => <SnapshotCard key={s.id} meetingId={meeting.id} snap={s} index={i} onChange={(x) => setSnaps((prev) => prev.map((y) => (y.id === x.id ? x : y)))} onDelete={removeSnap} />)}</ol>}
+                    : snaps.length === 0 ? <p className="mo-empty">None yet. During the call, use <Camera size={12} style={{ verticalAlign: "-1px" }} /> <b>Snapshot</b> in the room's header to save the code as it is; a final one is saved when the meeting ends.</p>
+                        : <ol className="mo-snaps">{snaps.map((s, i) => <SnapshotCard key={s.id} meetingId={meeting.id} snap={s} prev={i > 0 ? snaps[i - 1] : null} index={i} onChange={(x) => setSnaps((prev) => prev.map((y) => (y.id === x.id ? x : y)))} onDelete={removeSnap} />)}</ol>}
             </section>
 
             <section className="mo-sec">

@@ -81,7 +81,17 @@ function initializeSockets(io) {
             if (ROOM_EVENTS.has(event) && !inRoom(socket, payload?.roomId)) return; // dropped
             if (event === 'join-video-chat' || event === 'rejoin-video-chat') {
                 const id = payload?.projectId;
-                if (id == null || !(inRoom(socket, String(id)) || inRoom(socket, `project-${id}`))) return;
+                if (id == null) return;
+                if (!(inRoom(socket, String(id)) || inRoom(socket, `project-${id}`))) {
+                    // A call kept going on its own socket after leaving the room's page: let it
+                    // back into the call when it may enter the room itself (rooms only).
+                    (async () => {
+                        if (payload?.idToken && !access.whoIs(socket.id)) await access.identify(socket, payload.idToken);
+                        const acc = await access.load(String(id));
+                        if (acc && access.mayEnter(String(id), acc, socket, payload?.clientId)) next();
+                    })().catch(() => { });
+                    return;
+                }
             }
             next();
         });

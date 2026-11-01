@@ -3,6 +3,7 @@
 //    unless someone is in them right now; their in-memory chat/whiteboard/problem go too
 //  - device sessions that were signed out over 30 days ago, or idle for 90 days, are deleted
 //  - analytics rows for rooms that no longer exist, older than 30 days, are deleted
+//  - daily meeting-email counts older than a week are deleted
 const { sql } = require('../repositories/DatabaseClient');
 const RoomRepository = require('../repositories/RoomRepository');
 const health = require('../health');
@@ -32,6 +33,7 @@ async function runCleanup(io, roomState = {}) {
             RETURNING 1
         `;
     } catch { /* analytics table optional */ }
+    await sql`DELETE FROM mail_quota WHERE day < CURRENT_DATE - 7`.catch(() => { }); // daily email counts
     const result = { rooms: rooms.length, sessions: sessions.length, analytics: logs.length };
     if (result.rooms || result.sessions || result.analytics) console.log('Cleanup:', JSON.stringify(result));
     return result;

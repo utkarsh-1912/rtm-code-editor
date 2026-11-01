@@ -125,7 +125,8 @@ const BREVO_URL = "https://api.brevo.com/v3/smtp/email";
  * Transactional email with fallback: Brevo first, then OneSignal email, then Resend.
  * Never throws; returns { success, provider, attempts } so callers can log or report it.
  */
-async function deliver({ to, subject, html }) {
+// attachments: [{ name, content (text), type }], e.g. a calendar invite.
+async function deliver({ to, subject, html, attachments = [] }) {
     const recipients = (Array.isArray(to) ? to : [to]).filter(Boolean);
     const attempts = [];
     const record = (provider, ok, detail) => { attempts.push({ provider, ok, ...(ok ? {} : { detail }) }); return ok; };
@@ -136,7 +137,8 @@ async function deliver({ to, subject, html }) {
                 sender: { name: "Utkristi Colabs", email: process.env.BREVO_FROM_EMAIL || "noreply@rtm-edit.com" },
                 to: recipients.map((email) => ({ email })),
                 subject,
-                htmlContent: html
+                htmlContent: html,
+                ...(attachments.length ? { attachment: attachments.map((a) => ({ name: a.name, content: Buffer.from(a.content).toString("base64") })) } : {}),
             }, process.env.BREVO_API_KEY);
             if (record("brevo", r.status >= 200 && r.status < 300, `${r.status} ${r.body}`.slice(0, 200))) return { success: true, provider: "brevo", attempts };
         } catch (err) { record("brevo", false, err.message); }
@@ -149,7 +151,7 @@ async function deliver({ to, subject, html }) {
 
     if (process.env.RESEND_API_KEY) {
         try {
-            const r = await sendMail({ to: recipients, subject, html });
+            const r = await sendMail({ to: recipients, subject, html, attachments });
             if (record("resend", r.status >= 200 && r.status < 300, r.body)) return { success: true, provider: "resend", attempts };
         } catch (err) { record("resend", false, err.message); }
     }
@@ -159,7 +161,7 @@ async function deliver({ to, subject, html }) {
     return { success: false, provider: null, attempts };
 }
 
-async function sendMail({ to, subject, html, apiKey }) {
+async function sendMail({ to, subject, html, apiKey, attachments = [] }) {
     const resendKey = apiKey || process.env.RESEND_API_KEY;
     if (!resendKey) {
         console.log("No Resend API key configured. Email log:", { to, subject });
@@ -170,7 +172,8 @@ async function sendMail({ to, subject, html, apiKey }) {
         from: "Utkristi Colabs <noreply@resend.dev>",
         to: Array.isArray(to) ? to : [to],
         subject: subject,
-        html: html
+        html: html,
+        ...(attachments.length ? { attachments: attachments.map((a) => ({ filename: a.name, content: Buffer.from(a.content).toString("base64"), content_type: a.type })) } : {}),
     };
 
     return await fetchRelay("https://api.resend.com/emails", payload, resendKey);

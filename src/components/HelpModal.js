@@ -63,15 +63,14 @@ export default function HelpModal({ open, onClose }) {
                 </nav>
                 <div className="hp-body">
                     {tab === "start" && (
-                        <ol className="hp-steps">
-                            {STEPS.map((s, i) => (
+                        <ul className="hp-steps">
+                            {STEPS.map((s) => (
                                 <li key={s.title}>
-                                    <span className="hp-step-n">{i + 1}</span>
                                     <span className="hp-step-ico"><s.Icon size={16} /></span>
                                     <div><b>{s.title}</b><p>{s.text}</p></div>
                                 </li>
                             ))}
-                        </ol>
+                        </ul>
                     )}
                     {tab === "new" && (
                         <ul className="hp-new">

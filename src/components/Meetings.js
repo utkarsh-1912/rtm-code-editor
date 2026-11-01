@@ -6,7 +6,7 @@ import { Modal } from "./ux/primitives";
 import { VISIBILITY_OPTIONS } from "./RoomAccess";
 import {
     scheduleMeeting, updateMeeting, deleteMeeting, listMeetings, listPastMeetings, meetingLink, icsUrl, googleCalendarUrl, outlookCalendarUrl,
-    formatWhen, isJoinable, startsIn,
+    formatWhen, isJoinable, startsIn, localZone, allZones, zonedToDate, dateInZone, zoneLabel,
 } from "../utils/meetings";
 
 const DURATIONS = [15, 30, 45, 60, 90, 120];
@@ -40,8 +40,9 @@ export async function confirmDeleteMeeting(m) {
     const told = upcoming && m.invitees?.length ? " Everyone invited gets a cancellation email." : "";
     if (!window.confirm(`Delete “${m.title}”?${told}`)) return false;
     try {
-        await deleteMeeting(m.id);
+        const res = await deleteMeeting(m.id);
         toast.success("Meeting deleted");
+        if (res?.failed) toast.error(`Couldn't email ${res.failed} ${res.failed === 1 ? "person" : "people"} about the cancellation. Let them know another way.`, { duration: 8000 });
         return true;
     } catch (err) {
         toast.error(err.message);
@@ -57,6 +58,14 @@ export function ScheduleModal({ open, onClose, roomId = null, hostName, onSchedu
     const [title, setTitle] = useState("");
     const [date, setDate] = useState(localDate(slot));
     const [time, setTime] = useState(localTime(slot));
+    // The date and time are on this zone's clock (yours by default; a candidate's when you pick it).
+    const [zone, setZone] = useState(localZone());
+    const zones = useMemo(() => {
+        const list = allZones();
+        const extra = [localZone(), meeting?.timeZone, "UTC"].filter((z) => z && !list.includes(z));
+        return [...new Set([...extra, ...list])];
+    }, [meeting?.timeZone]);
+    const zoneOptions = useMemo(() => zones.map((z) => ({ z, text: `${z.replace(/_/g, " ")} (${zoneLabel(z)})` })), [zones]);
     const [duration, setDuration] = useState(30);
     const [access, setAccess] = useState("invite");
     const [emails, setEmails] = useState([]);
@@ -68,15 +77,18 @@ export function ScheduleModal({ open, onClose, roomId = null, hostName, onSchedu
     useEffect(() => {
         if (!open) return;
         if (meeting) {
-            const at = new Date(meeting.startsAt);
-            setTitle(meeting.title || ""); setDate(localDate(at)); setTime(localTime(at)); setDuration(meeting.durationMin || 30);
+            const tz = meeting.timeZone && zones.includes(meeting.timeZone) ? meeting.timeZone : localZone();
+            const at = dateInZone(meeting.startsAt, tz);
+            setZone(tz);
+            setTitle(meeting.title || ""); setDate(at.date); setTime(at.time); setDuration(meeting.durationMin || 30);
             setAccess(meeting.access || "invite"); setEmails(meeting.invitees || []); setDescription(meeting.description || "");
         } else {
+            setZone(localZone());
             setTitle(""); setDate(localDate(slot)); setTime(localTime(slot)); setDuration(30); setAccess("invite");
             setEmails([]); setDescription("");
         }
         setDraft(""); setDone(null);
-    }, [open, slot, meeting]);
+    }, [open, slot, meeting, zones]);
     const durations = DURATIONS.includes(duration) ? DURATIONS : [...DURATIONS, duration].sort((a, b) => a - b);
 
     const addDraft = () => {
@@ -88,7 +100,7 @@ export function ScheduleModal({ open, onClose, roomId = null, hostName, onSchedu
     };
 
     const submit = async () => {
-        const startsAt = new Date(`${date}T${time}`);
+        const startsAt = date && time ? zonedToDate(date, time, zone) : new Date(NaN);
         if (!title.trim()) return toast.error("Give the meeting a title.");
         if (Number.isNaN(startsAt.getTime())) return toast.error("Pick a date and time.");
         const all = draft.trim() ? [...emails, ...draft.split(/[\s,;]+/).filter((e) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e))] : emails;
@@ -96,12 +108,15 @@ export function ScheduleModal({ open, onClose, roomId = null, hostName, onSchedu
         try {
             const fields = {
                 title: title.trim(), description, startsAt: startsAt.toISOString(), durationMin: duration,
-                timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone, invitees: [...new Set(all.map((e) => e.toLowerCase()))], access,
+                timeZone: zone, invitees: [...new Set(all.map((e) => e.toLowerCase()))], access,
             };
             const res = editing ? await updateMeeting(meeting.id, fields) : await scheduleMeeting({ ...fields, roomId, hostName });
             if (editing) {
                 // Nothing to show after an edit: close and say who was told.
-                toast.success(res.emailed ? `Saved. ${res.emailed} ${res.emailed === 1 ? "person was" : "people were"} emailed.` : "Saved");
+                const n = (x) => `${x} ${x === 1 ? "person" : "people"}`;
+                toast.success(res.emailed ? `Saved. Emailed ${n(res.emailed)}.` : "Saved");
+                if (res.failed) toast.error(`Couldn't email ${n(res.failed)}: the mail service didn't accept it. Share the meeting link with them instead.`, { duration: 8000 });
+                if (res.limited) toast(`${res.limited} email${res.limited === 1 ? " wasn't" : "s weren't"} sent: you've reached today's email limit. They still see it in the app.`, { duration: 7000 });
                 onScheduled?.(res.meeting);
                 onClose?.();
                 return;
@@ -126,7 +141,13 @@ export function ScheduleModal({ open, onClose, roomId = null, hostName, onSchedu
                 footer={<button type="button" className="u-btn u-btn--solid" onClick={onClose}>Done</button>}>
                 <div className="mt-done">
                     <span className="mt-done-ico"><Check size={20} /></span>
-                    <p>{m.invitees?.length ? (done.emailed ? `Invites sent to ${m.invitees.length} ${m.invitees.length === 1 ? "person" : "people"}.` : `Saved. Email invites couldn't be sent right now; share the link instead.`) : "Saved. Share the link with anyone you want to join."}</p>
+                    <p>{m.invitees?.length
+                        ? done.limited
+                            ? `Saved. ${done.emailed ? `${done.emailed} invite${done.emailed === 1 ? "" : "s"} sent; ` : ""}${done.limited} not emailed because you've reached today's email limit. Share the link with them instead.`
+                            : done.failed && done.emailed
+                                ? `Invites sent to ${done.emailed}; ${done.failed} couldn't be emailed. Share the link with them instead.`
+                                : done.emailed ? `Invites sent to ${done.emailed} ${done.emailed === 1 ? "person" : "people"}.` : `Saved. Email invites couldn't be sent right now; share the link instead.`
+                        : "Saved. Share the link with anyone you want to join."}</p>
                     <div className="dl-cmd"><code>{meetingLink(m)}</code><button type="button" className="u-btn u-btn--sm u-btn--solid" onClick={() => copy(meetingLink(m))}><Copy size={13} /> Copy</button></div>
                     <span className="u-label">Add to your calendar</span>
                     <CalendarLinks meeting={m} />
@@ -171,7 +192,17 @@ export function ScheduleModal({ open, onClose, roomId = null, hostName, onSchedu
                     </select>
                 </div>
             </div>
-            <span className="u-small u-muted mt-tz"><Clock size={12} /> {Intl.DateTimeFormat().resolvedOptions().timeZone.replace(/_/g, " ")}. Invitees see it in their own time zone.</span>
+            <div className="mt-tz">
+                <Clock size={12} />
+                <label htmlFor="mt-zone" className="u-small u-muted">Time zone</label>
+                <select id="mt-zone" className="u-select" value={zone} onChange={(e) => setZone(e.target.value)}>
+                    {zoneOptions.map(({ z, text }) => <option key={z} value={z}>{text}</option>)}
+                </select>
+                {zone !== localZone() && date && time && !Number.isNaN(zonedToDate(date, time, zone).getTime()) && (
+                    <span className="u-small u-muted">That's {zonedToDate(date, time, zone).toLocaleString([], { weekday: "short", hour: "numeric", minute: "2-digit" })} for you.</span>
+                )}
+                <span className="u-small u-faint">Invitees see it in their own time zone.</span>
+            </div>
 
             <div className="u-field">
                 <label htmlFor="mt-invite">Invite <span className="u-faint">— emails, Enter or comma to add</span></label>

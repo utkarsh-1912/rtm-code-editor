@@ -7,7 +7,7 @@ const UserRepository = require('../repositories/UserRepository');
 const NotificationRepository = require('../repositories/NotificationRepository');
 const { verifyToken } = require('../services/Identity');
 const { deliver } = require('../services/MailService');
-const { meetingEmail, nameFromEmail } = require('../services/MeetingMail');
+const { meetingEmail, nameFromEmail, rsvpCheck } = require('../services/MeetingMail');
 
 const APP = () => process.env.APP_URL || 'http://localhost:5000';
 const ACCESS = new Set(['public', 'invite', 'private']);
@@ -35,9 +35,18 @@ const isOwner = (m, who) => !!who && who.uid === m.host_uid;
 const isOrganiser = (m, who) => isOwner(m, who) || (!!who?.email && (m.co_hosts || []).includes(who.email.toLowerCase()));
 const hostView = (m, who) => ({
     ...publicView(m), invitees: m.invitees || [], hostUid: m.host_uid, coHosts: m.co_hosts || [], notes: m.host_notes || '',
-    isHost: true, isOwner: isOwner(m, who),
+    rsvps: m.rsvps || {}, isHost: true, isOwner: isOwner(m, who),
 });
-const viewFor = (m, who) => (isOrganiser(m, who) ? hostView(m, who) : publicView(m));
+const invitedEmail = (m, who) => {
+    const email = (who?.email || '').toLowerCase();
+    return email && (m.invitees || []).includes(email) ? email : null;
+};
+// Invitees also see their own answer, so the page can show Going / Not going.
+const viewFor = (m, who) => {
+    if (isOrganiser(m, who)) return hostView(m, who);
+    const email = invitedEmail(m, who);
+    return email ? { ...publicView(m), invited: true, rsvp: (m.rsvps || {})[email] || null } : publicView(m);
+};
 const snapshotView = (x) => ({ id: x.id, kind: x.kind, label: x.label, code: x.code, language: x.language, takenBy: x.taken_by, note: x.note, createdAt: x.created_at });
 
 // --- Calendar file (.ics) ---------------------------------------------------------------------
@@ -62,24 +71,45 @@ function ics(m) {
     ].join('\r\n');
 }
 
+// Meeting emails one account may cause per day (invites, updates, cancellations).
+const DAILY_EMAILS = () => Math.max(1, Number(process.env.MEETING_EMAILS_PER_DAY) || 100);
+
 // Email (one each, greeting them by name) + in-app notification. Best effort; never fails the request.
 // `kind`: invite | updated | rescheduled | cancelled | removed | reminder (see MeetingMail).
-async function tellPeople(m, emails, { kind, previous = null }) {
+// `by`: the account whose action sends these, counted against its daily cap (none for reminders).
+// Past the cap the email is skipped (`limited` counts them); in-app notifications still go out.
+async function tellPeople(m, emails, { kind, previous = null, by = null }) {
     const host = (m.host_email || '').toLowerCase();
     const people = [...new Set(emails || [])].filter((e) => e && e !== host);
     let emailed = 0;
-    for (const email of people) {
+    let limited = 0;
+    let failed = 0; // the mail service refused or isn't set up
+    const one = async (email) => {
         const user = await UserRepository.getUserByEmail(email).catch(() => null);
         const name = user?.name && user.name !== 'Developer' ? user.name : nameFromEmail(email);
-        const { subject, html } = meetingEmail(m, { to: { email, name }, kind, previous });
-        const mail = await deliver({ to: [email], subject, html }).catch(() => ({ success: false }));
-        if (mail.success) emailed += 1;
+        const { subject, html, attachments } = meetingEmail(m, { to: { email, name }, kind, previous });
+        const allowed = !by || await MeetingRepository.takeMailQuota(by, DAILY_EMAILS()).catch(() => true);
+        if (!allowed) limited += 1;
+        else {
+            const mail = await deliver({ to: [email], subject, html, attachments }).catch(() => ({ success: false }));
+            if (mail.success) emailed += 1;
+            else {
+                failed += 1;
+                if (by) MeetingRepository.refundMailQuota(by).catch(() => { });
+            }
+        }
         if (user?.auth_provider_id) {
             const gone = kind === 'cancelled' || kind === 'removed';
             NotificationRepository.notifyUser(user.auth_provider_id, { type: 'meeting', message: subject, url: gone ? '/dashboard' : `/meet/${m.id}`, data: { meetingId: m.id } }).catch(() => { });
         }
-    }
-    return { emailed };
+    };
+    // A few at a time: 50 invitees one after another would keep the request waiting too long.
+    const queue = [...people];
+    await Promise.all(Array.from({ length: Math.min(5, queue.length) }, async () => {
+        while (queue.length) await one(queue.shift()).catch((err) => console.error('Meeting email failed:', err.message));
+    }));
+    if (limited) console.warn(`Meeting emails capped for ${by}: ${limited} skipped (${DAILY_EMAILS()}/day)`);
+    return { emailed, limited, failed };
 }
 const tellInvitees = (m, opts) => tellPeople(m, m.invitees || [], opts);
 
@@ -140,7 +170,7 @@ router.post('/meetings', async (req, res) => {
             timeZone, hostUid: who.uid, hostName: String(b.hostName || hostUser?.name || who.email || 'Host').slice(0, 120),
             hostEmail: who.email, invitees, access,
         });
-        const sent = await tellInvitees(meeting, { kind: 'invite' });
+        const sent = await tellInvitees(meeting, { kind: 'invite', by: who.uid });
         res.json({ meeting: hostView(meeting, who), ...sent });
     } catch (err) {
         console.error('Schedule meeting failed:', err);
@@ -197,6 +227,7 @@ router.patch('/meetings/:id', async (req, res) => {
         const before = await MeetingRepository.getMeeting(req.params.id);
         if (!before || !isOrganiser(before, who)) return res.status(404).json({ error: 'Meeting not found, or not yours.' });
         if (before.cancelled_at) return res.status(400).json({ error: 'This meeting was cancelled.' });
+        if (before.ended_at) return res.status(400).json({ error: 'This meeting has ended.' });
         const f = readFields(req.body || {}, before);
         if (f.error) return res.status(400).json({ error: f.error });
         const moved = f.startsAt.getTime() !== new Date(before.starts_at).getTime() || f.durationMin !== before.duration_min;
@@ -221,10 +252,14 @@ router.patch('/meetings/:id', async (req, res) => {
 
         const changed = moved || m.title !== before.title || m.description !== before.description || m.access !== before.access;
         let emailed = 0;
-        if (changed && kept.length) emailed += (await tellPeople(m, kept, { kind: moved ? 'rescheduled' : 'updated', previous: before })).emailed;
-        if (added.length) emailed += (await tellPeople(m, added, { kind: 'invite' })).emailed;
-        if (removed.length) emailed += (await tellPeople(m, removed, { kind: 'removed' })).emailed;
-        res.json({ meeting: hostView(m, who), emailed });
+        let limited = 0;
+        let failed = 0;
+        const add = (r) => { emailed += r.emailed; limited += r.limited; failed += r.failed; };
+        if (changed && kept.length) add(await tellPeople(m, kept, { kind: moved ? 'rescheduled' : 'updated', previous: before, by: who.uid }));
+        if (added.length) add(await tellPeople(m, added, { kind: 'invite', by: who.uid }));
+        if (removed.length) add(await tellPeople(m, removed, { kind: 'removed', by: who.uid }));
+        // `told` says nobody needed an email (e.g. only the guest list order changed).
+        res.json({ meeting: hostView(m, who), emailed, limited, failed, told: emailed + limited + failed > 0 });
     } catch (err) {
         console.error('Edit meeting failed:', err);
         res.status(500).json({ error: 'Could not save the meeting.' });
@@ -239,10 +274,53 @@ router.delete('/meetings/:id', async (req, res) => {
         const m = await MeetingRepository.deleteMeeting(req.params.id, who.uid);
         if (!m) return res.status(404).json({ error: 'Meeting not found, or not yours.' });
         const upcoming = !m.cancelled_at && new Date(m.starts_at).getTime() + m.duration_min * 60000 > Date.now();
-        const sent = upcoming ? await tellInvitees(m, { kind: 'cancelled' }) : { emailed: 0 };
+        const sent = upcoming ? await tellInvitees(m, { kind: 'cancelled', by: who.uid }) : { emailed: 0, limited: 0, failed: 0 };
         res.json({ success: true, ...sent });
     } catch (err) {
         res.status(500).json({ error: 'Could not delete the meeting.' });
+    }
+});
+
+// --- Accept / Decline ------------------------------------------------------------------------
+// Records an answer and tells the organisers (in the app). Returns the updated meeting.
+async function answer(m, email, value) {
+    if ((m.rsvps || {})[email] === value) return m; // unchanged: no repeat notification
+    const updated = await MeetingRepository.setRsvp(m.id, email, value);
+    const user = await UserRepository.getUserByEmail(email).catch(() => null);
+    const who = user?.name && user.name !== 'Developer' ? user.name : nameFromEmail(email);
+    const text = value === 'yes' ? `${who} is coming to ${m.title}` : `${who} can't make ${m.title}`;
+    NotificationRepository.notifyUser(m.host_uid, { type: 'meeting', message: text, url: `/meet/${m.id}`, data: { meetingId: m.id } }).catch(() => { });
+    for (const co of m.co_hosts || []) {
+        const coUser = await UserRepository.getUserByEmail(co).catch(() => null);
+        if (coUser?.auth_provider_id) NotificationRepository.notifyUser(coUser.auth_provider_id, { type: 'meeting', message: text, url: `/meet/${m.id}`, data: { meetingId: m.id } }).catch(() => { });
+    }
+    return updated;
+}
+
+// From the email's buttons: a signed link, no sign-in needed. Lands on the meeting page.
+router.get('/meetings/:id/rsvp', async (req, res) => {
+    const m = await MeetingRepository.getMeeting(req.params.id).catch(() => null);
+    const email = String(req.query.e || '').toLowerCase();
+    const value = req.query.r === 'no' ? 'no' : 'yes';
+    if (!m) return res.redirect(`${APP()}/meet/${encodeURIComponent(req.params.id)}`);
+    const ok = rsvpCheck(m.id, email, req.query.t) && (m.invitees || []).includes(email) && !m.cancelled_at && !m.ended_at;
+    if (ok) await answer(m, email, value).catch(() => { });
+    res.redirect(`${APP()}/meet/${m.id}?${new URLSearchParams({ rsvp: ok ? value : 'invalid', as: nameFromEmail(email) })}`);
+});
+
+// From the meeting page, signed in with the invited address.
+router.post('/meetings/:id/rsvp', async (req, res) => {
+    try {
+        const who = await caller(req);
+        if (!who) return res.status(401).json({ error: 'Sign in first.' });
+        const m = await MeetingRepository.getMeeting(req.params.id);
+        const email = m && invitedEmail(m, who);
+        if (!email) return res.status(404).json({ error: "You're not on the guest list for this meeting." });
+        if (m.cancelled_at || m.ended_at) return res.status(400).json({ error: 'This meeting is over.' });
+        const value = req.body?.answer === 'no' ? 'no' : 'yes';
+        res.json(viewFor(await answer(m, email, value), who));
+    } catch (err) {
+        res.status(500).json({ error: 'Could not save your answer.' });
     }
 });
 
@@ -292,10 +370,12 @@ router.put('/meetings/:id/co-hosts', async (req, res) => {
             .map((e) => String(e || '').trim().toLowerCase()).filter((e) => EMAIL.test(e) && e !== host);
         const emails = [...new Set(list)].slice(0, 10);
         const added = emails.filter((e) => !(ctx.m.co_hosts || []).includes(e));
+        const dropped = (ctx.m.co_hosts || []).filter((e) => !emails.includes(e) && !(ctx.m.invitees || []).includes(e));
         const m = await MeetingRepository.setCoHosts(ctx.m.id, emails);
         const acc = await RoomRepository.getRoomAccess(m.room_id).catch(() => null);
-        if (acc?.ownerUid === m.host_uid && added.length) {
-            await RoomRepository.setRoomAccess(m.room_id, m.host_uid, { visibility: acc.visibility, allowed: [...(acc.allowed || []), ...added] });
+        if (acc?.ownerUid === m.host_uid && (added.length || dropped.length)) {
+            const allowed = [...new Set([...(acc.allowed || []).filter((e) => !dropped.includes(e)), ...added])];
+            await RoomRepository.setRoomAccess(m.room_id, m.host_uid, { visibility: acc.visibility, allowed });
             req.app.get('io')?.roomAccess?.forget(m.room_id);
         }
         for (const email of added) {
@@ -371,6 +451,46 @@ router.delete('/meetings/:id/snapshots/:sid', async (req, res) => {
     }
 });
 
+// Ends a meeting: a last snapshot, the room locked to organisers, everyone else in it sent out.
+// Used by "End meeting" and by the job that ends meetings left running long past their time.
+async function closeMeeting(io, meeting, { takenBy, code, language, auto = false }) {
+    // Mark it ended first: that's atomic, so two "End" clicks (or End racing the auto-end job)
+    // can't both take a final snapshot and send people out twice.
+    const m = await MeetingRepository.endMeeting(meeting.id);
+    if (!m) return { meeting: (await MeetingRepository.getMeeting(meeting.id)) || meeting, removed: 0, alreadyEnded: true };
+    await snapshotRoom(m, { kind: 'end', label: auto ? 'Ended automatically after the scheduled time' : 'When the meeting ended', takenBy, code, language });
+    // The room goes private. This meeting's guests lose access; organisers keep it, and so does
+    // anyone the room's owner had let in for their own use (the room may outlive the meeting).
+    const organisers = [m.host_email, ...(m.co_hosts || [])].filter(Boolean).map((e) => e.toLowerCase());
+    const guests = new Set((m.invitees || []).filter((e) => !organisers.includes(e)));
+    const acc = await RoomRepository.getRoomAccess(m.room_id).catch(() => null);
+    if (acc?.ownerUid === m.host_uid) {
+        const allowed = [...new Set([...(acc.allowed || []).filter((e) => !guests.has(e)), ...organisers])];
+        await RoomRepository.setRoomAccess(m.room_id, m.host_uid, { visibility: 'private', allowed });
+    }
+    let removed = 0;
+    if (io) {
+        io.roomAccess?.revoke(m.room_id);
+        const inRoom = [...(io.sockets.adapter.rooms.get(m.room_id) || []), ...(io.sockets.adapter.rooms.get(`call:${m.room_id}`) || [])];
+        for (const id of new Set(inRoom)) {
+            const socket = io.sockets.sockets.get(id);
+            if (!socket) continue;
+            const who = io.roomAccess?.whoIs(id);
+            const allowedIn = who?.email && !guests.has(who.email.toLowerCase()) && (acc?.allowed || []).includes(who.email.toLowerCase());
+            if (who && (isOrganiser(m, who) || who.uid === acc?.ownerUid || allowedIn)) {
+                socket.emit('meeting-ended', { meetingId: m.id, organiser: isOrganiser(m, who), auto, stays: true });
+                continue;
+            }
+            socket.emit('meeting-ended', { meetingId: m.id, organiser: false });
+            socket.to(`call:${m.room_id}`).emit('user-left-video', { userId: id });
+            socket.leave(`call:${m.room_id}`);
+            socket.leave(m.room_id);
+            removed += 1;
+        }
+    }
+    return { meeting: m, removed };
+}
+
 // End the meeting for everyone: a last snapshot, then the room locks to organisers only and
 // everyone else in it right now is sent out.
 router.post('/meetings/:id/end', async (req, res) => {
@@ -379,32 +499,8 @@ router.post('/meetings/:id/end', async (req, res) => {
         if (!ctx) return;
         if (ctx.m.ended_at) return res.json({ meeting: hostView(ctx.m, ctx.who), alreadyEnded: true });
         const takenBy = String(req.body?.takenBy || ctx.who.email || 'Organiser').slice(0, 120);
-        await snapshotRoom(ctx.m, { kind: 'end', label: 'When the meeting ended', takenBy, ...codeFrom(req.body) });
-        const m = (await MeetingRepository.endMeeting(ctx.m.id)) || ctx.m;
-
-        const organisers = [m.host_email, ...(m.co_hosts || [])].filter(Boolean).map((e) => e.toLowerCase());
-        const acc = await RoomRepository.getRoomAccess(m.room_id).catch(() => null);
-        if (acc?.ownerUid === m.host_uid) {
-            await RoomRepository.setRoomAccess(m.room_id, m.host_uid, { visibility: 'private', allowed: organisers });
-        }
-        const io = req.app.get('io');
-        let removed = 0;
-        if (io) {
-            io.roomAccess?.revoke(m.room_id);
-            const inRoom = [...(io.sockets.adapter.rooms.get(m.room_id) || []), ...(io.sockets.adapter.rooms.get(`call:${m.room_id}`) || [])];
-            for (const id of new Set(inRoom)) {
-                const socket = io.sockets.sockets.get(id);
-                if (!socket) continue;
-                const who = io.roomAccess?.whoIs(id);
-                if (who && isOrganiser(m, who)) { socket.emit('meeting-ended', { meetingId: m.id, organiser: true }); continue; }
-                socket.emit('meeting-ended', { meetingId: m.id, organiser: false });
-                socket.to(`call:${m.room_id}`).emit('user-left-video', { userId: id });
-                socket.leave(`call:${m.room_id}`);
-                socket.leave(m.room_id);
-                removed += 1;
-            }
-        }
-        res.json({ meeting: hostView(m, ctx.who), removed });
+        const { meeting: m, removed, alreadyEnded } = await closeMeeting(req.app.get('io'), ctx.m, { takenBy, ...codeFrom(req.body) });
+        res.json({ meeting: hostView(m, ctx.who), removed, alreadyEnded: !!alreadyEnded });
     } catch (err) {
         console.error('End meeting failed:', err);
         res.status(500).json({ error: 'Could not end the meeting.' });
@@ -414,3 +510,5 @@ router.post('/meetings/:id/end', async (req, res) => {
 module.exports = router;
 module.exports.ics = ics;
 module.exports.tellInvitees = tellInvitees;
+module.exports.closeMeeting = closeMeeting;
+module.exports.isOrganiser = isOrganiser;

@@ -173,6 +173,7 @@ function Editor() {
       setIsMeetingActive(false);
       reactNavigator(meetingId ? `/meet/${meetingId}` : "/", { replace: true });
     },
+    onEndRequest: () => setEndMeetingOpen(true),
   });
   const orgMeeting = roomMeetingState.meeting;
   // Arrived from a meeting page (camera and mic already checked there): open the call now.

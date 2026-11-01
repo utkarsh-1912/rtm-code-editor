@@ -68,7 +68,11 @@ async function updateMeeting(id, f) {
         UPDATE meetings SET
             title = ${f.title}, description = ${f.description || ''}, starts_at = ${f.startsAt}, duration_min = ${f.durationMin},
             time_zone = ${f.timeZone || 'UTC'}, invitees = ${JSON.stringify(f.invitees || [])}::jsonb, access = ${f.access || 'public'},
-            reminded_at = CASE WHEN starts_at = ${f.startsAt}::timestamptz THEN reminded_at ELSE NULL END
+            -- A new time re-arms the reminder and the "running over" prompt, and clears answers:
+            -- the reschedule email asks everyone again.
+            reminded_at = CASE WHEN starts_at = ${f.startsAt}::timestamptz THEN reminded_at ELSE NULL END,
+            nudged_at = CASE WHEN starts_at = ${f.startsAt}::timestamptz AND duration_min = ${f.durationMin} THEN nudged_at ELSE NULL END,
+            rsvps = CASE WHEN starts_at = ${f.startsAt}::timestamptz THEN rsvps ELSE '{}'::jsonb END
         WHERE id = ${id} AND cancelled_at IS NULL
         RETURNING *
     `;
@@ -125,6 +129,54 @@ async function deleteSnapshot(meetingId, snapshotId) {
     return rows.length > 0;
 }
 
+// An invitee's answer: "yes", "no", or null to clear it.
+async function setRsvp(id, email, answer) {
+    const rows = answer
+        ? await sql`UPDATE meetings SET rsvps = COALESCE(rsvps, '{}'::jsonb) || jsonb_build_object(${email}::text, ${answer}::text) WHERE id = ${id} RETURNING *`
+        : await sql`UPDATE meetings SET rsvps = COALESCE(rsvps, '{}'::jsonb) - ${email}::text WHERE id = ${id} RETURNING *`;
+    return rows[0] || null;
+}
+
+// Meetings still open `afterMin` minutes past their end (and not long ago, so old meetings from
+// before this existed are left alone). Marks them so the organiser is told once.
+async function takeOverruns(afterMin = 10) {
+    return await sql`
+        UPDATE meetings SET nudged_at = CURRENT_TIMESTAMP
+        WHERE ended_at IS NULL AND cancelled_at IS NULL AND nudged_at IS NULL
+          AND starts_at + make_interval(mins => duration_min + ${afterMin}) <= NOW()
+          AND starts_at + make_interval(mins => duration_min) > NOW() - INTERVAL '6 hours'
+        RETURNING *
+    `;
+}
+
+// Meetings still open `afterMin` minutes past their end: these are ended for the organiser.
+async function dueAutoEnd(afterMin = 60) {
+    return await sql`
+        SELECT * FROM meetings
+        WHERE ended_at IS NULL AND cancelled_at IS NULL
+          AND starts_at + make_interval(mins => duration_min + ${afterMin}) <= NOW()
+          AND starts_at + make_interval(mins => duration_min) > NOW() - INTERVAL '6 hours'
+    `;
+}
+
+// Counts one meeting email against an account's daily cap. False when the cap is reached
+// (nothing is counted then). Atomic, so parallel requests can't go over.
+async function takeMailQuota(uid, limit) {
+    const rows = await sql`
+        INSERT INTO mail_quota (uid, day, sent) VALUES (${uid}, CURRENT_DATE, 1)
+        ON CONFLICT (uid, day) DO UPDATE SET sent = mail_quota.sent + 1
+        WHERE mail_quota.sent < ${limit}
+        RETURNING sent
+    `;
+    return rows.length > 0;
+}
+
+// Gives back one email's worth when it couldn't be sent (a mail service outage shouldn't use
+// up the day's allowance).
+async function refundMailQuota(uid) {
+    await sql`UPDATE mail_quota SET sent = sent - 1 WHERE uid = ${uid} AND day = CURRENT_DATE AND sent > 0`;
+}
+
 // Meetings starting within `minutes` that haven't had their reminder; marks them as reminded.
 async function takeDueReminders(minutes = 10) {
     return await sql`
@@ -138,5 +190,5 @@ async function takeDueReminders(minutes = 10) {
 
 module.exports = {
     createMeeting, getMeeting, listForUser, listPastForOrganiser, meetingsForRoom, cancelMeeting, updateMeeting,
-    setNotes, setCoHosts, endMeeting, deleteMeeting, addSnapshot, listSnapshots, updateSnapshot, deleteSnapshot, takeDueReminders,
+    setNotes, setCoHosts, endMeeting, deleteMeeting, addSnapshot, listSnapshots, updateSnapshot, deleteSnapshot, takeDueReminders, takeMailQuota, refundMailQuota, setRsvp, takeOverruns, dueAutoEnd,
 };
