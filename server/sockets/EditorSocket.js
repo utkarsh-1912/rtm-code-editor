@@ -3,6 +3,7 @@ const RoomRepository = require('../repositories/RoomRepository');
 const UserRepository = require('../repositories/UserRepository');
 const ProjectRepository = require('../repositories/ProjectRepository');
 const { projectAccessFor } = require('../security/access');
+const CodeRecorder = require('../services/CodeRecorder');
 const AnalyticsRepository = require('../repositories/AnalyticsRepository');
 
 // Rooms whose "second person joined" step is already logged (once per room per server run).
@@ -156,6 +157,7 @@ function setupEditorSocket(io, socket, safeSocket, context) {
     socket.on(ACTIONS.CODE_CHANGE, safeSocket(({ roomId, code }) => {
         socket.in(roomId).emit(ACTIONS.CODE_CHANGE, { code });
         RoomRepository.updateRoomCode(roomId, code).catch(() => { });
+        CodeRecorder.onCode(roomId, code).catch(() => { }); // playback, while a scheduled meeting is on
     }));
 
     // Bring a newcomer up to date: only someone sharing a room with them may do it.

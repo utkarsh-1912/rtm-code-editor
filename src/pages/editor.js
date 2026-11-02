@@ -39,6 +39,7 @@ import VideoChat from "../components/VideoChat";
 import useCallStartedAlert from "../components/useCallStartedAlert";
 import useRoomMeeting from "../components/useRoomMeeting";
 import { EndMeetingModal } from "../components/MeetingOrganiser";
+import InterviewerPanel from "../components/InterviewerPanel";
 import { useCallCarry } from "../context/CallCarry";
 import { getCallPrefs } from "../utils/callPrefs";
 import WorkspaceHeader from "../components/WorkspaceHeader";
@@ -166,6 +167,7 @@ function Editor() {
   // A scheduled meeting you organise here: snapshot, notes, end it. When an organiser ends it,
   // everyone else is shown out to the meeting page.
   const [endMeetingOpen, setEndMeetingOpen] = useState(false);
+  const [panelOpen, setPanelOpen] = useState(false);
   const roomMeetingState = useRoomMeeting({
     roomId, user, socketRef,
     onShownOut: (meetingId) => {
@@ -679,7 +681,8 @@ function Editor() {
           { id: "call", label: isMeetingActive ? "Leave call" : "Start voice & video call", icon: <Icon name="call" size={20} filled={isMeetingActive} />, onClick: () => setIsMeetingActive((v) => !v), active: isMeetingActive, tone: "green" },
           ...(orgMeeting ? [
             { id: "snapshot", label: `Snapshot the code (${orgMeeting.title})`, icon: <Icon name="snapshot" size={20} />, onClick: () => roomMeetingState.snapshot({ code: codeRef.current, language, takenBy: user?.name || userName }) },
-            { id: "meet-notes", label: "Meeting notes & snapshots", icon: <Icon name="meeting-notes" size={20} />, onClick: () => window.open(`/meet/${orgMeeting.id}`, "_blank", "noopener"), section: "more" },
+            { id: "meet-panel", label: "Interviewer panel (only interviewers see it)", icon: <Icon name="hide" size={20} filled={panelOpen} />, onClick: () => setPanelOpen((v) => !v), active: panelOpen },
+            { id: "meet-notes", label: "Meeting page: feedback, playback, notes", icon: <Icon name="meeting-notes" size={20} />, onClick: () => window.open(`/meet/${orgMeeting.id}`, "_blank", "noopener"), section: "more" },
             { id: "meet-end", label: "End meeting for everyone", icon: <Icon name="meeting-end" size={20} />, onClick: () => setEndMeetingOpen(true), section: "more", tone: "red" },
           ] : []),
           ...(user?.uid ? [{ id: "schedule", label: "Schedule a call in this room", icon: <Icon name="calendar-add" size={20} />, onClick: () => setScheduleOpen(true), section: "more" }] : []),
@@ -917,6 +920,7 @@ function Editor() {
       />
 
       <ScheduleModal open={scheduleOpen} onClose={() => setScheduleOpen(false)} roomId={roomId} hostName={user?.name || userName} />
+      {orgMeeting && panelOpen && <InterviewerPanel meeting={orgMeeting} socketRef={socketRef} onClose={() => setPanelOpen(false)} />}
       {orgMeeting && (
         <EndMeetingModal open={endMeetingOpen} meeting={orgMeeting} onClose={() => setEndMeetingOpen(false)}
           code={codeRef.current} language={language} takenBy={user?.name || userName}

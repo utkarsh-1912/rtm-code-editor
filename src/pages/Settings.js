@@ -13,6 +13,8 @@ import { useSearchParams } from 'react-router-dom';
 import DesktopPanel from '../components/DesktopPanel';
 import DeviceList from '../components/DeviceList';
 import AIModelsPanel from '../components/AIModelsPanel';
+import BookingLinksPanel from '../components/BookingLinksPanel';
+import BrandingPanel from '../components/BrandingPanel';
 import { IS_DESKTOP } from '../utils/desktop';
 import GitHubIcon from '../components/GitHubIcon';
 import { useGitHubStatus, connectGitHub, disconnectGitHub, CONNECTED_MESSAGE } from '../utils/github';
@@ -23,6 +25,8 @@ const SECTIONS = [
     { id: 'billing', title: 'Plan & billing' },
     { id: 'notifications', title: 'Notifications' },
     { id: 'connections', title: 'Connections' },
+    { id: 'scheduling', title: 'Booking links' },
+    { id: 'branding', title: 'Branding' },
     { id: 'ai', title: 'AI models' },
     { id: 'security', title: 'Security' },
     ...(IS_DESKTOP ? [{ id: 'desktop', title: 'Desktop app' }] : []),
@@ -381,6 +385,8 @@ const Settings = () => {
                         </div>
                     )}
 
+                    {active === 'scheduling' && <BookingLinksPanel />}
+                    {active === 'branding' && <BrandingPanel user={user} />}
                     {active === 'ai' && <AIModelsPanel user={user} />}
 
                     {active === 'security' && (

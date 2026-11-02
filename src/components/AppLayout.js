@@ -117,10 +117,12 @@ const AppLayout = ({ children }) => {
                 <span className="u-strip-hide u-ellipsis"><Announcements audience="app" /></span>
             </>}
             stripRight={<button onClick={() => setHelpOpen(true)} title="Help, what's new and shortcuts (?)"><LifeBuoy size={12} style={{ verticalAlign: '-2px' }} /> Help</button>}
+            onSearch={user ? undefined : () => setSearchOpen(true)}
             right={<>
                 <button className="u-icon" onClick={() => setSearchOpen(true)} aria-label="Search (Ctrl K)" title="Search (Ctrl K)"><Search size={18} /></button>
                 {user && <div style={{ position: 'relative' }}>
-                    <button className={`u-icon${notifOpen ? ' on' : ''}`} onClick={() => { setNotifOpen((v) => !v); setHasUnread(false); }} aria-label="Notifications">
+                    {/* Phones open notifications from the account menu instead. */}
+                    <button className={`u-icon u-icon--hide${notifOpen ? ' on' : ''}`} onClick={() => { setNotifOpen((v) => !v); setHasUnread(false); }} aria-label="Notifications">
                         <Bell size={18} />
                         {hasUnread && <span className="u-badge" />}
                     </button>
@@ -140,7 +142,8 @@ const AppLayout = ({ children }) => {
                 ) : (
                 <div ref={userRef} style={{ position: 'relative' }}>
                     <button className="u-avatar" onClick={() => setUserMenu((v) => !v)} aria-label="Account menu" aria-expanded={userMenu}>
-                        <Avatar name={user?.name || user?.email || ''} photoURL={user?.photoURL} size={34} title="" />
+                        <Avatar name={user?.name || user?.email || ''} photoURL={user?.photoURL} size={28} title="" />
+                        {hasUnread && <span className="u-badge u-avatar-badge" />}
                     </button>
                     {userMenu && (
                         <div className="u-pop" role="menu">
@@ -152,7 +155,8 @@ const AppLayout = ({ children }) => {
                             <button role="menuitem" onClick={() => { setUserMenu(false); navigate('/settings?section=profile'); }}><UserRound size={16} />Profile</button>
                             <button role="menuitem" onClick={() => { setUserMenu(false); navigate('/settings?section=security'); }}><ShieldCheck size={16} />Devices &amp; security</button>
                             <button role="menuitem" onClick={() => { setUserMenu(false); navigate('/settings?section=billing'); }}><CreditCard size={16} />Plan &amp; billing</button>
-                            {/* Phones hide the header's search and theme icons, so offer them here. */}
+                            {/* Phones hide the header's notification, search and theme icons, so offer them here. */}
+                            <button role="menuitem" className="u-pop-sm" onClick={() => { setUserMenu(false); setNotifOpen(true); setHasUnread(false); }}><Bell size={16} />Notifications{hasUnread && <span className="u-pop-dot" aria-label="unread" />}</button>
                             <button role="menuitem" className="u-pop-sm" onClick={() => { setUserMenu(false); setSearchOpen(true); }}><Search size={16} />Search</button>
                             <button role="menuitem" className="u-pop-sm" onClick={() => { setUserMenu(false); toggleTheme(); }}>{isLight ? <Moon size={16} /> : <Sun size={16} />}{isLight ? 'Dark' : 'Light'} theme</button>
                             <div className="u-pop-sep" role="separator" />

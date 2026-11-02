@@ -55,6 +55,7 @@ export default function SiteLayout({ children }) {
                 <Link to="/status">Status</Link>
                 <button onClick={() => setHelpOpen(true)} title="Help, what's new and shortcuts (?)"><LifeBuoy size={12} style={{ verticalAlign: "-2px" }} /> Help</button>
             </>}
+            onSearch={() => setSearchOpen(true)}
             right={<>
                 <button className="u-icon" onClick={() => setSearchOpen(true)} aria-label="Search (Ctrl K)" title="Search (Ctrl K)"><Search size={18} /></button>
                 <ThemeButton className="u-icon u-icon--hide" />

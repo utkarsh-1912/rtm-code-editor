@@ -103,7 +103,7 @@ const step = (n, title, text) => `
  * @param kind     see KINDS
  * @param previous the meeting before a reschedule (to show the old time)
  */
-function meetingEmail(m, { to, kind = 'invite', previous = null }) {
+function meetingEmail(m, { to, kind = 'invite', previous = null, brand = null }) {
     const k = KINDS[kind] || KINDS.invite;
     const tz = validZone(m.time_zone);
     const name = to?.name || nameFromEmail(to?.email);
@@ -173,8 +173,10 @@ function meetingEmail(m, { to, kind = 'invite', previous = null }) {
       <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:560px;">
         <tr><td style="padding:0 4px 14px;">
           <table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>
-            <td style="vertical-align:middle;padding-right:10px;"><img src="${LOGO()}" width="28" height="28" alt="" style="display:block;width:28px;height:28px;border:0;"></td>
-            <td style="vertical-align:middle;font-family:${T.display};font-stretch:62%;font-weight:700;font-size:16px;line-height:1;letter-spacing:.02em;text-transform:uppercase;color:${T.ink};">Utkristi CoLabs</td>
+            ${brand?.logo
+        ? `<td style="vertical-align:middle;padding-right:10px;"><img src="${esc(brand.logo)}" height="28" alt="" style="display:block;height:28px;width:auto;max-width:140px;border:0;"></td>`
+        : brand ? '' : `<td style="vertical-align:middle;padding-right:10px;"><img src="${LOGO()}" width="28" height="28" alt="" style="display:block;width:28px;height:28px;border:0;"></td>`}
+            <td style="vertical-align:middle;font-family:${T.display};font-stretch:62%;font-weight:700;font-size:16px;line-height:1;letter-spacing:.02em;text-transform:uppercase;color:${T.ink};">${esc(brand?.name || 'Utkristi CoLabs')}</td>
           </tr></table>
         </td></tr>
         <tr><td class="m-card" style="background:${T.card};border:1px solid ${T.line};border-radius:22px;overflow:hidden;">
@@ -195,7 +197,7 @@ function meetingEmail(m, { to, kind = 'invite', previous = null }) {
             </td></tr>
             ${k.cta ? `
             <tr><td class="m-px" style="padding:24px 32px 0;">
-              <a class="m-cta" href="${esc(link)}" style="display:block;text-align:center;background:${T.ink};color:${T.paper};padding:15px 20px;border-radius:999px;font-family:${T.text};font-size:15px;font-weight:600;text-decoration:none;">${k.cta} &rarr;</a>
+              <a class="m-cta" href="${esc(link)}" style="display:block;text-align:center;background:${brand?.color || T.ink};color:${T.paper};padding:15px 20px;border-radius:999px;font-family:${T.text};font-size:15px;font-weight:600;text-decoration:none;">${k.cta} &rarr;</a>
               <p style="margin:10px 0 0;font-family:${T.mono};font-size:11px;line-height:1.5;color:${T.ink3};text-align:center;word-break:break-all;">${esc(meetingUrl(m))}</p>
             </td></tr>` : ''}
             ${rsvp ? `
@@ -213,7 +215,7 @@ function meetingEmail(m, { to, kind = 'invite', previous = null }) {
           </table>
         </td></tr>
         <tr><td style="padding:18px 8px 0;text-align:center;font-family:${T.mono};font-size:11px;line-height:1.8;color:${T.ink3};">
-          ${esc(m.host_name || 'Someone')} added ${esc(to?.email || 'you')} to a meeting on Utkristi CoLabs.<br>
+          ${esc(m.host_name || 'Someone')} added ${esc(to?.email || 'you')} to a meeting${brand ? ` with ${esc(brand.name)}` : ''} on Utkristi CoLabs.<br>${brand ? 'Powered by Utkristi CoLabs<br>' : ''}
           <a href="${APP()}/unsubscribe?email=${encodeURIComponent(to?.email || '')}" style="color:${T.ink3};">Email settings</a> &middot; <a href="${APP()}/support" style="color:${T.ink3};">Help</a>
         </td></tr>
       </table>

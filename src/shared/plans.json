@@ -7,7 +7,11 @@
       "name": "Free",
       "tagline": "For solo devs and trying things out",
       "monthly": 0,
-      "limits": { "projects": 10, "aiPerDay": 10 },
+      "limits": {
+        "projects": 10,
+        "aiPerDay": 10,
+        "branding": false
+      },
       "features": [
         "Unlimited rooms, guests join free",
         "Live sync, chat, voice, video and whiteboard",
@@ -22,7 +26,11 @@
       "name": "Team",
       "tagline": "For people who build together every week",
       "monthly": 12,
-      "limits": { "projects": null, "aiPerDay": null },
+      "limits": {
+        "projects": null,
+        "aiPerDay": null,
+        "branding": false
+      },
       "features": [
         "Everything in Free",
         "Unlimited projects and snapshots",
@@ -36,9 +44,14 @@
       "name": "Enterprise",
       "tagline": "For larger organizations",
       "monthly": null,
-      "limits": { "projects": null, "aiPerDay": null },
+      "limits": {
+        "projects": null,
+        "aiPerDay": null,
+        "branding": true
+      },
       "features": [
         "Everything in Team",
+        "Custom branding for candidates: your logo, colour and name",
         "Self-hosted runner and Judge0",
         "SSO and advanced access",
         "Dedicated support and SLA",

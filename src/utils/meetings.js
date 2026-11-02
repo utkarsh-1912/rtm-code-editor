@@ -37,6 +37,12 @@ export const deleteSnapshot = (id, sid) => call(`${mid(id)}/snapshots/${sid}`, {
 export const endMeeting = (id, body = {}) => call(`${mid(id)}/end`, { method: "POST", body });
 // Invitees answer "yes" / "no" (signed in with the invited address).
 export const rsvpMeeting = (id, answer) => call(`${mid(id)}/rsvp`, { method: "POST", body: { answer } });
+// Interviews (organisers): feedback, private notes, the interviewers' chat, code playback.
+export const getFeedback = (id) => call(`${mid(id)}/feedback`);
+export const saveFeedback = (id, body) => call(`${mid(id)}/feedback`, { method: "PUT", body });
+export const saveMyNotes = (id, notes) => call(`${mid(id)}/my-notes`, { method: "PUT", body: { notes } });
+export const getPanel = (id) => call(`${mid(id)}/panel`);
+export const getTimeline = (id) => call(`${mid(id)}/timeline`);
 
 // --- Time zones --------------------------------------------------------------------------------
 export const localZone = () => Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
@@ -128,3 +134,17 @@ export function startsIn(startsAt, now = Date.now()) {
     const d = Math.round(h / 24);
     return `in ${d} day${d === 1 ? "" : "s"}`;
 }
+
+// --- Booking links (yours) and the public booking page -------------------------------------------
+export const listBookingLinks = () => call("/booking-links");
+export const createBookingLink = (body) => call("/booking-links", { method: "POST", body });
+export const updateBookingLink = (id, body) => call(`/booking-links/${encodeURIComponent(id)}`, { method: "PUT", body });
+export const deleteBookingLink = (id) => call(`/booking-links/${encodeURIComponent(id)}`, { method: "DELETE" });
+export const getBookingPage = (id) => call(`/book/${encodeURIComponent(id)}`);
+export const bookSlot = (id, body) => call(`/book/${encodeURIComponent(id)}`, { method: "POST", body });
+export const bookingUrl = (id) => `${publicOrigin()}/book/${id}`;
+
+// --- Team branding (Enterprise) ------------------------------------------------------------------
+export const getBranding = (orgId) => call(`/organizations/${orgId}/branding`);
+export const saveBranding = (orgId, body) => call(`/organizations/${orgId}/branding`, { method: "PUT", body });
+export const listTeams = (uid) => call(`/organizations?userId=${encodeURIComponent(uid)}`);

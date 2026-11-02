@@ -8,6 +8,9 @@ const NotificationRepository = require('../repositories/NotificationRepository')
 const { verifyToken } = require('../services/Identity');
 const { deliver } = require('../services/MailService');
 const { meetingEmail, nameFromEmail, rsvpCheck } = require('../services/MeetingMail');
+const InterviewRepository = require('../repositories/InterviewRepository');
+const CodeRecorder = require('../services/CodeRecorder');
+const Branding = require('../services/Branding');
 
 const APP = () => process.env.APP_URL || 'http://localhost:5000';
 const ACCESS = new Set(['public', 'invite', 'private']);
@@ -84,10 +87,11 @@ async function tellPeople(m, emails, { kind, previous = null, by = null }) {
     let emailed = 0;
     let limited = 0;
     let failed = 0; // the mail service refused or isn't set up
+    const brand = await Branding.brandFor(m.brand_org_id).catch(() => null);
     const one = async (email) => {
         const user = await UserRepository.getUserByEmail(email).catch(() => null);
         const name = user?.name && user.name !== 'Developer' ? user.name : nameFromEmail(email);
-        const { subject, html, attachments } = meetingEmail(m, { to: { email, name }, kind, previous });
+        const { subject, html, attachments } = meetingEmail(m, { to: { email, name }, kind, previous, brand });
         const allowed = !by || await MeetingRepository.takeMailQuota(by, DAILY_EMAILS()).catch(() => true);
         if (!allowed) limited += 1;
         else {
@@ -132,47 +136,53 @@ function readFields(b, base = {}) {
 }
 
 // Schedule a meeting (signed in). Uses an existing room you may use, or makes a new one.
+// Creates a meeting for `host` ({ uid, email, name }): the room (an existing one the host owns,
+// or a new one), its access and guest list, the team brand (Enterprise), then the invitations.
+// Shared by scheduling and booking links. Throws { status, message } for bad requests.
+async function scheduleFor(app, host, f, { roomId: wantRoom = '', roomName = '', coHosts = [], bookingLinkId = null } = {}) {
+    let roomId = String(wantRoom || '').trim().slice(0, 255);
+    if (roomId) {
+        const acc = await RoomRepository.getRoomAccess(roomId);
+        if (acc && acc.ownerUid && acc.ownerUid !== host.uid) throw Object.assign(new Error("Only the room's owner can schedule meetings in it."), { status: 403 });
+        if (!acc) await RoomRepository.saveRoom(roomId, '', 'javascript', []);
+    } else {
+        roomId = newRoomId();
+        await RoomRepository.saveRoom(roomId, '', 'javascript', []);
+    }
+    await RoomRepository.claimRoomOwner(roomId, host.uid);
+    const current = await RoomRepository.getRoomAccess(roomId);
+    if (current?.ownerUid === host.uid) {
+        await RoomRepository.setRoomAccess(roomId, host.uid, { visibility: f.access, allowed: [...new Set([...(current.allowed || []), ...f.invitees, ...coHosts])] });
+        app.get('io')?.roomAccess?.forget(roomId);
+    }
+    // Keep the room in the host's workspace (so housekeeping never removes it early).
+    const hostUser = await UserRepository.getUser(host.uid).catch(() => null);
+    if (hostUser) await RoomRepository.linkRoomToUser(host.uid, roomId).catch(() => { });
+    if (roomName && !wantRoom) await RoomRepository.updateRoomName(roomId, String(roomName)).catch(() => { });
+
+    const meeting = await MeetingRepository.createMeeting({
+        roomId, title: f.title, description: f.description, startsAt: f.startsAt.toISOString(), durationMin: f.durationMin,
+        timeZone: f.timeZone, hostUid: host.uid, hostName: String(host.name || hostUser?.name || host.email || 'Host').slice(0, 120),
+        hostEmail: host.email, invitees: f.invitees, access: f.access, coHosts,
+        brandOrgId: await Branding.brandOrgFor(host.uid).catch(() => null), bookingLinkId,
+    });
+    const sent = await tellInvitees(meeting, { kind: 'invite', by: host.uid });
+    return { meeting, sent };
+}
+
+// Schedule a meeting (signed in). Uses an existing room you may use, or makes a new one.
 router.post('/meetings', async (req, res) => {
     try {
         const who = await caller(req);
         if (!who) return res.status(401).json({ error: 'Sign in to schedule meetings.' });
         const b = req.body || {};
-        const { title, startsAt, durationMin, invitees, access, description, timeZone, error } = readFields(b);
-        if (error) return res.status(400).json({ error });
-        if (startsAt.getTime() < Date.now() - 5 * 60000) return res.status(400).json({ error: 'That time has already passed.' });
-
-        // The room: existing (you must own it, or it must be open) or a fresh one you own.
-        let roomId = String(b.roomId || '').trim().slice(0, 255);
-        if (roomId) {
-            const acc = await RoomRepository.getRoomAccess(roomId);
-            if (acc && acc.ownerUid && acc.ownerUid !== who.uid) return res.status(403).json({ error: "Only the room's owner can schedule meetings in it." });
-            if (!acc) await RoomRepository.saveRoom(roomId, '', 'javascript', []);
-        } else {
-            roomId = newRoomId();
-            await RoomRepository.saveRoom(roomId, '', 'javascript', []);
-        }
-        await RoomRepository.claimRoomOwner(roomId, who.uid);
-        const current = await RoomRepository.getRoomAccess(roomId);
-        if (current?.ownerUid === who.uid) {
-            await RoomRepository.setRoomAccess(roomId, who.uid, {
-                visibility: access,
-                allowed: [...(current.allowed || []), ...invitees],
-            });
-            req.app.get('io')?.roomAccess?.forget(roomId);
-        }
-        // Keep the room in the host's workspace (so housekeeping never removes it early).
-        const hostUser = await UserRepository.getUser(who.uid).catch(() => null);
-        if (hostUser) await RoomRepository.linkRoomToUser(who.uid, roomId).catch(() => { });
-        if (b.roomName && !b.roomId) await RoomRepository.updateRoomName(roomId, String(b.roomName)).catch(() => { });
-
-        const meeting = await MeetingRepository.createMeeting({
-            roomId, title, description, startsAt: startsAt.toISOString(), durationMin,
-            timeZone, hostUid: who.uid, hostName: String(b.hostName || hostUser?.name || who.email || 'Host').slice(0, 120),
-            hostEmail: who.email, invitees, access,
-        });
-        const sent = await tellInvitees(meeting, { kind: 'invite', by: who.uid });
+        const f = readFields(b);
+        if (f.error) return res.status(400).json({ error: f.error });
+        if (f.startsAt.getTime() < Date.now() - 5 * 60000) return res.status(400).json({ error: 'That time has already passed.' });
+        const { meeting, sent } = await scheduleFor(req.app, { uid: who.uid, email: who.email, name: b.hostName }, f, { roomId: b.roomId, roomName: b.roomName });
         res.json({ meeting: hostView(meeting, who), ...sent });
     } catch (err) {
+        if (err.status) return res.status(err.status).json({ error: err.message });
         console.error('Schedule meeting failed:', err);
         res.status(500).json({ error: 'Could not schedule the meeting.' });
     }
@@ -200,7 +210,7 @@ router.get('/meetings/:id', async (req, res) => {
         const m = await MeetingRepository.getMeeting(req.params.id);
         if (!m) return res.status(404).json({ error: 'Meeting not found.' });
         const who = await caller(req);
-        res.json(viewFor(m, who));
+        res.json({ ...viewFor(m, who), brand: await Branding.brandFor(m.brand_org_id).catch(() => null) });
     } catch (err) {
         res.status(500).json({ error: 'Could not load the meeting.' });
     }
@@ -451,6 +461,114 @@ router.delete('/meetings/:id/snapshots/:sid', async (req, res) => {
     }
 });
 
+// --- Interview feedback, the interviewers' chat, code playback --------------------------------
+// What every interviewer rates (1 = weak … 4 = strong) and the overall call.
+const CRITERIA = [
+    { id: 'problem', label: 'Problem solving' },
+    { id: 'code', label: 'Code quality' },
+    { id: 'design', label: 'System design' },
+    { id: 'communication', label: 'Communication' },
+    { id: 'collaboration', label: 'Collaboration' },
+];
+const RECOMMENDATIONS = ['strong_yes', 'yes', 'no', 'strong_no'];
+const feedbackView = (f) => ({
+    uid: f.uid, name: f.name || f.email || 'Interviewer', email: f.email, ratings: f.ratings || {}, recommendation: f.recommendation,
+    notes: f.notes || '', submittedAt: f.submitted_at, updatedAt: f.updated_at,
+});
+
+// Your feedback, and everyone else's once you've submitted yours (so first opinions stay
+// independent, as structured interviews recommend).
+router.get('/meetings/:id/feedback', async (req, res) => {
+    try {
+        const ctx = await organiserOnly(req, res);
+        if (!ctx) return;
+        const rows = await InterviewRepository.getFeedback(ctx.m.id);
+        const mine = rows.find((r) => r.uid === ctx.who.uid);
+        const others = rows.filter((r) => r.uid !== ctx.who.uid);
+        const submitted = others.filter((r) => r.submitted_at);
+        res.json({
+            criteria: CRITERIA,
+            mine: mine ? feedbackView(mine) : null,
+            others: mine?.submitted_at ? submitted.map(feedbackView) : [],
+            submittedCount: submitted.length + (mine?.submitted_at ? 1 : 0),
+            waitingOn: others.filter((r) => !r.submitted_at).map((r) => r.name || r.email),
+        });
+    } catch (err) {
+        res.status(500).json({ error: 'Could not load feedback.' });
+    }
+});
+
+router.put('/meetings/:id/feedback', async (req, res) => {
+    try {
+        const ctx = await organiserOnly(req, res);
+        if (!ctx) return;
+        const b = req.body || {};
+        const ratings = {};
+        for (const c of CRITERIA) {
+            const v = Number(b.ratings?.[c.id]);
+            if (Number.isInteger(v) && v >= 1 && v <= 4) ratings[c.id] = v;
+        }
+        const recommendation = RECOMMENDATIONS.includes(b.recommendation) ? b.recommendation : null;
+        if (b.submit && !recommendation) return res.status(400).json({ error: 'Pick your overall recommendation before submitting.' });
+        const user = await UserRepository.getUser(ctx.who.uid).catch(() => null);
+        const row = await InterviewRepository.saveFeedback(ctx.m.id, {
+            uid: ctx.who.uid, email: ctx.who.email, name: user?.name || nameFromEmail(ctx.who.email),
+            ratings, recommendation, notes: String(b.notes || '').slice(0, 20000), submit: !!b.submit,
+        });
+        // Tell the other organisers when someone submits.
+        if (b.submit) {
+            const text = `${row.name} submitted feedback for ${ctx.m.title}`;
+            const uids = new Set([ctx.m.host_uid]);
+            for (const email of ctx.m.co_hosts || []) {
+                const u = await UserRepository.getUserByEmail(email).catch(() => null);
+                if (u?.auth_provider_id) uids.add(u.auth_provider_id);
+            }
+            uids.delete(ctx.who.uid);
+            uids.forEach((uid) => NotificationRepository.notifyUser(uid, { type: 'meeting', message: text, url: `/meet/${ctx.m.id}`, data: { meetingId: ctx.m.id } }).catch(() => { }));
+        }
+        res.json(feedbackView(row));
+    } catch (err) {
+        console.error('Feedback failed:', err);
+        res.status(500).json({ error: 'Could not save your feedback.' });
+    }
+});
+
+// Your private notes only (the room's side panel saves these while the call runs).
+router.put('/meetings/:id/my-notes', async (req, res) => {
+    try {
+        const ctx = await organiserOnly(req, res);
+        if (!ctx) return;
+        const user = await UserRepository.getUser(ctx.who.uid).catch(() => null);
+        const row = await InterviewRepository.saveNotes(ctx.m.id, { uid: ctx.who.uid, email: ctx.who.email, name: user?.name || nameFromEmail(ctx.who.email), notes: String(req.body?.notes || '').slice(0, 20000) });
+        res.json({ notes: row.notes });
+    } catch (err) {
+        res.status(500).json({ error: 'Could not save your notes.' });
+    }
+});
+
+router.get('/meetings/:id/panel', async (req, res) => {
+    try {
+        const ctx = await organiserOnly(req, res);
+        if (!ctx) return;
+        res.json((await InterviewRepository.panelMessages(ctx.m.id)).map((r) => ({ id: r.id, author: r.author, text: r.text, at: r.created_at })));
+    } catch (err) {
+        res.status(500).json({ error: 'Could not load the interviewers\' chat.' });
+    }
+});
+
+// Code playback frames (see services/CodeRecorder.js for the format).
+router.get('/meetings/:id/timeline', async (req, res) => {
+    try {
+        const ctx = await organiserOnly(req, res);
+        if (!ctx) return;
+        const rows = await InterviewRepository.frames(ctx.m.id);
+        res.set('Cache-Control', 'private, max-age=30');
+        res.json(rows.map((r) => ({ at: r.at, ...r.frame })));
+    } catch (err) {
+        res.status(500).json({ error: 'Could not load the playback.' });
+    }
+});
+
 // Ends a meeting: a last snapshot, the room locked to organisers, everyone else in it sent out.
 // Used by "End meeting" and by the job that ends meetings left running long past their time.
 async function closeMeeting(io, meeting, { takenBy, code, language, auto = false }) {
@@ -458,6 +576,7 @@ async function closeMeeting(io, meeting, { takenBy, code, language, auto = false
     // can't both take a final snapshot and send people out twice.
     const m = await MeetingRepository.endMeeting(meeting.id);
     if (!m) return { meeting: (await MeetingRepository.getMeeting(meeting.id)) || meeting, removed: 0, alreadyEnded: true };
+    await CodeRecorder.finish(m.id).catch(() => { }); // last playback frame
     await snapshotRoom(m, { kind: 'end', label: auto ? 'Ended automatically after the scheduled time' : 'When the meeting ended', takenBy, code, language });
     // The room goes private. This meeting's guests lose access; organisers keep it, and so does
     // anyone the room's owner had let in for their own use (the room may outlive the meeting).
@@ -512,3 +631,6 @@ module.exports.ics = ics;
 module.exports.tellInvitees = tellInvitees;
 module.exports.closeMeeting = closeMeeting;
 module.exports.isOrganiser = isOrganiser;
+module.exports.CRITERIA = CRITERIA;
+module.exports.scheduleFor = scheduleFor;
+module.exports.readFields = readFields;

@@ -5,9 +5,10 @@ const newId = () => `m${crypto.randomBytes(9).toString('base64url').replace(/[-_
 
 async function createMeeting(m) {
     const rows = await sql`
-        INSERT INTO meetings (id, room_id, title, description, starts_at, duration_min, time_zone, host_uid, host_name, host_email, invitees, access)
+        INSERT INTO meetings (id, room_id, title, description, starts_at, duration_min, time_zone, host_uid, host_name, host_email, invitees, access, co_hosts, brand_org_id, booking_link_id)
         VALUES (${newId()}, ${m.roomId}, ${m.title}, ${m.description || ''}, ${m.startsAt}, ${m.durationMin}, ${m.timeZone || 'UTC'},
-                ${m.hostUid}, ${m.hostName || null}, ${m.hostEmail || null}, ${JSON.stringify(m.invitees || [])}::jsonb, ${m.access || 'public'})
+                ${m.hostUid}, ${m.hostName || null}, ${m.hostEmail || null}, ${JSON.stringify(m.invitees || [])}::jsonb, ${m.access || 'public'},
+                ${JSON.stringify(m.coHosts || [])}::jsonb, ${m.brandOrgId || null}, ${m.bookingLinkId || null})
         RETURNING *
     `;
     return rows[0];

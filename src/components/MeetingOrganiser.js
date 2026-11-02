@@ -3,6 +3,8 @@ import toast from "react-hot-toast";
 import { Camera, Copy, ChevronDown, ChevronRight, Lock, Mail, Power, Trash2, UserPlus, X, Flag } from "lucide-react";
 import { Modal } from "./ux/primitives";
 import { lineDiff, withContext } from "../utils/lineDiff";
+import InterviewFeedback from "./InterviewFeedback";
+import CodePlayback from "./CodePlayback";
 import {
     saveMeetingNotes, saveCoHosts, listSnapshots, updateSnapshot, deleteSnapshot, endMeeting,
 } from "../utils/meetings";
@@ -186,6 +188,13 @@ export default function MeetingOrganiser({ meeting, onChange, userName }) {
                     : started && <button type="button" className="u-btn u-btn--sm mo-end" onClick={() => setEnding(true)}><Power size={14} /> End meeting</button>}
             </div>
 
+            {started && (
+                <section className="mo-sec" id="feedback">
+                    <div className="mo-sec-head"><h2>Your feedback</h2></div>
+                    <InterviewFeedback meetingId={meeting.id} />
+                </section>
+            )}
+
             <section className="mo-sec">
                 <div className="mo-sec-head">
                     <h2>Guests{meeting.invitees?.length ? ` · ${meeting.invitees.length}` : ""}</h2>
@@ -218,6 +227,13 @@ export default function MeetingOrganiser({ meeting, onChange, userName }) {
                 <textarea className="u-textarea mo-notes" rows={6} value={notes} onChange={(e) => setNotes(e.target.value)}
                     placeholder="Questions to ask, what went well, follow-ups… Only organisers can see this." maxLength={20000} />
             </section>
+
+            {started && (
+                <section className="mo-sec">
+                    <div className="mo-sec-head"><h2>Code playback</h2></div>
+                    <CodePlayback meetingId={meeting.id} startsAt={meeting.startsAt} />
+                </section>
+            )}
 
             <section className="mo-sec">
                 <div className="mo-sec-head">

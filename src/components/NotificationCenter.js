@@ -290,7 +290,7 @@ const CustomStyles = () => (
         .notification-item:hover .delete-btn {
             opacity: 1 !important;
         }
-        @media (max-width: 480px) {
+        @media (max-width: 700px) {
             .notification-center-dropdown {
                 position: fixed !important;
                 top: 64px !important;

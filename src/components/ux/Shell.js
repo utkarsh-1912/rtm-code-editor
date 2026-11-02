@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Link, NavLink, useLocation } from "react-router-dom";
-import { Menu, X, Sun, Moon, ArrowUpRight } from "lucide-react";
+import { Menu, X, Sun, Moon, ArrowUpRight, Search } from "lucide-react";
 import Logo from "../Logo";
 import { useReveal, useClock, localCity } from "./primitives";
 import { getThemePref, resolveTheme, setThemePref } from "../../utils/theme";
@@ -119,7 +119,7 @@ export function ThemeButton({ className = "u-icon" }) {
  */
 export default function Shell({
     homeTo = "/", links = [], stripLeft, stripRight, right, holdHeader = false,
-    sheetFoot, columns = [], footerCta, children, after, mainClass = "u-main",
+    sheetFoot, onSearch, columns = [], footerCta, children, after, mainClass = "u-main",
 }) {
     const backend = useBackend();
     const location = useLocation();
@@ -182,6 +182,12 @@ export default function Shell({
                         <Logo size={26} />
                         <button className="u-icon" onClick={() => setSheetOpen(false)} aria-label="Close menu"><X size={22} /></button>
                     </div>
+                    {/* Search sits in the phone menu too, next to the pages it can find. */}
+                    {onSearch && (
+                        <button type="button" className="u-sheet-search" onClick={() => { setSheetOpen(false); onSearch(); }}>
+                            <Search size={18} /><span>Search pages, docs and help</span>
+                        </button>
+                    )}
                     <nav className="u-lines is-in">
                         {links.map(({ to, label, end }, i) => (
                             <NavLink key={to} to={to} end={end} className={({ isActive }) => `u-display${isActive ? " active" : ""}`}>

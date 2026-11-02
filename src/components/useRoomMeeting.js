@@ -44,7 +44,13 @@ export default function useRoomMeeting({ roomId, user, socketRef, onShownOut, on
                 return;
             }
             if (organiser) {
-                toast.success(auto ? "The meeting was ended automatically. The room is now organisers only." : "Meeting ended. The room is now organisers only.", { id: "meeting-ended" });
+                // Straight on to feedback while it's fresh.
+                toast((t) => (
+                    <span className="u-toast-call">
+                        <span>{auto ? "The meeting was ended automatically." : "Meeting ended."} The room is now organisers only.</span>
+                        <button className="u-btn u-btn--solid u-btn--sm" onClick={() => { toast.dismiss(t.id); window.open(`/meet/${meetingId}#feedback`, "_blank", "noopener"); }}>Write feedback</button>
+                    </span>
+                ), { id: "meeting-ended", duration: 15000 });
                 setMeeting(null);
                 return;
             }

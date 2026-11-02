@@ -4,6 +4,7 @@ const setupWhiteboardSocket = require('./WhiteboardSocket');
 const { pauseWhiteboardSim } = setupWhiteboardSocket;
 const setupProblemSocket = require('./ProblemSocket');
 const setupMediaSocket = require('./MediaSocket');
+const setupInterviewSocket = require('./InterviewSocket');
 const { createPairingTracker } = require('./pairingTracker');
 const { createRoomAccess } = require('./RoomAccess');
 
@@ -99,6 +100,7 @@ function initializeSockets(io) {
         setupWhiteboardSocket(io, socket, safeSocket, context);
         setupProblemSocket(io, socket, safeSocket, context);
         setupMediaSocket(io, socket, safeSocket, context);
+        setupInterviewSocket(io, socket, safeSocket, context);
 
         socket.on("disconnecting", safeSocket(() => {
             pairing.close(socket.id);

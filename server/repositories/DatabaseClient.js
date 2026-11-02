@@ -245,6 +245,68 @@ async function initializeSchema() {
         );
         `;
         await sql`CREATE INDEX IF NOT EXISTS meeting_snapshots_meeting ON meeting_snapshots (meeting_id, created_at);`;
+        // Interviews: each interviewer's feedback, the interviewer-only chat, code playback.
+        await sql`
+        CREATE TABLE IF NOT EXISTS meeting_feedback (
+            meeting_id VARCHAR(32) NOT NULL REFERENCES meetings(id) ON DELETE CASCADE,
+            uid VARCHAR(128) NOT NULL,
+            email VARCHAR(200),
+            name VARCHAR(120),
+            ratings JSONB DEFAULT '{}'::jsonb,
+            recommendation VARCHAR(16),
+            notes TEXT DEFAULT '',
+            submitted_at TIMESTAMP WITH TIME ZONE,
+            updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (meeting_id, uid)
+        );
+        `;
+        await sql`
+        CREATE TABLE IF NOT EXISTS meeting_panel (
+            id SERIAL PRIMARY KEY,
+            meeting_id VARCHAR(32) NOT NULL REFERENCES meetings(id) ON DELETE CASCADE,
+            author VARCHAR(120),
+            text TEXT NOT NULL,
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+        );
+        `;
+        await sql`CREATE INDEX IF NOT EXISTS meeting_panel_meeting ON meeting_panel (meeting_id, id);`;
+        await sql`
+        CREATE TABLE IF NOT EXISTS meeting_timeline (
+            id SERIAL PRIMARY KEY,
+            meeting_id VARCHAR(32) NOT NULL REFERENCES meetings(id) ON DELETE CASCADE,
+            at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+            frame JSONB NOT NULL
+        );
+        `;
+        await sql`CREATE INDEX IF NOT EXISTS meeting_timeline_meeting ON meeting_timeline (meeting_id, id);`;
+        // Booking links: a host's weekly availability; candidates pick a slot themselves.
+        await sql`
+        CREATE TABLE IF NOT EXISTS booking_links (
+            id VARCHAR(32) PRIMARY KEY,
+            host_uid VARCHAR(128) NOT NULL,
+            host_name VARCHAR(120),
+            host_email VARCHAR(200),
+            title VARCHAR(200) NOT NULL,
+            description TEXT DEFAULT '',
+            duration_min INTEGER NOT NULL DEFAULT 45,
+            time_zone VARCHAR(64) DEFAULT 'UTC',
+            hours JSONB DEFAULT '{}'::jsonb,
+            days_ahead INTEGER DEFAULT 14,
+            notice_min INTEGER DEFAULT 240,
+            buffer_min INTEGER DEFAULT 15,
+            access VARCHAR(16) DEFAULT 'invite',
+            co_hosts JSONB DEFAULT '[]'::jsonb,
+            brand_org_id INTEGER,
+            active BOOLEAN DEFAULT TRUE,
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+        );
+        `;
+        await sql`ALTER TABLE meetings ADD COLUMN IF NOT EXISTS brand_org_id INTEGER;`;
+        await sql`ALTER TABLE meetings ADD COLUMN IF NOT EXISTS booking_link_id VARCHAR(32);`;
+        // Enterprise branding on a team: name, colour and logo shown to candidates.
+        await sql`ALTER TABLE organizations ADD COLUMN IF NOT EXISTS brand_name VARCHAR(80);`;
+        await sql`ALTER TABLE organizations ADD COLUMN IF NOT EXISTS brand_color VARCHAR(9);`;
+        await sql`ALTER TABLE organizations ADD COLUMN IF NOT EXISTS brand_logo TEXT;`;
         // Project access: a random share key (the link), and people invited by email.
         await sql`ALTER TABLE projects ADD COLUMN IF NOT EXISTS share_key VARCHAR(40);`;
         await sql`

@@ -115,6 +115,9 @@ export default function MeetPage() {
                 : joinable ? { text: "Happening now", dot: "" }
                     : { text: `Starts ${startsIn(m.startsAt)}`, dot: "u-dot--warn" };
     const organiser = m.isHost && !m.cancelled;
+    // Enterprise teams show their own logo, name and colour to candidates.
+    const brand = m.brand;
+    const brandColor = brand?.color || null;
 
     const tiles = [
         { label: "Date", value: start.toLocaleDateString([], { day: "numeric" }), small: start.toLocaleDateString([], { month: "short" }), sub: start.toLocaleDateString([], { weekday: "long", year: "numeric" }) },
@@ -124,7 +127,7 @@ export default function MeetPage() {
     ];
 
     const joinCard = live ? (
-        <section className="u-card mp-card" data-rise aria-label="Join">
+        <section className={`u-card mp-card${brandColor ? " is-branded" : ""}`} style={brandColor ? { "--brand": brandColor } : undefined} data-rise aria-label="Join">
             {m.invited && (
                 <div className="mp-rsvp" role="group" aria-label="Will you join?">
                     <span className="u-label">Will you join?</span>
@@ -166,6 +169,7 @@ export default function MeetPage() {
         <AppLayout>
             <header className="db-head" data-rise>
                 <div>
+                    {brand && <span className="mp-brand">{brand.logo && <img src={brand.logo} alt="" />}<b>{brand.name}</b></span>}
                     <span className="u-label"><span className={`u-dot ${status.dot}`} /> Meeting · {status.text}</span>
                     <h1 className="db-title">{m.title}</h1>
                     <p className="mp-host">Hosted by {m.isOwner ? "you" : m.hostName || "the host"}{m.coHosts?.length ? ` · ${m.coHosts.length} co-organiser${m.coHosts.length === 1 ? "" : "s"}` : ""}</p>

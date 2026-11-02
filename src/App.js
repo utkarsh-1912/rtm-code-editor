@@ -25,6 +25,7 @@ import SignUp from "./pages/SignUp";
 import Dashboard from "./pages/Dashboard";
 import Snippets from "./pages/Snippets";
 import MeetPage from "./pages/MeetPage";
+import BookPage from "./pages/BookPage";
 import OfflinePage from "./pages/OfflinePage";
 import Docs from "./pages/Docs";
 import RequireAuth from "./components/RequireAuth";
@@ -118,6 +119,7 @@ function App() {
             <Route path="/dashboard" element={<RequireAuth><Dashboard /></RequireAuth>} />
             <Route path="/snippets" element={<RequireAuth><Snippets /></RequireAuth>} />
             <Route path="/meet/:meetingId" element={<MeetPage />} />
+            <Route path="/book/:linkId" element={<BookPage />} />
             <Route path="/offline" element={<OfflinePage />} />
             <Route path="/docs" element={<Docs />} />
             <Route path="/settings" element={<RequireAuth allowGuest={IS_DESKTOP}><Settings /></RequireAuth>} />
