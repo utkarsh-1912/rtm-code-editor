@@ -51,8 +51,13 @@ async function clearNotifications(userId) {
     return await sql`DELETE FROM notifications WHERE user_id = ${user[0].id}`;
 }
 
-async function deleteNotification(notificationId) {
-    return await sql`DELETE FROM notifications WHERE id = ${notificationId}`;
+// Only the owner's own notification (userId: their sign-in id).
+async function deleteNotification(notificationId, userId) {
+    return await sql`
+        DELETE FROM notifications
+        WHERE id = ${Number(notificationId) || 0}
+          AND user_id = (SELECT id FROM users WHERE auth_provider_id = ${userId})
+    `;
 }
 
 module.exports = {

@@ -1,5 +1,4 @@
 const ACTIONS = require('../../src/Action');
-const StreamingService = require('../services/StreamingService');
 
 function setupMediaSocket(io, socket, safeSocket, context) {
     const { userSocketMap } = context;
@@ -65,18 +64,8 @@ function setupMediaSocket(io, socket, safeSocket, context) {
         socket.to(roomId).emit(ACTIONS.SCREEN_SHARE_STOP, { userId: socket.id });
     }));
 
-    // RTMP Streaming
-    socket.on(ACTIONS.START_STREAMING, safeSocket(({ projectId, rtmpKey }) => {
-        StreamingService.startStream(projectId, rtmpKey);
-    }));
-
-    socket.on(ACTIONS.STREAM_DATA, safeSocket(({ projectId, chunk }) => {
-        StreamingService.writeStreamChunk(projectId, chunk);
-    }));
-
-    socket.on(ACTIONS.STOP_STREAMING, safeSocket(({ projectId }) => {
-        StreamingService.stopStream(projectId);
-    }));
+    // RTMP streaming events were removed: they let any connection start ffmpeg writing to an
+    // address of its choosing (server files, internal hosts) and nothing in the app used them.
 }
 
 module.exports = setupMediaSocket;

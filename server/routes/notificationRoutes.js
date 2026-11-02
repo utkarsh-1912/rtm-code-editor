@@ -12,7 +12,7 @@ router.get('/notifications', async (req, res) => {
         res.json(notifications);
     } catch (err) {
         console.error(err);
-        res.status(500).json({ error: err.message });
+        res.status(500).json({ error: 'Something went wrong. Please try again.' });
     }
 });
 
@@ -25,7 +25,7 @@ router.put('/notifications/read', async (req, res) => {
         res.json(read);
     } catch (err) {
         console.error(err);
-        res.status(500).json({ error: err.message });
+        res.status(500).json({ error: 'Something went wrong. Please try again.' });
     }
 });
 
@@ -38,18 +38,19 @@ router.delete('/notifications', async (req, res) => {
         res.json({ success: true });
     } catch (err) {
         console.error(err);
-        res.status(500).json({ error: err.message });
+        res.status(500).json({ error: 'Something went wrong. Please try again.' });
     }
 });
 
 // Delete single notification
 router.delete('/notifications/:id', async (req, res) => {
     try {
-        await NotificationRepository.deleteNotification(req.params.id);
+        if (!req.user) return res.status(401).json({ error: 'Sign in again to continue.' });
+        await NotificationRepository.deleteNotification(req.params.id, req.user.uid);
         res.json({ success: true });
     } catch (err) {
         console.error(err);
-        res.status(500).json({ error: err.message });
+        res.status(500).json({ error: 'Something went wrong. Please try again.' });
     }
 });
 
@@ -64,7 +65,7 @@ router.post('/notifications/test', async (req, res) => {
         res.json({ success: true });
     } catch (err) {
         console.error(err);
-        res.status(500).json({ error: err.message });
+        res.status(500).json({ error: 'Something went wrong. Please try again.' });
     }
 });
 

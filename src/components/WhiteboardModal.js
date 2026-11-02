@@ -5,11 +5,12 @@ import {
     Play, Pause, RotateCcw, Gauge, ALargeSmall, Bold, AlignLeft, AlignCenter, AlignRight,
     AlignVerticalJustifyStart, AlignVerticalJustifyCenter, AlignVerticalJustifyEnd,
     AlignStartVertical, AlignCenterVertical, AlignEndVertical, AlignStartHorizontal, AlignCenterHorizontal, AlignEndHorizontal,
-    AlignHorizontalDistributeCenter, AlignVerticalDistributeCenter
+    AlignHorizontalDistributeCenter, AlignVerticalDistributeCenter, Workflow
 } from "lucide-react";
 import {
     SHAPES, TEMPLATES, SHAPE_PREVIEW, makeNode, snap, nodeAt, connectorAt, onResizeHandle, labelPoint,
     drawNode, drawConnector, drawNodeOutline, drawSimFooter, TEXT_SIZES, retypeNode,
+    FLOW_STEPS, isFlowShape, tidyLayout,
 } from "./whiteboard/diagram";
 import { toTopology, simKind, isSimNode, isClient, hasCapacity, fieldsFor, typicalSim } from "./whiteboard/sim/topology";
 import { explain, fmtRate, fmtMs } from "./whiteboard/sim/explain";
@@ -350,6 +351,23 @@ const WhiteboardModal = ({ isOpen, onClose, socketRef, roomId }) => {
         setConnectStyle((st) => ({ ...st, ...patch }));
         if (selectedEl?.type === 'connector') applyUpdate([{ ...selectedEl, ...patch }]);
     };
+
+    // Lay connected shapes out left to right (synced like any edit; Undo puts them back).
+    const tidyUp = () => {
+        const moved = tidyLayout(elementsRef.current);
+        if (moved.length) applyUpdate(moved);
+    };
+    const tidyRef = useRef(tidyUp);
+    tidyRef.current = tidyUp;
+    useEffect(() => {
+        if (!isOpen) return undefined;
+        const onKey = (e) => {
+            const typing = /^(INPUT|TEXTAREA)$/.test(e.target?.tagName || '') || e.target?.isContentEditable;
+            if (!typing && e.shiftKey && !e.ctrlKey && !e.metaKey && e.key.toLowerCase() === 't') { e.preventDefault(); tidyRef.current(); }
+        };
+        window.addEventListener('keydown', onKey);
+        return () => window.removeEventListener('keydown', onKey);
+    }, [isOpen]);
 
     // --- Simulate mode ---
     const emitSim = (patch) => emitDraw('SIM', patch);
@@ -808,7 +826,9 @@ const WhiteboardModal = ({ isOpen, onClose, socketRef, roomId }) => {
             if (drag.mode === 'connect') {
                 setPreview(null);
                 if (drag.target) {
-                    const conn = { id: generateId(), type: 'connector', from: drag.from, to: drag.target, label: '', color, ...connectStyle };
+                    const ends = elementsRef.current.filter((e) => e.id === drag.from || e.id === drag.target);
+                    const flow = ends.length === 2 && ends.every((e) => isFlowShape(e.shape));
+                    const conn = { id: generateId(), type: 'connector', from: drag.from, to: drag.target, label: '', color, ...connectStyle, ...(flow && connectStyle.route === 'straight' ? { route: 'curve' } : {}) };
                     addElements([conn]);
                     setSelectedId(conn.id);
                 }
@@ -989,23 +1009,26 @@ const WhiteboardModal = ({ isOpen, onClose, socketRef, roomId }) => {
                 <strong>Whiteboard</strong>
                 <span className="wb-meta">{people} {people === 1 ? 'person' : 'people'} · room {roomId}</span>
                 <span className="wb-sim" role="group" aria-label="Simulate">
-                    <button className={sim.running ? 'on' : ''} onClick={toggleSim} title={sim.running ? 'Pause the simulation for everyone' : 'Simulate traffic through the system-design blocks, for everyone'} aria-pressed={sim.running}>
-                        {sim.running ? <Pause size={15} /> : <Play size={15} />}
+                    <button className={`wb-sim-go${sim.running ? ' on' : ''}`} onClick={toggleSim} title={sim.running ? 'Pause the simulation for everyone' : 'Simulate traffic through the system-design blocks, for everyone'} aria-pressed={sim.running}>
+                        {sim.running ? <><i className="wb-sim-dot" aria-hidden="true" /><Pause size={13} /></> : <Play size={13} />}
                         <span className="wb-sim-label">{sim.running ? 'Pause' : simActive ? 'Resume' : 'Simulate'}</span>
                     </button>
-                    <input
-                        type="range" min="0" max="1000" step="1"
-                        value={loadToPos(load)}
-                        onChange={(e) => chooseLoad(posToLoad(Number(e.target.value)))}
-                        aria-label="Load (requests per second)"
-                        aria-valuetext={`${load} requests per second`}
-                        title="Load: requests per second sent by the clients"
-                    />
-                    <output className="wb-sim-load">{fmtRate(load)} req/s</output>
+                    <label className="wb-sim-range" title="Load: requests per second sent by the clients">
+                        <span className="wb-sim-cap">Load</span>
+                        <input
+                            type="range" min="0" max="1000" step="1"
+                            value={loadToPos(load)}
+                            style={{ '--p': `${loadToPos(load) / 10}%` }}
+                            onChange={(e) => chooseLoad(posToLoad(Number(e.target.value)))}
+                            aria-label="Load (requests per second)"
+                            aria-valuetext={`${load} requests per second`}
+                        />
+                        <output className="wb-sim-load">{fmtRate(load)}<small> req/s</small></output>
+                    </label>
                     {simActive && (
                         <>
-                            <span className="wb-sim-time" title="Simulated time since the run started">t {((simSnap?.t ?? 0) / 1000).toFixed(1)} s</span>
-                            <button onClick={resetSim} title="Stop and reset the run" aria-label="Reset simulation"><RotateCcw size={14} /></button>
+                            <span className="wb-sim-time" title="Simulated time since the run started">t {((simSnap?.t ?? 0) / 1000).toFixed(1)}s</span>
+                            <button className="wb-sim-reset" onClick={resetSim} title="Stop and reset the run" aria-label="Reset simulation"><RotateCcw size={13} /></button>
                         </>
                     )}
                 </span>
@@ -1150,8 +1173,9 @@ const WhiteboardModal = ({ isOpen, onClose, socketRef, roomId }) => {
                         {tool === 'connector' && (
                             <div className="wb-conn">
                                 <div className="wb-seg">
-                                    <button className={connectStyle.route !== 'elbow' ? 'on' : ''} onClick={() => setConnectStyle((st) => ({ ...st, route: 'straight' }))}>Straight</button>
+                                    <button className={connectStyle.route !== 'elbow' && connectStyle.route !== 'curve' ? 'on' : ''} onClick={() => setConnectStyle((st) => ({ ...st, route: 'straight' }))}>Straight</button>
                                     <button className={connectStyle.route === 'elbow' ? 'on' : ''} onClick={() => setConnectStyle((st) => ({ ...st, route: 'elbow' }))}>Elbow</button>
+                                    <button className={connectStyle.route === 'curve' ? 'on' : ''} onClick={() => setConnectStyle((st) => ({ ...st, route: 'curve' }))}>Curve</button>
                                 </div>
                                 <div className="wb-seg">
                                     <button className={!connectStyle.dashed ? 'on' : ''} onClick={() => setConnectStyle((st) => ({ ...st, dashed: false }))}>Solid</button>
@@ -1231,9 +1255,16 @@ const WhiteboardModal = ({ isOpen, onClose, socketRef, roomId }) => {
                             {isConn && (
                                 <>
                                     <span className="wb-ctx-sep" />
-                                    <button className={selectedEl.route === 'elbow' ? 'on' : ''} onClick={() => chooseConnectStyle({ route: selectedEl.route === 'elbow' ? 'straight' : 'elbow' })} title={selectedEl.route === 'elbow' ? 'Elbow (click for straight)' : 'Straight (click for elbow)'} aria-label="Route">
-                                        <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d={selectedEl.route === 'elbow' ? 'M2 3h6v10h6' : 'M2 13L14 3'} fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" /></svg>
-                                    </button>
+                                    {(() => {
+                                        const route = selectedEl.route || 'straight';
+                                        const next = { straight: 'elbow', elbow: 'curve', curve: 'straight' }[route] || 'elbow';
+                                        const icon = { straight: 'M2 13L14 3', elbow: 'M2 3h6v10h6', curve: 'M2 13C9 13 7 3 14 3' }[route] || 'M2 13L14 3';
+                                        return (
+                                            <button className={route !== 'straight' ? 'on' : ''} onClick={() => chooseConnectStyle({ route: next })} title={`${route[0].toUpperCase()}${route.slice(1)} (click for ${next})`} aria-label="Route">
+                                                <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d={icon} fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                                            </button>
+                                        );
+                                    })()}
                                     <button className={selectedEl.dashed ? 'on' : ''} onClick={() => chooseConnectStyle({ dashed: !selectedEl.dashed })} title={selectedEl.dashed ? 'Dashed (async)' : 'Solid'} aria-label="Line style">
                                         <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M2 8h12" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeDasharray={selectedEl.dashed ? '2.5 2.5' : '0'} /></svg>
                                     </button>
@@ -1286,6 +1317,15 @@ const WhiteboardModal = ({ isOpen, onClose, socketRef, roomId }) => {
                                                 {TEMPLATES.map((t) => (
                                                     <button key={t.id} className={selectedEl.kind === t.id ? 'on' : ''} onClick={() => changeType({ template: t.id })} title={t.text} role="menuitem">
                                                         <i style={{ background: t.color === 'ink' ? 'var(--wb-ink)' : t.color }} />
+                                                        {t.label}
+                                                    </button>
+                                                ))}
+                                            </span>
+                                            <span className="wb-lib-h">Workflow steps</span>
+                                            <span className="wb-lib-blocks wb-lib-flow">
+                                                {FLOW_STEPS.map((t) => (
+                                                    <button key={t.id} className={selectedEl.kind === t.id ? 'on' : ''} onClick={() => changeType({ template: t.id })} title={t.text} role="menuitem">
+                                                        <b className={t.shape === 'trigger' ? 'is-trigger' : ''}>{t.badge.slice(0, 2)}</b>
                                                         {t.label}
                                                     </button>
                                                 ))}
@@ -1363,12 +1403,27 @@ const WhiteboardModal = ({ isOpen, onClose, socketRef, roomId }) => {
                                 </button>
                             ))}
                         </div>
-                        <p className="wb-lib-tip">Click the board to place it. Connect shapes with the connector (A); double-click to edit text.</p>
+                        <span className="wb-lib-h">Workflow steps</span>
+                        <div className="wb-lib-blocks wb-lib-flow">
+                            {FLOW_STEPS.map((t) => (
+                                <button key={t.id} className={pick.template === t.id ? 'on' : ''} onClick={() => setPick({ shape: t.shape, template: t.id })} title={t.text}>
+                                    <b className={t.shape === 'trigger' ? 'is-trigger' : ''}>{t.badge.slice(0, 2)}</b>
+                                    {t.label}
+                                </button>
+                            ))}
+                        </div>
+                        <p className="wb-lib-tip">Click the board to place it. Connect shapes with the connector (A); double-click to edit text. Workflow steps connect with curves; Tidy up (bottom right) lays a flow out left to right.</p>
                     </div>
                 )}
 
                 {/* Zoom */}
                 <div className="wb-zoom">
+                    {elements.some((e) => e.type === 'connector' && e.to) && (
+                        <>
+                            <button onClick={tidyUp} aria-label="Tidy up" title="Tidy up: lay connected shapes out left to right (Shift T)"><Workflow size={15} /></button>
+                            <span className="wb-zoom-sep" aria-hidden="true" />
+                        </>
+                    )}
                     <button onClick={() => zoomBy(1 / 1.2)} aria-label="Zoom out" title="Zoom out (-)"><ZoomOut size={15} /></button>
                     <button className="wb-pct" onClick={resetView} title="Reset view (0)">{Math.round(zoom * 100)}%</button>
                     <button onClick={() => zoomBy(1.2)} aria-label="Zoom in" title="Zoom in (+)"><ZoomIn size={15} /></button>

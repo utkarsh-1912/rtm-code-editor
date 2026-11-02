@@ -43,6 +43,43 @@ const jsonBody = express.json({ limit: '2mb' });
 // The Stripe webhook needs the untouched raw body to verify its signature.
 app.use((req, res, next) => (req.path.endsWith('/files/bulk') || req.path.startsWith('/api/github/') || req.path === '/api/billing/webhook' ? next() : jsonBody(req, res, next)));
 
+// Security headers on every response (the app is served from here in production).
+app.disable('x-powered-by');
+app.use((req, res, next) => {
+  res.set({
+    'X-Content-Type-Options': 'nosniff',
+    'Referrer-Policy': 'strict-origin-when-cross-origin',
+    'X-Frame-Options': 'SAMEORIGIN',
+    'Cross-Origin-Opener-Policy': 'same-origin-allow-popups',
+    'Permissions-Policy': 'camera=(self), microphone=(self), display-capture=(self), geolocation=()',
+  });
+  if (process.env.NODE_ENV === 'production') res.set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+  next();
+});
+
+// Rate limits (per client address; behind one proxy the last X-Forwarded-For entry is the client).
+const clientIp = (req) => String(req.headers['x-forwarded-for'] || '').split(',').map((x) => x.trim()).filter(Boolean).pop() || req.socket.remoteAddress || '?';
+function limiter(name, max, windowMs) {
+  const hits = new Map();
+  setInterval(() => { const now = Date.now(); for (const [k, v] of hits) if (now - v.at > windowMs) hits.delete(k); }, windowMs).unref();
+  return (req, res, next) => {
+    const key = clientIp(req);
+    const now = Date.now();
+    const h = hits.get(key);
+    if (!h || now - h.at > windowMs) { hits.set(key, { at: now, n: 1 }); return next(); }
+    if (++h.n > max) { res.set('Retry-After', String(Math.ceil((h.at + windowMs - now) / 1000))); return res.status(429).json({ error: 'Too many requests. Please slow down and try again shortly.' }); }
+    next();
+  };
+}
+app.use('/api', limiter('api', 600, 60 * 1000));
+app.use('/api/support', limiter('support', 5, 60 * 60 * 1000));
+app.use(/^\/api\/projects\/[^/]+\/invite$/, limiter('invite', 30, 60 * 60 * 1000));
+app.use('/api/user/sync', limiter('sync', 30, 60 * 1000));
+
+// Who is calling (verified sign-in), and requests that name a user must be that user.
+const { attachUser, enforceClaimedUser } = require('./server/security/access');
+app.use('/api', attachUser, enforceClaimedUser);
+
 // Request Logging Middleware
 app.use((req, res, next) => {
   console.log(`[SVR] ${req.method} ${req.url}`);
@@ -92,6 +129,9 @@ initializeSockets(io);
 require("./server/jobs/cleanup").startCleanupJob(io, require("./server/sockets/SocketManager").roomState);
 // Meeting reminders: a nudge about 10 minutes before a scheduled call.
 require("./server/jobs/reminders").startReminderJob(io);
+if (process.env.NODE_ENV === 'production' && process.env.RUNNER_LOCAL === '1') {
+  console.warn('SECURITY: RUNNER_LOCAL=1 runs visitor code directly on this server (no sandbox). Anyone can read its files and secrets. Use Judge0 or an isolated runner in production.');
+}
 
 // Server Entry Point: listen right away (so health checks, the runner and sockets work
 // on a cold start) and bring the database up in the background with retries.

@@ -19,6 +19,8 @@ import { resolveTheme, setThemePref } from "../utils/theme";
 import "../styles/app.css";
 import ACTIONS from "../Action";
 import { initSocket } from "../socket";
+import { auth } from "../firebase";
+import { rememberProjectKey, projectKey } from "../utils/authFetch";
 import VideoChat from "../components/VideoChat";
 import useCallStartedAlert from "../components/useCallStartedAlert";
 import { useCallCarry } from "../context/CallCarry";
@@ -541,13 +543,16 @@ const ProjectPage = () => {
         if (!socketRef.current || !name) return;
         joinedNameRef.current = name;
         socketRef.current.userName = name;
-        socketRef.current.emit(ACTIONS.PROJECT_JOIN, {
+        const send = (idToken) => socketRef.current?.emit(ACTIONS.PROJECT_JOIN, {
             projectId,
             userName: name,
             photoURL: user?.photoURL || null,
             uid: user?.uid || null,
             clientId: CLIENT_ID,
+            idToken: idToken || undefined,
+            key: projectKey(projectId) || undefined,
         });
+        Promise.resolve(auth.currentUser?.getIdToken().catch(() => null)).then(send);
         hasJoinedRef.current = true;
     }, [projectId, user?.photoURL, user?.uid]);
 
@@ -560,9 +565,20 @@ const ProjectPage = () => {
         const init = async () => {
             try {
                 const backendUrl = getBackendUrl();
+                // Opened from a share link (?k=...): remember the key for this project's requests.
+                const linkKey = new URLSearchParams(window.location.search).get('k');
+                if (linkKey) rememberProjectKey(projectId, linkKey);
                 const projRes = await fetch(`${backendUrl}/api/projects/${projectId}`);
+                if (projRes.status === 401) { navigate('/login', { replace: true, state: { from: window.location.pathname + window.location.search } }); return; }
+                if (projRes.status === 403) throw new Error("You don't have access to this project. Ask its owner to invite you or send you its link.");
                 if (!projRes.ok) throw new Error("Project not found");
                 const projData = await projRes.json();
+                // Keep the share key in the address bar so a copied link lets teammates in.
+                if (projData.shareKey) {
+                    rememberProjectKey(projectId, projData.shareKey);
+                    const url = new URL(window.location.href);
+                    if (url.searchParams.get('k') !== projData.shareKey) { url.searchParams.set('k', projData.shareKey); window.history.replaceState(window.history.state, '', url); }
+                }
                 setProject(projData);
 
                 if (projData.type === 'web') {

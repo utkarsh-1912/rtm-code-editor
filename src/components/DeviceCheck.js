@@ -79,23 +79,23 @@ const DeviceCheck = forwardRef(function DeviceCheck({ name }, ref) {
     }), [status, ask, cam, mic, release]);
 
     return (
-        <div className="dc">
-            <div className="dc-preview">
+        <div className="devc">
+            <div className="devc-preview">
                 <video ref={videoRef} autoPlay playsInline muted className={cam && status === "ready" ? "" : "is-hidden"} />
                 {!(cam && status === "ready") && (
-                    <div className="dc-off">
+                    <div className="devc-off">
                         {status === "blocked" ? <ShieldAlert size={22} /> : <VideoOff size={22} />}
                         <span>{status === "ready" ? "Camera off" : status === "asking" ? "Waiting for your browser…" : status === "blocked" ? "Camera and mic are blocked" : status === "missing" ? "No camera or mic found" : "Camera and mic not checked yet"}</span>
                     </div>
                 )}
-                {name && <span className="dc-name">{name}</span>}
+                {name && <span className="devc-name">{name}</span>}
             </div>
-            <div className="dc-row">
-                <button type="button" className={`dc-toggle${mic ? " on" : ""}`} onClick={() => setMic((v) => !v)} disabled={status !== "ready"} aria-pressed={mic} title={mic ? "Join with mic on" : "Join muted"}>
+            <div className="devc-row">
+                <button type="button" className={`devc-toggle${mic ? " on" : ""}`} onClick={() => setMic((v) => !v)} disabled={status !== "ready"} aria-pressed={mic} title={mic ? "Join with mic on" : "Join muted"}>
                     {mic ? <Mic size={16} /> : <MicOff size={16} />}
-                    {status === "ready" && mic && <span className="dc-level" style={{ transform: `scaleX(${level})` }} />}
+                    {status === "ready" && mic && <span className="devc-level" style={{ transform: `scaleX(${level})` }} />}
                 </button>
-                <button type="button" className={`dc-toggle${cam ? " on" : ""}`} onClick={() => setCam((v) => !v)} disabled={status !== "ready"} aria-pressed={cam} title={cam ? "Join with camera on" : "Join with camera off"}>
+                <button type="button" className={`devc-toggle${cam ? " on" : ""}`} onClick={() => setCam((v) => !v)} disabled={status !== "ready"} aria-pressed={cam} title={cam ? "Join with camera on" : "Join with camera off"}>
                     {cam ? <Video size={16} /> : <VideoOff size={16} />}
                 </button>
                 {status !== "ready" && (
@@ -103,7 +103,7 @@ const DeviceCheck = forwardRef(function DeviceCheck({ name }, ref) {
                         {status === "blocked" ? "Try again" : "Allow camera & mic"}
                     </button>
                 )}
-                <span className="dc-hint">
+                <span className="devc-hint">
                     {status === "blocked" ? "Allow them from the lock icon in the address bar. You can still join to listen and watch."
                         : status === "ready" ? "Pick what starts on. You can change it in the call."
                             : "Your browser will ask once."}

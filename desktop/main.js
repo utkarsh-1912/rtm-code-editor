@@ -6,6 +6,7 @@
 const { app, BrowserWindow, ipcMain, shell, nativeTheme, Menu, Notification, dialog } = require("electron");
 const path = require("path");
 const { runLocal, llmLocal, localStatus } = require("./local");
+const { vaultSet, vaultDelete, vaultList, vaultFetch } = require("./vault");
 const { runBuiltin, toolchains } = require("./runner");
 const packs = require("./packs");
 const { createFsAccess } = require("./fsAccess");
@@ -197,6 +198,11 @@ handle("colabs:terminalClose", async ({ key = "main" }) => {
     return { ok: true };
 });
 handle("colabs:llmLocal", llmLocal);
+// Your own AI keys: encrypted by the OS; requests are sent from here so the page never holds a key.
+handle("colabs:vaultSet", vaultSet);
+handle("colabs:vaultDelete", vaultDelete);
+handle("colabs:vaultList", vaultList);
+handle("colabs:vaultFetch", vaultFetch);
 handle("colabs:localStatus", localStatus);
 handle("colabs:notify", async ({ title, body }) => {
     // Web push does not exist inside Electron, so unread alerts surface as native notifications.

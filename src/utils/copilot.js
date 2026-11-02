@@ -1,5 +1,7 @@
 import { getBackendUrl } from "./api";
 import { desktop } from "./runner";
+import { auth } from "../firebase";
+import { getDefault, listConnections, chatOwn } from "./aiModels";
 
 const TASKS = {
     explain: {
@@ -60,8 +62,20 @@ export async function askCopilot({ action, code, language, prompt, roomId, proje
     const messages = buildMessages({ action, code, language, prompt });
     const started = performance.now();
 
+    // Your default model (Settings > AI models): one you connected with your own key, a model
+    // this site provides, or "auto" (below).
+    const choice = getDefault(userId);
+    if (choice.startsWith("own:")) {
+        const connection = listConnections(userId).find((c) => c.id === choice.slice(4));
+        if (connection) {
+            const out = await chatOwn(userId, connection, messages);
+            return parseReply(action, out.text, { model: out.model, where: out.where, ms: performance.now() - started });
+        }
+    }
+    const modelId = choice.startsWith("platform:") ? choice.slice(9) : undefined;
+
     const bridge = desktop();
-    if (bridge?.llmLocal) {
+    if (!modelId && bridge?.llmLocal) {
         try {
             const local = await bridge.llmLocal({ messages });
             if (local?.text) return parseReply(action, local.text, { model: local.model, where: "on this device", ms: performance.now() - started });
@@ -70,10 +84,11 @@ export async function askCopilot({ action, code, language, prompt, roomId, proje
         }
     }
 
+    const token = await auth.currentUser?.getIdToken().catch(() => null);
     const res = await fetch(`${getBackendUrl()}/api/copilot`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action, messages, language, roomId, projectId, userId }),
+        headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        body: JSON.stringify({ action, messages, language, roomId, projectId, userId, modelId }),
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok || !data.success) throw new Error(data.error || `Copilot responded ${res.status}`);

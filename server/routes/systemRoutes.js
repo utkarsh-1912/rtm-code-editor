@@ -5,6 +5,7 @@ const UserRepository = require('../repositories/UserRepository');
 const RoomRepository = require('../repositories/RoomRepository');
 const MailService = require('../services/MailService');
 const { paging } = require('../utils/paging');
+const { isAdmin } = require('../security/access');
 
 // Header announcements: server/config/announcements.json, or the ANNOUNCEMENTS_JSON env var
 // (an array) to change them without a deploy. ?audience=site|app; only entries within their
@@ -47,6 +48,8 @@ router.get('/announcements', (req, res) => {
 // Test Email Dispatch Endpoint
 router.get('/test-email', async (req, res) => {
     try {
+        // Developers only: otherwise anyone could make this server send mail to anyone.
+        if (!isAdmin(req.user)) return res.status(404).json({ error: 'Not found' });
         const { to } = req.query;
         if (!to) return res.status(400).json({ error: "Missing recipient email" });
 
@@ -63,7 +66,7 @@ router.get('/test-email', async (req, res) => {
         res.json({ success: true, result });
     } catch (err) {
         console.error(err);
-        res.status(500).json({ error: err.message });
+        res.status(500).json({ error: 'Something went wrong. Please try again.' });
     }
 });
 
@@ -76,7 +79,7 @@ router.get('/user-dashboard', async (req, res) => {
         res.json(dashboard);
     } catch (err) {
         console.error(err);
-        res.status(500).json({ error: err.message });
+        res.status(500).json({ error: 'Something went wrong. Please try again.' });
     }
 });
 
@@ -89,7 +92,7 @@ router.get('/user-subscription', async (req, res) => {
         res.json({ email, isUnsubscribed });
     } catch (err) {
         console.error(err);
-        res.status(500).json({ error: err.message });
+        res.status(500).json({ error: 'Something went wrong. Please try again.' });
     }
 });
 
@@ -102,7 +105,7 @@ router.get('/rooms', async (req, res) => {
         res.json(await RoomRepository.getUserRoomsPage(userId, page));
     } catch (err) {
         console.error(err);
-        res.status(500).json({ error: err.message });
+        res.status(500).json({ error: 'Something went wrong. Please try again.' });
     }
 });
 
@@ -111,6 +114,10 @@ router.put('/rename-room', async (req, res) => {
     try {
         const { roomId, newName } = req.body;
         if (!roomId) return res.status(400).json({ error: "Missing roomId" });
+        if (!req.user) return res.status(401).json({ error: 'Sign in again to continue.' });
+        const acc = await RoomRepository.getRoomAccess(roomId);
+        const linked = await RoomRepository.isLinkedToUser(req.user.uid, roomId);
+        if (acc?.ownerUid ? acc.ownerUid !== req.user.uid : !linked) return res.status(403).json({ error: "Only the room's owner can rename it." });
         const updated = await RoomRepository.updateRoomName(roomId, newName);
         if (!updated) return res.status(404).json({ error: "Room not found" });
         // People in the room see the new name right away.
@@ -118,7 +125,7 @@ router.put('/rename-room', async (req, res) => {
         res.json({ id: updated.room_id, name: updated.name || updated.room_id, customName: !!updated.name });
     } catch (err) {
         console.error(err);
-        res.status(500).json({ error: err.message });
+        res.status(500).json({ error: 'Something went wrong. Please try again.' });
     }
 });
 
@@ -131,7 +138,7 @@ router.delete('/remove-room', async (req, res) => {
         res.json({ success: true });
     } catch (err) {
         console.error(err);
-        res.status(500).json({ error: err.message });
+        res.status(500).json({ error: 'Something went wrong. Please try again.' });
     }
 });
 
@@ -144,7 +151,7 @@ router.get('/search', async (req, res) => {
         res.json(results);
     } catch (err) {
         console.error(err);
-        res.status(500).json({ error: err.message });
+        res.status(500).json({ error: 'Something went wrong. Please try again.' });
     }
 });
 

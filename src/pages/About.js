@@ -6,10 +6,10 @@ import CtaBand from "../components/Site/CtaBand";
 import { pad2 } from "../components/ux/primitives";
 
 const PILLARS = [
-    { icon: Video, title: "Talk while you code", text: "Voice, video and screen sharing live inside the editor, so pairing never means switching tabs." },
+    { icon: Video, title: "Talk while you code", text: "Voice, video and screen sharing live inside the editor, and scheduled calls come with calendar invites, notes and code snapshots for the organiser." },
     { icon: Layers, title: "Focus by design", text: "A command palette (Ctrl+K) and focus mode (Alt+F) keep every action one keystroke away and everything else out of sight." },
     { icon: Folder, title: "Rooms and projects", text: "Spin up a throwaway room in seconds, or keep a persistent multi-file project for your team." },
-    { icon: Cpu, title: "Runs where you are", text: "Seventeen languages, SQL over your own CSV files, and desktop apps that use your machine's runner and local AI before the server." },
+    { icon: Cpu, title: "Runs where you are", text: "Seventeen languages, SQL over your own CSV files, desktop apps that run code offline on your machine, and the AI model of your choice with your own key." },
 ];
 
 const PRINCIPLES = [

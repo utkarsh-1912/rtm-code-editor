@@ -10,14 +10,16 @@ Real-time pair programming in the browser and on the desktop. Rooms for quick se
 
 | Area | Features |
 | --- | --- |
-| Rooms | One-click private rooms with a shareable link, guests join with just a name, spectator (read-only) links, live cursors, room chat |
-| Projects | Multi-file workspace with a file tree and tabs. Web projects get a live preview + console; C++, Python and Java projects get stdin + output. Invite teammates by email |
-| Running code | JavaScript, Python, C++ and Java through the code runner (Judge0 or local processes), output shared with everyone in the room |
-| Collaboration | Peer-to-peer voice and video, screen sharing with annotations, a shared whiteboard |
+| Rooms | One-click rooms with a shareable link, guests join with just a name, spectator (read-only) links, live cursors, room chat. Open, ask-to-join or invited-only access |
+| Projects | Multi-file workspace with a file tree and tabs, card or classic layouts. Web projects get a live preview + console; other languages get stdin + output. Private to the owner, invitees and holders of the project's share link |
+| Running code | 17 languages through the code runner (Judge0, or local processes in development); the desktop app runs them all on your computer, offline |
+| Calls | Peer-to-peer voice and video, screen sharing with the presenter's camera beside it, shared pointers and drawing, a "call started" prompt for the room, camera/mic check before joining |
+| Meetings | Scheduled calls in any time zone: email with a calendar invite attached, Yes / No replies, reminders, edit and reschedule (calendars update). Organisers get the guest list, private notes, code snapshots with line-by-line changes and comments, co-organisers, and End meeting (guests lose access; auto-ends an hour after running over) |
+| Whiteboard | Freehand drawing and system-design diagrams with labelled connectors, live for everyone |
 | History | Save named snapshots, compare them line by line with the current code, restore any version |
-| AI copilot | Explain, refactor, audit & fix, write tests, or ask anything. Runs on an open-weight model you host (default: Qwen2.5-Coder via Ollama) |
+| AI copilot | Explain, refactor, audit & fix, write tests, or ask anything. Choose the default model: the hosted one, models the site provides (some by request), or your own key for Gemini, Claude Sonnet/Haiku, OpenAI, OpenRouter, Grok, Qwen, Kimi, Sarvam or any OpenAI-compatible server |
 | Library | Personal and team snippet vaults, insert a snippet into any room, export code to a GitHub gist |
-| Everywhere | Command palette (Ctrl K), focus mode (Alt F), Vim/Emacs keybindings, dark/light/system themes |
+| Everywhere | Search (Ctrl K), help (?), focus mode (Alt F), Vim/Emacs keybindings, dark/light/system themes |
 
 ## Architecture
 
@@ -91,6 +93,15 @@ GEMINI_API_KEY=…
 # LLM_BASE_URL=http://localhost:11434/v1
 # LLM_MODEL=qwen2.5-coder:1.5b
 # LLM_API_KEY=…
+
+# Models you provide to users (Settings › AI models, Features page "Request access")
+# ANTHROPIC_API_KEY=…                # also: OPENAI_, OPENROUTER_, XAI_, QWEN_, KIMI_, SARVAM_API_KEY
+# PLATFORM_MODELS='[{"id":"sonnet","label":"Claude Sonnet 5.5","provider":"anthropic","model":"claude-sonnet-5-5","access":"request"}]'
+ADMIN_EMAILS=you@yourdomain.com      # who approves model access requests (comma-separated)
+
+# Meetings
+# RSVP_SECRET=…                      # signs the Yes/No links in invite emails (default: derived from DATABASE_URL)
+# MEETING_EMAILS_PER_DAY=100         # per-account cap on meeting emails
 ```
 
 Then, in two terminals:
@@ -136,6 +147,28 @@ ollama serve
 
 To use a fine-tuned model, load your GGUF into Ollama with a `Modelfile` (`FROM ./my-model.gguf`), `ollama create my-coder -f Modelfile`, and set `LLM_MODEL=my-coder`.
 
+### Meetings
+
+Schedule from the workspace or inside a room. The meeting page (`/meet/:id`) is the invite link: a camera and mic check, the guest's name carried over from the email, and Join from 10 minutes before the start. Organisers (the host and co-organisers) see the guest list with replies, private notes, and the code snapshots taken in the room during the call (each with its changes since the previous one and a private comment). **End meeting** takes a final snapshot, makes the room private to organisers and sends everyone else out. A background job sends reminders, asks organisers to end meetings that run over, and ends them an hour after their end time.
+
+Invite emails carry an `.ics` invite (`METHOD:REQUEST`, cancellations as `METHOD:CANCEL`) so mail apps add and update the calendar entry themselves, plus signed Yes / No links. Each account can send `MEETING_EMAILS_PER_DAY` meeting emails a day; failed sends don't count.
+
+### AI models and your own keys
+
+`src/shared/aiProviders.js` lists the providers and how to call each one; the browser, the desktop app and the server all use it.
+
+- **Your own key** (Settings › AI models): kept on the device, never on the server. In a browser it's encrypted with AES-256-GCM under a non-extractable WebCrypto key in IndexedDB, optionally under a passphrase (PBKDF2, 600k rounds) that keeps keys locked until unlocked. In the desktop app it's encrypted with Electron `safeStorage` (DPAPI / Keychain) and never returned to the page: the main process adds the key to the request. Every key is bound to the address it was saved for and can't be sent anywhere else.
+- **Providers that block browser calls** (Grok, Qwen, Kimi, Sarvam) go through `POST /api/ai/relay`: signed-in, rate-limited, known provider addresses only, the key travels in a header for that one request and is never stored or logged.
+- **Platform models** come from `PLATFORM_MODELS` (default: hosted Gemini for everyone, Claude Sonnet and Haiku by request when `ANTHROPIC_API_KEY` is set). People request access; `ADMIN_EMAILS` approve in Settings › AI models, and the copilot route enforces it.
+
+### Security model
+
+- `server/security/access.js` verifies the Firebase ID token on every `/api` request. Any `userId` / `uid` in a request must be the signed-in caller, so ids can't be swapped. The web app adds the token to every API request (`src/utils/authFetch.js`).
+- Projects open to their owner, people invited by email and holders of the project's random share key (`/project/:id?k=…`). Only the owner renames, deletes or invites. The same rule guards the project's live session and its GitHub routes.
+- Rooms are open, ask-to-join or invited-only; private rooms check the verified sign-in before anyone joins, and socket events only count from members.
+- Rate limits on the API, support form, invitations and sign-in sync; security headers on every response; generic error messages to callers.
+- The local code engine is not a sandbox: keep `RUNNER_LOCAL` unset in production (the server warns at start if it isn't).
+
 ## Desktop apps
 
 The [`desktop/`](desktop) folder is an Electron shell around the web app for Windows, macOS and Linux:
@@ -144,10 +177,11 @@ The [`desktop/`](desktop) folder is an Electron shell around the web app for Win
 - It's an app, not the website. `/` goes to your workspace, or to a small launcher when you're signed out (sign in, or join or start a room as a guest, plus local Judge0 and AI status). Marketing pages aren't in the app, and help, legal and status links open in your browser. The website footer is replaced by a slim status bar, **Settings › Desktop app** shows what runs locally, and the menus add **Go** (`Ctrl+1/2/3` for Workspace, Snippets and Settings), **File › New Room** (`Ctrl+N`) and **Help**. Menu navigation happens in place, so calls and connections stay up.
 - The bundled UI is the version that shipped with the installer, so update the app to get web UI changes. Keep server API changes backward compatible, because installed apps keep using the UI they shipped with. Installers built without a UI bundle open the hosted site and show a splash until it wakes, as does `COLABS_REMOTE_UI=1`, `--url=` or `COLABS_APP_URL`.
 - It runs code on a **local Judge0** (`http://localhost:2358`) first and only uses the server if that fails.
-- It sends copilot requests to a **local model** (`http://localhost:11434/v1`, `qwen2.5-coder:1.5b`) first, then the server.
+- It sends copilot requests to a **local model** (`http://localhost:11434/v1`, `qwen2.5-coder:1.5b`) first, then the server, unless you picked another default model in Settings › AI models.
+- It runs all 17 languages on your computer: JavaScript, TypeScript, Python, SQL and Lua are bundled, installed toolchains are detected, and **Settings › Desktop app** installs language packs for the rest. Without internet the workspace shows its last copy and the offline editor (`Ctrl+4`) runs files locally.
 - Sign-in popups stay in the app, and other links open in your browser.
 - **Open Folder / Open Files** (File menu, `Ctrl+Shift+O` / `Ctrl+O`, or the dashboard buttons) turn a folder on disk into a project, VS Code style. It skips `.git`, `node_modules`, build output and binary files, and imports at most 500 text files (1 MB each, 20 MB in total). The project type is `web` if there's an `index.html`, otherwise the most common language. In a project, **Save to disk** writes the files back to that folder, and **Add files from disk** adds more. The web app can do the same imports in a browser but can't save back.
-- **Terminal** (`` Ctrl+` `` or the project header) opens a separate terminal window in the project's folder. Each line runs in your shell (`cmd.exe` on Windows, `$SHELL` elsewhere, or `COLABS_SHELL`). `cd`, `clear` and `exit` are built in, typing while a program runs goes to its stdin, and `Ctrl+C` stops it. It's line-based rather than a full PTY, so full-screen programs like `vim` won't work.
+- **Terminal** (`` Ctrl+` ``, the status bar, or the project's card layout) docks a terminal into the project, running in the project's folder; pop it out into its own window any time. Each line runs in your shell (`cmd.exe` on Windows, `$SHELL` elsewhere, or `COLABS_SHELL`). `cd`, `clear` and `exit` are built in, typing while a program runs goes to its stdin, and `Ctrl+C` stops it. It's line-based rather than a full PTY, so full-screen programs like `vim` won't work.
 - The web page never gets raw file access. It can only read what you pick in a native dialog, write inside folders you picked, and open a terminal; commands can only be typed in the terminal window itself.
 
 Override the defaults with `COLABS_APP_URL`, `COLABS_REMOTE_UI`, `COLABS_UI_PORT`, `COLABS_JUDGE0_URL`, `COLABS_LLM_URL`, `COLABS_LLM_MODEL` and `COLABS_SHELL`.
@@ -174,17 +208,21 @@ npm run dist              # bundle-web + installers for the current OS into desk
 - **API + web:** `npm run build` then `NODE_ENV=production node server.js`. In production the server also serves the React build. Render, Railway and Fly all work, and so does any Node host.
 - **Database:** any Postgres. The schema is created automatically on start, and `npm run setup-db` creates it on demand.
 - **Code runner:** point `JUDGE0_URL` at a Judge0 instance, or deploy `npm run runner` separately next to it.
-- **AI:** set `GEMINI_API_KEY` on the API host (or `LLM_BASE_URL` for a self-hosted model). Without either, the copilot says it isn't set up instead of failing silently.
+- **AI:** set `GEMINI_API_KEY` on the API host (or `LLM_BASE_URL` for a self-hosted model). Without either, the copilot says it isn't set up instead of failing silently. Add provider keys, `PLATFORM_MODELS` and `ADMIN_EMAILS` to offer more models.
+- **Email:** set a mail provider (`BREVO_API_KEY` with a verified `BREVO_FROM_EMAIL`, or OneSignal / Resend) or invites, meeting emails and reminders aren't delivered; the app says so when a send fails.
 
 ## Project layout
 
 ```
 server.js                 API server entry (Express + Socket.IO)
 server/runner/            code runner (no DB): engines, router, standalone service
-server/routes/            REST routes (projects, snippets, AI, snapshots, …)
+server/routes/            REST routes (projects, snippets, meetings, AI, snapshots, …)
+server/security/          sign-in verification and access rules for every API request
+server/jobs/              meeting reminders / auto-end, hourly cleanup
 server/sockets/           real-time rooms, whiteboard and media signalling
 server/repositories/      Postgres access
 src/                      React app (pages, components, styles/app.css design system)
+src/shared/               shared by server and app: plans, languages, AI providers
 desktop/                  Electron app for Windows, macOS and Linux
 .github/workflows/        desktop release pipeline
 ```

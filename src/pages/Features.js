@@ -1,26 +1,32 @@
 import React, { useState } from "react";
-import { Code2, Video, PenTool, Terminal, MessageSquare, Sparkles, FolderTree, GitCompare, Users, Zap, Search, Command, Database, MonitorDown, BellRing, Share2, CalendarPlus, Lock, LayoutTemplate, Workflow } from "lucide-react";
+import { Code2, Video, PenTool, Terminal, MessageSquare, Sparkles, FolderTree, GitCompare, Users, Zap, Search, Command, Database, MonitorDown, BellRing, Share2, CalendarPlus, Lock, LayoutTemplate, Workflow, NotebookPen, KeyRound, SquareTerminal, WifiOff, ShieldCheck } from "lucide-react";
 import SiteLayout, { PageHead } from "../components/Site/SiteLayout";
 import CtaBand from "../components/Site/CtaBand";
+import ModelsBand from "../components/Site/ModelsBand";
 import { pad2 } from "../components/ux/primitives";
 
 const FEATURES = [
     { group: "Collaborate", icon: Code2, title: "Multiplayer editing", text: "Everyone types in the same file with live cursors and conflict-free sync. Vim and Emacs keybindings included." },
-    { group: "Collaborate", icon: Video, title: "Voice, video & screen", text: "Calls in every room and project. Share your screen, then draw and point on it together." },
+    { group: "Collaborate", icon: Video, title: "Voice, video & screen", text: "Calls in every room and project. Present your screen with your camera still on, then point and draw on it together. Everyone in the room hears when a call starts, and you check your camera and mic before joining." },
     { group: "Collaborate", icon: PenTool, title: "Whiteboard", text: "Doodle together in real time. Sketch an idea or circle a bug, from a laptop or a phone, with everyone's pointer on the board." },
     { group: "Collaborate", icon: Workflow, title: "Flowcharts & system design", text: "Drag in services, databases, queues and caches, connect them with labelled arrows, and edit together." },
-    { group: "Collaborate", icon: CalendarPlus, title: "Scheduled calls", text: "Plan interviews and pairing sessions. Invitees get an email, Google or Outlook calendar links and a reminder before it starts." },
+    { group: "Collaborate", icon: CalendarPlus, title: "Scheduled calls", text: "Plan interviews and pairing sessions in any time zone. Invitees get an email with a calendar invite attached, answer Yes or No in one click, and get a reminder. Reschedule and their calendars update." },
+    { group: "Collaborate", icon: NotebookPen, title: "Meeting review", text: "Organisers get private notes, code snapshots during the call with line-by-line changes and comments, and co-organisers. End the meeting and guests lose access to the room at once." },
     { group: "Collaborate", icon: MessageSquare, title: "Room chat", text: "Chat with emoji right beside the code you are discussing." },
     { group: "Build", icon: Terminal, title: "Run 17 languages", text: "JavaScript, Python, Java, C++, Go, Rust, SQL and more. Run together and share the output with the whole room." },
     { group: "Build", icon: Database, title: "SQL with your own data", text: "Import CSV, TSV or JSON files as tables, then query them by name with SQLite. No database to set up." },
     { group: "Build", icon: FolderTree, title: "Project workspaces", text: "Persistent multi-file projects with nested folders, drag-and-drop moves, live preview and team access. Ten on Free, unlimited on Team." },
     { group: "Build", icon: LayoutTemplate, title: "Layouts your way", text: "Arrange rooms and projects as cards: problem, code, output, chat, people and the call. Presets for interviews and pairing." },
     { group: "Build", icon: GitCompare, title: "Snapshots & diffs", text: "Save the state of a session and compare versions side by side. Unlimited on Team." },
-    { group: "Build", icon: Sparkles, title: "AI copilot", text: "Explanations, refactors, fixes and tests inside the session, with nothing to set up. Ten prompts a day on Free, unlimited on Team, and uncapped with a model on your own computer in the desktop app." },
+    { group: "Build", icon: Sparkles, title: "AI copilot", text: "Explanations, refactors, fixes and tests inside the session, with nothing to set up. Pick the model you like as your default. Ten prompts a day on Free, unlimited on Team." },
+    { group: "Build", icon: KeyRound, title: "Bring your own model", text: "Connect Gemini, Claude Sonnet and Haiku, OpenAI, OpenRouter, Grok, Qwen, Kimi, Sarvam or any OpenAI-compatible server with your own API key. Keys stay encrypted on your device and only go to their provider." },
     { group: "Desktop", icon: MonitorDown, title: "Desktop apps", text: "Installers for Windows, macOS and Linux. Open folders from your computer, run code on your own machine first, and fall back to the cloud when you need it." },
+    { group: "Desktop", icon: SquareTerminal, title: "Built-in terminal", text: "A terminal docked in your project, running in its folder on your computer. Pop it out into its own window any time." },
+    { group: "Desktop", icon: WifiOff, title: "Works offline", text: "All 17 languages run on your computer with one-click language packs. Your workspace shows from the last sync, and the offline editor opens, saves and runs files." },
     { group: "Organise", icon: Zap, title: "Instant rooms", text: "Link-shared rooms for pairing and interviews. Guests join without an account." },
     { group: "Organise", icon: Share2, title: "Editor & spectator links", text: "Share a room as an editor or as a read-only spectator, from one invite dialog." },
     { group: "Organise", icon: Lock, title: "Private & invite-only rooms", text: "Open to anyone with the link, ask-to-join where you let people in, or invited accounts only." },
+    { group: "Organise", icon: ShieldCheck, title: "Private projects", text: "Projects open only for you, people you invite, and whoever you give the project's private link. Only the owner can rename, delete or invite." },
     { group: "Organise", icon: BellRing, title: "Push & email alerts", text: "Invites reach you as push notifications and email, with an in-app inbox as the record." },
     { group: "Organise", icon: Code2, title: "Snippet library", text: "Save reusable snippets, filter by language and tag, and export them to GitHub gists." },
     { group: "Organise", icon: Users, title: "Teams", text: "Shared snippet vaults with owner, admin and member roles." },
@@ -61,6 +67,8 @@ export default function Features() {
                     </article>
                 ))}
             </div>
+
+            <ModelsBand />
 
             <CtaBand />
         </SiteLayout>

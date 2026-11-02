@@ -25,7 +25,7 @@ router.get('/snapshots', async (req, res) => {
         res.json(snapshots);
     } catch (err) {
         console.error(err);
-        res.status(500).json({ error: err.message });
+        res.status(500).json({ error: 'Something went wrong. Please try again.' });
     }
 });
 
@@ -49,7 +49,7 @@ router.post('/snapshots', async (req, res) => {
         res.json(snapshot);
     } catch (err) {
         console.error(err);
-        res.status(500).json({ error: err.message });
+        res.status(500).json({ error: 'Something went wrong. Please try again.' });
     }
 });
 
@@ -62,7 +62,7 @@ router.get('/snapshots/:id', async (req, res) => {
         res.json(snapshot);
     } catch (err) {
         console.error(err);
-        res.status(500).json({ error: err.message });
+        res.status(500).json({ error: 'Something went wrong. Please try again.' });
     }
 });
 
@@ -75,7 +75,7 @@ router.delete('/snapshots/:id', async (req, res) => {
         res.json({ success: true });
     } catch (err) {
         console.error(err);
-        res.status(500).json({ error: err.message });
+        res.status(500).json({ error: 'Something went wrong. Please try again.' });
     }
 });
 

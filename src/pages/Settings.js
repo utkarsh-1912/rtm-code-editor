@@ -12,6 +12,7 @@ import { usePlan, openPortal } from '../utils/billing';
 import { useSearchParams } from 'react-router-dom';
 import DesktopPanel from '../components/DesktopPanel';
 import DeviceList from '../components/DeviceList';
+import AIModelsPanel from '../components/AIModelsPanel';
 import { IS_DESKTOP } from '../utils/desktop';
 import GitHubIcon from '../components/GitHubIcon';
 import { useGitHubStatus, connectGitHub, disconnectGitHub, CONNECTED_MESSAGE } from '../utils/github';
@@ -22,6 +23,7 @@ const SECTIONS = [
     { id: 'billing', title: 'Plan & billing' },
     { id: 'notifications', title: 'Notifications' },
     { id: 'connections', title: 'Connections' },
+    { id: 'ai', title: 'AI models' },
     { id: 'security', title: 'Security' },
     ...(IS_DESKTOP ? [{ id: 'desktop', title: 'Desktop app' }] : []),
 ];
@@ -378,6 +380,8 @@ const Settings = () => {
                             </ul>
                         </div>
                     )}
+
+                    {active === 'ai' && <AIModelsPanel user={user} />}
 
                     {active === 'security' && (
                         <>

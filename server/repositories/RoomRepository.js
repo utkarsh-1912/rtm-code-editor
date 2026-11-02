@@ -139,6 +139,17 @@ async function linkRoomToUser(userId, roomId) {
     `;
 }
 
+// Is the room in this person's workspace?
+async function isLinkedToUser(userId, roomId) {
+    const rows = await sql`
+        SELECT 1 FROM user_rooms ur
+        JOIN users u ON u.id = ur.user_id
+        JOIN rooms r ON r.id = ur.room_id
+        WHERE u.auth_provider_id = ${userId} AND r.room_id = ${roomId}
+    `;
+    return rows.length > 0;
+}
+
 async function unlinkRoomFromUser(userId, roomId) {
     const user = await sql`SELECT id FROM users WHERE auth_provider_id = ${userId}`;
     if (!user.length) return null;
@@ -226,6 +237,7 @@ module.exports = {
     updateRoomName,
     updateLastRoom,
     linkRoomToUser,
+    isLinkedToUser,
     unlinkRoomFromUser,
     isRoomGuest,
     deleteIdleGuestRooms,

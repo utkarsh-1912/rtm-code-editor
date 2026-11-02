@@ -245,6 +245,31 @@ async function initializeSchema() {
         );
         `;
         await sql`CREATE INDEX IF NOT EXISTS meeting_snapshots_meeting ON meeting_snapshots (meeting_id, created_at);`;
+        // Project access: a random share key (the link), and people invited by email.
+        await sql`ALTER TABLE projects ADD COLUMN IF NOT EXISTS share_key VARCHAR(40);`;
+        await sql`
+        CREATE TABLE IF NOT EXISTS project_members (
+            project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+            email VARCHAR(200) NOT NULL,
+            added_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (project_id, email)
+        );
+        `;
+        // Access to platform AI models that need approval ("Request access").
+        await sql`
+        CREATE TABLE IF NOT EXISTS ai_access (
+            id SERIAL PRIMARY KEY,
+            uid VARCHAR(128) NOT NULL,
+            email VARCHAR(200),
+            name VARCHAR(120),
+            model_id VARCHAR(60) NOT NULL,
+            note TEXT DEFAULT '',
+            status VARCHAR(16) NOT NULL DEFAULT 'pending',
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+            decided_at TIMESTAMP WITH TIME ZONE,
+            UNIQUE (uid, model_id)
+        );
+        `;
         // Meeting emails sent per account per day (a cap, so invites can't be used to spam).
         await sql`
         CREATE TABLE IF NOT EXISTS mail_quota (

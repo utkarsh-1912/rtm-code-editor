@@ -29,6 +29,10 @@ contextBridge.exposeInMainWorld("colabsDesktop", {
         return () => ipcRenderer.removeListener("colabs:terminalClosed", listener);
     },
     llmLocal: (payload) => ipcRenderer.invoke("colabs:llmLocal", payload),
+    vaultSet: (payload) => ipcRenderer.invoke("colabs:vaultSet", payload),
+    vaultDelete: (payload) => ipcRenderer.invoke("colabs:vaultDelete", payload),
+    vaultList: () => ipcRenderer.invoke("colabs:vaultList"),
+    vaultFetch: (payload) => ipcRenderer.invoke("colabs:vaultFetch", payload),
     localStatus: () => ipcRenderer.invoke("colabs:localStatus"),
     info: () => ipcRenderer.invoke("colabs:info"),
     openFolder: () => ipcRenderer.invoke("colabs:openFolder"),

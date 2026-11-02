@@ -6,6 +6,23 @@ const UserRepository = require('../repositories/UserRepository');
 const NotificationRepository = require('../repositories/NotificationRepository');
 const PlanRepository = require('../repositories/PlanRepository');
 const { paging } = require('../utils/paging');
+const { projectAccess, addMember, requireUser } = require('../security/access');
+
+// Every /projects/:id... route: owner, invited people, or the share link (X-Project-Key).
+router.param('id', async (req, res, next, id) => {
+    try {
+        const access = await projectAccess(req, res, id);
+        if (!access) return;
+        req.project = access.project;
+        req.projectOwner = access.owner;
+        next();
+    } catch (err) { next(err); }
+});
+const ownerOnly = (req, res) => {
+    if (req.projectOwner) return true;
+    res.status(403).json({ error: 'Only the project owner can do that.' });
+    return false;
+};
 
 // Get all projects for a user
 router.get('/projects', async (req, res) => {
@@ -18,7 +35,7 @@ router.get('/projects', async (req, res) => {
         res.json(await ProjectRepository.getProjects(userId));
     } catch (err) {
         console.error(err);
-        res.status(500).json({ error: err.message });
+        res.status(500).json({ error: 'Something went wrong. Please try again.' });
     }
 });
 
@@ -38,7 +55,7 @@ router.post('/projects', async (req, res) => {
         res.json(project);
     } catch (err) {
         console.error(err);
-        res.status(500).json({ error: err.message });
+        res.status(500).json({ error: 'Something went wrong. Please try again.' });
     }
 });
 
@@ -47,21 +64,22 @@ router.get('/projects/:id', async (req, res) => {
     try {
         const project = await ProjectRepository.getProject(req.params.id);
         if (!project) return res.status(404).json({ error: "Project not found" });
-        res.json(project);
+        res.json({ ...project, shareKey: req.project.share_key, isOwner: !!req.projectOwner });
     } catch (err) {
         console.error(err);
-        res.status(500).json({ error: err.message });
+        res.status(500).json({ error: 'Something went wrong. Please try again.' });
     }
 });
 
 // Delete project
 router.delete('/projects/:id', async (req, res) => {
     try {
+        if (!ownerOnly(req, res)) return;
         await ProjectRepository.deleteProject(req.params.id);
         res.json({ success: true });
     } catch (err) {
         console.error(err);
-        res.status(500).json({ error: err.message });
+        res.status(500).json({ error: 'Something went wrong. Please try again.' });
     }
 });
 
@@ -72,7 +90,7 @@ router.get('/projects/:id/files', async (req, res) => {
         res.json(files);
     } catch (err) {
         console.error(err);
-        res.status(500).json({ error: err.message });
+        res.status(500).json({ error: 'Something went wrong. Please try again.' });
     }
 });
 
@@ -92,7 +110,7 @@ router.post('/projects/:id/files', async (req, res) => {
         res.json(rows[0] || null);
     } catch (err) {
         console.error(err);
-        res.status(500).json({ error: err.message });
+        res.status(500).json({ error: 'Something went wrong. Please try again.' });
     }
 });
 
@@ -120,13 +138,14 @@ router.post('/projects/:id/files/bulk', express.json({ limit: '10mb' }), async (
         res.json({ success: true, count: saved.length, files: saved });
     } catch (err) {
         console.error(err);
-        res.status(500).json({ error: err.message });
+        res.status(500).json({ error: 'Something went wrong. Please try again.' });
     }
 });
 
 // Rename a project (name only).
 router.patch('/projects/:id', async (req, res) => {
     try {
+        if (!ownerOnly(req, res)) return;
         const project = await ProjectRepository.renameProject(req.params.id, req.body?.name);
         if (!project) return res.status(404).json({ error: "Project not found" });
         req.app.get('io')?.to(`project-${req.params.id}`).emit('project-renamed', { name: project.name });
@@ -168,25 +187,29 @@ router.delete('/projects/:id/files', async (req, res) => {
         res.json({ success: true, count: deleted.length });
     } catch (err) {
         console.error(err);
-        res.status(500).json({ error: err.message });
+        res.status(500).json({ error: 'Something went wrong. Please try again.' });
     }
 });
 
 // Send project invitation email
 router.post('/projects/:id/invite', async (req, res) => {
     try {
+        if (!ownerOnly(req, res)) return;
         const { email, inviterName, inviterPhoto } = req.body;
-        if (!email) return res.status(400).json({ error: "Missing recipient email" });
+        if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(email))) return res.status(400).json({ error: "Enter a valid email address" });
+        // Invited people get access by email; the link also carries the share key.
+        await addMember(req.params.id, String(email).trim());
 
         const project = await ProjectRepository.getProject(req.params.id);
         const projectTitle = project ? project.name : "Studio Project";
+        const link = `${process.env.APP_URL || 'http://localhost:5000'}/project/${req.params.id}?k=${encodeURIComponent(req.project.share_key)}`;
 
         const html = MailService.getEmailTemplate({
             title: `You've been invited to join ${projectTitle}`,
             message: `${inviterName || 'A teammate'} invited you to collaborate in real-time on the project "${projectTitle}". Click below to open the workspace.`,
             ctaText: "Join Workspace",
-            ctaUrl: `${process.env.APP_URL || 'http://localhost:5000'}/project/${req.params.id}`,
-            inviterName,
+            ctaUrl: link,
+            inviterName: String(inviterName || '').slice(0, 80),
             inviterPhoto,
             recipientEmail: email
         });
@@ -199,7 +222,7 @@ router.post('/projects/:id/invite', async (req, res) => {
             await NotificationRepository.notifyUser(invitee.auth_provider_id, {
                 type: 'invite',
                 message: `${inviterName || 'A teammate'} invited you to "${projectTitle}"`,
-                url: `${process.env.APP_URL || 'http://localhost:5000'}/project/${req.params.id}`,
+                url: `/project/${req.params.id}?k=${encodeURIComponent(req.project.share_key)}`,
                 data: { projectId: req.params.id },
             }).catch(() => { });
         }
@@ -207,7 +230,7 @@ router.post('/projects/:id/invite', async (req, res) => {
         res.json({ success: true, emailed: mail.success, provider: mail.provider, message: mail.success ? "Invitation sent successfully" : "Invitation saved, but no email provider could deliver it" });
     } catch (err) {
         console.error(err);
-        res.status(500).json({ error: err.message });
+        res.status(500).json({ error: 'Something went wrong. Please try again.' });
     }
 });
 

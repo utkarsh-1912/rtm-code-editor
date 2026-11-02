@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 import { CalendarPlus, CalendarDays, Clock, Copy, X, Video, Download, MoreHorizontal, Mail, Check, Pencil, Trash2 } from "lucide-react";
@@ -48,6 +48,60 @@ export async function confirmDeleteMeeting(m) {
         toast.error(err.message);
         return false;
     }
+}
+
+// Time zone field in the app's style: shows the chosen zone; opens a searchable list under it
+// (inside the dialog, so it scrolls with the form instead of floating over the buttons).
+function ZonePicker({ value, options, onChange, labelledBy }) {
+    const [open, setOpen] = useState(false);
+    const [q, setQ] = useState("");
+    const [cursor, setCursor] = useState(0);
+    const listRef = useRef(null);
+    const current = options.find((o) => o.z === value);
+    const shown = useMemo(() => {
+        const s = q.trim().toLowerCase().replace(/\s+/g, "_");
+        const list = s ? options.filter((o) => o.z.toLowerCase().includes(s) || o.text.toLowerCase().includes(q.trim().toLowerCase())) : options;
+        return list.slice(0, 200);
+    }, [q, options]);
+    useEffect(() => { setCursor(0); }, [q]);
+    useEffect(() => {
+        if (!open) return;
+        const i = Math.max(0, shown.findIndex((o) => o.z === value));
+        if (!q) setCursor(i);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [open]);
+    useEffect(() => { listRef.current?.querySelector(`[data-i="${cursor}"]`)?.scrollIntoView({ block: "nearest" }); }, [cursor, open]);
+    const choose = (z) => { onChange(z); setOpen(false); setQ(""); };
+    const onKey = (e) => {
+        if (e.key === "ArrowDown") { e.preventDefault(); setCursor((c) => Math.min(shown.length - 1, c + 1)); }
+        else if (e.key === "ArrowUp") { e.preventDefault(); setCursor((c) => Math.max(0, c - 1)); }
+        else if (e.key === "Enter") { e.preventDefault(); if (shown[cursor]) choose(shown[cursor].z); }
+        else if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); setOpen(false); setQ(""); }
+    };
+    return (
+        <div className="zp">
+            <button type="button" className={`u-select zp-btn${open ? " on" : ""}`} onClick={() => setOpen((o) => !o)} aria-haspopup="listbox" aria-expanded={open} aria-labelledby={labelledBy}>
+                <span className="zp-name">{current ? current.z.replace(/_/g, " ") : value}</span>
+                {current && <span className="zp-off">{current.text.match(/\((GMT[^)]*)\)$/)?.[1]}</span>}
+            </button>
+            {open && (
+                <div className="zp-pop">
+                    <input className="u-input zp-search" autoFocus value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={onKey} placeholder="Search a city or region" aria-label="Search time zones" />
+                    <ul className="zp-list" role="listbox" ref={listRef} aria-labelledby={labelledBy}>
+                        {shown.map((o, i) => (
+                            <li key={o.z} data-i={i} role="option" aria-selected={o.z === value}
+                                className={`${o.z === value ? "is-on" : ""}${i === cursor ? " is-cursor" : ""}`}
+                                onMouseMove={() => cursor !== i && setCursor(i)} onMouseDown={(e) => { e.preventDefault(); choose(o.z); }}>
+                                <span>{o.z.replace(/_/g, " ")}</span>
+                                <span className="zp-off">{o.text.match(/\((GMT[^)]*)\)$/)?.[1]}</span>
+                            </li>
+                        ))}
+                        {!shown.length && <li className="zp-none">No time zone matches “{q}”.</li>}
+                    </ul>
+                </div>
+            )}
+        </div>
+    );
 }
 
 // Schedule a call in a new room, or in `roomId` when given (from inside a room).
@@ -191,17 +245,16 @@ export function ScheduleModal({ open, onClose, roomId = null, hostName, onSchedu
                         {durations.map((d) => <option key={d} value={d}>{lengthLabel(d)}</option>)}
                     </select>
                 </div>
-            </div>
-            <div className="mt-tz">
-                <Clock size={12} />
-                <label htmlFor="mt-zone" className="u-small u-muted">Time zone</label>
-                <select id="mt-zone" className="u-select" value={zone} onChange={(e) => setZone(e.target.value)}>
-                    {zoneOptions.map(({ z, text }) => <option key={z} value={z}>{text}</option>)}
-                </select>
-                {zone !== localZone() && date && time && !Number.isNaN(zonedToDate(date, time, zone).getTime()) && (
-                    <span className="u-small u-muted">That's {zonedToDate(date, time, zone).toLocaleString([], { weekday: "short", hour: "numeric", minute: "2-digit" })} for you.</span>
-                )}
-                <span className="u-small u-faint">Invitees see it in their own time zone.</span>
+                <div className="u-field mt-when-zone">
+                <span className="u-field-label" id="mt-zone-label">Time zone</span>
+                <ZonePicker value={zone} options={zoneOptions} onChange={setZone} labelledBy="mt-zone-label" />
+                <span className="u-hint mt-tz">
+                    <Clock size={12} />
+                    {zone !== localZone() && date && time && !Number.isNaN(zonedToDate(date, time, zone).getTime())
+                        ? <>That's {zonedToDate(date, time, zone).toLocaleString([], { weekday: "short", hour: "numeric", minute: "2-digit" })} for you. Invitees see it in their own time zone.</>
+                        : "Invitees see it in their own time zone."}
+                </span>
+                </div>
             </div>
 
             <div className="u-field">

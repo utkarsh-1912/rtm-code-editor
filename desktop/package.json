@@ -36,6 +36,7 @@
       "main.js",
       "preload.js",
       "local.js",
+      "vault.js",
       "runner.js",
       "sandbox.js",
       "packs.js",

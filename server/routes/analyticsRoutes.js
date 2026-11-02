@@ -1,16 +1,18 @@
 const express = require('express');
 const router = express.Router();
+const { projectAccess } = require('../security/access');
 const AnalyticsRepository = require('../repositories/AnalyticsRepository');
 
 // Get analytics stats
 router.get('/analytics', async (req, res) => {
     try {
         const { roomId, projectId } = req.query;
+        if (projectId && !(await projectAccess(req, res, projectId))) return;
         const analytics = await AnalyticsRepository.getWorkspaceAnalytics({ roomId, projectId });
         res.json(analytics);
     } catch (err) {
         console.error(err);
-        res.status(500).json({ error: err.message });
+        res.status(500).json({ error: 'Something went wrong. Please try again.' });
     }
 });
 
@@ -23,7 +25,7 @@ router.post('/analytics/log', async (req, res) => {
         res.json(log);
     } catch (err) {
         console.error(err);
-        res.status(500).json({ error: err.message });
+        res.status(500).json({ error: 'Something went wrong. Please try again.' });
     }
 });
 

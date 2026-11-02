@@ -3,7 +3,7 @@
 // Elements (stored and synced like any other whiteboard element):
 //   node:      { id, type: "node", shape, x, y, w, h, text, color, badge?, kind?, sim? }
 //              (sim: capacity for simulate mode, see whiteboard/sim/topology.js)
-//   connector: { id, type: "connector", from, to, label, color, route: "straight"|"elbow",
+//   connector: { id, type: "connector", from, to, label, color, route: "straight"|"elbow"|"curve",
 //                dashed, arrows: "end"|"both"|"none" }
 // Connectors reference nodes by id, so they follow the nodes when those move.
 
@@ -40,10 +40,34 @@ export const TEMPLATES = [
     { id: "search", label: "Search", shape: "process", badge: "SEARCH", color: "#F472B6", text: "Search index" },
 ];
 
-const SIZE = Object.fromEntries([...SHAPES, { id: "queue", w: 176, h: 64 }, { id: "cloud", w: 176, h: 100 }].map((s) => [s.id, s]));
+// Workflow steps (automation maps): a compact tile with the step type inside and what it does
+// written under it. Triggers have a rounded left edge. Connect them with curved connectors and
+// use Tidy up to lay the flow out left to right.
+export const FLOW_STEPS = [
+    { id: "flow-webhook", label: "Webhook", shape: "trigger", badge: "Webhook", color: "ink", text: "When a request arrives" },
+    { id: "flow-schedule", label: "Schedule", shape: "trigger", badge: "Schedule", color: "ink", text: "Every day at 9 AM" },
+    { id: "flow-form", label: "Form", shape: "trigger", badge: "Form", color: "ink", text: "When the form is sent" },
+    { id: "flow-code", label: "Code", shape: "step", badge: "Code", color: "ink", text: "Transform the data" },
+    { id: "flow-if", label: "If", shape: "step", badge: "If", color: "ink", text: "Condition?" },
+    { id: "flow-switch", label: "Switch", shape: "step", badge: "Switch", color: "ink", text: "Route by value" },
+    { id: "flow-http", label: "HTTP request", shape: "step", badge: "HTTP", color: "ink", text: "Call an API" },
+    { id: "flow-ai", label: "AI", shape: "step", badge: "AI", color: "ink", text: "Ask a model" },
+    { id: "flow-email", label: "Email", shape: "step", badge: "Email", color: "ink", text: "Send an email" },
+    { id: "flow-sms", label: "SMS", shape: "step", badge: "SMS", color: "ink", text: "Send a text" },
+    { id: "flow-chat", label: "Chat message", shape: "step", badge: "Chat", color: "ink", text: "Post to a channel" },
+    { id: "flow-sheet", label: "Sheet", shape: "step", badge: "Sheets", color: "ink", text: "Add a row" },
+    { id: "flow-db", label: "Database", shape: "step", badge: "DB", color: "ink", text: "Save the record" },
+    { id: "flow-wait", label: "Wait", shape: "step", badge: "Wait", color: "ink", text: "Hold until later" },
+    { id: "flow-merge", label: "Merge", shape: "step", badge: "Merge", color: "ink", text: "Join branches" },
+    { id: "flow-end", label: "Done", shape: "trigger", badge: "Done", color: "ink", text: "End" },
+];
+export const isFlowShape = (shape) => shape === "step" || shape === "trigger";
+const blockById = (id) => (id ? TEMPLATES.find((tt) => tt.id === id) || FLOW_STEPS.find((tt) => tt.id === id) || null : null);
+
+const SIZE = Object.fromEntries([...SHAPES, { id: "queue", w: 176, h: 64 }, { id: "cloud", w: 176, h: 100 }, { id: "step", w: 72, h: 72 }, { id: "trigger", w: 84, h: 72 }].map((s) => [s.id, s]));
 
 export function makeNode({ shape = "process", template, x, y, color = "ink", id }) {
-    const t = template ? TEMPLATES.find((tt) => tt.id === template) : null;
+    const t = blockById(template);
     const s = t ? t.shape : shape;
     const size = SIZE[s] || SIZE.process;
     return {
@@ -65,8 +89,8 @@ export function makeNode({ shape = "process", template, x, y, color = "ink", id 
 // centre, text style and, if it was resized, its size. Template text and colour follow the
 // new block unless they had been changed.
 export function retypeNode(n, { shape = "process", template }) {
-    const t = template ? TEMPLATES.find((tt) => tt.id === template) : null;
-    const prev = n.kind ? TEMPLATES.find((tt) => tt.id === n.kind) : null;
+    const t = blockById(template);
+    const prev = blockById(n.kind);
     const s = t ? t.shape : shape;
     const size = SIZE[s] || SIZE.process;
     const prevSize = SIZE[n.shape] || SIZE.process;
@@ -124,7 +148,41 @@ function sideAnchor(n, other) {
     return { x: c.x, y: dy >= 0 ? n.y + n.h : n.y, axis: "y" };
 }
 
-// The polyline for a connector (2 points straight, 4 points elbow).
+// A smooth S-curve between the facing sides of two nodes, as points. Going backwards (target
+// behind the source) it loops out and back in, like workflow editors draw it.
+const CURVE_STEPS = 28;
+function curvePoints(a, b) {
+    const ca = center(a), cb = center(b);
+    // Sideways unless the two are stacked (then top/bottom), like workflow editors.
+    const sideways = Math.abs(cb.x - ca.x) > (a.w + b.w) * 0.3;
+    let p, q, c1, c2;
+    if (sideways) {
+        const right = cb.x >= ca.x;
+        p = { x: right ? a.x + a.w : a.x, y: ca.y };
+        q = { x: right ? b.x : b.x + b.w, y: cb.y };
+        const pull = Math.max(48, Math.abs(q.x - p.x) * 0.5);
+        c1 = { x: p.x + (right ? pull : -pull), y: p.y };
+        c2 = { x: q.x - (right ? pull : -pull), y: q.y };
+    } else {
+        const down = cb.y >= ca.y;
+        p = { x: ca.x, y: down ? a.y + a.h : a.y };
+        q = { x: cb.x, y: down ? b.y : b.y + b.h };
+        const pull = Math.max(40, Math.abs(q.y - p.y) * 0.5);
+        c1 = { x: p.x, y: p.y + (down ? pull : -pull) };
+        c2 = { x: q.x, y: q.y - (down ? pull : -pull) };
+    }
+    const pts = [];
+    for (let i = 0; i <= CURVE_STEPS; i++) {
+        const t = i / CURVE_STEPS, u = 1 - t;
+        pts.push({
+            x: u * u * u * p.x + 3 * u * u * t * c1.x + 3 * u * t * t * c2.x + t * t * t * q.x,
+            y: u * u * u * p.y + 3 * u * u * t * c1.y + 3 * u * t * t * c2.y + t * t * t * q.y,
+        });
+    }
+    return pts;
+}
+
+// The polyline for a connector (2 points straight, 3–4 points elbow, sampled points for curves).
 export function connectorPath(conn, byId, pointer) {
     const a = byId[conn.from];
     const b = conn.to ? byId[conn.to] : null;
@@ -133,6 +191,7 @@ export function connectorPath(conn, byId, pointer) {
         if (!pointer) return null;
         return [boundaryPoint(a, pointer.x, pointer.y), pointer];
     }
+    if (conn.route === "curve") return curvePoints(a, b);
     if (conn.route === "elbow") {
         const p = sideAnchor(a, b), q = sideAnchor(b, a);
         if (p.axis === "x") {
@@ -154,6 +213,7 @@ const distToSegment = (p, a, b) => {
 };
 
 const midOfPath = (pts) => {
+    if (pts.length > 4) return pts[Math.floor(pts.length / 2)];
     if (pts.length === 4) return { x: (pts[1].x + pts[2].x) / 2, y: (pts[1].y + pts[2].y) / 2 };
     if (pts.length === 3) return pts[1];
     return { x: (pts[0].x + pts[1].x) / 2, y: (pts[0].y + pts[1].y) / 2 };
@@ -228,7 +288,28 @@ function wrapText(ctx, text, maxWidth) {
     return out;
 }
 
+function flowPath(ctx, n) {
+    const { x, y, w, h } = n;
+    const r = 14;
+    ctx.beginPath();
+    if (n.shape === "trigger") {
+        // Rounded (half-circle) left edge: where a flow starts.
+        const lr = h / 2;
+        ctx.moveTo(x + lr, y);
+        ctx.lineTo(x + w - r, y);
+        ctx.arcTo(x + w, y, x + w, y + r, r);
+        ctx.lineTo(x + w, y + h - r);
+        ctx.arcTo(x + w, y + h, x + w - r, y + h, r);
+        ctx.lineTo(x + lr, y + h);
+        ctx.arc(x + lr, y + lr, lr, Math.PI / 2, Math.PI * 1.5);
+        ctx.closePath();
+        return;
+    }
+    if (ctx.roundRect) ctx.roundRect(x, y, w, h, r); else ctx.rect(x, y, w, h);
+}
+
 function shapePath(ctx, n) {
+    if (isFlowShape(n.shape)) { flowPath(ctx, n); return; }
     const { x, y, w, h } = n;
     ctx.beginPath();
     switch (n.shape) {
@@ -303,6 +384,29 @@ export function drawNode(ctx, n, { ink, editing }) {
         ctx.moveTo(cx, hip); ctx.lineTo(cx - n.w * 0.3, n.y + n.h * 0.86);
         ctx.moveTo(cx, hip); ctx.lineTo(cx + n.w * 0.3, n.y + n.h * 0.86);
         ctx.stroke();
+    } else if (isFlowShape(n.shape)) {
+        const dark = ink === "#F2F1EC";
+        ctx.fillStyle = n.color === "ink" ? (dark ? "#26262A" : "#FFFFFF") : withAlpha(stroke, 0.16);
+        ctx.strokeStyle = n.color === "ink" ? withAlpha(ink, 0.32) : stroke;
+        ctx.shadowColor = "rgba(0,0,0,0.25)";
+        ctx.shadowBlur = 10;
+        ctx.shadowOffsetY = 3;
+        shapePath(ctx, n);
+        ctx.fill();
+        ctx.shadowColor = "transparent";
+        ctx.stroke();
+        if (n.badge) {
+            const tx = n.x + (n.shape === "trigger" ? n.w * 0.55 : n.w / 2);
+            ctx.font = "600 11.5px ui-monospace, 'SF Mono', Menlo, Consolas, monospace";
+            ctx.fillStyle = n.color === "ink" ? ink : stroke;
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+            const room = n.w - 12;
+            let label = n.badge;
+            while (ctx.measureText(label).width > room && label.length > 2) label = label.slice(0, -1);
+            ctx.fillText(label === n.badge ? label : `${label}…`, tx, n.y + n.h / 2);
+            ctx.textAlign = "start";
+        }
     } else {
         shapePath(ctx, n);
         ctx.fill();
@@ -326,7 +430,7 @@ export function drawNode(ctx, n, { ink, editing }) {
     }
 
     // Type badge (system design blocks).
-    if (n.badge) {
+    if (n.badge && !isFlowShape(n.shape)) {
         ctx.font = "700 9px ui-monospace, 'SF Mono', Menlo, Consolas, monospace";
         const bw = ctx.measureText(n.badge).width + 10;
         const bx = n.shape === "cloud" ? n.x + n.w * 0.3 : n.shape === "io" ? n.x + 26 : n.x + 8;
@@ -348,17 +452,19 @@ export function drawNode(ctx, n, { ink, editing }) {
         ctx.fillStyle = ink;
         ctx.textBaseline = "middle";
         const inset = n.shape === "decision" ? n.w * 0.22 : n.shape === "io" ? 24 : n.shape === "cloud" ? n.w * 0.18 : 12;
-        const maxW = n.shape === "actor" ? 140 : Math.max(30, n.w - inset * 2);
+        const below = n.shape === "actor" || isFlowShape(n.shape); // label under the figure
+        const maxW = below ? Math.max(120, n.w + 60) : Math.max(30, n.w - inset * 2);
         const lines = wrapText(ctx, n.text, maxW).slice(0, 12);
         const lh = Math.round(fs * 1.26);
         const badgeShift = n.badge && n.shape !== "decision" ? 7 : 0;
-        const actor = n.shape === "actor";
+        const actor = below;
         const align = actor ? "center" : n.align || "center";
         const valign = actor ? "middle" : n.valign || "middle";
+        if (isFlowShape(n.shape)) ctx.fillStyle = withAlpha(ink === "#F2F1EC" ? "#F2F1EC" : "#1B1A17", 0.72);
         const span = (lines.length - 1) * lh;
         const topPad = (n.badge && n.shape !== "decision" ? 26 : 10) + (n.shape === "database" ? 14 : 0);
         const bottomPad = 10 + (n.shape === "database" ? 12 : n.shape === "document" ? 10 : 0);
-        const cy = actor ? n.y + n.h + 12 + span / 2
+        const cy = actor ? n.y + n.h + (isFlowShape(n.shape) ? 16 : 12) + span / 2
             : valign === "top" ? n.y + topPad + lh / 2 + span / 2
                 : valign === "bottom" ? n.y + n.h - bottomPad - lh / 2 - span / 2
                     : n.shape === "database" ? n.y + n.h / 2 + 6 + badgeShift
@@ -490,4 +596,87 @@ export const SHAPE_PREVIEW = {
     actor: "M16 4a3 3 0 1 0 0.01 0M16 10v7M10 12h12M16 17l-5 6M16 17l5 6",
     queue: "M3 6h26v14H3zM20 8v10M24 8v10",
     cloud: "M9 21c-5 0-5-7 0-7 0-6 8-7 10-3 3-3 9 0 7 4 4 1 3 6-1 6z",
+    step: "M11 4h10a4 4 0 0 1 4 4v10a4 4 0 0 1-4 4H11a4 4 0 0 1-4-4V8a4 4 0 0 1 4-4z",
+    trigger: "M15 4h10a3 3 0 0 1 3 3v12a3 3 0 0 1-3 3H15a9 9 0 0 1 0-18z",
 };
+
+// ---- tidy up -------------------------------------------------------------------------------
+// Lays connected nodes out left to right: each node one column after the furthest node feeding
+// it, rows ordered to follow their inputs (fewer crossings), centred on where the group was.
+// Returns the moved nodes (only the ones that changed). `ids`: limit to these nodes.
+export function tidyLayout(elements, { ids = null, colGap = 96, rowGap = 56 } = {}) {
+    const conns = elements.filter((e) => e.type === "connector" && e.to);
+    const linked = new Set(conns.flatMap((c) => [c.from, c.to]));
+    const nodes = elements.filter((e) => e.type === "node" && linked.has(e.id) && (!ids || ids.has(e.id)));
+    if (nodes.length < 2) return [];
+    const byId = new Map(nodes.map((n) => [n.id, n]));
+    const edges = conns.filter((c) => byId.has(c.from) && byId.has(c.to) && c.from !== c.to);
+    const outs = new Map(nodes.map((n) => [n.id, []]));
+    const ins = new Map(nodes.map((n) => [n.id, []]));
+    edges.forEach((c) => { outs.get(c.from).push(c.to); ins.get(c.to).push(c.from); });
+
+    // Drop edges that close a loop (depth-first, left-most first), so columns are well defined.
+    const state = new Map();
+    const forward = new Set();
+    const visit = (id) => {
+        state.set(id, 1);
+        for (const to of outs.get(id)) {
+            if (state.get(to) === 1) continue; // back edge
+            forward.add(`${id}>${to}`);
+            if (!state.get(to)) visit(to);
+        }
+        state.set(id, 2);
+    };
+    [...nodes].sort((a, b) => a.x - b.x || a.y - b.y).forEach((n) => { if (!state.get(n.id)) visit(n.id); });
+
+    // Column = longest path from a start node.
+    const col = new Map();
+    const colOf = (id, seen = new Set()) => {
+        if (col.has(id)) return col.get(id);
+        seen.add(id);
+        const preds = ins.get(id).filter((f) => forward.has(`${f}>${id}`) && !seen.has(f));
+        const c = preds.length ? Math.max(...preds.map((f) => colOf(f, seen) + 1)) : 0;
+        col.set(id, c);
+        return c;
+    };
+    nodes.forEach((n) => colOf(n.id));
+
+    // Rows: start in current vertical order, then a few passes placing each node near the
+    // average row of its inputs.
+    const columns = [];
+    nodes.forEach((n) => { (columns[col.get(n.id)] ||= []).push(n.id); });
+    columns.forEach((c) => c.sort((a, b) => byId.get(a).y - byId.get(b).y));
+    const row = new Map();
+    const index = () => columns.forEach((c) => c.forEach((id, i) => row.set(id, i - (c.length - 1) / 2)));
+    index();
+    for (let pass = 0; pass < 4; pass++) {
+        columns.forEach((c, ci) => {
+            if (!ci) return;
+            const want = (id) => {
+                const preds = ins.get(id).filter((f) => col.get(f) < ci);
+                return preds.length ? preds.reduce((sum, f) => sum + row.get(f), 0) / preds.length : row.get(id);
+            };
+            c.sort((a, b) => want(a) - want(b));
+        });
+        index();
+    }
+
+    // Sizes per column and row so different shapes still line up.
+    const colW = columns.map((c) => Math.max(...c.map((id) => byId.get(id).w)));
+    const tallest = Math.max(...nodes.map((n) => n.h + (isFlowShape(n.shape) || n.shape === "actor" ? 40 : 0)));
+    const left = Math.min(...nodes.map((n) => n.x));
+    const midY = (Math.min(...nodes.map((n) => n.y)) + Math.max(...nodes.map((n) => n.y + n.h))) / 2;
+    const moved = [];
+    let x = left;
+    columns.forEach((c, ci) => {
+        c.forEach((id) => {
+            const n = byId.get(id);
+            const cy = midY + row.get(id) * (tallest + rowGap);
+            const nx = snap(x + (colW[ci] - n.w) / 2);
+            const ny = snap(cy - n.h / 2);
+            if (nx !== n.x || ny !== n.y) moved.push({ ...n, x: nx, y: ny });
+        });
+        x += colW[ci] + colGap;
+    });
+    return moved;
+}

@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const { requireUser, ownsSnippet } = require('../security/access');
 const SnippetRepository = require('../repositories/SnippetRepository');
 const { paging } = require('../utils/paging');
 
@@ -14,7 +15,7 @@ router.get('/snippets', async (req, res) => {
         res.json(await SnippetRepository.getSnippets(userId));
     } catch (err) {
         console.error(err);
-        res.status(500).json({ error: err.message });
+        res.status(500).json({ error: 'Something went wrong. Please try again.' });
     }
 });
 
@@ -27,30 +28,36 @@ router.post('/snippets', async (req, res) => {
         res.json(snippet);
     } catch (err) {
         console.error(err);
-        res.status(500).json({ error: err.message });
+        res.status(500).json({ error: 'Something went wrong. Please try again.' });
     }
 });
 
 // Update snippet
 router.put('/snippets/:id', async (req, res) => {
     try {
+        const me = requireUser(req, res);
+        if (!me) return;
+        if (!(await ownsSnippet(me.uid, req.params.id))) return res.status(404).json({ error: "Snippet not found" });
         const { title, code, language, tags } = req.body;
         const updated = await SnippetRepository.updateSnippet(req.params.id, title, code, language, tags);
         res.json(updated);
     } catch (err) {
         console.error(err);
-        res.status(500).json({ error: err.message });
+        res.status(500).json({ error: 'Something went wrong. Please try again.' });
     }
 });
 
 // Delete snippet
 router.delete('/snippets/:id', async (req, res) => {
     try {
+        const me = requireUser(req, res);
+        if (!me) return;
+        if (!(await ownsSnippet(me.uid, req.params.id))) return res.status(404).json({ error: "Snippet not found" });
         await SnippetRepository.deleteSnippet(req.params.id);
         res.json({ success: true });
     } catch (err) {
         console.error(err);
-        res.status(500).json({ error: err.message });
+        res.status(500).json({ error: 'Something went wrong. Please try again.' });
     }
 });
 

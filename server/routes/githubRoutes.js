@@ -5,6 +5,15 @@ const GitHubRepository = require('../repositories/GitHubRepository');
 const ProjectRepository = require('../repositories/ProjectRepository');
 const PlanRepository = require('../repositories/PlanRepository');
 const { verifyFirebaseUser } = require('../services/BillingService');
+const { projectAccess } = require('../security/access');
+
+// /github/projects/:id/...: only people who may open the project (owner, invited, share link).
+router.param('id', async (req, res, next, id) => {
+    try {
+        const access = await projectAccess(req, res, id);
+        if (access) next();
+    } catch (err) { next(err); }
+});
 const { languages: LANGUAGES } = require('../../src/shared/languages.json');
 
 // Pushes and syncs carry whole projects; server.js skips its 2 MB parser for /api/github.

@@ -1,6 +1,6 @@
 import React from "react";
 import { Link } from "react-router-dom";
-import { Lock, Radio, UserCheck, EyeOff, Cpu, Monitor, CreditCard, ArrowUpRight } from "lucide-react";
+import { Lock, Radio, UserCheck, EyeOff, Cpu, Monitor, CreditCard, ArrowUpRight, KeyRound, ShieldCheck, Gauge } from "lucide-react";
 import SiteLayout, { PageHead } from "../components/Site/SiteLayout";
 import { pad2 } from "../components/ux/primitives";
 
@@ -10,6 +10,9 @@ const ITEMS = [
     { icon: UserCheck, title: "Managed authentication", text: "Sign in with Google, GitHub or email through a managed identity service. We never see your Google or GitHub password.", cap: "managed sign-in" },
     { icon: EyeOff, title: "Private by link", text: "Rooms are identified by random IDs. Spectator links are read-only, so you can share a room without handing over the keyboard.", cap: "random ids · viewer role" },
     { icon: Lock, title: "Invite-only and private rooms", text: "Owners can make a room ask-to-join or invited-accounts-only. The server checks who you are before you get in, and connections outside a room can't send anything into it.", cap: "verified sign-in · owner approval" },
+    { icon: ShieldCheck, title: "Checked on every request", text: "The server verifies your sign-in on every request and only acts on your own account, projects, snippets and teams. Projects open only to their owner, invitees and holders of a private link, never by guessing a number.", cap: "verified sign-in · per-resource access" },
+    { icon: KeyRound, title: "Your AI keys stay yours", text: "API keys you add for your own models are encrypted on your device (AES-256 with a key the browser can't export, or your system keychain in the desktop app), can be locked with a passphrase, and are only ever sent to their own provider. We never store them.", cap: "aes-256 · os keychain · origin-bound" },
+    { icon: Gauge, title: "Abuse protection", text: "Rate limits on the API, contact form and invitations, a daily cap on meeting emails, and strict security headers on every page.", cap: "rate limits · security headers" },
     { icon: CreditCard, title: "Secure payments", text: "Card details go straight to a certified payment processor's hosted checkout. We never see or store them, and billing requests are verified against your sign-in.", cap: "hosted checkout · verified sign-in" },
     { icon: Cpu, title: "Isolated code execution", text: "Code you run on our servers runs in isolated sandboxes with time and output limits. In the desktop app, code runs on your own machine and never reaches our server.", cap: "sandboxed · local first" },
     { icon: Monitor, title: "A narrow desktop bridge", text: "The desktop app exposes only calls to local services to the page, with context isolation and the Chromium sandbox on, and opens outside links in your browser.", cap: "context isolation · sandbox" },

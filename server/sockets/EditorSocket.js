@@ -2,6 +2,7 @@ const ACTIONS = require('../../src/Action');
 const RoomRepository = require('../repositories/RoomRepository');
 const UserRepository = require('../repositories/UserRepository');
 const ProjectRepository = require('../repositories/ProjectRepository');
+const { projectAccessFor } = require('../security/access');
 const AnalyticsRepository = require('../repositories/AnalyticsRepository');
 
 // Rooms whose "second person joined" step is already logged (once per room per server run).
@@ -88,8 +89,15 @@ function setupEditorSocket(io, socket, safeSocket, context) {
         }
     }));
 
-    socket.on(ACTIONS.PROJECT_JOIN, safeSocket(async ({ projectId, userName, photoURL, clientId, uid }) => {
+    socket.on(ACTIONS.PROJECT_JOIN, safeSocket(async ({ projectId, userName, photoURL, clientId, uid, idToken, key }) => {
         if (!projectId) return;
+        // Same rule as the API: owner, invited people, or the project's share link.
+        const who = await access.identify(socket, idToken);
+        const allowed = await projectAccessFor({ user: who, key }, projectId);
+        if (allowed.status) {
+            socket.emit('project-access', { status: 'denied', reason: allowed.status === 401 ? 'sign-in' : 'not-invited', error: allowed.error });
+            return;
+        }
         const finalUserName = userName || "Guest";
         const roomId = `project-${projectId}`;
         userSocketMap[socket.id] = finalUserName;
@@ -150,8 +158,12 @@ function setupEditorSocket(io, socket, safeSocket, context) {
         RoomRepository.updateRoomCode(roomId, code).catch(() => { });
     }));
 
+    // Bring a newcomer up to date: only someone sharing a room with them may do it.
     socket.on(ACTIONS.SYNC_CODE, safeSocket(({ socketId, code }) => {
-        io.to(socketId).emit(ACTIONS.CODE_CHANGE, { code });
+        const target = io.sockets.sockets.get(String(socketId || ''));
+        if (!target) return;
+        const shared = [...socket.rooms].some((r) => r !== socket.id && target.rooms.has(r));
+        if (shared) io.to(target.id).emit(ACTIONS.CODE_CHANGE, { code });
     }));
 
     socket.on(ACTIONS.SYNC_LANGUAGE, safeSocket(({ roomId, language }) => {

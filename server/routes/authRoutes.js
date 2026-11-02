@@ -12,20 +12,21 @@ router.get('/user/profile', async (req, res) => {
         res.json(user || {});
     } catch (err) {
         console.error(err);
-        res.status(500).json({ error: err.message });
+        res.status(500).json({ error: 'Something went wrong. Please try again.' });
     }
 });
 
 // Create or refresh the signed-in user's record (name, email, avatar) after sign-in.
 router.post('/user/sync', async (req, res) => {
     try {
-        const { uid, email, name, photoURL } = req.body || {};
+        const { uid, name, photoURL } = req.body || {};
         if (!uid) return res.status(400).json({ error: "Missing uid" });
+        const email = req.user?.email || req.body?.email; // verified address wins
         const user = await UserRepository.findOrCreateUser({ uid, email, name, photoURL });
         res.json(user);
     } catch (err) {
         console.error(err);
-        res.status(500).json({ error: err.message });
+        res.status(500).json({ error: 'Something went wrong. Please try again.' });
     }
 });
 
@@ -40,7 +41,7 @@ router.put('/user/profile', async (req, res) => {
         res.json(updated);
     } catch (err) {
         console.error(err);
-        res.status(500).json({ error: err.message });
+        res.status(500).json({ error: 'Something went wrong. Please try again.' });
     }
 });
 
@@ -53,7 +54,7 @@ router.delete('/user', async (req, res) => {
         res.json({ success: true, message: "Account deleted successfully" });
     } catch (err) {
         console.error(err);
-        res.status(500).json({ error: err.message });
+        res.status(500).json({ error: 'Something went wrong. Please try again.' });
     }
 });
 
@@ -65,7 +66,7 @@ router.get('/sessions', async (req, res) => {
         res.json(await UserRepository.getSessions(userId, sessionKey || null));
     } catch (err) {
         console.error(err);
-        res.status(500).json({ error: err.message });
+        res.status(500).json({ error: 'Something went wrong. Please try again.' });
     }
 });
 
@@ -98,7 +99,7 @@ router.delete('/sessions/others', async (req, res) => {
         res.json({ success: true, count: revoked.length });
     } catch (err) {
         console.error(err);
-        res.status(500).json({ error: err.message });
+        res.status(500).json({ error: 'Something went wrong. Please try again.' });
     }
 });
 
@@ -113,7 +114,7 @@ router.patch('/sessions/:id', async (req, res) => {
         res.json(row);
     } catch (err) {
         console.error(err);
-        res.status(500).json({ error: err.message });
+        res.status(500).json({ error: 'Something went wrong. Please try again.' });
     }
 });
 
@@ -128,7 +129,7 @@ router.delete('/sessions/:id', async (req, res) => {
         res.json({ success: true });
     } catch (err) {
         console.error(err);
-        res.status(500).json({ error: err.message });
+        res.status(500).json({ error: 'Something went wrong. Please try again.' });
     }
 });
 
@@ -141,7 +142,7 @@ router.post('/unsubscribe', async (req, res) => {
         res.json({ success: true, message: "Unsubscribe status updated" });
     } catch (err) {
         console.error(err);
-        res.status(500).json({ error: err.message });
+        res.status(500).json({ error: 'Something went wrong. Please try again.' });
     }
 });
 
@@ -166,7 +167,7 @@ router.get('/welcome-new-user', async (req, res) => {
         res.json({ success: true, message: "Welcome email dispatched", provider: result.provider });
     } catch (err) {
         console.error(err);
-        res.status(500).json({ error: err.message });
+        res.status(500).json({ error: 'Something went wrong. Please try again.' });
     }
 });
 

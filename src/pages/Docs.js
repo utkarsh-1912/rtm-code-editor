@@ -28,12 +28,14 @@ const SECTIONS = [
             { h: "Files", list: ["Create files and folders from the ⋮ menu in the file tree.", "Rename, move or delete from a file's ⋮ menu, or drag files and folders into a folder.", "Web projects show a live preview as you type; other languages get input and output panels."] },
             { h: "Layout", p: "Classic is a sidebar with the editor. Switch to cards from layout in the status bar to arrange files, editor, output, chat, people, the call and (in the desktop app) the terminal." },
             { h: "History", p: "Save snapshots and compare versions side by side from Version history." },
+            { h: "Sharing", list: ["Projects are private: only you, people you invite and holders of the project's link can open them.", "Invite people from Invite: they get an email and keep access.", "The link in your address bar includes a private key; send that link to let someone in. They need to be signed in.", "Only the owner can rename, delete or invite."] },
         ],
     },
     {
         id: "calls", title: "Calls and scheduling", Icon: Video, blocks: [
-            { h: "Calls", p: "Start a voice and video call in any room or project. Share your screen, draw on it together, pin a person to the stage, and dock the call into your layout or keep it floating." },
-            { h: "Scheduled calls", list: ["Schedule from your workspace or inside a room (Schedule a call).", "Invitees get an email, Google and Outlook calendar links and a calendar file.", "Everyone gets a reminder 10 minutes before. Join opens 10 minutes before the start.", "Choose who can join: anyone with the link, ask to join, or invitees only."] },
+            { h: "Calls", p: "Start a voice and video call in any room or project; everyone in the room gets a Join prompt. Present your screen (your camera stays on beside it), point and draw on it together, pin a person to the stage, and dock the call into your layout or keep it floating." },
+            { h: "Scheduled calls", list: ["Schedule from your workspace or inside a room (Schedule a call), in your time zone or anyone else's.", "Invitees get an email with a calendar invite attached (Google, Outlook, Apple) and Yes / Can't make it buttons.", "Everyone gets a reminder 10 minutes before. Join opens 10 minutes before the start, with a camera and mic check first.", "Edit or reschedule any time: people are emailed and their calendars update. Removed people are told.", "Choose who can join: anyone with the link, ask to join, or invitees only."] },
+            { h: "For organisers", list: ["The meeting page shows the guest list with answers, your private notes, and co-organisers.", "During the call, Snapshot in the room's header saves the code; each snapshot shows its changes since the last one and takes a private comment.", "End meeting saves a final snapshot and sends guests out; only organisers keep access to the room.", "Running over? You're asked to end it 10 minutes after the end time, and it ends by itself an hour later."] },
         ],
     },
     {
@@ -62,7 +64,9 @@ const SECTIONS = [
     {
         id: "ai", title: "AI copilot", Icon: Bot, blocks: [
             { p: "Explain, refactor, fix and write tests for the code in front of you, with nothing to set up." },
-            { h: "Limits", p: "Free includes a daily number of prompts; Team is unlimited. In the desktop app, a model running on your own computer has no limit." },
+            { h: "Choose your model", p: "Settings › AI models sets the copilot's default: the site's model, models we provide (some by request), or your own." },
+            { h: "Your own API key", list: ["Add a model with your key for Gemini, Claude (Sonnet, Haiku), OpenAI, OpenRouter, Grok, Qwen, Kimi, Sarvam or any OpenAI-compatible server, then Test it.", "Keys are encrypted on your device (AES-256 in the browser, your system keychain in the desktop app) and never stored on our servers.", "Each key is only ever sent to its own provider. Add a passphrase to keep keys locked until you unlock them."] },
+            { h: "Limits", p: "Free includes a daily number of prompts; Team is unlimited. Your own key and a model on your own computer (desktop app) have no limit from us." },
         ],
     },
     {
@@ -78,7 +82,7 @@ const SECTIONS = [
     },
     {
         id: "security", title: "Privacy and security", Icon: Lock, blocks: [
-            { list: ["Rooms have random ids; owners can make them ask-to-join or invited-only, and the server checks who you are before you get in.", "Calls travel directly between participants where possible, encrypted in transit.", "Code you run in the cloud runs in isolated sandboxes; in the desktop app it can stay on your computer.", "See every signed-in device in Settings and sign any of them out."] },
+            { list: ["Every request is checked against your sign-in: nobody can read or change your account, projects, snippets or teams by guessing an id.", "Rooms have random ids; owners can make them ask-to-join or invited-only. Projects are private to you, your invitees and holders of their private link.", "Calls travel directly between participants where possible, encrypted in transit.", "Your AI keys are encrypted on your device and never stored on our servers.", "Code you run in the cloud runs in isolated sandboxes; in the desktop app it can stay on your computer.", "See every signed-in device in Settings and sign any of them out."] },
             { p: <>More on the <Link to="/security" className="u-ul">Security</Link> and <Link to="/privacy" className="u-ul">Privacy</Link> pages.</> },
         ],
     },
