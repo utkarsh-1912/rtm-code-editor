@@ -5,14 +5,14 @@ import { useNavigate } from "react-router-dom";
 import { getBranding, saveBranding, listTeams } from "../utils/meetings";
 import { getBackendUrl } from "../utils/api";
 
-// Settings > Branding (Enterprise): your team's logo, colour and name on everything candidates
+// Settings > Branding (Enterprise): your team's logo and name on everything candidates
 // see — meeting pages, booking pages and meeting emails.
 export default function BrandingPanel({ user }) {
     const navigate = useNavigate();
     const [teams, setTeams] = useState(null);
     const [orgId, setOrgId] = useState(null);
     const [b, setB] = useState(null);
-    const [form, setForm] = useState({ name: "", color: "#2F62C9", logo: undefined });
+    const [form, setForm] = useState({ name: "", logo: undefined });
     const [busy, setBusy] = useState(false);
 
     useEffect(() => {
@@ -25,7 +25,7 @@ export default function BrandingPanel({ user }) {
     useEffect(() => {
         if (!orgId) return;
         setB(null);
-        getBranding(orgId).then((x) => { setB(x); setForm({ name: x.name || "", color: x.color || "#2F62C9", logo: undefined }); }).catch((err) => toast.error(err.message));
+        getBranding(orgId).then((x) => { setB(x); setForm({ name: x.name || "", logo: undefined }); }).catch((err) => toast.error(err.message));
     }, [orgId]);
 
     const pickLogo = (file) => {
@@ -39,7 +39,7 @@ export default function BrandingPanel({ user }) {
     const save = async () => {
         setBusy(true);
         try {
-            await saveBranding(orgId, { name: form.name, color: form.color, ...(form.logo !== undefined ? { logo: form.logo } : {}) });
+            await saveBranding(orgId, { name: form.name, ...(form.logo !== undefined ? { logo: form.logo } : {}) });
             toast.success("Branding saved. New meetings show it to candidates.");
             setB(await getBranding(orgId));
             setForm((f) => ({ ...f, logo: undefined }));
@@ -61,7 +61,7 @@ export default function BrandingPanel({ user }) {
             <div className="br-head">
                 <div>
                     <h3>Custom branding</h3>
-                    <p className="u-small u-muted">Your logo, colour and name on meeting pages, booking pages and meeting emails, for meetings your team's owners and admins host.</p>
+                    <p className="u-small u-muted">Your logo and name on meeting pages, booking pages and meeting emails, for meetings your team's owners and admins host.</p>
                 </div>
                 {teams.length > 1 && (
                     <select className="u-select br-team" value={orgId || ""} onChange={(e) => setOrgId(Number(e.target.value))} aria-label="Team">
@@ -81,9 +81,6 @@ export default function BrandingPanel({ user }) {
                         <div className="u-field"><label htmlFor="br-name">Display name</label>
                             <input id="br-name" className="u-input" value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} placeholder={b.teamName} maxLength={80} />
                         </div>
-                        <div className="u-field"><label htmlFor="br-color">Accent colour</label>
-                            <span className="br-color"><input id="br-color" type="color" value={form.color} onChange={(e) => setForm((f) => ({ ...f, color: e.target.value }))} /><code>{form.color}</code></span>
-                        </div>
                         <div className="u-field"><span className="u-field-label">Logo</span>
                             <span className="br-logo">
                                 {logoShown ? <img src={logoShown} alt="" /> : <span className="u-small u-faint">No logo</span>}
@@ -92,7 +89,7 @@ export default function BrandingPanel({ user }) {
                             </span>
                         </div>
                     </div>
-                    <div className="br-preview" style={{ "--brand": form.color }}>
+                    <div className="br-preview">
                         <span className="u-label">Preview</span>
                         <div className="br-card">
                             <span className="br-card-top">{logoShown && <img src={logoShown} alt="" />}<b>{form.name || b.teamName}</b></span>

@@ -207,8 +207,14 @@ async function getUserRoomsPage(userId, { limit, offset }) {
     const [rows, count] = await Promise.all([
         sql`
             SELECT r.room_id, r.name, r.language,
-                   GREATEST(r.updated_at, COALESCE(ur.last_opened_at, r.updated_at)) AS updated_at
+                   GREATEST(r.updated_at, COALESCE(ur.last_opened_at, r.updated_at)) AS updated_at,
+                   m.id AS meeting_id, m.title AS meeting_title, m.access AS meeting_access
             FROM rooms r JOIN user_rooms ur ON r.id = ur.room_id
+            LEFT JOIN LATERAL (
+                SELECT id, title, access FROM meetings
+                WHERE room_id = r.room_id AND cancelled_at IS NULL
+                ORDER BY starts_at DESC LIMIT 1
+            ) m ON TRUE
             WHERE ur.user_id = ${uid}
             ORDER BY 4 DESC, r.id DESC
             LIMIT ${limit} OFFSET ${offset}
@@ -216,7 +222,11 @@ async function getUserRoomsPage(userId, { limit, offset }) {
         sql`SELECT COUNT(*)::int AS n FROM user_rooms WHERE user_id = ${uid}`,
     ]);
     return {
-        items: rows.map((r) => ({ ...r, id: r.room_id, name: r.name || r.room_id, customName: !!r.name })),
+        // A room made for a meeting that isn't open to anyone shows as that meeting (its page).
+        items: rows.map(({ meeting_id, meeting_title, meeting_access, ...r }) => ({
+            ...r, id: r.room_id, name: r.name || r.room_id, customName: !!r.name,
+            ...(meeting_id && meeting_access !== 'public' ? { meetingId: meeting_id, meetingTitle: meeting_title } : {}),
+        })),
         total: count[0].n,
         limit,
         offset,

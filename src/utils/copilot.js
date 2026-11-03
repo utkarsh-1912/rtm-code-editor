@@ -63,14 +63,14 @@ export async function askCopilot({ action, code, language, prompt, roomId, proje
     const started = performance.now();
 
     // Your default model (Settings > AI models): one you connected with your own key, a model
-    // this site provides, or "auto" (below).
+    // this site provides, or "auto": a model you connected if there is one, else the site's.
     const choice = getDefault(userId);
-    if (choice.startsWith("own:")) {
-        const connection = listConnections(userId).find((c) => c.id === choice.slice(4));
-        if (connection) {
-            const out = await chatOwn(userId, connection, messages);
-            return parseReply(action, out.text, { model: out.model, where: out.where, ms: performance.now() - started });
-        }
+    const own = listConnections(userId);
+    const connection = (choice.startsWith("own:") && own.find((c) => c.id === choice.slice(4)))
+        || (!choice.startsWith("platform:") ? own[0] : null);
+    if (connection) {
+        const out = await chatOwn(userId, connection, messages);
+        return parseReply(action, out.text, { model: out.model, where: out.where, ms: performance.now() - started });
     }
     const modelId = choice.startsWith("platform:") ? choice.slice(9) : undefined;
 

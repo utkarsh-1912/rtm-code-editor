@@ -197,7 +197,7 @@ function meetingEmail(m, { to, kind = 'invite', previous = null, brand = null })
             </td></tr>
             ${k.cta ? `
             <tr><td class="m-px" style="padding:24px 32px 0;">
-              <a class="m-cta" href="${esc(link)}" style="display:block;text-align:center;background:${brand?.color || T.ink};color:${T.paper};padding:15px 20px;border-radius:999px;font-family:${T.text};font-size:15px;font-weight:600;text-decoration:none;">${k.cta} &rarr;</a>
+              <a class="m-cta" href="${esc(link)}" style="display:block;text-align:center;background:${T.ink};color:${T.paper};padding:15px 20px;border-radius:999px;font-family:${T.text};font-size:15px;font-weight:600;text-decoration:none;">${k.cta} &rarr;</a>
               <p style="margin:10px 0 0;font-family:${T.mono};font-size:11px;line-height:1.5;color:${T.ink3};text-align:center;word-break:break-all;">${esc(meetingUrl(m))}</p>
             </td></tr>` : ''}
             ${rsvp ? `

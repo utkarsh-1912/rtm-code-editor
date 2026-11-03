@@ -58,7 +58,7 @@ export default function AIModelsPanel({ user }) {
                     <span className="u-small u-muted">Used by the AI copilot in rooms and projects.</span>
                 </div>
                 <div className="aim-choices" role="radiogroup" aria-label="Default model">
-                    <Choice on={choice === "auto"} onClick={() => pick("auto")} title="Automatic" sub="The site's default model (the desktop app tries a model on your computer first)." />
+                    <Choice on={choice === "auto"} onClick={() => pick("auto")} title="Automatic" sub="A model you connected below if there is one, else the site's default model (the desktop app tries a model on your computer first)." />
                     {usable.filter((m) => !m.default).map((m) => (
                         <Choice key={m.id} on={choice === `platform:${m.id}`} onClick={() => pick(`platform:${m.id}`)} title={m.label} sub={`Provided by this site · ${m.providerName}`} />
                     ))}

@@ -7,6 +7,14 @@ import { Avatar } from "./clients";
 
 export default function ChatWindow({ socketRef, roomId, userName, isLightMode, isMobile, messages = [], setMessages }) {
     const [inputMsg, setInputMsg] = useState("");
+    const inputRef = useRef(null);
+    // Grow the message box with its lines (browsers without CSS field-sizing).
+    useEffect(() => {
+        const el = inputRef.current;
+        if (!el) return;
+        el.style.height = "auto";
+        el.style.height = `${Math.min(el.scrollHeight, 114)}px`;
+    }, [inputMsg]);
     const [showEmojiPicker, setShowEmojiPicker] = useState(false);
     const [editingMsgId, setEditingMsgId] = useState(null);
     const [editMsgText, setEditMsgText] = useState("");
@@ -98,12 +106,13 @@ export default function ChatWindow({ socketRef, roomId, userName, isLightMode, i
                                 )}
                                 {isEditingThis ? (
                                     <div className="cw-edit">
-                                        <input
+                                        <textarea
                                             autoFocus
+                                            rows={Math.min(5, editMsgText.split('\n').length)}
                                             className="u-input"
                                             value={editMsgText}
                                             onChange={(e) => setEditMsgText(e.target.value)}
-                                            onKeyDown={(e) => { if (e.key === 'Enter') handleEditMessage(msg.id); if (e.key === 'Escape') setEditingMsgId(null); }}
+                                            onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleEditMessage(msg.id); } if (e.key === 'Escape') setEditingMsgId(null); }}
                                             aria-label="Edit message"
                                         />
                                         <button className="u-icon" onClick={() => handleEditMessage(msg.id)} aria-label="Save edit"><Icon name="check" size={16} /></button>
@@ -146,8 +155,10 @@ export default function ChatWindow({ socketRef, roomId, userName, isLightMode, i
                     <button className={`u-icon${showEmojiPicker ? " on" : ""}`} onClick={() => setShowEmojiPicker(!showEmojiPicker)} aria-label="Insert emoji" title="Emoji">
                         <Icon name="emoji" size={20} />
                     </button>
-                    <input
-                        type="text"
+                    {/* Enter sends; Shift+Enter starts a new line. Grows up to five lines. */}
+                    <textarea
+                        ref={inputRef}
+                        rows={1}
                         placeholder="Message the room"
                         value={inputMsg}
                         onChange={(e) => setInputMsg(e.target.value)}

@@ -52,7 +52,6 @@ export default function BookPage() {
     };
 
     const brand = page?.brand;
-    const style = brand?.color ? { "--brand": brand.color } : undefined;
     const fmtDay = (k, opts) => new Date(`${k}T12:00:00`).toLocaleDateString([], opts);
     const fmtTime = (iso) => new Date(iso).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
 
@@ -70,7 +69,7 @@ export default function BookPage() {
 
     return (
         <AppLayout>
-            <div className={`bk${brand?.color ? " is-branded" : ""}`} style={style}>
+            <div className="bk">
                 <header className="db-head" data-rise>
                     <div>
                         {brand && <span className="mp-brand">{brand.logo && <img src={brand.logo} alt="" />}<b>{brand.name}</b></span>}

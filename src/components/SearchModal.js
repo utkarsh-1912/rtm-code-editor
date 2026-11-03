@@ -102,6 +102,17 @@ const SearchModal = ({ isOpen, onClose, onOpenHelp, onToggleTheme }) => {
             { kind: 'page', id: 'p-bill', title: 'Plan & billing', sub: 'Settings', icon: CreditCard, run: go('/settings?section=billing') },
             { kind: 'page', id: 'p-status', title: 'System status', sub: 'Is everything working?', icon: Activity, run: go('/status') },
             { kind: 'page', id: 'p-support', title: 'Support', sub: 'Contact us', icon: LifeBuoy, run: go('/support') },
+            ...(user?.uid ? [
+                { kind: 'page', id: 'p-booking', title: 'Booking links', sub: 'Settings · let candidates pick a time', icon: CalendarPlus, run: go('/settings?section=scheduling') },
+                { kind: 'page', id: 'p-brand', title: 'Branding', sub: 'Settings · your logo and name (Enterprise)', icon: Settings, run: go('/settings?section=branding') },
+            ] : []),
+            // The public site, so visitors who aren't signed in find something too.
+            { kind: 'page', id: 'p-features', title: 'Features', sub: 'Rooms, calls, whiteboard and more', icon: LayoutGrid, run: go('/features') },
+            { kind: 'page', id: 'p-pricing', title: 'Pricing', sub: 'Free, Team and Enterprise plans', icon: CreditCard, run: go('/pricing') },
+            { kind: 'page', id: 'p-docs', title: 'Docs', sub: 'Guides and API', icon: Code2, run: go('/docs') },
+            { kind: 'page', id: 'p-download', title: 'Download', sub: 'Desktop apps for Windows, macOS and Linux', icon: Folder, run: go('/download') },
+            { kind: 'page', id: 'p-security', title: 'Security', sub: 'How your code and calls are protected', icon: Activity, run: go('/security') },
+            { kind: 'page', id: 'p-about', title: 'About', sub: 'Who builds Utkristi CoLabs', icon: LifeBuoy, run: go('/about') },
         ];
 
         if (!q) {

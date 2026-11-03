@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { CalendarPlus, WifiOff, ServerOff, Plus, Search, MoreHorizontal, Pencil, Trash2, Folder, FolderOpen, FileUp, Terminal, Link2, ArrowUpRight, ArrowRight, Check, Sparkles, RotateCcw, X } from 'lucide-react';
+import { CalendarPlus, CalendarClock, WifiOff, ServerOff, Plus, Search, MoreHorizontal, Pencil, Trash2, Folder, FolderOpen, FileUp, Terminal, Link2, ArrowUpRight, ArrowRight, Check, Sparkles, RotateCcw, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
 import AppLayout from '../components/AppLayout';
@@ -167,7 +167,7 @@ const Dashboard = () => {
                 : mergeActivity(rooms, projects);
         if (lang) list = list.filter((i) => i.kind === 'room' && i.lang === lang);
         const q = query.trim().toLowerCase();
-        if (q) list = list.filter((i) => [i.name, i.id, i.description, i.lang, i.type].some((v) => (v || '').toString().toLowerCase().includes(q)));
+        if (q) list = list.filter((i) => [i.name, i.id, i.description, i.lang, i.type, i.meetingTitle].some((v) => (v || '').toString().toLowerCase().includes(q)));
         if (sort === 'name') list = [...list].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
         else if (view !== 'all') list = [...list].sort((a, b) => (itemDate(b)?.getTime() || 0) - (itemDate(a)?.getTime() || 0));
         return list;
@@ -201,13 +201,14 @@ const Dashboard = () => {
 
     const openItem = (item) => {
         if (item.kind === 'project') navigate(`/project/${item.id}`);
+        else if (item.meetingId) navigate(`/meet/${item.meetingId}`); // private meeting rooms open as their meeting
         else navigate(`/editor/${item.id}`, { state: { userName: user?.name || '', role: 'editor' } });
     };
 
-    const copyRoomLink = async (id) => {
+    const copyRoomLink = async (id, meetingId) => {
         try {
-            await navigator.clipboard.writeText(`${publicOrigin()}/editor/${encodeURIComponent(id)}`);
-            toast.success('Room link copied');
+            await navigator.clipboard.writeText(meetingId ? `${publicOrigin()}/meet/${encodeURIComponent(meetingId)}` : `${publicOrigin()}/editor/${encodeURIComponent(id)}`);
+            toast.success(meetingId ? 'Meeting link copied' : 'Room link copied');
         } catch {
             toast.error('Could not copy link');
         }
@@ -490,20 +491,21 @@ const Dashboard = () => {
                     <ul className="db-rows">
                         {pageItems.map((item) => {
                             const isProject = item.kind === 'project';
+                            const isMeeting = !isProject && !!item.meetingId;
                             const key = `${item.kind}-${item.id}`;
                             const when = itemDate(item);
                             return (
                                 <li key={key} className="db-row" tabIndex={0} onClick={() => openItem(item)} onKeyDown={(e) => e.key === 'Enter' && openItem(item)}>
-                                    <span className="d-ico">{isProject ? <Folder size={16} /> : <Terminal size={16} />}</span>
+                                    <span className="d-ico">{isProject ? <Folder size={16} /> : isMeeting ? <CalendarClock size={16} /> : <Terminal size={16} />}</span>
                                     <span className="db-name">
-                                        <b className="u-ellipsis">{item.name || item.id}</b>
-                                        <span className="u-mono u-ellipsis">{isProject ? (item.description || 'Project') : `room/${item.id}`}</span>
+                                        <b className="u-ellipsis">{isMeeting && !item.customName ? item.meetingTitle : (item.name || item.id)}</b>
+                                        <span className="u-mono u-ellipsis">{isProject ? (item.description || 'Project') : isMeeting ? `meeting/${item.meetingId}` : `room/${item.id}`}</span>
                                     </span>
-                                    <span className="db-type"><span className="u-chip u-chip--mono">{isProject ? (item.type || 'project') : (item.lang || 'room')}</span></span>
+                                    <span className="db-type"><span className="u-chip u-chip--mono">{isProject ? (item.type || 'project') : isMeeting ? 'meeting' : (item.lang || 'room')}</span></span>
                                     <span className="db-when u-mono">{when ? timeAgo(when) : (item.lastActive || 'just now').split(',')[0]}</span>
                                     <span className="db-row-actions" onClick={(e) => e.stopPropagation()}>
                                         {!isProject && (
-                                            <button className="u-icon" onClick={() => copyRoomLink(item.id)} title="Copy invite link" aria-label={`Copy invite link for ${item.name || item.id}`}><Link2 size={15} /></button>
+                                            <button className="u-icon" onClick={() => copyRoomLink(item.id, item.meetingId)} title={isMeeting ? 'Copy meeting link' : 'Copy invite link'} aria-label={`Copy ${isMeeting ? 'meeting' : 'invite'} link for ${item.name || item.id}`}><Link2 size={15} /></button>
                                         )}
                                         <RowMenu open={menuFor === key} onToggle={(v) => setMenuFor(v ? key : null)}>
                                             <button onClick={() => { setMenuFor(null); openItem(item); }}><ArrowUpRight size={16} />Open</button>

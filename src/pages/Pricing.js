@@ -26,7 +26,7 @@ const COMPARE = [
     ["Push and email notifications", false, true, true],
     ["Self-hosted code runner", false, false, true],
     ["SSO and advanced access", false, false, true],
-    ["Custom branding (logo, colour, name for candidates)", false, false, true],
+    ["Custom branding (logo and name for candidates)", false, false, true],
     ["Support", "Community", "Priority", "Dedicated + SLA"],
 ];
 
