@@ -101,7 +101,12 @@ async function codeforces(contest, index, gym = false) {
     let pageTitle = null;
     const tests = [];
     try {
-        const html = await getJson(url, { text: true });
+        // One retry: Codeforces sometimes answers slowly or with a busy page.
+        let html = await getJson(url, { text: true }).catch(() => null);
+        if (!html || !/problem-statement/.test(html)) {
+            await new Promise((r) => setTimeout(r, 800));
+            html = await getJson(url, { text: true });
+        }
         const m = /<div class="problem-statement">([\s\S]*?)<\/div>\s*<\/div>\s*<script/i.exec(html) || /<div class="problem-statement">([\s\S]*)/i.exec(html);
         const t = /<div class="title">\s*([A-Z]\d?\.\s*[^<]+)<\/div>/i.exec(html);
         if (t) pageTitle = decode(t[1].trim());
@@ -121,12 +126,16 @@ async function codeforces(contest, index, gym = false) {
             const note = /<div class="note">([\s\S]*?)<\/div>\s*<\/div>/i.exec(m[1]);
             if (note) text += `\n\n${htmlToText(note[1].replace(/<div class="section-title">[\s\S]*?<\/div>/i, '### Note\n'))}`;
         }
-    } catch { /* the site may block automated reads: keep the link */ }
-    if (!p && !text) throw Object.assign(new Error('Codeforces has no problem at that link.'), { status: 404 });
+    } catch { /* reported below */ }
+    if (!text) {
+        // Never fill the pane with a stub: say what happened so people can try again.
+        if (!p) throw Object.assign(new Error('Codeforces has no problem at that link.'), { status: 404 });
+        throw Object.assign(new Error('Codeforces didn’t send the statement just now. Try again in a moment.'), { status: 502 });
+    }
     return {
         source: 'Codeforces', url,
         title: p ? `${contest}${p.index}. ${p.name}` : pageTitle ? `${contest}${pageTitle}` : `${contest}${index}`, difficulty: p?.rating ? String(p.rating) : null, tags: p?.tags || [],
-        text: text || `Read the statement on Codeforces: ${url}`, starters: {}, tests,
+        text, starters: {}, tests,
     };
 }
 
