@@ -24,6 +24,7 @@ import { isTemplate } from "../utils/languages";
 import { useSession, SessionPills, TimerModal, toggleFollowMe } from "../components/SessionControls";
 import LiveCaptions from "../components/LiveCaptions";
 import { getRoomPolicy } from "../utils/meetings";
+import { wrapForLeetCode, harnessProblem, hasOwnEntry, signature } from "../utils/leetcodeRun";
 import { CLIENT_ID } from "../utils/clientId";
 import { resolveTheme, setThemePref } from "../utils/theme";
 import "../styles/app.css";
@@ -202,7 +203,11 @@ function Editor() {
   const [examples, setExamples] = useState([]);
   const [exampleIndex, setExampleIndex] = useState(null);
   const examplesKey = useRef("");
-  const setRoomExamples = (list) => {
+  // LeetCode mode: the imported problem's function signature, used to call the code with the input.
+  const [harness, setHarness] = useState(null);
+  const [lcMode, setLcMode] = useState(true);
+  const setRoomExamples = (list, sig) => {
+    setHarness(sig || null);
     const next = Array.isArray(list) ? list : [];
     const key = JSON.stringify(next);
     if (key === examplesKey.current) return;
@@ -211,6 +216,12 @@ function Editor() {
     if (next.length) { setStdin(next[0].input); setExampleIndex(0); } else setExampleIndex(null);
   };
   const pickExample = (i) => { setStdin(examples[i]?.input || ""); setExampleIndex(i); };
+  // Typing your own input: it's no longer that example, so its expected output isn't compared.
+  const editStdin = (v) => {
+    setStdin(v);
+    if (exampleIndex != null && (examples[exampleIndex]?.input || "") !== v) setExampleIndex(null);
+  };
+  const lcInfo = harness ? { sig: signature(harness), problem: harnessProblem(language, harness), own: hasOwnEntry(language, currentCode) } : null;
   const reportPaste = (chars) => { if (roomPolicy.live) socketRef.current?.emit(ACTIONS.CODE_PASTE, { roomId, chars, by: userName }); };
   // Arrived from a meeting page (camera and mic already checked there): open the call now.
   useEffect(() => {
@@ -631,7 +642,8 @@ function Editor() {
     let time;
     let meta = { by: userName, at: Date.now() };
     try {
-      const source = language === "sql" ? buildSqlPrelude(sqlTables) + codeRef.current : codeRef.current;
+      const wrapped = harness && lcMode ? wrapForLeetCode(language, codeRef.current, harness) : null;
+      const source = language === "sql" ? buildSqlPrelude(sqlTables) + codeRef.current : (wrapped || codeRef.current);
       // Others can edit this room unless it's yours and you're alone: ask before running locally.
       const shared = clients.length > 1 || !roomMeta?.isOwner;
       const result = await runCode({ language, source, stdin, sharedScope: shared ? `room:${roomId}` : null });
@@ -685,7 +697,7 @@ function Editor() {
     }
     if (id === "io") {
       return (
-          <OutputWindow examples={examples} exampleIndex={exampleIndex} onPickExample={pickExample}
+          <OutputWindow examples={examples} exampleIndex={exampleIndex} onPickExample={pickExample} onCustomInput={editStdin} onPickCustom={() => setExampleIndex(null)} leetcode={lcInfo} lcMode={lcMode} onLcMode={setLcMode}
                             output={output}
                             isError={isError}
                             time={execTime}
@@ -814,7 +826,7 @@ function Editor() {
                     />
                   )}
                   {activeTab === "output" && (
-                    <OutputWindow examples={examples} exampleIndex={exampleIndex} onPickExample={pickExample} output={output} isError={isError} time={execTime} isMobile={isMobile} stdin={stdin} setStdin={setStdin} isLightMode={isLightMode} language={language} tables={sqlTables} setTables={setSqlTables} />
+                    <OutputWindow examples={examples} exampleIndex={exampleIndex} onPickExample={pickExample} onCustomInput={editStdin} onPickCustom={() => setExampleIndex(null)} leetcode={lcInfo} lcMode={lcMode} onLcMode={setLcMode} output={output} isError={isError} time={execTime} isMobile={isMobile} stdin={stdin} setStdin={setStdin} isLightMode={isLightMode} language={language} tables={sqlTables} setTables={setSqlTables} />
                   )}
                   {activeTab === "chat" && (
                     <ChatWindow

@@ -58,9 +58,10 @@ function TablesPanel({ tables, setTables }) {
 }
 
 // Room I/O: what the program reads (stdin) beside what it printed.
-export default function OutputWindow({ output, isError, time, isMobile, stdin, setStdin, language, tables, setTables, examples = [], exampleIndex = null, onPickExample }) {
+export default function OutputWindow({ output, isError, time, isMobile, stdin, setStdin, language, tables, setTables, examples = [], exampleIndex = null, onPickExample, onCustomInput, onPickCustom, leetcode, lcMode, onLcMode }) {
     const ex = exampleIndex != null ? examples[exampleIndex] : null;
-    const norm = (v) => String(v || "").trim().replace(/[ \t]+$/gm, "").replace(/\r/g, "");
+    // Compare ignoring trailing spaces and the spaces LeetCode puts after commas.
+    const norm = (v) => String(v || "").trim().replace(/[ \t]+$/gm, "").replace(/\r/g, "").replace(/,\s+/g, ",");
     const verdict = ex?.output && output && !isError ? (norm(output) === norm(ex.output) ? "ok" : "bad") : null;
     const input = language === "sql" && setTables ? <TablesPanel tables={tables || []} setTables={setTables} /> : (
         <div className="ws-io-col">
@@ -72,14 +73,27 @@ export default function OutputWindow({ output, isError, time, isMobile, stdin, s
                             <button key={i} type="button" className={exampleIndex === i ? "on" : ""} aria-pressed={exampleIndex === i}
                                 onClick={() => onPickExample(i)} title={`Example ${i + 1}: put its input here`}>Ex {i + 1}</button>
                         ))}
+                        <button type="button" className={exampleIndex == null ? "on" : ""} aria-pressed={exampleIndex == null}
+                            onClick={() => onPickCustom?.()} title="Type your own input to try">Custom</button>
                     </span>
                 ) : <b>stdin</b>}
             </div>
+            {leetcode && (
+                <div className={`io-lc${leetcode.problem && lcMode ? " is-off" : ""}`}>
+                    <label><input type="checkbox" checked={!!lcMode} onChange={(e) => onLcMode?.(e.target.checked)} /> LeetCode mode</label>
+                    <span className="u-ellipsis" title={leetcode.problem || leetcode.sig}>
+                        {!lcMode ? "Off: your program reads the input itself."
+                            : leetcode.problem ? leetcode.problem
+                                : leetcode.own ? "Your code has its own main, so it runs as written."
+                                    : <>One line per argument → <code>{leetcode.sig}</code></>}
+                    </span>
+                </div>
+            )}
             <textarea
                 className="ws-stdin"
                 value={stdin || ""}
-                onChange={(e) => setStdin && setStdin(e.target.value)}
-                placeholder="Text your program reads from standard input"
+                onChange={(e) => (onCustomInput ? onCustomInput(e.target.value) : setStdin && setStdin(e.target.value))}
+                placeholder={leetcode && lcMode && !leetcode.problem ? "One argument per line, as LeetCode writes them, e.g.\n[2,7,11,15]\n9" : "Text your program reads from standard input"}
                 spellCheck={false}
                 aria-label="Program input"
             />

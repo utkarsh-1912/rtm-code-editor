@@ -70,6 +70,7 @@ export default function ProblemPane({ socketRef, roomId, userName, isReadOnly, l
     const [link, setLink] = useState("");
     const [busy, setBusy] = useState(false);
     const [importError, setImportError] = useState("");
+    const [importOpenUrl, setImportOpenUrl] = useState(""); // the problem, to open and copy by hand
     // Interviews: leave out the title, difficulty, topics and source (they hint at the answer).
     const [hideHints, setHideHints] = useState(!!interviewMode);
     useEffect(() => { setHideHints(!!interviewMode); }, [interviewMode]);
@@ -94,16 +95,16 @@ export default function ProblemPane({ socketRef, roomId, userName, isReadOnly, l
     useEffect(() => {
         const socket = socketRef.current;
         if (!socket) return undefined;
-        const onChange = ({ text: incoming, by, at, tests, series: incomingSeries }) => {
+        const onChange = ({ text: incoming, by, at, tests, series: incomingSeries, harness }) => {
             setText(incoming || "");
             save(incoming || "");
             setMeta(by ? { by, at } : null);
-            if (Array.isArray(tests)) onExamplesRef.current?.(tests);
+            if (Array.isArray(tests)) onExamplesRef.current?.(tests, harness || null);
             if (incomingSeries !== undefined) setSeries(incomingSeries || null);
         };
-        const onSync = ({ text: serverText, by, at, tests, series: serverSeries }) => {
+        const onSync = ({ text: serverText, by, at, tests, series: serverSeries, harness }) => {
             if (serverText) {
-                onChange({ text: serverText, by, at, tests, series: serverSeries ?? null });
+                onChange({ text: serverText, by, at, tests, series: serverSeries ?? null, harness });
             } else if (textRef.current && !isReadOnly) {
                 // The server restarted and lost it: restore from this browser.
                 socket.emit(ACTIONS.PROBLEM_CHANGE, { roomId, text: textRef.current, by: userName });
@@ -125,20 +126,20 @@ export default function ProblemPane({ socketRef, roomId, userName, isReadOnly, l
 
     // `tests` and `nextSeries` (optional) replace the room's examples and contest; clearing the
     // problem clears both.
-    const update = (value, tests, nextSeries) => {
+    const update = (value, tests, nextSeries, harness) => {
         const v = value.slice(0, MAX);
         setText(v);
         save(v);
         setMeta({ by: userName, at: Date.now() });
         const nextTests = tests !== undefined ? tests : (v.trim() ? undefined : []);
         const seriesOut = nextSeries !== undefined ? nextSeries : (v.trim() ? undefined : null);
-        if (nextTests !== undefined) onExamplesRef.current?.(nextTests);
+        if (nextTests !== undefined) onExamplesRef.current?.(nextTests, harness || null);
         if (seriesOut !== undefined) setSeries(seriesOut);
         clearTimeout(sendTimer.current);
         sendTimer.current = setTimeout(() => {
             socketRef.current?.emit(ACTIONS.PROBLEM_CHANGE, {
                 roomId, text: v, by: userName,
-                ...(nextTests !== undefined ? { tests: nextTests } : {}),
+                ...(nextTests !== undefined ? { tests: nextTests, harness: harness || null } : {}),
                 ...(seriesOut !== undefined ? { series: seriesOut } : {}),
             });
         }, 250);
@@ -157,7 +158,7 @@ export default function ProblemPane({ socketRef, roomId, userName, isReadOnly, l
     const fetchImport = async (url) => {
         const res = await fetch(`${getBackendUrl()}/api/problems/import?url=${encodeURIComponent(url)}`);
         const data = await res.json().catch(() => ({}));
-        if (!res.ok) throw new Error(data.error || "Couldn't import that link.");
+        if (!res.ok) throw Object.assign(new Error(data.error || "Couldn't import that link."), { openUrl: data.openUrl || "" });
         return data;
     };
     // One problem into the pane: title and topics unless hidden, the statement, the source as a
@@ -165,7 +166,7 @@ export default function ProblemPane({ socketRef, roomId, userName, isReadOnly, l
     const showProblem = (data, nextSeries) => {
         const head = hideHints ? "" : [`# ${data.title}`, [data.difficulty, ...(data.tags || []).slice(0, 6)].filter(Boolean).join(" · ")].filter(Boolean).join("\n");
         const body = [head, data.text, hideHints ? "" : `Source: [${data.source}](${data.url})`].filter(Boolean).join("\n\n");
-        update(body, Array.isArray(data.tests) ? data.tests : [], nextSeries);
+        update(body, Array.isArray(data.tests) ? data.tests : [], nextSeries, data.harness || null);
         setStarters(Object.keys(data.starters || {}).length ? data.starters : null);
     };
 
@@ -175,6 +176,7 @@ export default function ProblemPane({ socketRef, roomId, userName, isReadOnly, l
         if (!link.trim()) return;
         setBusy(true);
         setImportError("");
+        setImportOpenUrl("");
         try {
             const data = await fetchImport(link.trim());
             if (data.kind === "contest") {
@@ -188,6 +190,7 @@ export default function ProblemPane({ socketRef, roomId, userName, isReadOnly, l
             setLink("");
         } catch (err) {
             setImportError(err.message);
+            setImportOpenUrl(err.openUrl || "");
         } finally { setBusy(false); }
     };
 
@@ -202,6 +205,7 @@ export default function ProblemPane({ socketRef, roomId, userName, isReadOnly, l
             setEditing(false);
         } catch (err) {
             setImportError(err.message);
+            setImportOpenUrl(err.openUrl || "");
             setImporting(true);
         } finally { setSeriesBusy(null); }
     };
@@ -240,7 +244,7 @@ export default function ProblemPane({ socketRef, roomId, userName, isReadOnly, l
                     <input className="u-input" value={link} onChange={(e) => setLink(e.target.value)} placeholder="A LeetCode or Codeforces problem or contest link" aria-label="Problem or contest link" autoFocus />
                     <button type="submit" className="u-btn u-btn--solid u-btn--sm" disabled={busy || !link.trim()}>{busy ? "Importing…" : "Import"}</button>
                     <label className="pb-hide"><input type="checkbox" checked={hideHints} onChange={(e) => setHideHints(e.target.checked)} /> Hide title, difficulty and topics (interviews)</label>
-                    {importError && <p className="pb-import-error" role="alert">{importError}</p>}
+                    {importError && <p className="pb-import-error" role="alert">{importError}{importOpenUrl && <> <a href={importOpenUrl} target="_blank" rel="noreferrer noopener">Open the problem ↗</a></>}</p>}
                 </form>
             )}
             {series && (

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { ChevronDown, UserCheck, CalendarPlus, CalendarClock, WifiOff, ServerOff, Plus, Search, MoreHorizontal, Pencil, Trash2, Folder, FolderOpen, FileUp, Terminal, Link2, ArrowUpRight, ArrowRight, Check, Sparkles, RotateCcw, X } from 'lucide-react';
+import { UserCheck, CalendarPlus, CalendarClock, WifiOff, ServerOff, Plus, Search, MoreHorizontal, Pencil, Trash2, Folder, FolderOpen, FileUp, Terminal, Link2, ArrowUpRight, ArrowRight, Check, Sparkles, RotateCcw, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
 import AppLayout from '../components/AppLayout';
@@ -15,6 +15,7 @@ import { usePlan, isPlanLimit, showUpgradeToast, catalogue } from '../utils/bill
 import { track } from '../utils/track';
 import { ScheduleModal, UpcomingMeetings } from '../components/Meetings';
 import NewInterview from '../components/NewInterview';
+import NewSplit from '../components/NewSplit';
 import { useOnline } from '../components/ux/Shell';
 import { useBackend } from '../context/BackendContext';
 
@@ -65,35 +66,6 @@ function RowMenu({ open, onToggle, children }) {
                 <MoreHorizontal size={18} />
             </button>
             {open && <div className="u-pop" role="menu" style={{ minWidth: 200 }}>{children}</div>}
-        </div>
-    );
-}
-
-// One place to start anything: a room now, a call later, a booking link, a project.
-function NewMenu({ items }) {
-    const [open, setOpen] = useState(false);
-    const ref = useRef(null);
-    useEffect(() => {
-        if (!open) return undefined;
-        const close = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
-        const key = (e) => e.key === 'Escape' && setOpen(false);
-        document.addEventListener('mousedown', close);
-        document.addEventListener('keydown', key);
-        return () => { document.removeEventListener('mousedown', close); document.removeEventListener('keydown', key); };
-    }, [open]);
-    return (
-        <div className="d-menu-wrap" ref={ref}>
-            <button className={`u-btn u-btn--ghost${open ? ' on' : ''}`} onClick={() => setOpen((v) => !v)} aria-haspopup="menu" aria-expanded={open}>New <ChevronDown size={15} /></button>
-            {open && (
-                <div className="u-pop db-new" role="menu">
-                    {items.map(({ id, Icon, title, sub, run, disabled }) => (
-                        <button key={id} role="menuitem" disabled={disabled} onClick={() => { setOpen(false); run(); }}>
-                            <Icon size={16} />
-                            <span className="db-new-text"><b>{title}</b><span>{sub}</span></span>
-                        </button>
-                    ))}
-                </div>
-            )}
         </div>
     );
 }
@@ -396,7 +368,7 @@ const Dashboard = () => {
                     <h1 className="db-title">Welcome back, {first}</h1>
                 </div>
                 <div className="db-actions">
-                    <NewMenu items={[
+                    <NewSplit onRoom={() => enterRoom(newRoomId())} items={[
                         { id: 'interview', Icon: UserCheck, title: 'Interview', sub: 'Start now, pick a time, or let them pick', run: () => setInterviewOpen(true) },
                         { id: 'room', Icon: Plus, title: 'Room now', sub: 'Code, talk and draw together; share the link', run: () => enterRoom(newRoomId()) },
                         { id: 'call', Icon: CalendarPlus, title: 'Scheduled call', sub: 'A room for later, with calendar invites', run: () => setScheduleOpen(true) },
@@ -405,7 +377,6 @@ const Dashboard = () => {
                         { id: 'folder', Icon: FolderOpen, title: 'Open a folder', sub: 'From your computer, as a project', run: () => importFromDisk('folder'), disabled: busy },
                         { id: 'files', Icon: FileUp, title: 'Open files', sub: 'From your computer, as a project', run: () => importFromDisk('files'), disabled: busy },
                     ]} />
-                    <button className="u-btn u-btn--solid" onClick={() => enterRoom(newRoomId())}><Plus size={16} /> New room</button>
                 </div>
             </header>
 

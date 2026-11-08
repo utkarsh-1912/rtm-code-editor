@@ -307,6 +307,7 @@ async function initializeSchema() {
         await sql`ALTER TABLE rooms ADD COLUMN IF NOT EXISTS problem TEXT DEFAULT '';`;
         await sql`ALTER TABLE rooms ADD COLUMN IF NOT EXISTS problem_tests JSONB DEFAULT '[]'::jsonb;`;
         await sql`ALTER TABLE rooms ADD COLUMN IF NOT EXISTS problem_series JSONB;`;
+        await sql`ALTER TABLE rooms ADD COLUMN IF NOT EXISTS problem_harness JSONB;`;
         // Session kits: a saved problem, starter code, language and timer length.
         await sql`
             CREATE TABLE IF NOT EXISTS session_kits (

@@ -27,30 +27,42 @@ function cleanSeries(s) {
     };
 }
 
+// LeetCode mode's function signature: { name, params: [{ name, type }], ret }.
+const IDENT = /^[A-Za-z_][A-Za-z0-9_]{0,60}$/;
+const TYPE = /^[A-Za-z0-9_<>\[\], ]{1,60}$/;
+function cleanHarness(h) {
+    if (!h || !IDENT.test(String(h.name || '')) || !Array.isArray(h.params) || h.params.length > 12) return null;
+    const params = h.params.map((p) => ({ name: String(p?.name || ''), type: String(p?.type || '') }));
+    if (params.some((p) => !IDENT.test(p.name) || !TYPE.test(p.type)) || !TYPE.test(String(h.ret || 'void'))) return null;
+    return { name: h.name, params, ret: String(h.ret || 'void') };
+}
+
 function setupProblemSocket(io, socket, safeSocket, context) {
     const { roomProblemState } = context;
 
     // `tests` is optional: typing in the problem keeps the examples; an import or a clear sets them.
-    socket.on(ACTIONS.PROBLEM_CHANGE, safeSocket(({ roomId, text, by, tests, series } = {}) => {
+    socket.on(ACTIONS.PROBLEM_CHANGE, safeSocket(({ roomId, text, by, tests, series, harness } = {}) => {
         if (!roomId || !socket.rooms.has(roomId)) return;
         const clean = String(text ?? '').slice(0, MAX_PROBLEM);
         const prev = roomProblemState[roomId] || {};
         const nextTests = tests !== undefined ? cleanTests(tests) : (clean ? prev.tests || [] : []);
         const nextSeries = series !== undefined ? cleanSeries(series) : (clean ? prev.series || null : null);
-        roomProblemState[roomId] = { text: clean, by: String(by || '').slice(0, 40), at: Date.now(), tests: nextTests, series: nextSeries };
+        // The signature goes with the examples: a new set of examples replaces it.
+        const nextHarness = tests !== undefined ? cleanHarness(harness) : (clean ? prev.harness || null : null);
+        roomProblemState[roomId] = { text: clean, by: String(by || '').slice(0, 40), at: Date.now(), tests: nextTests, series: nextSeries, harness: nextHarness };
         socket.to(roomId).emit(ACTIONS.PROBLEM_CHANGE, roomProblemState[roomId]);
         clearTimeout(saveTimers[roomId]);
         saveTimers[roomId] = setTimeout(() => {
             delete saveTimers[roomId];
-            RoomRepository.setRoomProblem(roomId, clean, nextTests, nextSeries).catch(() => { });
+            RoomRepository.setRoomProblem(roomId, clean, nextTests, nextSeries, nextHarness).catch(() => { });
         }, 1500);
     }));
 
     socket.on(ACTIONS.PROBLEM_SYNC_REQUEST, safeSocket(({ roomId } = {}) => {
         if (!roomId || !socket.rooms.has(roomId)) return;
         if (roomProblemState[roomId]) return socket.emit(ACTIONS.PROBLEM_SYNC, roomProblemState[roomId]);
-        RoomRepository.getRoomProblemState(roomId).then(({ text, tests, series }) => {
-            if (text && !roomProblemState[roomId]) roomProblemState[roomId] = { text, by: '', at: Date.now(), tests, series };
+        RoomRepository.getRoomProblemState(roomId).then(({ text, tests, series, harness }) => {
+            if (text && !roomProblemState[roomId]) roomProblemState[roomId] = { text, by: '', at: Date.now(), tests, series, harness };
             socket.emit(ACTIONS.PROBLEM_SYNC, roomProblemState[roomId] || { text: '', by: '', at: 0, tests: [] });
         }).catch(() => socket.emit(ACTIONS.PROBLEM_SYNC, { text: '', by: '', at: 0, tests: [] }));
     }));
@@ -59,3 +71,4 @@ function setupProblemSocket(io, socket, safeSocket, context) {
 module.exports = setupProblemSocket;
 module.exports.cleanTests = cleanTests;
 module.exports.cleanSeries = cleanSeries;
+module.exports.cleanHarness = cleanHarness;

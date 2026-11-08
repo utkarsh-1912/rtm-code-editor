@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Bell, Sun, Moon, LogOut, LogIn, LifeBuoy, Settings as SettingsIcon, LayoutGrid, Code2, Plus, UserRound, ShieldCheck, CreditCard, ChevronDown, UserCheck, CalendarPlus, CalendarClock, Folder } from 'lucide-react';
+import { Search, Bell, Sun, Moon, LogOut, LogIn, LifeBuoy, Settings as SettingsIcon, LayoutGrid, Code2, Plus, UserRound, ShieldCheck, CreditCard, UserCheck, CalendarPlus, CalendarClock, Folder } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
 import { getBackendUrl } from '../utils/api';
@@ -12,6 +12,7 @@ import Shell, { useOnline, useThemeToggle } from './ux/Shell';
 import { useBackend, backendLabel } from '../context/BackendContext';
 import { Avatar } from './clients';
 import { newRoomId } from './ux/primitives';
+import NewSplit from './NewSplit';
 
 // One home for signed-in users: the workspace lives at /dashboard ("/" redirects there).
 const NAV = [
@@ -26,36 +27,6 @@ const COLUMNS = [
     { title: 'Help', links: [['Support', '/support'], ['Status', '/status'], ['Security', '/security']] },
     { title: 'Legal', links: [['Privacy', '/privacy'], ['Terms', '/terms']] },
 ];
-
-// The navbar's New button: a room in one click, everything else from its menu.
-function NewSplit({ onRoom, items }) {
-    const [open, setOpen] = useState(false);
-    const ref = useRef(null);
-    useEffect(() => {
-        if (!open) return undefined;
-        const close = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
-        const key = (e) => e.key === 'Escape' && setOpen(false);
-        document.addEventListener('mousedown', close);
-        document.addEventListener('keydown', key);
-        return () => { document.removeEventListener('mousedown', close); document.removeEventListener('keydown', key); };
-    }, [open]);
-    return (
-        <div className="u-split u-nav-new" ref={ref}>
-            <button className="u-btn u-btn--solid u-split-main" onClick={onRoom}><Plus size={16} /> New room</button>
-            <button className="u-btn u-btn--solid u-split-more" onClick={() => setOpen((v) => !v)} aria-label="More things to create" aria-haspopup="menu" aria-expanded={open}><ChevronDown size={15} /></button>
-            {open && (
-                <div className="u-pop u-split-pop" role="menu">
-                    {items.map(({ id, Icon, title, sub, run }) => (
-                        <button key={id} role="menuitem" onClick={() => { setOpen(false); run(); }}>
-                            <Icon size={16} />
-                            <span className="u-split-text"><b>{title}</b><span>{sub}</span></span>
-                        </button>
-                    ))}
-                </div>
-            )}
-        </div>
-    );
-}
 
 const AppLayout = ({ children }) => {
     const { user, logout } = useAuth();
@@ -162,7 +133,7 @@ const AppLayout = ({ children }) => {
                     {isLight ? <Moon size={18} /> : <Sun size={18} />}
                 </button>
                 {user ? (
-                    <NewSplit onRoom={startRoom} items={[
+                    <NewSplit inNav onRoom={startRoom} items={[
                         { id: 'room', Icon: Plus, title: 'Room now', sub: 'Code, talk and draw together', run: startRoom },
                         { id: 'interview', Icon: UserCheck, title: 'Interview', sub: 'Start now, pick a time, or let them pick', run: () => navigate('/dashboard', { state: { openInterview: true } }) },
                         { id: 'call', Icon: CalendarPlus, title: 'Scheduled call', sub: 'A room for later, with invites', run: () => navigate('/dashboard', { state: { openSchedule: true } }) },
@@ -178,7 +149,7 @@ const AppLayout = ({ children }) => {
                 {!user ? (
                     // Guests (public pages like a meeting link) have no account menu.
                     <button className="u-btn u-btn--ghost" onClick={() => navigate('/login', { state: { from: window.location.pathname + window.location.search } })}>
-                        <LogIn size={15} /> Sign in
+                        <LogIn size={15} /> <span className="u-hide-xs">Sign in</span>
                     </button>
                 ) : (
                 <div ref={userRef} style={{ position: 'relative' }}>

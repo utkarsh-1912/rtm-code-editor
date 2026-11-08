@@ -41,10 +41,11 @@ function htmlToText(html) {
 
 async function getJson(url, init = {}) {
     const ctrl = new AbortController();
-    const t = setTimeout(() => ctrl.abort(), 10000);
+    const t = setTimeout(() => ctrl.abort(), init.timeout || 10000);
     try {
-        const res = await fetch(url, { ...init, signal: ctrl.signal, headers: { 'User-Agent': UA, ...(init.headers || {}) } });
-        if (!res.ok) throw Object.assign(new Error(`The site answered ${res.status}.`), { status: 502 });
+        const { timeout, text, ...rest } = init;
+        const res = await fetch(url, { ...rest, signal: ctrl.signal, headers: { 'User-Agent': UA, ...(init.headers || {}) } });
+        if (!res.ok) throw Object.assign(new Error(`The site answered ${res.status}.`), { status: 502, httpStatus: res.status });
         return init.text ? await res.text() : await res.json();
     } finally { clearTimeout(t); }
 }
@@ -65,7 +66,14 @@ async function leetcode(slug) {
     // Example tests: LeetCode lists each case's arguments one per line; the expected outputs
     // come from the statement's "Output:" lines, in order.
     let params = 1;
-    try { params = Math.max(1, (JSON.parse(q.metaData || '{}').params || []).length || 1); } catch { /* keep 1 */ }
+    let harness = null; // { name, params: [{ name, type }], ret } for LeetCode mode (not for design problems)
+    try {
+        const meta = JSON.parse(q.metaData || '{}');
+        params = Math.max(1, (meta.params || []).length || 1);
+        if (meta.name && Array.isArray(meta.params) && !meta.systemdesign && !meta.classname) {
+            harness = { name: meta.name, params: meta.params.map((p) => ({ name: p.name, type: p.type })), ret: meta.return?.type || 'void' };
+        }
+    } catch { /* keep 1 */ }
     const lines = String(q.exampleTestcases || '').split('\n').filter((l) => l.trim() !== '');
     const outputs = [...text.matchAll(/^Output:\s*`?([^`\n]*)`?/gim)].map((m) => m[1].trim());
     const tests = [];
@@ -75,7 +83,7 @@ async function leetcode(slug) {
     return {
         source: 'LeetCode', url: `https://leetcode.com/problems/${slug}/`,
         title: `${q.questionFrontendId}. ${q.title}`, difficulty: q.difficulty, tags: (q.topicTags || []).map((t) => t.name),
-        text, starters, tests,
+        text, starters, tests, harness,
     };
 }
 
@@ -94,19 +102,41 @@ async function cfMeta(contest, index) {
     return cfSet.byKey.get(`${contest}${String(index).toUpperCase()}`) || null;
 }
 
+// A Codeforces problem page with its statement: the problemset page, then the contest page,
+// twice over with a short pause between tries (Codeforces is often slow or busy for a moment).
+// { html } on success; { missing: true } when every answer was "not found"; {} otherwise.
+async function codeforcesPage(contest, index, gym) {
+    const paths = gym
+        ? [`/gym/${contest}/problem/${index}`]
+        : [`/problemset/problem/${contest}/${index}`, `/contest/${contest}/problem/${index}`];
+    const tries = [...paths, ...paths].map((p) => `https://codeforces.com${p}`);
+    let notFound = 0;
+    for (let i = 0; i < tries.length; i++) {
+        try {
+            const html = await getJson(tries[i], { text: true, timeout: 15000 });
+            if (/problem-statement/.test(html)) return { html };
+        } catch (err) {
+            if (err.httpStatus === 404) notFound++;
+        }
+        if (i < tries.length - 1) await new Promise((r) => setTimeout(r, 700 + i * 500));
+    }
+    return notFound === tries.length ? { missing: true } : {};
+}
+
 async function codeforces(contest, index, gym = false) {
-    const p = gym ? null : await cfMeta(contest, index).catch(() => null);
     const url = gym ? `https://codeforces.com/gym/${contest}/problem/${index}` : `https://codeforces.com/problemset/problem/${contest}/${index}`;
+    // The page and the name/rating/tags list load side by side.
+    const [page, p] = await Promise.all([
+        codeforcesPage(contest, index, gym),
+        gym ? null : cfMeta(contest, index).catch(() => null),
+    ]);
+    const html = page.html;
+    if (page.missing) throw Object.assign(new Error('Codeforces has no problem at that link.'), { status: 404 });
     let text = '';
     let pageTitle = null;
     const tests = [];
     try {
-        // One retry: Codeforces sometimes answers slowly or with a busy page.
-        let html = await getJson(url, { text: true }).catch(() => null);
-        if (!html || !/problem-statement/.test(html)) {
-            await new Promise((r) => setTimeout(r, 800));
-            html = await getJson(url, { text: true });
-        }
+        if (!html) throw new Error('no statement');
         const m = /<div class="problem-statement">([\s\S]*?)<\/div>\s*<\/div>\s*<script/i.exec(html) || /<div class="problem-statement">([\s\S]*)/i.exec(html);
         const t = /<div class="title">\s*([A-Z]\d?\.\s*[^<]+)<\/div>/i.exec(html);
         if (t) pageTitle = decode(t[1].trim());
@@ -128,9 +158,8 @@ async function codeforces(contest, index, gym = false) {
         }
     } catch { /* reported below */ }
     if (!text) {
-        // Never fill the pane with a stub: say what happened so people can try again.
-        if (!p) throw Object.assign(new Error('Codeforces has no problem at that link.'), { status: 404 });
-        throw Object.assign(new Error('Codeforces didn’t send the statement just now. Try again in a moment.'), { status: 502 });
+        // Never fill the pane with a stub: say what happened (with the link, to copy it by hand).
+        throw Object.assign(new Error('Codeforces isn’t answering this server right now. Try again in a moment, or open the problem and paste it.'), { status: 502, openUrl: url });
     }
     return {
         source: 'Codeforces', url,
@@ -212,7 +241,10 @@ router.get('/problems/import', async (req, res) => {
         if (cache.size > 500) cache.delete(cache.keys().next().value);
         res.json(data);
     } catch (err) {
-        res.status(err.status || 502).json({ error: err.name === 'AbortError' ? 'The site took too long to answer. Try again.' : (err.message || 'Could not import that problem.') });
+        res.status(err.status || 502).json({
+            error: err.name === 'AbortError' ? 'The site took too long to answer. Try again.' : (err.message || 'Could not import that problem.'),
+            ...(err.openUrl ? { openUrl: err.openUrl } : {}),
+        });
     }
 });
 
