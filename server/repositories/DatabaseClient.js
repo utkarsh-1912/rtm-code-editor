@@ -305,6 +305,8 @@ async function initializeSchema() {
         await sql`ALTER TABLE meetings ADD COLUMN IF NOT EXISTS booking_link_id VARCHAR(32);`;
         // The room's Problem panel text, so it survives restarts and can be set up in advance.
         await sql`ALTER TABLE rooms ADD COLUMN IF NOT EXISTS problem TEXT DEFAULT '';`;
+        await sql`ALTER TABLE rooms ADD COLUMN IF NOT EXISTS problem_tests JSONB DEFAULT '[]'::jsonb;`;
+        await sql`ALTER TABLE rooms ADD COLUMN IF NOT EXISTS problem_series JSONB;`;
         // Session kits: a saved problem, starter code, language and timer length.
         await sql`
             CREATE TABLE IF NOT EXISTS session_kits (

@@ -9,8 +9,18 @@ async function getRoomProblem(roomId) {
     const rows = await sql`SELECT problem FROM rooms WHERE room_id = ${roomId}`;
     return rows[0]?.problem || '';
 }
-async function setRoomProblem(roomId, text) {
-    await sql`UPDATE rooms SET problem = ${String(text || '').slice(0, 20 * 1024)} WHERE room_id = ${roomId}`;
+async function setRoomProblem(roomId, text, tests, series) {
+    if (tests === undefined) {
+        await sql`UPDATE rooms SET problem = ${String(text || '').slice(0, 20 * 1024)} WHERE room_id = ${roomId}`;
+    } else {
+        await sql`UPDATE rooms SET problem = ${String(text || '').slice(0, 20 * 1024)}, problem_tests = ${JSON.stringify(tests || [])}::jsonb,
+            problem_series = ${series ? JSON.stringify(series) : null}::jsonb WHERE room_id = ${roomId}`;
+    }
+}
+// The problem and its example tests ({ text, tests }).
+async function getRoomProblemState(roomId) {
+    const rows = await sql`SELECT problem, problem_tests, problem_series FROM rooms WHERE room_id = ${roomId}`;
+    return { text: rows[0]?.problem || '', tests: Array.isArray(rows[0]?.problem_tests) ? rows[0].problem_tests : [], series: rows[0]?.problem_series || null };
 }
 
 async function saveRoom(roomId, code, language, chatHistory) {
@@ -243,6 +253,7 @@ async function getUserRoomsPage(userId, { limit, offset }) {
 
 module.exports = {
     getRoomProblem,
+    getRoomProblemState,
     setRoomProblem,
     getUserRoomsPage,
     getRoom,

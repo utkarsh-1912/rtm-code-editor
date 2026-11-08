@@ -10,13 +10,19 @@ const LEETCODE_LANG = { javascript: "javascript", typescript: "typescript", pyth
 const MAX = 20 * 1024;
 const LABEL = /^(example\s*\d*|input|output|explanation|constraints?|note|follow[- ]?up|hint\s*\d*)\b[^:]{0,24}:/i;
 
-// `code` spans inside a line.
+// Pictures from these sites show in the pane; anything else stays a link.
+const IMAGE_HOSTS = /^https:\/\/([a-z0-9-]+\.)*(leetcode\.com|leetcode\.cn|codeforces\.com|codeforces\.org)\//i;
+
+// `code` spans, [text](https://…) and bare https:// links inside a line.
 function inline(text, keyBase) {
-    return text.split(/(`[^`\n]+`)/g).map((part, i) =>
-        part.startsWith("`") && part.endsWith("`") && part.length > 2
-            ? <code key={`${keyBase}-${i}`}>{part.slice(1, -1)}</code>
-            : part
-    );
+    return text.split(/(`[^`\n]+`|\[[^\]\n]+\]\(https:\/\/[^)\s]+\)|https:\/\/[^\s)]+)/g).map((part, i) => {
+        const key = `${keyBase}-${i}`;
+        if (part.startsWith("`") && part.endsWith("`") && part.length > 2) return <code key={key}>{part.slice(1, -1)}</code>;
+        const md = /^\[([^\]]+)\]\((https:\/\/[^)\s]+)\)$/.exec(part);
+        if (md) return <a key={key} href={md[2]} target="_blank" rel="noreferrer noopener">{md[1]}</a>;
+        if (/^https:\/\//.test(part)) return <a key={key} href={part} target="_blank" rel="noreferrer noopener">{part.replace(/^https:\/\/(www\.)?/, "")}</a>;
+        return part;
+    });
 }
 
 // Light formatting for pasted questions (LeetCode style). Plain text in, React nodes out:
@@ -28,6 +34,12 @@ function Formatted({ text }) {
         return block.split("\n").map((line, li) => {
             const key = `${bi}-${li}`;
             if (!line.trim()) return <div key={key} className="pb-gap" />;
+            const img = line.match(/^!\[([^\]]*)\]\((https:\/\/[^)\s]+)\)$/);
+            if (img) {
+                return IMAGE_HOSTS.test(img[2])
+                    ? <img key={key} className="pb-img" src={img[2]} alt={img[1] || "Illustration from the problem"} referrerPolicy="no-referrer" />
+                    : <div key={key} className="pb-p"><a href={img[2]} target="_blank" rel="noreferrer noopener">Open image</a></div>;
+            }
             const h = line.match(/^(#{1,3})\s+(.*)$/);
             if (h) return <div key={key} className={`pb-h pb-h${h[1].length}`}>{inline(h[2], key)}</div>;
             const bullet = line.match(/^\s*(?:[-*•]|\d+[.)])\s+(.*)$/);
@@ -46,7 +58,7 @@ function Formatted({ text }) {
 }
 
 // The question the room is solving: anyone can paste or edit it; everyone sees it live.
-export default function ProblemPane({ socketRef, roomId, userName, isReadOnly, language, onInsertCode, canUseKits, getCode, onApplyKit, onSetInput }) {
+export default function ProblemPane({ socketRef, roomId, userName, isReadOnly, language, onInsertCode, canUseKits, getCode, onApplyKit, onExamples, interviewMode }) {
     const storeKey = `room-problem-${roomId}`;
     const [text, setText] = useState(() => {
         try { return localStorage.getItem(storeKey) || ""; } catch { return ""; }
@@ -58,16 +70,21 @@ export default function ProblemPane({ socketRef, roomId, userName, isReadOnly, l
     const [link, setLink] = useState("");
     const [busy, setBusy] = useState(false);
     const [importError, setImportError] = useState("");
-    // The last import's starter code and example tests, kept for this tab (the pane is
-    // unmounted when you switch tabs on a phone).
+    // Interviews: leave out the title, difficulty, topics and source (they hint at the answer).
+    const [hideHints, setHideHints] = useState(!!interviewMode);
+    useEffect(() => { setHideHints(!!interviewMode); }, [interviewMode]);
+    // The last import's starter code, kept for this tab (the pane is unmounted when you switch
+    // tabs on a phone). Example tests go to the whole room with the problem.
     const importKey = `room-import-${roomId}`;
     const saved = (() => { try { return JSON.parse(sessionStorage.getItem(importKey) || "{}"); } catch { return {}; } })();
     const [starters, setStarters] = useState(saved.starters || null); // { langSlug: code }
-    const [tests, setTests] = useState(saved.tests || []); // [{ input, output }]
-    const [testIndex, setTestIndex] = useState(saved.testIndex ?? null);
     useEffect(() => {
-        try { sessionStorage.setItem(importKey, JSON.stringify({ starters, tests, testIndex })); } catch { /* storage blocked */ }
-    }, [importKey, starters, tests, testIndex]);
+        try { sessionStorage.setItem(importKey, JSON.stringify({ starters })); } catch { /* storage blocked */ }
+    }, [importKey, starters]);
+    // A contest the room is working through, shared with everyone: { title, source, url, index, problems }.
+    const [series, setSeries] = useState(null);
+    const onExamplesRef = useRef(onExamples);
+    onExamplesRef.current = onExamples;
     const sendTimer = useRef(null);
     const textRef = useRef(text);
     textRef.current = text;
@@ -77,37 +94,53 @@ export default function ProblemPane({ socketRef, roomId, userName, isReadOnly, l
     useEffect(() => {
         const socket = socketRef.current;
         if (!socket) return undefined;
-        const onChange = ({ text: incoming, by, at }) => {
+        const onChange = ({ text: incoming, by, at, tests, series: incomingSeries }) => {
             setText(incoming || "");
             save(incoming || "");
             setMeta(by ? { by, at } : null);
+            if (Array.isArray(tests)) onExamplesRef.current?.(tests);
+            if (incomingSeries !== undefined) setSeries(incomingSeries || null);
         };
-        const onSync = ({ text: serverText, by, at }) => {
+        const onSync = ({ text: serverText, by, at, tests, series: serverSeries }) => {
             if (serverText) {
-                onChange({ text: serverText, by, at });
+                onChange({ text: serverText, by, at, tests, series: serverSeries ?? null });
             } else if (textRef.current && !isReadOnly) {
                 // The server restarted and lost it: restore from this browser.
                 socket.emit(ACTIONS.PROBLEM_CHANGE, { roomId, text: textRef.current, by: userName });
             }
         };
+        // Ask now, and again once this socket is in the room (asks from outside it are ignored).
+        const onJoined = ({ socketId }) => { if (socketId === socket.id) socket.emit(ACTIONS.PROBLEM_SYNC_REQUEST, { roomId }); };
         socket.on(ACTIONS.PROBLEM_CHANGE, onChange);
         socket.on(ACTIONS.PROBLEM_SYNC, onSync);
+        socket.on(ACTIONS.JOINED, onJoined);
         socket.emit(ACTIONS.PROBLEM_SYNC_REQUEST, { roomId });
         return () => {
+            socket.off(ACTIONS.JOINED, onJoined);
             socket.off(ACTIONS.PROBLEM_CHANGE, onChange);
             socket.off(ACTIONS.PROBLEM_SYNC, onSync);
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [socketRef, roomId]);
 
-    const update = (value) => {
+    // `tests` and `nextSeries` (optional) replace the room's examples and contest; clearing the
+    // problem clears both.
+    const update = (value, tests, nextSeries) => {
         const v = value.slice(0, MAX);
         setText(v);
         save(v);
         setMeta({ by: userName, at: Date.now() });
+        const nextTests = tests !== undefined ? tests : (v.trim() ? undefined : []);
+        const seriesOut = nextSeries !== undefined ? nextSeries : (v.trim() ? undefined : null);
+        if (nextTests !== undefined) onExamplesRef.current?.(nextTests);
+        if (seriesOut !== undefined) setSeries(seriesOut);
         clearTimeout(sendTimer.current);
         sendTimer.current = setTimeout(() => {
-            socketRef.current?.emit(ACTIONS.PROBLEM_CHANGE, { roomId, text: v, by: userName });
+            socketRef.current?.emit(ACTIONS.PROBLEM_CHANGE, {
+                roomId, text: v, by: userName,
+                ...(nextTests !== undefined ? { tests: nextTests } : {}),
+                ...(seriesOut !== undefined ? { series: seriesOut } : {}),
+            });
         }, 250);
     };
     useEffect(() => () => clearTimeout(sendTimer.current), []);
@@ -115,33 +148,62 @@ export default function ProblemPane({ socketRef, roomId, userName, isReadOnly, l
     const pasteFromClipboard = async () => {
         try {
             const clip = await navigator.clipboard.readText();
-            if (clip) { update(clip); setEditing(false); }
+            if (clip) { update(clip, [], null); setEditing(false); }
         } catch {
             setEditing(true);
         }
     };
 
-    // LeetCode or Codeforces link -> the statement (and LeetCode's starter code).
+    const fetchImport = async (url) => {
+        const res = await fetch(`${getBackendUrl()}/api/problems/import?url=${encodeURIComponent(url)}`);
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || "Couldn't import that link.");
+        return data;
+    };
+    // One problem into the pane: title and topics unless hidden, the statement, the source as a
+    // link, its examples; and the contest it belongs to, when there is one.
+    const showProblem = (data, nextSeries) => {
+        const head = hideHints ? "" : [`# ${data.title}`, [data.difficulty, ...(data.tags || []).slice(0, 6)].filter(Boolean).join(" · ")].filter(Boolean).join("\n");
+        const body = [head, data.text, hideHints ? "" : `Source: [${data.source}](${data.url})`].filter(Boolean).join("\n\n");
+        update(body, Array.isArray(data.tests) ? data.tests : [], nextSeries);
+        setStarters(Object.keys(data.starters || {}).length ? data.starters : null);
+    };
+
+    // A problem link, or a contest link (its problems become a strip; the first one opens).
     const importLink = async (e) => {
         e?.preventDefault();
         if (!link.trim()) return;
         setBusy(true);
         setImportError("");
         try {
-            const res = await fetch(`${getBackendUrl()}/api/problems/import?url=${encodeURIComponent(link.trim())}`);
-            const data = await res.json().catch(() => ({}));
-            if (!res.ok) throw new Error(data.error || "Couldn't import that link.");
-            update(data.pane);
-            setStarters(Object.keys(data.starters || {}).length ? data.starters : null);
-            setTests(Array.isArray(data.tests) ? data.tests : []);
-            setTestIndex(null);
-            if (data.tests?.length && onSetInput) { onSetInput(data.tests[0].input); setTestIndex(0); }
+            const data = await fetchImport(link.trim());
+            if (data.kind === "contest") {
+                const first = await fetchImport(data.problems[0].url);
+                showProblem(first, { title: data.title, source: data.source, url: data.url, index: 0, problems: data.problems });
+            } else {
+                showProblem(data, null);
+            }
             setImporting(false);
             setEditing(false);
             setLink("");
         } catch (err) {
             setImportError(err.message);
         } finally { setBusy(false); }
+    };
+
+    // Move to another problem of the contest (for everyone in the room).
+    const [seriesBusy, setSeriesBusy] = useState(null);
+    const openInSeries = async (i) => {
+        if (!series || seriesBusy != null || i === series.index) return;
+        setSeriesBusy(i);
+        try {
+            const data = await fetchImport(series.problems[i].url);
+            showProblem(data, { ...series, index: i });
+            setEditing(false);
+        } catch (err) {
+            setImportError(err.message);
+            setImporting(true);
+        } finally { setSeriesBusy(null); }
     };
     const starter = starters && LEETCODE_LANG[language] ? starters[LEETCODE_LANG[language]] : null;
 
@@ -166,7 +228,7 @@ export default function ProblemPane({ socketRef, roomId, userName, isReadOnly, l
                 )}
                 <span className="pb-meta">{meta?.by ? `edited by ${meta.by}` : text.trim() ? `${text.length.toLocaleString()} chars` : "shared with the room"}</span>
                 <span className="pb-tools">
-                    {canUseKits && !isReadOnly && <KitMenu problem={text} getCode={getCode} language={language} onApply={(kit) => { if (kit.problem) update(kit.problem); setEditing(false); onApplyKit?.(kit); }} />}
+                    {canUseKits && !isReadOnly && <KitMenu problem={text} getCode={getCode} language={language} onApply={(kit) => { if (kit.problem) update(kit.problem, [], null); setEditing(false); onApplyKit?.(kit); }} />}
                     {!isReadOnly && <button className={`ec-icon${importing ? " on" : ""}`} onClick={() => { setImporting((v) => !v); setImportError(""); }} title="Import from a LeetCode or Codeforces link" aria-label="Import problem from a link" aria-expanded={importing}><Icon name="open-external" size={14} /></button>}
                     {text.trim() && <button className="ec-icon" onClick={copy} title="Copy problem" aria-label="Copy problem">{copied ? <Icon name="check" size={14} /> : <Icon name="copy" size={14} />}</button>}
                     {!isReadOnly && text.trim() && <button className="ec-icon" onClick={() => { update(""); setEditing(true); }} title="Clear for everyone" aria-label="Clear problem"><Icon name="delete" size={14} /></button>}
@@ -175,27 +237,35 @@ export default function ProblemPane({ socketRef, roomId, userName, isReadOnly, l
 
             {importing && !isReadOnly && (
                 <form className="pb-import" onSubmit={importLink}>
-                    <input className="u-input" value={link} onChange={(e) => setLink(e.target.value)} placeholder="leetcode.com/problems/… or codeforces.com/problemset/problem/…" aria-label="Problem link" autoFocus />
+                    <input className="u-input" value={link} onChange={(e) => setLink(e.target.value)} placeholder="A LeetCode or Codeforces problem or contest link" aria-label="Problem or contest link" autoFocus />
                     <button type="submit" className="u-btn u-btn--solid u-btn--sm" disabled={busy || !link.trim()}>{busy ? "Importing…" : "Import"}</button>
+                    <label className="pb-hide"><input type="checkbox" checked={hideHints} onChange={(e) => setHideHints(e.target.checked)} /> Hide title, difficulty and topics (interviews)</label>
                     {importError && <p className="pb-import-error" role="alert">{importError}</p>}
                 </form>
+            )}
+            {series && (
+                <div className="pb-series" role="group" aria-label="Contest problems">
+                    <span className="pb-series-name" title={series.title}>{hideHints ? "Contest" : series.title}</span>
+                    <span className="pb-series-list">
+                        {series.problems.map((p, i) => (
+                            <button key={p.url} type="button" className={i === series.index ? "on" : ""} aria-current={i === series.index ? "true" : undefined}
+                                disabled={isReadOnly || seriesBusy != null} onClick={() => openInSeries(i)}
+                                title={hideHints ? `Problem ${p.label}` : `${p.label}. ${p.title}`}>{seriesBusy === i ? "…" : p.label}</button>
+                        ))}
+                    </span>
+                    {!isReadOnly && (
+                        <span className="pb-series-nav">
+                            <button type="button" className="ec-icon" onClick={() => openInSeries(series.index - 1)} disabled={series.index === 0 || seriesBusy != null} aria-label="Previous problem" title="Previous problem">‹</button>
+                            <button type="button" className="ec-icon" onClick={() => openInSeries(series.index + 1)} disabled={series.index >= series.problems.length - 1 || seriesBusy != null} aria-label="Next problem" title="Next problem">›</button>
+                        </span>
+                    )}
+                </div>
             )}
             {starter && onInsertCode && !isReadOnly && !showEditor && (
                 <div className="pb-starter">
                     <span>Starter code for this language is available.</span>
                     <button type="button" className="u-btn u-btn--ghost u-btn--sm" onClick={() => { onInsertCode(starter); setStarters(null); }}>Use starter code</button>
                     <button type="button" className="ec-icon" onClick={() => setStarters(null)} aria-label="Dismiss"><Icon name="close" size={12} /></button>
-                </div>
-            )}
-            {tests.length > 0 && onSetInput && !showEditor && (
-                <div className="pb-tests" role="group" aria-label="Example tests">
-                    <span>Examples</span>
-                    {tests.map((t, i) => (
-                        <button key={i} type="button" className={testIndex === i ? "on" : ""} aria-pressed={testIndex === i}
-                            onClick={() => { onSetInput(t.input); setTestIndex(i); }}
-                            title={`Put example ${i + 1}'s input in the Input box${t.output ? `\nExpected: ${t.output}` : ""}`}>{i + 1}</button>
-                    ))}
-                    {testIndex != null && tests[testIndex]?.output && <em className="u-ellipsis" title={tests[testIndex].output}>expected {tests[testIndex].output}</em>}
                 </div>
             )}
             {showEditor ? (

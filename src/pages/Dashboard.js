@@ -177,6 +177,10 @@ const Dashboard = () => {
             setView('projects');
             window.history.replaceState({}, document.title, window.location.pathname + window.location.search);
         }
+        if (location.state?.openInterview) {
+            setInterviewOpen(true);
+            window.history.replaceState({}, document.title, window.location.pathname + window.location.search);
+        }
         if (location.state?.openSchedule) {
             setScheduleOpen(true);
             window.history.replaceState({}, document.title, window.location.pathname + window.location.search);

@@ -197,6 +197,20 @@ function Editor() {
     return () => { live = false; clearInterval(t); };
   }, [roomId]);
   const aiAllowed = !!orgMeeting || roomPolicy.aiAllowed;
+  // Example tests that came with the room's problem (shown in Input / Output). A new set fills
+  // Input with the first example.
+  const [examples, setExamples] = useState([]);
+  const [exampleIndex, setExampleIndex] = useState(null);
+  const examplesKey = useRef("");
+  const setRoomExamples = (list) => {
+    const next = Array.isArray(list) ? list : [];
+    const key = JSON.stringify(next);
+    if (key === examplesKey.current) return;
+    examplesKey.current = key;
+    setExamples(next);
+    if (next.length) { setStdin(next[0].input); setExampleIndex(0); } else setExampleIndex(null);
+  };
+  const pickExample = (i) => { setStdin(examples[i]?.input || ""); setExampleIndex(i); };
   const reportPaste = (chars) => { if (roomPolicy.live) socketRef.current?.emit(ACTIONS.CODE_PASTE, { roomId, chars, by: userName }); };
   // Arrived from a meeting page (camera and mic already checked there): open the call now.
   useEffect(() => {
@@ -641,7 +655,7 @@ function Editor() {
 
   // One card of the desktop layout. `handle` is the drag grip for cards that show it inline.
   const renderRoomPanel = (id, handle) => {
-    if (id === "problem") return <ProblemPane socketRef={socketRef} roomId={roomId} userName={userName} isReadOnly={isReadOnly} language={language} onInsertCode={insertStarter} canUseKits={!!user} getCode={() => codeRef.current} onApplyKit={applyKit} onSetInput={(v) => { setStdin(v); if (!roomLayout.has("io")) roomLayout.toggle("io"); }} />;
+    if (id === "problem") return <ProblemPane socketRef={socketRef} roomId={roomId} userName={userName} isReadOnly={isReadOnly} language={language} onInsertCode={insertStarter} canUseKits={!!user} getCode={() => codeRef.current} onApplyKit={applyKit} onExamples={setRoomExamples} interviewMode={roomPolicy.live || !!orgMeeting} />;
     if (id === "code") {
       return (
           <EditorComp
@@ -671,7 +685,7 @@ function Editor() {
     }
     if (id === "io") {
       return (
-          <OutputWindow
+          <OutputWindow examples={examples} exampleIndex={exampleIndex} onPickExample={pickExample}
                             output={output}
                             isError={isError}
                             time={execTime}
@@ -771,7 +785,7 @@ function Editor() {
               <div style={{ height: "100%", display: "flex", flexDirection: "column" }}>
                 <div style={{ flex: 1, overflow: "hidden" }}>
                   {activeTab === "problem" && (
-                    <ProblemPane socketRef={socketRef} roomId={roomId} userName={userName} isReadOnly={isReadOnly} language={language} onInsertCode={insertStarter} canUseKits={!!user} getCode={() => codeRef.current} onApplyKit={applyKit} onSetInput={(v) => { setStdin(v); if (!roomLayout.has("io")) roomLayout.toggle("io"); }} />
+                    <ProblemPane socketRef={socketRef} roomId={roomId} userName={userName} isReadOnly={isReadOnly} language={language} onInsertCode={insertStarter} canUseKits={!!user} getCode={() => codeRef.current} onApplyKit={applyKit} onExamples={setRoomExamples} interviewMode={roomPolicy.live || !!orgMeeting} />
                   )}
                   {activeTab === "code" && (
                     <EditorComp
@@ -800,7 +814,7 @@ function Editor() {
                     />
                   )}
                   {activeTab === "output" && (
-                    <OutputWindow output={output} isError={isError} time={execTime} isMobile={isMobile} stdin={stdin} setStdin={setStdin} isLightMode={isLightMode} language={language} tables={sqlTables} setTables={setSqlTables} />
+                    <OutputWindow examples={examples} exampleIndex={exampleIndex} onPickExample={pickExample} output={output} isError={isError} time={execTime} isMobile={isMobile} stdin={stdin} setStdin={setStdin} isLightMode={isLightMode} language={language} tables={sqlTables} setTables={setSqlTables} />
                   )}
                   {activeTab === "chat" && (
                     <ChatWindow
@@ -1037,6 +1051,13 @@ function Editor() {
           codeRef.current = newCode;
           setCurrentCode(newCode);
           socketRef.current?.emit(ACTIONS.CODE_CHANGE, { roomId, code: newCode });
+        }}
+        onInsertCode={(snippet) => {
+          const next = codeRef.current.trim() && !isTemplate(codeRef.current) ? `${codeRef.current.replace(/\s+$/, "")}\n\n${snippet}` : snippet;
+          codeRef.current = next;
+          setCurrentCode(next);
+          localStorage.setItem(`code-${roomId}`, next);
+          socketRef.current?.emit(ACTIONS.CODE_CHANGE, { roomId, code: next });
         }}
       />
 

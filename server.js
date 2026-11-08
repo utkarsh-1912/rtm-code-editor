@@ -71,8 +71,6 @@ function limiter(name, max, windowMs) {
     next();
   };
 }
-// Round-trip check for the meeting page's connection test (no body, never cached).
-app.get('/api/ping', (req, res) => { res.set('Cache-Control', 'no-store'); res.status(204).end(); });
 app.use('/api', limiter('api', 600, 60 * 1000));
 const bookLimit = limiter('book', 10, 60 * 60 * 1000); // candidates booking a slot
 app.use('/api/support', limiter('support', 5, 60 * 60 * 1000));

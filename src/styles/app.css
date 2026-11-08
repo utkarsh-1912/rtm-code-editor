@@ -3186,12 +3186,7 @@ button.dk-get { border: 0; background: transparent; padding: 0; font: inherit; f
 .lc-line.is-live { opacity: .85; }
 .lc-hint { font-size: 13px; color: #A3A098; }
 
-/* Problem pane: example tests from an import */
-.pb-tests { display: flex; align-items: center; gap: 4px; padding: 6px 10px 6px 14px; border-bottom: 1px solid var(--u-line); font-size: 12px; color: var(--u-ink-3); min-width: 0; }
-.pb-tests > span { margin-right: 4px; font-family: var(--u-mono); text-transform: uppercase; letter-spacing: .06em; font-size: 10.5px; }
-.pb-tests button { width: 26px; height: 24px; border: 1px solid var(--u-line-2); border-radius: 7px; background: transparent; color: var(--u-ink-2); font: inherit; font-size: 12px; cursor: pointer; }
-.pb-tests button.on { background: var(--u-solid); border-color: var(--u-solid); color: var(--u-on-solid); }
-.pb-tests em { margin-left: 6px; font-style: normal; font-family: var(--u-mono); color: var(--u-ink-2); min-width: 0; }
+
 
 /* New interview: three paths */
 .ni { display: flex; flex-direction: column; gap: 8px; }
@@ -3213,3 +3208,58 @@ button.dk-get { border: 0; background: transparent; padding: 0; font: inherit; f
   .ss { right: 8px; bottom: 76px; max-width: calc(100% - 16px); }
   .lc { bottom: 120px; }
 }
+
+/* Problem pane: pictures from the problem, links, and the interview option */
+.pb-img { display: block; max-width: 100%; height: auto; margin: 8px 0; border-radius: 8px; border: 1px solid var(--u-line); background: #fff; }
+.pb-view a { color: var(--u-accent); text-underline-offset: 3px; }
+.pb-hide { flex-basis: 100%; display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--u-ink-3); cursor: pointer; }
+.pb-hide input { accent-color: var(--u-ink); margin: 0; }
+
+/* Input / Output: example tests and the expected output */
+.io-ex { display: inline-flex; align-items: center; gap: 4px; margin-left: auto; }
+.io-ex button { min-width: 24px; height: 22px; padding: 0 6px; border: 1px solid var(--u-line-2); border-radius: 6px; background: transparent; color: var(--u-ink-2); font: inherit; font-size: 11px; cursor: pointer; }
+.io-ex button.on { background: var(--u-solid); border-color: var(--u-solid); color: var(--u-on-solid); }
+.io-expected { flex: none; max-height: 40%; overflow: auto; margin: 0; padding: 8px 12px; border-top: 1px solid var(--u-line); font-family: var(--u-mono); font-size: 12.5px; color: var(--u-ink-2); white-space: pre-wrap; }
+.io-expected b { display: block; margin-bottom: 4px; font-family: var(--u-mono); font-size: 10.5px; font-weight: 500; letter-spacing: .06em; text-transform: uppercase; color: var(--u-ink-3); }
+.io-expected b.is-ok { color: var(--u-ok); }
+.io-expected b.is-bad { color: var(--u-bad); }
+
+/* AI copilot: re-run check, history, inserting code */
+.ai-repeat { display: flex; flex-direction: column; gap: 10px; padding: 14px 16px; border: 1px solid var(--u-line-2); border-radius: 14px; background: var(--u-tint); }
+.ai-repeat p { margin: 0; font-size: 14px; line-height: 1.5; color: var(--u-ink-2); }
+.ai-repeat b { color: var(--u-ink); }
+.ai-repeat > span { display: flex; gap: 8px; flex-wrap: wrap; }
+.ai-actions { display: inline-flex; gap: 6px; flex-wrap: wrap; }
+.ai-saved { font-size: 13px; font-weight: 400; color: var(--u-pane-ink-2, var(--u-ink-3)); }
+.ai-history { border: 1px solid var(--u-line); border-radius: 14px; padding: 10px 14px; }
+.ai-history summary { cursor: pointer; font-size: 13px; color: var(--u-ink-2); }
+.ai-history ul { list-style: none; margin: 10px 0 8px; padding: 0; display: flex; flex-direction: column; gap: 2px; max-height: 220px; overflow-y: auto; }
+.ai-history li button { width: 100%; display: grid; grid-template-columns: 96px minmax(0, 1fr) auto; gap: 10px; align-items: baseline; padding: 8px 10px; border: 0; border-radius: 10px; background: transparent; color: var(--u-ink); font: inherit; font-size: 13px; text-align: left; cursor: pointer; }
+.ai-history li button:hover, .ai-history li button.on { background: var(--u-tint); }
+.ai-history li span { color: var(--u-ink-3); }
+.ai-history li em { font-style: normal; font-family: var(--u-mono); font-size: 11px; color: var(--u-ink-3); }
+.rt-codewrap { position: relative; }
+.rt-insert { position: absolute; top: 6px; right: 6px; height: 24px; padding: 0 10px; border: 1px solid color-mix(in srgb, currentColor 20%, transparent); border-radius: 999px; background: color-mix(in srgb, currentColor 6%, transparent); color: inherit; font: inherit; font-size: 11.5px; cursor: pointer; opacity: .85; }
+.rt-insert:hover { opacity: 1; }
+
+/* Navbar: New room with a menu for everything else */
+.u-split { position: relative; display: inline-flex; margin-left: 6px; }
+.u-split-main { border-top-right-radius: 0; border-bottom-right-radius: 0; padding-right: 12px; }
+.u-split-more { border-top-left-radius: 0; border-bottom-left-radius: 0; padding: 0 10px; margin-left: 1px; }
+.u-split-pop { min-width: 290px; }
+.u-split-pop button { align-items: flex-start; padding-top: 9px; padding-bottom: 9px; }
+.u-split-pop button svg { margin-top: 2px; }
+.u-split-text { display: flex; flex-direction: column; gap: 2px; text-align: left; }
+.u-split-text b { font-size: 13.5px; font-weight: 600; color: var(--u-ink); }
+.u-split-text span { font-size: 12px; color: var(--u-ink-3); }
+
+/* Problem pane: the contest strip */
+.pb-series { display: flex; align-items: center; gap: 8px; padding: 6px 8px 6px 14px; border-bottom: 1px solid var(--u-line); min-width: 0; }
+.pb-series-name { flex: 0 1 auto; min-width: 0; max-width: 40%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; color: var(--u-ink-2); }
+.pb-series-list { flex: 1; min-width: 0; display: flex; gap: 4px; overflow-x: auto; scrollbar-width: none; }
+.pb-series-list::-webkit-scrollbar { display: none; }
+.pb-series-list button { flex: none; min-width: 28px; height: 24px; padding: 0 7px; border: 1px solid var(--u-line-2); border-radius: 7px; background: transparent; color: var(--u-ink-2); font: inherit; font-size: 12px; font-family: var(--u-mono); cursor: pointer; }
+.pb-series-list button.on { background: var(--u-solid); border-color: var(--u-solid); color: var(--u-on-solid); }
+.pb-series-list button:disabled { cursor: default; }
+.pb-series-nav { flex: none; display: inline-flex; }
+.pb-series-nav .ec-icon { font-size: 16px; line-height: 1; }

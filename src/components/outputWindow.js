@@ -58,10 +58,23 @@ function TablesPanel({ tables, setTables }) {
 }
 
 // Room I/O: what the program reads (stdin) beside what it printed.
-export default function OutputWindow({ output, isError, time, isMobile, stdin, setStdin, language, tables, setTables }) {
+export default function OutputWindow({ output, isError, time, isMobile, stdin, setStdin, language, tables, setTables, examples = [], exampleIndex = null, onPickExample }) {
+    const ex = exampleIndex != null ? examples[exampleIndex] : null;
+    const norm = (v) => String(v || "").trim().replace(/[ \t]+$/gm, "").replace(/\r/g, "");
+    const verdict = ex?.output && output && !isError ? (norm(output) === norm(ex.output) ? "ok" : "bad") : null;
     const input = language === "sql" && setTables ? <TablesPanel tables={tables || []} setTables={setTables} /> : (
         <div className="ws-io-col">
-            <div className="ws-pane-head"><span>Input</span><b>stdin</b></div>
+            <div className="ws-pane-head">
+                <span>Input</span>
+                {examples.length > 0 && onPickExample ? (
+                    <span className="io-ex" role="group" aria-label="Example tests">
+                        {examples.map((t, i) => (
+                            <button key={i} type="button" className={exampleIndex === i ? "on" : ""} aria-pressed={exampleIndex === i}
+                                onClick={() => onPickExample(i)} title={`Example ${i + 1}: put its input here`}>Ex {i + 1}</button>
+                        ))}
+                    </span>
+                ) : <b>stdin</b>}
+            </div>
             <textarea
                 className="ws-stdin"
                 value={stdin || ""}
@@ -86,6 +99,12 @@ export default function OutputWindow({ output, isError, time, isMobile, stdin, s
             <pre className={`ws-console${isError ? " is-error" : ""}`} aria-live="polite">
                 {output || <span className="u-caret">No output yet. Press Run</span>}
             </pre>
+            {ex?.output && (
+                <pre className="io-expected">
+                    <b className={verdict ? `is-${verdict}` : ""}>{verdict === "ok" ? "Expected · matches" : verdict === "bad" ? "Expected · differs" : `Expected (example ${exampleIndex + 1})`}</b>
+                    {ex.output}
+                </pre>
+            )}
         </div>
     );
 

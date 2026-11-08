@@ -74,11 +74,18 @@ function blocks(src) {
     return out;
 }
 
-export default function RichText({ text, className = "" }) {
+export default function RichText({ text, className = "", onCode }) {
     return (
         <div className={`rt ${className}`.trim()}>
             {blocks(text).map((b, k) => {
-                if (b.type === "code") return <pre key={k} className="rt-code"><code>{b.text}</code></pre>;
+                if (b.type === "code") {
+                    return (
+                        <div key={k} className="rt-codewrap">
+                            {onCode && <button type="button" className="rt-insert" onClick={() => onCode(b.text)} title="Add this code to the end of the editor">Insert into editor</button>}
+                            <pre className="rt-code"><code>{b.text}</code></pre>
+                        </div>
+                    );
+                }
                 if (b.type === "h") { const H = `h${b.level}`; return <H key={k}>{inline(b.text, `h${k}`)}</H>; }
                 if (b.type === "hr") return <hr key={k} />;
                 if (b.type === "quote") return <blockquote key={k}>{inline(b.text, `q${k}`)}</blockquote>;
