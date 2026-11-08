@@ -19,7 +19,7 @@ export default function ServerWake() {
             <span className="sw-mark" aria-hidden="true"><i /></span>
             <div className="sw-text">
                 <strong>{down ? "Lost the server" : "Waking the server"}</strong>
-                <span>{down ? "Retrying in the background. Rooms reconnect on their own." : "Free hosting sleeps when idle; the first load can take up to a minute."}</span>
+                <span>{down ? "Retrying in the background. Rooms reconnect on their own." : "Servers sleeps when idle; the first load can take up to a minute."}</span>
             </div>
             <span className="u-label sw-time">{mmss(waitedMs)}</span>
             <button className="u-icon" onClick={retry} title="Try again now" aria-label="Try again now"><Icon name="reload" size={16} /></button>

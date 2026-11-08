@@ -384,7 +384,7 @@ function Editor() {
           // Fallback to retry loop if immediate ping fails
         }
 
-        // Free hosting can take up to a minute to wake; keep trying for ~90s.
+        // Servers can take up to a minute to wake; keep trying for ~90s.
         let retries = 0;
         const maxRetries = 110;
         while (retries < maxRetries) {

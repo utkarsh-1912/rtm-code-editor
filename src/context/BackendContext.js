@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useEffect, useRef, useState } from "react";
 import { getBackendUrl } from "../utils/api";
 
-// Tracks whether the API server is awake. Free hosting sleeps when idle and can take
+// Tracks whether the API server is awake. Servers sleeps when idle and can take
 // up to a minute to start, so we poll quickly until it answers, then slowly.
 const BackendContext = createContext({ status: "checking", db: null, latency: null, waitedMs: 0, retry: () => {} });
 

@@ -38,7 +38,7 @@ Remote collaboration for code, in the browser and on the desktop. Rooms for quic
 - **The code runner has no database dependency.** It lives in [`server/runner/`](server/runner) and is mounted at `/api/run` in the API server, or run on its own with `npm run runner`.
 - **The API server starts before the database.** It listens immediately, so health checks, the runner and sockets work during a cold start. The schema initialises in the background with retries, and `/api/ping` reports `db: starting | ready | error`.
 - **Rooms don't wait on the database.** People are joined and synced over sockets first; persistence happens afterwards.
-- **Cold starts are visible.** Free hosting sleeps when idle. The web app shows a "Waking the server" notice with a timer, and the desktop app shows a splash until the server answers.
+- **Cold starts are visible.** Servers sleeps when idle. The web app shows a "Waking the server" notice with a timer, and the desktop app shows a splash until the server answers.
 
 ## Run it locally
 
