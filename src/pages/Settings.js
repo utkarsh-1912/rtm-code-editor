@@ -13,23 +13,25 @@ import { useSearchParams } from 'react-router-dom';
 import DesktopPanel from '../components/DesktopPanel';
 import DeviceList from '../components/DeviceList';
 import AIModelsPanel from '../components/AIModelsPanel';
+import CalendarConnections from '../components/CalendarConnections';
 import BookingLinksPanel from '../components/BookingLinksPanel';
 import BrandingPanel from '../components/BrandingPanel';
 import { IS_DESKTOP } from '../utils/desktop';
 import GitHubIcon from '../components/GitHubIcon';
 import { useGitHubStatus, connectGitHub, disconnectGitHub, CONNECTED_MESSAGE } from '../utils/github';
 
+// Grouped so the list stays short to scan: you, how you work together, and the app.
 const SECTIONS = [
-    { id: 'profile', title: 'Profile' },
-    { id: 'appearance', title: 'Appearance' },
-    { id: 'billing', title: 'Plan & billing' },
-    { id: 'notifications', title: 'Notifications' },
-    { id: 'connections', title: 'Connections' },
-    { id: 'scheduling', title: 'Booking links' },
-    { id: 'branding', title: 'Branding' },
-    { id: 'ai', title: 'AI models' },
-    { id: 'security', title: 'Security' },
-    ...(IS_DESKTOP ? [{ id: 'desktop', title: 'Desktop app' }] : []),
+    { id: 'profile', title: 'Profile', group: 'Account' },
+    { id: 'appearance', title: 'Appearance', group: 'Account' },
+    { id: 'notifications', title: 'Notifications', group: 'Account' },
+    { id: 'security', title: 'Security', group: 'Account' },
+    { id: 'billing', title: 'Plan & billing', group: 'Account' },
+    { id: 'connections', title: 'Connections', group: 'Collaboration' },
+    { id: 'ai', title: 'AI models', group: 'Collaboration' },
+    { id: 'scheduling', title: 'Booking links', group: 'Collaboration' },
+    { id: 'branding', title: 'Branding', group: 'Collaboration' },
+    ...(IS_DESKTOP ? [{ id: 'desktop', title: 'Desktop app', group: 'App' }] : []),
 ];
 
 const NOTIFS = [
@@ -211,9 +213,12 @@ const Settings = () => {
             <div className="g-layout">
                 <nav className="g-index" aria-label="Settings sections" data-rise>
                     {sections.map((s, i) => (
-                        <button key={s.id} className={active === s.id ? 'on' : ''} onClick={() => setActive(s.id)} aria-current={active === s.id ? 'page' : undefined}>
-                            <span>{pad2(i + 1)}</span><span>{s.title}</span>
-                        </button>
+                        <React.Fragment key={s.id}>
+                            {s.group !== sections[i - 1]?.group && <span className="g-index-group">{s.group}</span>}
+                            <button className={active === s.id ? 'on' : ''} onClick={() => setActive(s.id)} aria-current={active === s.id ? 'page' : undefined}>
+                                <span>{pad2(i + 1)}</span><span>{s.title}</span>
+                            </button>
+                        </React.Fragment>
                     ))}
                 </nav>
 
@@ -382,6 +387,7 @@ const Settings = () => {
                                         : <button className="u-btn u-btn--solid u-btn--sm" onClick={connectGithub} disabled={githubBusy}>Connect</button>)}
                                 </li>
                             </ul>
+                            <CalendarConnections />
                         </div>
                     )}
 

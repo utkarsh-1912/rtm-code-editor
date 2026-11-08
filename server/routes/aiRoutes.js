@@ -41,6 +41,17 @@ router.post('/copilot', async (req, res) => {
         } else if (!anonAllowed(req.headers['x-forwarded-for']?.split(',')[0].trim() || req.socket.remoteAddress || '?')) {
             return res.status(402).json({ success: false, code: 'PLAN_LIMIT', limit: 'ai', error: 'Sign in to keep using the AI copilot, or run a local model in the desktop app.' });
         }
+        // A meeting in this room with the copilot turned off for guests: only organisers may use it.
+        if (roomId) {
+            const live = await require('../repositories/InterviewRepository').liveMeetingRow(String(roomId)).catch(() => null);
+            if (live?.ai_policy === 'off') {
+                const m = await require('../repositories/MeetingRepository').getMeeting(live.id);
+                const who = await caller(req).catch(() => null);
+                if (!m || !require('./meetingRoutes').isOrganiser(m, who)) {
+                    return res.status(403).json({ success: false, code: 'AI_OFF', error: 'The organiser turned off the AI copilot for this meeting.' });
+                }
+            }
+        }
         // A chosen platform model (Settings > AI models); otherwise the default hosted model.
         let reply;
         const chosen = modelId ? AIModels.platformModel(String(modelId)) : null;

@@ -303,6 +303,52 @@ async function initializeSchema() {
         `;
         await sql`ALTER TABLE meetings ADD COLUMN IF NOT EXISTS brand_org_id INTEGER;`;
         await sql`ALTER TABLE meetings ADD COLUMN IF NOT EXISTS booking_link_id VARCHAR(32);`;
+        // The room's Problem panel text, so it survives restarts and can be set up in advance.
+        await sql`ALTER TABLE rooms ADD COLUMN IF NOT EXISTS problem TEXT DEFAULT '';`;
+        // Session kits: a saved problem, starter code, language and timer length.
+        await sql`
+            CREATE TABLE IF NOT EXISTS session_kits (
+                id SERIAL PRIMARY KEY,
+                owner_uid VARCHAR(128) NOT NULL,
+                title VARCHAR(120) NOT NULL,
+                problem TEXT DEFAULT '',
+                language VARCHAR(32) DEFAULT 'javascript',
+                code TEXT DEFAULT '',
+                timer_min INTEGER DEFAULT 0,
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+            );
+        `;
+        await sql`CREATE INDEX IF NOT EXISTS session_kits_owner ON session_kits (owner_uid);`;
+        await sql`ALTER TABLE booking_links ADD COLUMN IF NOT EXISTS kit_id INTEGER;`;
+        // Google / Microsoft calendar connections (encrypted refresh tokens) and each meeting's
+        // copy in the host's calendar.
+        await sql`
+            CREATE TABLE IF NOT EXISTS calendar_connections (
+                uid VARCHAR(128) NOT NULL,
+                provider VARCHAR(16) NOT NULL,
+                account_email VARCHAR(255),
+                refresh_token TEXT NOT NULL,
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (uid, provider)
+            );
+        `;
+        await sql`ALTER TABLE meetings ADD COLUMN IF NOT EXISTS calendar_events JSONB DEFAULT '{}'::jsonb;`;
+        // Booking links: busy times from the host's own calendar (a private iCal address).
+        await sql`ALTER TABLE booking_links ADD COLUMN IF NOT EXISTS calendar_url TEXT;`;
+        // Whether guests may use the AI copilot during the meeting ('on' or 'off').
+        await sql`ALTER TABLE meetings ADD COLUMN IF NOT EXISTS ai_policy VARCHAR(8) DEFAULT 'on';`;
+        // What guests said about the meeting afterwards (a rating and an optional comment).
+        await sql`
+            CREATE TABLE IF NOT EXISTS meeting_guest_feedback (
+                id SERIAL PRIMARY KEY,
+                meeting_id VARCHAR(32) NOT NULL REFERENCES meetings(id) ON DELETE CASCADE,
+                name VARCHAR(80),
+                rating SMALLINT NOT NULL,
+                comment TEXT DEFAULT '',
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+            );
+        `;
         // Enterprise branding on a team: name, colour and logo shown to candidates.
         await sql`ALTER TABLE organizations ADD COLUMN IF NOT EXISTS brand_name VARCHAR(80);`;
         await sql`ALTER TABLE organizations ADD COLUMN IF NOT EXISTS brand_color VARCHAR(9);`;

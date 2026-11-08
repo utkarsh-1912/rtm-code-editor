@@ -21,6 +21,9 @@ import { runCode, formatRun } from "../utils/runner";
 import { buildSqlPrelude } from "../utils/sqlData";
 import { track } from "../utils/track";
 import { isTemplate } from "../utils/languages";
+import { useSession, SessionPills, TimerModal, toggleFollowMe } from "../components/SessionControls";
+import LiveCaptions from "../components/LiveCaptions";
+import { getRoomPolicy } from "../utils/meetings";
 import { CLIENT_ID } from "../utils/clientId";
 import { resolveTheme, setThemePref } from "../utils/theme";
 import "../styles/app.css";
@@ -178,6 +181,23 @@ function Editor() {
     onEndRequest: () => setEndMeetingOpen(true),
   });
   const orgMeeting = roomMeetingState.meeting;
+  // Working together: "Follow me" and the shared session timer.
+  const sessionState = useSession(socketRef, roomId, socketConnected);
+  const [timerOpen, setTimerOpen] = useState(false);
+  const [captionsOn, setCaptionsOn] = useState(false);
+  useEffect(() => { if (!isMeetingActive) setCaptionsOn(false); }, [isMeetingActive]);
+  // A scheduled meeting running in this room: whether guests may use the AI copilot, and that
+  // the code is recorded for the organisers' playback (said in the status bar).
+  const [roomPolicy, setRoomPolicy] = useState({ live: false, aiAllowed: true });
+  useEffect(() => {
+    let live = true;
+    const load = () => getRoomPolicy(roomId).then((p) => live && setRoomPolicy(p)).catch(() => { });
+    load();
+    const t = setInterval(load, 60000);
+    return () => { live = false; clearInterval(t); };
+  }, [roomId]);
+  const aiAllowed = !!orgMeeting || roomPolicy.aiAllowed;
+  const reportPaste = (chars) => { if (roomPolicy.live) socketRef.current?.emit(ACTIONS.CODE_PASTE, { roomId, chars, by: userName }); };
   // Arrived from a meeting page (camera and mic already checked there): open the call now.
   useEffect(() => {
     if (location.state?.startCall) { setIsMeetingMinimized(false); setIsMeetingActive(true); }
@@ -265,6 +285,32 @@ function Editor() {
     a.click();
     URL.revokeObjectURL(url);
     toast.success("Code downloaded successfully!");
+  };
+
+  // A session kit: its language and starter code (asking before replacing real work), and its timer.
+  const applyKit = (kit) => {
+    if (kit.code && codeRef.current.trim() && !isTemplate(codeRef.current) && !window.confirm(`Replace the code in the editor with “${kit.title}”'s starter code?`)) return;
+    if (kit.language && kit.language !== language) {
+      setLanguage(kit.language);
+      socketRef.current?.emit(ACTIONS.SYNC_LANGUAGE, { roomId, language: kit.language });
+    }
+    if (kit.code) {
+      codeRef.current = kit.code;
+      setCurrentCode(kit.code);
+      localStorage.setItem(`code-${roomId}`, kit.code);
+      socketRef.current?.emit(ACTIONS.CODE_CHANGE, { roomId, code: kit.code });
+    }
+    if (kit.timerMin) socketRef.current?.emit(ACTIONS.SESSION_TIMER, { roomId, minutes: kit.timerMin, label: kit.title, userName });
+    toast.success(`“${kit.title}” is set up for everyone`);
+  };
+
+  // Starter code from an imported problem replaces the editor's code for everyone.
+  const insertStarter = (code) => {
+    if (codeRef.current.trim() && !isTemplate(codeRef.current) && !window.confirm("Replace the code in the editor with the starter code?")) return;
+    codeRef.current = code;
+    setCurrentCode(code);
+    localStorage.setItem(`code-${roomId}`, code);
+    socketRef.current?.emit(ACTIONS.CODE_CHANGE, { roomId, code });
   };
 
   const handleSnippetImport = (snippetCode, mode) => {
@@ -595,7 +641,7 @@ function Editor() {
 
   // One card of the desktop layout. `handle` is the drag grip for cards that show it inline.
   const renderRoomPanel = (id, handle) => {
-    if (id === "problem") return <ProblemPane socketRef={socketRef} roomId={roomId} userName={userName} isReadOnly={isReadOnly} />;
+    if (id === "problem") return <ProblemPane socketRef={socketRef} roomId={roomId} userName={userName} isReadOnly={isReadOnly} language={language} onInsertCode={insertStarter} canUseKits={!!user} getCode={() => codeRef.current} onApplyKit={applyKit} onSetInput={(v) => { setStdin(v); if (!roomLayout.has("io")) roomLayout.toggle("io"); }} />;
     if (id === "code") {
       return (
           <EditorComp
@@ -617,6 +663,9 @@ function Editor() {
                             settings={settings}
                             isReadOnly={isReadOnly}
                             userName={userName}
+                            presenting={sessionState.presenting}
+                            followId={sessionState.followId}
+                            onPaste={reportPaste}
                           />
       );
     }
@@ -664,6 +713,7 @@ function Editor() {
 
   return (
     <div className="ws">
+      <h1 className="u-sr-only">Room {roomName || roomId}</h1>
 
       <WorkspaceHeader
         isMobile={isMobile}
@@ -686,34 +736,42 @@ function Editor() {
             { id: "meet-end", label: "End meeting for everyone", icon: <Icon name="meeting-end" size={20} />, onClick: () => setEndMeetingOpen(true), section: "more", tone: "red" },
           ] : []),
           ...(user?.uid ? [{ id: "schedule", label: "Schedule a call in this room", icon: <Icon name="calendar-add" size={20} />, onClick: () => setScheduleOpen(true), section: "more" }] : []),
+          { id: "follow", label: sessionState.presenting ? "Stop presenting (others stop following you)" : "Follow me: everyone's editor scrolls with yours", icon: <Icon name="show" size={20} filled={sessionState.presenting} />, onClick: () => toggleFollowMe(socketRef, roomId, userName, !sessionState.presenting), active: sessionState.presenting },
+          ...(isMeetingActive ? [{ id: "captions", label: captionsOn ? "Turn captions off" : "Live captions (captions your speech too, using your browser's speech service)", icon: <Icon name="chat" size={20} filled={captionsOn} />, onClick: () => setCaptionsOn((v) => !v), active: captionsOn }] : []),
+          { id: "timer", label: sessionState.session.timer ? "Session timer (running)" : "Session timer", icon: <Icon name="timer" size={20} filled={!!sessionState.session.timer} />, onClick: () => setTimerOpen(true), active: !!sessionState.session.timer },
           { id: "board", label: "Whiteboard", icon: <Icon name="whiteboard" size={20} />, onClick: () => setShowWhiteboard(true) },
-          { id: "ai", label: "AI Copilot", icon: <Icon name="ai" size={20} />, onClick: () => setShowAICopilot(true) },
+          ...(aiAllowed ? [{ id: "ai", label: "AI Copilot", icon: <Icon name="ai" size={20} />, onClick: () => setShowAICopilot(true) }] : []),
           { id: "share", label: "Invite people", icon: <Icon name="invite" size={20} />, onClick: () => setShowShare(true) },
-          { id: "history", label: "Version history", icon: <Icon name="history" size={20} />, onClick: () => setShowDiffViewer(true), section: "more" },
-          { id: "analytics", label: "Analytics", icon: <Icon name="analytics" size={20} />, onClick: () => setShowAnalytics(true), section: "more" },
+          // Guests get a shorter menu: the room's own tools, not the workspace's.
+          ...(user ? [
+            { id: "history", label: "Version history", icon: <Icon name="history" size={20} />, onClick: () => setShowDiffViewer(true), section: "more" },
+            { id: "analytics", label: "Analytics", icon: <Icon name="analytics" size={20} />, onClick: () => setShowAnalytics(true), section: "more" },
+          ] : []),
           ...(user ? [
             { id: "focus", label: "Focus mode", icon: <Icon name="focus" size={20} />, onClick: () => setShowFocusModal(true), section: "more" },
             { id: "snippet", label: "Import snippet", icon: <Icon name="snippet" size={20} />, onClick: () => setShowSnippetModal(true), section: "more" },
           ] : []),
-          { id: "github", label: "GitHub", icon: <Icon name="github" size={20} />, onClick: () => setShowGitHub(true), section: "more" },
+          ...(user ? [{ id: "github", label: "GitHub", icon: <Icon name="github" size={20} />, onClick: () => setShowGitHub(true), section: "more" }] : []),
           { id: "download", label: "Download code", icon: <Icon name="download" size={20} />, onClick: downloadCode, section: "more" },
           { id: "copy", label: "Copy room ID", icon: <Icon name="copy" size={20} />, onClick: copyRoomId, section: "more" },
           { id: "viewer", label: "Copy spectator link", icon: <Icon name="spectator" size={20} />, onClick: () => handleShare("viewer"), section: "more" },
-          { id: "palette", label: "Command palette", icon: <Icon name="palette" size={20} />, onClick: () => setShowCommandPalette(true), section: "more", desktopOnly: true },
+          ...(user ? [{ id: "palette", label: "Command palette", icon: <Icon name="palette" size={20} />, onClick: () => setShowCommandPalette(true), section: "more", desktopOnly: true }] : []),
           { id: "settings", label: "Editor settings", icon: <Icon name="settings" size={20} />, onClick: () => setShowSettings(true), section: "more" },
           ...(user ? [{ id: "dash", label: "Back to dashboard", icon: <Icon name="dashboard" size={20} />, onClick: () => reactNavigator("/dashboard"), section: "more" }] : []),
           { id: "leave", label: "Leave room", icon: <Icon name="leave-room" size={20} />, onClick: leaveRoom, section: "more", tone: "red" },
         ]}
       />
 
-      <div className="ws-body" style={{ flexDirection: "column" }}>
+      <div className="ws-body" style={{ flexDirection: "column", position: "relative" }}>
+        <LiveCaptions socketRef={socketRef} roomId={roomId} userName={userName} on={captionsOn && isMeetingActive} />
+        <SessionPills state={sessionState} socketRef={socketRef} roomId={roomId} userName={userName} onOpenTimer={() => setTimerOpen(true)} />
         {socketConnected ? (
           <>
             {isMobile ? (
               <div style={{ height: "100%", display: "flex", flexDirection: "column" }}>
                 <div style={{ flex: 1, overflow: "hidden" }}>
                   {activeTab === "problem" && (
-                    <ProblemPane socketRef={socketRef} roomId={roomId} userName={userName} isReadOnly={isReadOnly} />
+                    <ProblemPane socketRef={socketRef} roomId={roomId} userName={userName} isReadOnly={isReadOnly} language={language} onInsertCode={insertStarter} canUseKits={!!user} getCode={() => codeRef.current} onApplyKit={applyKit} onSetInput={(v) => { setStdin(v); if (!roomLayout.has("io")) roomLayout.toggle("io"); }} />
                   )}
                   {activeTab === "code" && (
                     <EditorComp
@@ -736,6 +794,9 @@ function Editor() {
                       settings={settings}
                       isReadOnly={isReadOnly}
                       userName={userName}
+                      presenting={sessionState.presenting}
+                      followId={sessionState.followId}
+                      onPaste={reportPaste}
                     />
                   )}
                   {activeTab === "output" && (
@@ -802,6 +863,7 @@ function Editor() {
             <span><span className={`u-dot${socketConnected ? "" : " u-dot--warn"}`} /> {socketConnected ? "connected" : "connecting…"}</span>
             <span>room/{roomId}</span>
             {isReadOnly && <span>spectator</span>}
+            {roomPolicy.live && <span title="A scheduled meeting is on: the code is recorded so the organisers can replay it, and big pastes are marked.">recording for playback</span>}
           </div>
           <div>
             <span className="ws-status-ed" ref={setStatusEl} />
@@ -846,6 +908,8 @@ function Editor() {
           />
         </div>
       )}
+
+      <TimerModal open={timerOpen} onClose={() => setTimerOpen(false)} socketRef={socketRef} roomId={roomId} userName={userName} timer={sessionState.session.timer} />
 
       <SettingsModal
         isOpen={showSettings}

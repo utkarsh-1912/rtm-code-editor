@@ -148,3 +148,9 @@ export const bookingUrl = (id) => `${publicOrigin()}/book/${id}`;
 export const getBranding = (orgId) => call(`/organizations/${orgId}/branding`);
 export const saveBranding = (orgId, body) => call(`/organizations/${orgId}/branding`, { method: "PUT", body });
 export const listTeams = (uid) => call(`/organizations?userId=${encodeURIComponent(uid)}`);
+
+// Room: is a scheduled meeting running here, and may guests use the AI copilot in it?
+export const getRoomPolicy = (roomId) => call(`/rooms/${encodeURIComponent(roomId)}/live-meeting`);
+export const setAiPolicy = (id, aiPolicy) => call(`/meetings/${encodeURIComponent(id)}/ai-policy`, { method: "PUT", body: { aiPolicy } });
+export const sendCandidateFeedback = (id, body) => call(`/meetings/${encodeURIComponent(id)}/candidate-feedback`, { method: "POST", body });
+export const getGuestFeedback = (id) => call(`/meetings/${encodeURIComponent(id)}/candidate-feedback`);

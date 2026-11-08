@@ -71,11 +71,15 @@ function limiter(name, max, windowMs) {
     next();
   };
 }
+// Round-trip check for the meeting page's connection test (no body, never cached).
+app.get('/api/ping', (req, res) => { res.set('Cache-Control', 'no-store'); res.status(204).end(); });
 app.use('/api', limiter('api', 600, 60 * 1000));
 const bookLimit = limiter('book', 10, 60 * 60 * 1000); // candidates booking a slot
 app.use('/api/support', limiter('support', 5, 60 * 60 * 1000));
 app.use(/^\/api\/projects\/[^/]+\/invite$/, limiter('invite', 30, 60 * 60 * 1000));
 app.use('/api/user/sync', limiter('sync', 30, 60 * 1000));
+app.use('/api/problems', limiter('problems', 30, 60 * 60 * 1000));
+app.post(/^\/api\/meetings\/[^/]+\/candidate-feedback$/, limiter('guestfb', 5, 60 * 60 * 1000));
 app.use(/^\/api\/book\/[^/]+$/, (req, res, next) => (req.method === 'POST' ? bookLimit(req, res, next) : next()));
 
 // Who is calling (verified sign-in), and requests that name a user must be that user.
@@ -115,6 +119,9 @@ app.use('/api', analyticsRoutes);
 app.use('/api', billingRoutes);
 app.use('/api', require('./server/routes/meetingRoutes'));
 app.use('/api', require('./server/routes/bookingRoutes'));
+app.use('/api', require('./server/routes/problemRoutes'));
+app.use('/api', require('./server/routes/kitRoutes'));
+app.use('/api', require('./server/routes/calendarRoutes'));
 app.use('/api', require('./server/routes/statusRoutes'));
 app.use('/api', githubRoutes);
 

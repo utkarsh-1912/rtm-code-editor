@@ -32,12 +32,15 @@ const FEATURES = [
     ["Run 17 languages", "Execute code together and share the output instantly, from Python to Rust."],
     ["SQL with your data", "Import a CSV, TSV or JSON file and query it right in the room."],
     ["Desktop apps", "Windows, macOS and Linux. Runs code and AI on your own machine when it can."],
-    ["Room chat", "Talk beside the code you are discussing, with emoji and edits."],
+    ["Follow me & timer", "Bring everyone to the code you're reading, and keep the session on time with a shared countdown."],
+    ["Live captions", "Captions in calls for everyone who turns them on, with each person choosing whether they're captioned."],
+    ["Room chat", "Talk beside the code you are discussing, with emoji, line breaks and edits."],
     ["Projects & snippets", "Keep multi-file work, history and reusable code between sessions."],
-    ["Scheduled calls", "Plan interviews and pairing sessions with invites, calendar links and reminders."],
+    ["Calls & booking links", "Schedule with calendar invites, or share a booking link that skips your busy times in Google or Outlook."],
+    ["Interviews, end to end", "Session kits, a private interviewer panel, structured feedback and a replay of the code."],
 ];
 
-const CAPABILITIES = ["Live cursors", "Voice & video", "Whiteboard", "System design", "17 languages", "SQL + CSV", "Desktop app", "Local AI", "Scheduled calls", "Private rooms", "Push alerts", "Room chat", "Snapshots", "AI copilot"];
+const CAPABILITIES = ["Live cursors", "Follow me", "Voice & video", "Live captions", "Whiteboard", "System design", "17 languages", "SQL + CSV", "Problem import", "Session timer", "Booking links", "Calendar sync", "Code playback", "Desktop app", "Local AI", "Private rooms", "Snapshots", "AI copilot"];
 
 // Code that types itself out, then starts over.
 function TypingCode() {

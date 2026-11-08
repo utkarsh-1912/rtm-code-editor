@@ -168,3 +168,31 @@ Instrument first, spend second. These events are now recorded in `analytics_logs
 - SEO basics: meta and Open Graph tags, structured data, `robots.txt`, `sitemap.xml`, per-page titles.
 - Lifecycle plumbing: Brevo email with OneSignal fallback, push notifications, billing notifications on plan changes.
 - Release pipeline and a download page that always links the latest installers.
+
+## Update: November 2026 positioning and launch notes
+
+**Positioning.** Utkristi CoLabs is remote collaboration for code first: people working on the same code, live, in one link. Interviews are one strong use of that, not the product's identity. It is not a practice or online-test platform; problem import exists so a pair can start from a known question, not to grade anyone.
+
+**One line.** Code together, remotely: one room for editing, talking, drawing and running code, from the first call to the final debrief.
+
+**New since the last plan (lead with the first three):**
+
+| Feature | Message | Who it's for |
+| --- | --- | --- |
+| Follow me | "Bring everyone to the line you're on." | Pairs, mentors, teams walking through code |
+| Session timer | "Keep the session on time together." | Pairing blocks, workshops, interviews |
+| Live captions | "Captions in every call, by choice." | Accessibility, mixed-language teams |
+| Problem import + example tests | "Paste a LeetCode or Codeforces link; start solving together." | Study groups, interview practice in pairs |
+| Session kits | "Set up a room in one click." | Interviewers, teachers, recurring sessions |
+| Booking links + calendar sync | "Let people pick a time; your busy times stay off." | Anyone who schedules sessions |
+| Interviewer panel, feedback, playback | "Fair decisions from evidence, not memory." | Hiring teams |
+| Guest feedback, connection check | "A better first impression for guests." | Hiring teams, educators |
+| Custom branding (Enterprise) | "Your logo and name on what guests see." | Larger organisations |
+
+**Launch checklist.**
+- Product Hunt / Hacker News: lead with Follow me + live captions + "guests need no account", demo video in `marketing/utkristi-colabs-demo.mp4`.
+- Landing page and Features page now group features as Collaborate, Meet, Build, Desktop, Organise.
+- Pitch deck: the "Utkristi CoLabs pitch" deck (11 slides, night theme) with the 1-minute demo.
+- Calendar sync needs the Google and Microsoft OAuth apps registered before it is announced (see README › Calendar sync).
+- Accessibility: keyboard focus rings everywhere, screen-reader labels on room controls, reduced-motion support; say so on the Security/About pages once a full audit is done.
+

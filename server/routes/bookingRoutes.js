@@ -10,6 +10,9 @@ const NotificationRepository = require('../repositories/NotificationRepository')
 const Branding = require('../services/Branding');
 const { validZone, zonedTime, dateIn } = require('../utils/zone');
 const { requireUser } = require('../security/access');
+const { cleanCalendarUrl, busyFromCalendar } = require('../services/IcalBusy');
+const CalendarSync = require('../services/CalendarSync');
+const { kitFor } = require('./kitRoutes');
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const DAYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
@@ -38,11 +41,15 @@ function readLink(b, base = {}) {
     const bufferMin = Math.min(120, Math.max(0, Math.round(Number(pick('bufferMin', base.buffer_min ?? 15)))));
     const access = ['public', 'invite', 'private'].includes(pick('access', base.access)) ? pick('access', base.access) : 'invite';
     const coHosts = [...new Set((pick('coHosts', base.co_hosts) || []).map((e) => String(e || '').trim().toLowerCase()).filter((e) => EMAIL.test(e)))].slice(0, 10);
+    const rawCal = pick('calendarUrl', base.calendar_url);
+    const calendarUrl = cleanCalendarUrl(rawCal);
+    const kitId = Number(pick('kitId', base.kit_id)) || null;
     let error = null;
     if (!title) error = 'Give the booking link a title.';
+    else if (calendarUrl === null) error = 'Use your calendar’s private iCal address from Google, Outlook or iCloud (it starts with https:// or webcal://).';
     else if (durationMin < 15 || durationMin > 240) error = 'Meetings booked this way last 15 minutes to 4 hours.';
     return {
-        title, durationMin, daysAhead, noticeMin, bufferMin, access, coHosts, error,
+        title, durationMin, daysAhead, noticeMin, bufferMin, access, coHosts, error, calendarUrl: calendarUrl || null, kitId,
         description: String(pick('description', base.description) || '').slice(0, 2000),
         timeZone: validZone(String(pick('timeZone', base.time_zone) || 'UTC')),
         hours: cleanHours(pick('hours', base.hours)),
@@ -53,6 +60,7 @@ function readLink(b, base = {}) {
 const view = (l) => ({
     id: l.id, title: l.title, description: l.description, durationMin: l.duration_min, timeZone: l.time_zone, hours: l.hours,
     daysAhead: l.days_ahead, noticeMin: l.notice_min, bufferMin: l.buffer_min, access: l.access, coHosts: l.co_hosts || [], active: l.active,
+    kitId: l.kit_id || null, calendarUrl: l.calendar_url || '',
 });
 
 // Times the host (or their co-hosts) are already in a meeting, from now to `until`.
@@ -73,10 +81,16 @@ async function freeSlots(link) {
     const now = Date.now();
     const earliest = now + link.notice_min * 60000;
     const until = new Date(now + (link.days_ahead + 1) * 86400000);
-    const busy = (await busyFor(link, until)).map((m) => {
-        const s = new Date(m.starts_at).getTime();
-        return [s - link.buffer_min * 60000, s + m.duration_min * 60000 + link.buffer_min * 60000];
-    });
+    const pad = link.buffer_min * 60000;
+    const busy = [
+        ...(await busyFor(link, until)).map((m) => {
+            const s = new Date(m.starts_at).getTime();
+            return [s - pad, s + m.duration_min * 60000 + pad];
+        }),
+        // The host's own calendar, when they connected one.
+        ...(await busyFromCalendar(link.calendar_url, until.getTime(), tz)).map(([s, e]) => [s - pad, e + pad]),
+        ...(await CalendarSync.busy(link.host_uid, now, until.getTime())).map(([s, e]) => [s - pad, e + pad]),
+    ];
     const len = link.duration_min * 60000;
     const step = 15 * 60000; // start times on the quarter hour
     const slots = [];
@@ -110,13 +124,14 @@ router.post('/booking-links', async (req, res) => {
         if (!me) return;
         const f = readLink(req.body || {});
         if (f.error) return res.status(400).json({ error: f.error });
+        if (f.kitId && !(await kitFor(me.uid, f.kitId))) f.kitId = null;
         const count = await sql`SELECT COUNT(*)::int n FROM booking_links WHERE host_uid = ${me.uid}`;
         if (count[0].n >= 20) return res.status(400).json({ error: 'You can have up to 20 booking links.' });
         const user = await UserRepository.getUser(me.uid).catch(() => null);
         const rows = await sql`
-            INSERT INTO booking_links (id, host_uid, host_name, host_email, title, description, duration_min, time_zone, hours, days_ahead, notice_min, buffer_min, access, co_hosts, active)
+            INSERT INTO booking_links (id, host_uid, host_name, host_email, title, description, duration_min, time_zone, hours, days_ahead, notice_min, buffer_min, access, co_hosts, active, kit_id, calendar_url)
             VALUES (${newId()}, ${me.uid}, ${user?.name || me.email}, ${me.email}, ${f.title}, ${f.description}, ${f.durationMin}, ${f.timeZone},
-                    ${JSON.stringify(f.hours)}::jsonb, ${f.daysAhead}, ${f.noticeMin}, ${f.bufferMin}, ${f.access}, ${JSON.stringify(f.coHosts)}::jsonb, ${f.active})
+                    ${JSON.stringify(f.hours)}::jsonb, ${f.daysAhead}, ${f.noticeMin}, ${f.bufferMin}, ${f.access}, ${JSON.stringify(f.coHosts)}::jsonb, ${f.active}, ${f.kitId}, ${f.calendarUrl})
             RETURNING *
         `;
         res.json(view(rows[0]));
@@ -131,10 +146,11 @@ router.put('/booking-links/:id', async (req, res) => {
         if (!base) return res.status(404).json({ error: 'Booking link not found.' });
         const f = readLink(req.body || {}, base);
         if (f.error) return res.status(400).json({ error: f.error });
+        if (f.kitId && !(await kitFor(me.uid, f.kitId))) f.kitId = null;
         const rows = await sql`
             UPDATE booking_links SET title = ${f.title}, description = ${f.description}, duration_min = ${f.durationMin}, time_zone = ${f.timeZone},
                 hours = ${JSON.stringify(f.hours)}::jsonb, days_ahead = ${f.daysAhead}, notice_min = ${f.noticeMin}, buffer_min = ${f.bufferMin},
-                access = ${f.access}, co_hosts = ${JSON.stringify(f.coHosts)}::jsonb, active = ${f.active}
+                access = ${f.access}, co_hosts = ${JSON.stringify(f.coHosts)}::jsonb, active = ${f.active}, kit_id = ${f.kitId}, calendar_url = ${f.calendarUrl}
             WHERE id = ${base.id} RETURNING *
         `;
         res.json(view(rows[0]));
@@ -186,7 +202,7 @@ router.post('/book/:id', async (req, res) => {
             description: [link.description, note ? `Note from ${name}: ${note}` : ''].filter(Boolean).join('\n\n'),
         });
         if (f.error) return res.status(400).json({ error: f.error });
-        const { meeting } = await scheduleFor(req.app, { uid: link.host_uid, email: link.host_email, name: link.host_name }, f, { coHosts: link.co_hosts || [], bookingLinkId: link.id });
+        const { meeting } = await scheduleFor(req.app, { uid: link.host_uid, email: link.host_email, name: link.host_name }, f, { coHosts: link.co_hosts || [], bookingLinkId: link.id, kitId: link.kit_id });
         NotificationRepository.notifyUser(link.host_uid, { type: 'meeting', message: `${name} booked ${link.title}`, url: `/meet/${meeting.id}`, data: { meetingId: meeting.id } }).catch(() => { });
         res.json({ meetingId: meeting.id, startsAt: meeting.starts_at, url: `/meet/${meeting.id}?as=${encodeURIComponent(name)}` });
     } catch (err) {

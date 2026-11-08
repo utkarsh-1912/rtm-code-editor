@@ -1,6 +1,11 @@
 import React, { useEffect, useRef, useState } from "react";
 import Icon from "./icons/Icon";
 import ACTIONS from "../Action";
+import { getBackendUrl } from "../utils/api";
+import KitMenu from "./KitMenu";
+
+// Room language -> LeetCode's starter-code language.
+const LEETCODE_LANG = { javascript: "javascript", typescript: "typescript", python: "python3", java: "java", c: "c", cpp: "cpp", csharp: "csharp", go: "golang", rust: "rust", kotlin: "kotlin", php: "php", ruby: "ruby", swift: "swift", sql: "mysql", bash: "bash" };
 
 const MAX = 20 * 1024;
 const LABEL = /^(example\s*\d*|input|output|explanation|constraints?|note|follow[- ]?up|hint\s*\d*)\b[^:]{0,24}:/i;
@@ -41,7 +46,7 @@ function Formatted({ text }) {
 }
 
 // The question the room is solving: anyone can paste or edit it; everyone sees it live.
-export default function ProblemPane({ socketRef, roomId, userName, isReadOnly }) {
+export default function ProblemPane({ socketRef, roomId, userName, isReadOnly, language, onInsertCode, canUseKits, getCode, onApplyKit, onSetInput }) {
     const storeKey = `room-problem-${roomId}`;
     const [text, setText] = useState(() => {
         try { return localStorage.getItem(storeKey) || ""; } catch { return ""; }
@@ -49,6 +54,20 @@ export default function ProblemPane({ socketRef, roomId, userName, isReadOnly })
     const [editing, setEditing] = useState(false);
     const [meta, setMeta] = useState(null); // { by, at }
     const [copied, setCopied] = useState(false);
+    const [importing, setImporting] = useState(false); // the link field is open
+    const [link, setLink] = useState("");
+    const [busy, setBusy] = useState(false);
+    const [importError, setImportError] = useState("");
+    // The last import's starter code and example tests, kept for this tab (the pane is
+    // unmounted when you switch tabs on a phone).
+    const importKey = `room-import-${roomId}`;
+    const saved = (() => { try { return JSON.parse(sessionStorage.getItem(importKey) || "{}"); } catch { return {}; } })();
+    const [starters, setStarters] = useState(saved.starters || null); // { langSlug: code }
+    const [tests, setTests] = useState(saved.tests || []); // [{ input, output }]
+    const [testIndex, setTestIndex] = useState(saved.testIndex ?? null);
+    useEffect(() => {
+        try { sessionStorage.setItem(importKey, JSON.stringify({ starters, tests, testIndex })); } catch { /* storage blocked */ }
+    }, [importKey, starters, tests, testIndex]);
     const sendTimer = useRef(null);
     const textRef = useRef(text);
     textRef.current = text;
@@ -102,6 +121,30 @@ export default function ProblemPane({ socketRef, roomId, userName, isReadOnly })
         }
     };
 
+    // LeetCode or Codeforces link -> the statement (and LeetCode's starter code).
+    const importLink = async (e) => {
+        e?.preventDefault();
+        if (!link.trim()) return;
+        setBusy(true);
+        setImportError("");
+        try {
+            const res = await fetch(`${getBackendUrl()}/api/problems/import?url=${encodeURIComponent(link.trim())}`);
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error(data.error || "Couldn't import that link.");
+            update(data.pane);
+            setStarters(Object.keys(data.starters || {}).length ? data.starters : null);
+            setTests(Array.isArray(data.tests) ? data.tests : []);
+            setTestIndex(null);
+            if (data.tests?.length && onSetInput) { onSetInput(data.tests[0].input); setTestIndex(0); }
+            setImporting(false);
+            setEditing(false);
+            setLink("");
+        } catch (err) {
+            setImportError(err.message);
+        } finally { setBusy(false); }
+    };
+    const starter = starters && LEETCODE_LANG[language] ? starters[LEETCODE_LANG[language]] : null;
+
     const copy = async () => {
         try {
             await navigator.clipboard.writeText(text);
@@ -123,11 +166,38 @@ export default function ProblemPane({ socketRef, roomId, userName, isReadOnly })
                 )}
                 <span className="pb-meta">{meta?.by ? `edited by ${meta.by}` : text.trim() ? `${text.length.toLocaleString()} chars` : "shared with the room"}</span>
                 <span className="pb-tools">
+                    {canUseKits && !isReadOnly && <KitMenu problem={text} getCode={getCode} language={language} onApply={(kit) => { if (kit.problem) update(kit.problem); setEditing(false); onApplyKit?.(kit); }} />}
+                    {!isReadOnly && <button className={`ec-icon${importing ? " on" : ""}`} onClick={() => { setImporting((v) => !v); setImportError(""); }} title="Import from a LeetCode or Codeforces link" aria-label="Import problem from a link" aria-expanded={importing}><Icon name="open-external" size={14} /></button>}
                     {text.trim() && <button className="ec-icon" onClick={copy} title="Copy problem" aria-label="Copy problem">{copied ? <Icon name="check" size={14} /> : <Icon name="copy" size={14} />}</button>}
                     {!isReadOnly && text.trim() && <button className="ec-icon" onClick={() => { update(""); setEditing(true); }} title="Clear for everyone" aria-label="Clear problem"><Icon name="delete" size={14} /></button>}
                 </span>
             </div>
 
+            {importing && !isReadOnly && (
+                <form className="pb-import" onSubmit={importLink}>
+                    <input className="u-input" value={link} onChange={(e) => setLink(e.target.value)} placeholder="leetcode.com/problems/… or codeforces.com/problemset/problem/…" aria-label="Problem link" autoFocus />
+                    <button type="submit" className="u-btn u-btn--solid u-btn--sm" disabled={busy || !link.trim()}>{busy ? "Importing…" : "Import"}</button>
+                    {importError && <p className="pb-import-error" role="alert">{importError}</p>}
+                </form>
+            )}
+            {starter && onInsertCode && !isReadOnly && !showEditor && (
+                <div className="pb-starter">
+                    <span>Starter code for this language is available.</span>
+                    <button type="button" className="u-btn u-btn--ghost u-btn--sm" onClick={() => { onInsertCode(starter); setStarters(null); }}>Use starter code</button>
+                    <button type="button" className="ec-icon" onClick={() => setStarters(null)} aria-label="Dismiss"><Icon name="close" size={12} /></button>
+                </div>
+            )}
+            {tests.length > 0 && onSetInput && !showEditor && (
+                <div className="pb-tests" role="group" aria-label="Example tests">
+                    <span>Examples</span>
+                    {tests.map((t, i) => (
+                        <button key={i} type="button" className={testIndex === i ? "on" : ""} aria-pressed={testIndex === i}
+                            onClick={() => { onSetInput(t.input); setTestIndex(i); }}
+                            title={`Put example ${i + 1}'s input in the Input box${t.output ? `\nExpected: ${t.output}` : ""}`}>{i + 1}</button>
+                    ))}
+                    {testIndex != null && tests[testIndex]?.output && <em className="u-ellipsis" title={tests[testIndex].output}>expected {tests[testIndex].output}</em>}
+                </div>
+            )}
             {showEditor ? (
                 <div className="pb-edit">
                     <textarea
@@ -140,7 +210,10 @@ export default function ProblemPane({ socketRef, roomId, userName, isReadOnly })
                         autoFocus={editing}
                     />
                     {!text.trim() && (
-                        <button className="pb-paste" onClick={pasteFromClipboard}><Icon name="paste" size={14} /> Paste from clipboard</button>
+                        <span className="pb-corner">
+                            <button type="button" className="ec-icon" onMouseDown={(e) => e.preventDefault()} onClick={() => setImporting(true)} title="Import from a LeetCode or Codeforces link" aria-label="Import problem from a link"><Icon name="open-external" size={14} /></button>
+                            <button type="button" className="ec-icon" onMouseDown={(e) => e.preventDefault()} onClick={pasteFromClipboard} title="Paste from clipboard" aria-label="Paste problem from clipboard"><Icon name="paste" size={14} /></button>
+                        </span>
                     )}
                 </div>
             ) : (

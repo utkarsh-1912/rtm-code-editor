@@ -4,10 +4,13 @@ import { getTimeline } from "../utils/meetings";
 
 // Replays how the code was written during a meeting. Frames are either the whole text
 // ({ full }) or one block of changed lines ({ s, d, i }); see server/services/CodeRecorder.js.
-function rebuild(frames) {
+// Paste markers ({ paste, by }) belong to the next change, which is where the pasted text shows.
+export function rebuild(frames) {
     const states = [];
     let lines = [];
+    let paste = null;
     for (const f of frames) {
+        if (Number.isFinite(f.paste)) { paste = { chars: f.paste, by: f.by || "" }; continue; }
         let changed = null;
         if (typeof f.full === "string") {
             lines = f.full.split("\n");
@@ -16,8 +19,10 @@ function rebuild(frames) {
             lines = [...lines.slice(0, f.s), ...(f.i || []), ...lines.slice(f.s + (f.d || 0))];
             changed = [f.s, f.s + (f.i || []).length];
         }
-        states.push({ at: new Date(f.at).getTime(), lines, changed });
+        states.push({ at: new Date(f.at).getTime(), lines, changed, paste });
+        paste = null;
     }
+    if (paste && states.length) states[states.length - 1].paste = paste;
     return states;
 }
 
@@ -64,8 +69,15 @@ export default function CodePlayback({ meetingId, startsAt }) {
             <div className="cp-bar">
                 <button type="button" className="cp-btn" onClick={() => { setI(0); setPlaying(false); }} aria-label="Back to start" title="Back to start"><SkipBack size={14} /></button>
                 <button type="button" className="cp-btn cp-play" onClick={() => { if (i >= last) setI(0); setPlaying((p) => !p); }} aria-label={playing ? "Pause" : "Play"}>{playing ? <Pause size={14} /> : <Play size={14} />}</button>
-                <input type="range" min={0} max={last} value={Math.min(i, last)} onChange={(e) => { setPlaying(false); setI(Number(e.target.value)); }}
-                    style={{ "--p": `${last ? (Math.min(i, last) / last) * 100 : 100}%` }} aria-label="Playback position" />
+                <span className="cp-track">
+                    <input type="range" min={0} max={last} value={Math.min(i, last)} onChange={(e) => { setPlaying(false); setI(Number(e.target.value)); }}
+                        style={{ "--p": `${last ? (Math.min(i, last) / last) * 100 : 100}%` }} aria-label="Playback position" />
+                    {/* Where something sizeable was pasted in (everyone in the room was told it's recorded). */}
+                    {states.map((st, n) => st.paste && (
+                        <button key={n} type="button" className="cp-mark" style={{ left: `${last ? (n / last) * 100 : 0}%` }}
+                            onClick={() => { setPlaying(false); setI(n); }} title={`Pasted ${st.paste.chars} characters${st.paste.by ? ` (${st.paste.by})` : ""}`} aria-label={`Paste at change ${n + 1}`} />
+                    ))}
+                </span>
                 <span className="cp-time">{since(cur.at)} <small>/ {since(states[last].at)}</small></span>
                 <button type="button" className="cp-btn cp-speed" onClick={() => setSpeed((s) => SPEEDS[(SPEEDS.indexOf(s) + 1) % SPEEDS.length])} title="Playback speed">{speed}×</button>
             </div>
@@ -74,7 +86,10 @@ export default function CodePlayback({ meetingId, startsAt }) {
                     <span key={n} className={n >= from && n < to ? "is-changed" : ""}><i>{n + 1}</i>{l || " "}{"\n"}</span>
                 ))}
             </pre>
-            <span className="cp-meta">Change {Math.min(i, last) + 1} of {states.length} · {new Date(cur.at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit", second: "2-digit" })}</span>
+            <span className="cp-meta">Change {Math.min(i, last) + 1} of {states.length} · {new Date(cur.at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit", second: "2-digit" })}
+                {cur.paste && <b className="cp-pasted"> · Pasted {cur.paste.chars} characters{cur.paste.by ? ` (${cur.paste.by})` : ""}</b>}
+                {states.some((st) => st.paste) && <span className="cp-legend"> · <i className="cp-mark-key" /> pastes</span>}
+            </span>
         </div>
     );
 }

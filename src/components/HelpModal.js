@@ -2,7 +2,7 @@ import React, { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
     Rocket, Sparkles, Keyboard, LifeBuoy, Terminal, Share2, Play, Video, PenTool, Folder, CalendarPlus, Lock,
-    Activity, ArrowUpRight, Search, LayoutTemplate, FolderInput, Code2, Bot,
+    Activity, ArrowUpRight, Search, LayoutTemplate, FolderInput, Code2, Bot, Eye, Timer, Captions, FileInput, ClipboardList, CalendarClock, ClipboardCheck,
 } from "lucide-react";
 import { Modal } from "./ux/primitives";
 
@@ -24,6 +24,13 @@ const STEPS = [
 ];
 
 const NEW = [
+    { Icon: Eye, title: "Follow me", text: "All tools › Follow me: everyone's editor scrolls with yours. Anyone can stop following and pick it up again." },
+    { Icon: Timer, title: "Session timer", text: "A countdown everyone in the room sees. Use it for pairing blocks, breaks or the parts of an interview." },
+    { Icon: Captions, title: "Live captions", text: "In a call, turn on captions to read what's said. Your own speech is captioned only when you turn them on." },
+    { Icon: FileInput, title: "Import a problem", text: "In the Problem card, paste a LeetCode or Codeforces link: statement, starter code and example tests, one click into Input." },
+    { Icon: ClipboardList, title: "Session kits", text: "Save a problem, starter code and timer as a kit, then apply it in a room or attach it to a booking link or call." },
+    { Icon: CalendarClock, title: "Booking links and calendar sync", text: "Let people pick a time from your hours. Connect Google Calendar or Outlook in Settings › Connections to skip busy times." },
+    { Icon: ClipboardCheck, title: "Interviews, end to end", text: "New › Interview: start now, pick a time or send a booking link. Then the interviewer panel, feedback with an AI draft, and code playback." },
     { Icon: CalendarPlus, title: "Scheduled calls", text: "Schedule a call from your workspace or inside a room. Invites by email, Google and Outlook links, a calendar file, and a reminder 10 minutes before." },
     { Icon: Lock, title: "Private and invite-only rooms", text: "Make a room invite-only (people knock, you let them in) or private (invited accounts only). Set it in Invite people." },
     { Icon: LayoutTemplate, title: "Layouts for projects", text: "Projects can use rearrangeable cards like rooms: files, editor, output, chat, people and the call. Classic stays the default." },

@@ -61,6 +61,13 @@ export function parseReply(action, text, meta = {}) {
 export async function askCopilot({ action, code, language, prompt, roomId, projectId, userId }) {
     const messages = buildMessages({ action, code, language, prompt });
     const started = performance.now();
+    const out = await runModel({ messages, userId, action, language, roomId, projectId });
+    return parseReply(action, out.text, { model: out.model, where: out.where, ms: performance.now() - started });
+}
+
+// Sends `messages` to the right model and returns { text, model, where }: your default model
+// (Settings > AI models), a model you connected, the desktop app's local model, or the server's.
+export async function runModel({ messages, userId, action = "prompt", language, roomId, projectId }) {
 
     // Your default model (Settings > AI models): one you connected with your own key, a model
     // this site provides, or "auto": a model you connected if there is one, else the site's.
@@ -68,17 +75,14 @@ export async function askCopilot({ action, code, language, prompt, roomId, proje
     const own = listConnections(userId);
     const connection = (choice.startsWith("own:") && own.find((c) => c.id === choice.slice(4)))
         || (!choice.startsWith("platform:") ? own[0] : null);
-    if (connection) {
-        const out = await chatOwn(userId, connection, messages);
-        return parseReply(action, out.text, { model: out.model, where: out.where, ms: performance.now() - started });
-    }
+    if (connection) return chatOwn(userId, connection, messages);
     const modelId = choice.startsWith("platform:") ? choice.slice(9) : undefined;
 
     const bridge = desktop();
     if (!modelId && bridge?.llmLocal) {
         try {
             const local = await bridge.llmLocal({ messages });
-            if (local?.text) return parseReply(action, local.text, { model: local.model, where: "on this device", ms: performance.now() - started });
+            if (local?.text) return { text: local.text, model: local.model, where: "on this device" };
         } catch (err) {
             /* no local model running: use the server */
         }
@@ -92,5 +96,5 @@ export async function askCopilot({ action, code, language, prompt, roomId, proje
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok || !data.success) throw new Error(data.error || `Copilot responded ${res.status}`);
-    return parseReply(action, data.text, { model: data.model, where: "server", ms: performance.now() - started });
+    return { text: data.text, model: data.model, where: "server" };
 }

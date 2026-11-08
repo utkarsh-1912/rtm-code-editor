@@ -44,6 +44,20 @@ export async function addConnection(uid, { provider, model, label, base, key }) 
     return c;
 }
 
+// Name and model id can change; the provider, server address and key can't (the key is bound
+// to the address it was saved for), so changing those means adding the model again.
+export function updateConnection(uid, id, { model, label }) {
+    const list = listConnections(uid);
+    const c = list.find((x) => x.id === id);
+    if (!c) throw new Error("That model was removed.");
+    const p = providerById(c.provider);
+    const cleanModel = String(model || "").trim();
+    if (!cleanModel) throw new Error("Enter the model id.");
+    const next = { ...c, model: cleanModel, label: String(label || "").trim() || `${p?.name || c.provider} · ${cleanModel}` };
+    saveConnections(uid, list.map((x) => (x.id === id ? next : x)));
+    return next;
+}
+
 export async function removeConnection(uid, id) {
     await vault.removeKey(vaultId(uid, id)).catch(() => { });
     saveConnections(uid, listConnections(uid).filter((c) => c.id !== id));

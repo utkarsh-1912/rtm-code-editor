@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { Search, Rocket, Terminal, Folder, Video, PenTool, Play, MonitorDown, Bot, Keyboard, Lock, LifeBuoy, Code2 } from "lucide-react";
+import { Search, Rocket, Terminal, Folder, Video, PenTool, Play, MonitorDown, Bot, Keyboard, Lock, LifeBuoy, Code2, Users } from "lucide-react";
 import SiteLayout, { PageHead } from "../components/Site/SiteLayout";
 
 // User documentation (the product guide). Each section: id, title, icon, and blocks of
@@ -19,7 +19,7 @@ const SECTIONS = [
             { h: "Layouts", p: "Arrange the room as cards: problem, code, input/output, chat and the call. Drag a card by its grip, resize with the dividers, or pick a preset from layout in the status bar." },
             { h: "Who can join", list: ["Anyone with the link: guests pick a name and join.", "Ask to join: people knock and the owner lets them in, once or always for their email.", "Invited people only: signed-in accounts on the owner's invite list."], tail: "Set it in Invite people. The first signed-in person in a room is its owner." },
             { h: "Spectators", p: "Share the spectator link for a read-only view, good for interviews and demos." },
-            { h: "Problem pane", p: "Paste the problem you're solving into the Problem card; everyone in the room sees it." },
+            { h: "Problem pane", list: ["Paste the problem you're solving into the Problem card; everyone in the room sees it, and it's kept with the room.", "Import a LeetCode or Codeforces link (the link icon): the statement, starter code for the room's language, and the example tests. Pick an example's number to put its input in the Input box.", "Signed in? The kit icon applies a session kit (problem, starter code, language and timer) or saves the room as a new kit."] },
         ],
     },
     {
@@ -35,6 +35,8 @@ const SECTIONS = [
         id: "calls", title: "Calls and scheduling", Icon: Video, blocks: [
             { h: "Calls", p: "Start a voice and video call in any room or project; everyone in the room gets a Join prompt. Present your screen (your camera stays on beside it), point and draw on it together, pin a person to the stage, and dock the call into your layout or keep it floating." },
             { h: "Scheduled calls", list: ["Schedule from your workspace or inside a room (Schedule a call), in your time zone or anyone else's.", "Invitees get an email with a calendar invite attached (Google, Outlook, Apple) and Yes / Can't make it buttons.", "Everyone gets a reminder 10 minutes before. Join opens 10 minutes before the start, with a camera and mic check first.", "Edit or reschedule any time: people are emailed and their calendars update. Removed people are told.", "Choose who can join: anyone with the link, ask to join, or invitees only."] },
+            { h: "New interview", list: ["New › Interview offers three ways: Start now (the meeting opens now and the candidate is emailed a link), Pick a time, or Let them pick (a booking link).", "Booking links (Settings › Booking links) offer free times in the guest's time zone from your weekly hours, minus notice, buffers and your other meetings.", "Connect Google Calendar or Outlook (Settings › Connections), or paste a private iCal address on the link, and busy times are never offered. Meetings you schedule are added to a connected calendar.", "Attach a session kit to a booking link or a call to set up the room's problem and starter code."] },
+            { h: "During and after", list: ["The interviewer panel (header, eye icon) is a private chat and notes for organisers only.", "The room shows recording for playback while a meeting is on; organisers can replay the code afterwards, with large pastes marked.", "Organisers can turn the AI copilot off for guests on the meeting page.", "Feedback: rate five skills and recommend. Others' feedback appears after you submit yours. Draft with AI uses your model with the recorded code, the panel chat and your notes. Copy or download the debrief.", "Guests can rate the meeting afterwards; organisers see the answers on the meeting page."] },
             { h: "For organisers", list: ["The meeting page shows the guest list with answers, your private notes, and co-organisers.", "During the call, Snapshot in the room's header saves the code; each snapshot shows its changes since the last one and takes a private comment.", "End meeting saves a final snapshot and sends guests out; only organisers keep access to the room.", "Running over? You're asked to end it 10 minutes after the end time, and it ends by itself an hour later."] },
         ],
     },
@@ -59,6 +61,15 @@ const SECTIONS = [
             { h: "Offline", p: "Without internet your workspace and snippets show from the last time you were online, and the offline editor (Go › Offline Editor, Ctrl 4) lets you write, open, save and run code on this computer." },
             { h: "Terminal", p: "Projects have a terminal panel in the desktop app (terminal in the status bar). It runs in the project's folder on your computer; pop it out into its own window any time." },
             { h: "Folders", p: "Open a folder from your computer as a project (Ctrl Shift O), and save a project back to disk (Ctrl S)." },
+        ],
+    },
+    {
+        id: "together", title: "Working together", Icon: Users, blocks: [
+            { p: "Tools for pairing, teaching and walking through code with other people, in every room." },
+            { h: "Follow me", p: "All tools › Follow me makes you the presenter: everyone else's editor scrolls to the lines you're looking at (by line, so different screens and font sizes don't matter). A pill shows who's presenting; anyone can stop following and follow again." },
+            { h: "Session timer", p: "All tools › Session timer starts a countdown everyone sees, with an optional label. Click the timer to change or stop it. It survives reloads." },
+            { h: "Live captions", p: "During a call, turn on Live captions. You see captions from everyone who has them on, and your own speech is captioned with your browser's speech recognition (which may use your browser maker's speech service). Nobody's speech is captioned unless they turn it on." },
+            { h: "Guests", p: "People without an account get a simpler room: the editor, run, chat, call and whiteboard, without the workspace tools." },
         ],
     },
     {

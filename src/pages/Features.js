@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Code2, Video, PenTool, Terminal, MessageSquare, Sparkles, FolderTree, GitCompare, Users, Zap, Search, Command, Database, MonitorDown, BellRing, Share2, CalendarPlus, Lock, LayoutTemplate, Workflow, NotebookPen, KeyRound, SquareTerminal, WifiOff, ShieldCheck } from "lucide-react";
+import { Code2, Video, PenTool, Terminal, MessageSquare, Sparkles, FolderTree, GitCompare, Users, Zap, Search, Command, Database, MonitorDown, BellRing, Share2, CalendarPlus, Lock, LayoutTemplate, Workflow, NotebookPen, KeyRound, SquareTerminal, WifiOff, ShieldCheck, Eye, Timer, Captions, FileInput, ClipboardList, CalendarClock, EyeOff, ClipboardCheck, PlayCircle, Star, Palette } from "lucide-react";
 import SiteLayout, { PageHead } from "../components/Site/SiteLayout";
 import CtaBand from "../components/Site/CtaBand";
 import ModelsBand from "../components/Site/ModelsBand";
@@ -10,9 +10,20 @@ const FEATURES = [
     { group: "Collaborate", icon: Video, title: "Voice, video & screen", text: "Calls in every room and project. Present your screen with your camera still on, then point and draw on it together. Everyone in the room hears when a call starts, and you check your camera and mic before joining." },
     { group: "Collaborate", icon: PenTool, title: "Whiteboard", text: "Doodle together in real time. Sketch an idea or circle a bug, from a laptop or a phone, with everyone's pointer on the board." },
     { group: "Collaborate", icon: Workflow, title: "Flowcharts & system design", text: "Drag in services, databases, queues and caches, connect them with labelled arrows, and edit together." },
-    { group: "Collaborate", icon: CalendarPlus, title: "Scheduled calls", text: "Plan interviews and pairing sessions in any time zone. Invitees get an email with a calendar invite attached, answer Yes or No in one click, and get a reminder. Reschedule and their calendars update." },
-    { group: "Collaborate", icon: NotebookPen, title: "Meeting review", text: "Organisers get private notes, code snapshots during the call with line-by-line changes and comments, and co-organisers. End the meeting and guests lose access to the room at once." },
-    { group: "Collaborate", icon: MessageSquare, title: "Room chat", text: "Chat with emoji right beside the code you are discussing." },
+    { group: "Collaborate", icon: Eye, title: "Follow me", text: "One click and everyone's editor scrolls with yours, line for line, whatever their screen size. Anyone can step away and follow again." },
+    { group: "Collaborate", icon: Timer, title: "Session timer", text: "A countdown the whole room shares: a pairing block, a break or the parts of an interview. It stays put if someone reloads." },
+    { group: "Collaborate", icon: Captions, title: "Live captions", text: "Turn on captions in a call and everyone who has them on reads what's said. Each person chooses whether their own speech is captioned." },
+    { group: "Collaborate", icon: MessageSquare, title: "Room chat", text: "Chat with emoji and line breaks right beside the code you are discussing." },
+    { group: "Meet", icon: CalendarPlus, title: "Scheduled calls", text: "Plan pairing sessions and interviews in any time zone. Invitees get an email with a calendar invite attached, answer Yes or No in one click, and get a reminder. Reschedule and their calendars update." },
+    { group: "Meet", icon: CalendarClock, title: "Booking links", text: "Share your weekly hours; people pick a free time in their own time zone and the meeting, room and invites are made for them. Connect Google Calendar, Outlook or any iCal feed and busy times are never offered." },
+    { group: "Meet", icon: EyeOff, title: "Interviewer panel", text: "A private chat and notes inside the room that only organisers see, so the panel can coordinate without the candidate seeing." },
+    { group: "Meet", icon: ClipboardCheck, title: "Structured feedback", text: "Rate five skills and recommend. Others' scores unlock after you submit yours. Draft it with your AI model from what was recorded, then copy or download the debrief." },
+    { group: "Meet", icon: PlayCircle, title: "Code playback", text: "Replay how the code was written during a meeting at up to 8× speed. Large pastes are marked, and the room tells everyone it's recording." },
+    { group: "Meet", icon: NotebookPen, title: "Meeting review", text: "Private notes, code snapshots with line-by-line changes and comments, and co-organisers. Turn the AI copilot off for guests. End the meeting and guests lose access at once." },
+    { group: "Meet", icon: Star, title: "Guest feedback", text: "After the meeting, guests rate it and leave a comment in a few seconds. Organisers see every answer on the meeting page." },
+    { group: "Meet", icon: Palette, title: "Custom branding", text: "Enterprise teams show their logo and name on meeting pages, booking pages and emails, in the same clean theme." },
+    { group: "Build", icon: FileInput, title: "Import a problem", text: "Paste a LeetCode or Codeforces link: the statement, starter code for your language and the example tests arrive in the room, with each example one click from the Input box." },
+    { group: "Build", icon: ClipboardList, title: "Session kits", text: "Save a problem, starter code, language and timer as a kit. Apply it in any room, or attach it to a booking link or a call so the room is ready when people arrive." },
     { group: "Build", icon: Terminal, title: "Run 17 languages", text: "JavaScript, Python, Java, C++, Go, Rust, SQL and more. Run together and share the output with the whole room." },
     { group: "Build", icon: Database, title: "SQL with your own data", text: "Import CSV, TSV or JSON files as tables, then query them by name with SQLite. No database to set up." },
     { group: "Build", icon: FolderTree, title: "Project workspaces", text: "Persistent multi-file projects with nested folders, drag-and-drop moves, live preview and team access. Ten on Free, unlimited on Team." },
@@ -34,7 +45,7 @@ const FEATURES = [
     { group: "Organise", icon: Command, title: "Focus mode & shortcuts", text: "Alt+F for distraction-free focus, and ? for help and every shortcut." },
 ];
 
-const GROUPS = ["All", "Collaborate", "Build", "Desktop", "Organise"];
+const GROUPS = ["All", "Collaborate", "Meet", "Build", "Desktop", "Organise"];
 
 export default function Features() {
     const [group, setGroup] = useState("All");
@@ -44,7 +55,7 @@ export default function Features() {
             <PageHead
                 label="Features"
                 title={["Everything", "to pair."]}
-                lede={<><b>Remote collaboration built for code.</b> Edit, talk, draw, query and run together, in the browser or on your desktop.</>}
+                lede={<><b>Remote collaboration built for code.</b> Edit, talk, draw and run together, follow each other through the code, and take a meeting from booking to debrief, in the browser or on your desktop.</>}
             />
 
             <div className="u-seg" role="tablist" aria-label="Filter features" data-rise style={{ marginBottom: 20 }}>

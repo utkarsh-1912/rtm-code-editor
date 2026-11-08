@@ -5,6 +5,7 @@ import { Modal } from "./ux/primitives";
 import { lineDiff, withContext } from "../utils/lineDiff";
 import InterviewFeedback from "./InterviewFeedback";
 import CodePlayback from "./CodePlayback";
+import { setAiPolicy, getGuestFeedback } from "../utils/meetings";
 import {
     saveMeetingNotes, saveCoHosts, listSnapshots, updateSnapshot, deleteSnapshot, endMeeting,
 } from "../utils/meetings";
@@ -144,6 +145,27 @@ function SnapshotCard({ meetingId, snap, prev, index, onChange, onDelete }) {
 
 // The organiser's side of a meeting page, to prepare before and review after: private notes,
 // the code snapshots taken in the room (with comments), co-organisers, and ending the meeting.
+// What guests said after the meeting.
+function GuestFeedback({ meetingId }) {
+    const [list, setList] = useState(null);
+    useEffect(() => { getGuestFeedback(meetingId).then(setList).catch(() => setList([])); }, [meetingId]);
+    if (!list || !list.length) return null;
+    const avg = list.reduce((a, x) => a + x.rating, 0) / list.length;
+    return (
+        <section className="mo-sec">
+            <div className="mo-sec-head"><h2>Guest feedback · {avg.toFixed(1)} / 5</h2></div>
+            <ul className="mo-gfb">
+                {list.map((f) => (
+                    <li key={f.id}>
+                        <b>{"★".repeat(f.rating)}<span>{"★".repeat(5 - f.rating)}</span></b>
+                        <span>{f.name || "A guest"}{f.comment ? `: ${f.comment}` : ""}</span>
+                    </li>
+                ))}
+            </ul>
+        </section>
+    );
+}
+
 export default function MeetingOrganiser({ meeting, onChange, userName }) {
     const [notes, setNotes] = useState(meeting.notes || "");
     const notesState = useAutosave(notes, (v) => saveMeetingNotes(meeting.id, v));
@@ -191,9 +213,24 @@ export default function MeetingOrganiser({ meeting, onChange, userName }) {
             {started && (
                 <section className="mo-sec" id="feedback">
                     <div className="mo-sec-head"><h2>Your feedback</h2></div>
-                    <InterviewFeedback meetingId={meeting.id} />
+                    <InterviewFeedback meetingId={meeting.id} title={meeting.title} />
                 </section>
             )}
+
+            {started && <GuestFeedback meetingId={meeting.id} />}
+
+            <section className="mo-sec">
+                <div className="mo-sec-head">
+                    <h2>AI copilot for guests</h2>
+                    <span className="mo-switch" role="radiogroup" aria-label="AI copilot for guests">
+                        {[["on", "Allowed"], ["off", "Off"]].map(([v, l]) => (
+                            <button key={v} type="button" role="radio" aria-checked={(meeting.aiPolicy || "on") === v} className={(meeting.aiPolicy || "on") === v ? "on" : ""}
+                                onClick={async () => { try { const next = await setAiPolicy(meeting.id, v); onChange?.({ ...meeting, ...next }); toast.success(v === "off" ? "Guests won't see the AI copilot in the room" : "Guests can use the AI copilot"); } catch (err) { toast.error(err.message); } }}>{l}</button>
+                        ))}
+                    </span>
+                </div>
+                <p className="mo-empty">While the meeting is on, the room shows everyone that the code is recorded for playback, and large pastes are marked on the timeline.</p>
+            </section>
 
             <section className="mo-sec">
                 <div className="mo-sec-head">

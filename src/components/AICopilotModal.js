@@ -3,6 +3,7 @@ import Icon from "./icons/Icon";
 import { Modal } from './ux/primitives';
 import toast from 'react-hot-toast';
 import { askCopilot } from '../utils/copilot';
+import RichText from './RichText';
 
 function AICopilotModal({ isOpen, onClose, code = "", language = "javascript", onApplyCode, roomId = null, projectId = null, userId = null }) {
     const [action, setAction] = useState("explain");
@@ -80,8 +81,8 @@ function AICopilotModal({ isOpen, onClose, code = "", language = "javascript", o
                                 </button>
                             )}
                         </div>
-                        {response.explanation && <p className="u-muted" style={{ margin: 0, fontSize: 14, lineHeight: 1.6 }}>{response.explanation}</p>}
                     </div>
+                    {response.explanation && <RichText className="ai-rt" text={response.explanation} />}
                     {resultCode && (
                         <pre className="u-code" style={{ maxHeight: 320 }}>
                             {resultCode.split('\n').map((l, i) => <span key={i}>{l || ' '}</span>)}

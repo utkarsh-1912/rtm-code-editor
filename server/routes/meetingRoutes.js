@@ -11,6 +11,7 @@ const { meetingEmail, nameFromEmail, rsvpCheck } = require('../services/MeetingM
 const InterviewRepository = require('../repositories/InterviewRepository');
 const CodeRecorder = require('../services/CodeRecorder');
 const Branding = require('../services/Branding');
+const CalendarSync = require('../services/CalendarSync');
 
 const APP = () => process.env.APP_URL || 'http://localhost:5000';
 const ACCESS = new Set(['public', 'invite', 'private']);
@@ -38,7 +39,7 @@ const isOwner = (m, who) => !!who && who.uid === m.host_uid;
 const isOrganiser = (m, who) => isOwner(m, who) || (!!who?.email && (m.co_hosts || []).includes(who.email.toLowerCase()));
 const hostView = (m, who) => ({
     ...publicView(m), invitees: m.invitees || [], hostUid: m.host_uid, coHosts: m.co_hosts || [], notes: m.host_notes || '',
-    rsvps: m.rsvps || {}, isHost: true, isOwner: isOwner(m, who),
+    rsvps: m.rsvps || {}, isHost: true, isOwner: isOwner(m, who), aiPolicy: m.ai_policy || 'on',
 });
 const invitedEmail = (m, who) => {
     const email = (who?.email || '').toLowerCase();
@@ -139,7 +140,9 @@ function readFields(b, base = {}) {
 // Creates a meeting for `host` ({ uid, email, name }): the room (an existing one the host owns,
 // or a new one), its access and guest list, the team brand (Enterprise), then the invitations.
 // Shared by scheduling and booking links. Throws { status, message } for bad requests.
-async function scheduleFor(app, host, f, { roomId: wantRoom = '', roomName = '', coHosts = [], bookingLinkId = null } = {}) {
+async function scheduleFor(app, host, f, { roomId: wantRoom = '', roomName = '', coHosts = [], bookingLinkId = null, kitId = null } = {}) {
+    // A session kit sets up a new room: its problem, language and starter code.
+    const kit = kitId ? await require('./kitRoutes').kitFor(host.uid, kitId).catch(() => null) : null;
     let roomId = String(wantRoom || '').trim().slice(0, 255);
     if (roomId) {
         const acc = await RoomRepository.getRoomAccess(roomId);
@@ -147,8 +150,9 @@ async function scheduleFor(app, host, f, { roomId: wantRoom = '', roomName = '',
         if (!acc) await RoomRepository.saveRoom(roomId, '', 'javascript', []);
     } else {
         roomId = newRoomId();
-        await RoomRepository.saveRoom(roomId, '', 'javascript', []);
+        await RoomRepository.saveRoom(roomId, kit?.code || '', kit?.language || 'javascript', []);
     }
+    if (kit?.problem && !(await RoomRepository.getRoomProblem(roomId))) await RoomRepository.setRoomProblem(roomId, kit.problem);
     await RoomRepository.claimRoomOwner(roomId, host.uid);
     const current = await RoomRepository.getRoomAccess(roomId);
     if (current?.ownerUid === host.uid) {
@@ -167,6 +171,7 @@ async function scheduleFor(app, host, f, { roomId: wantRoom = '', roomName = '',
         brandOrgId: await Branding.brandOrgFor(host.uid).catch(() => null), bookingLinkId,
     });
     const sent = await tellInvitees(meeting, { kind: 'invite', by: host.uid });
+    CalendarSync.syncMeeting(meeting).catch(() => { }); // the host's own calendar, when connected
     return { meeting, sent };
 }
 
@@ -179,7 +184,7 @@ router.post('/meetings', async (req, res) => {
         const f = readFields(b);
         if (f.error) return res.status(400).json({ error: f.error });
         if (f.startsAt.getTime() < Date.now() - 5 * 60000) return res.status(400).json({ error: 'That time has already passed.' });
-        const { meeting, sent } = await scheduleFor(req.app, { uid: who.uid, email: who.email, name: b.hostName }, f, { roomId: b.roomId, roomName: b.roomName });
+        const { meeting, sent } = await scheduleFor(req.app, { uid: who.uid, email: who.email, name: b.hostName }, f, { roomId: b.roomId, roomName: b.roomName, kitId: b.kitId });
         res.json({ meeting: hostView(meeting, who), ...sent });
     } catch (err) {
         if (err.status) return res.status(err.status).json({ error: err.message });
@@ -244,6 +249,7 @@ router.patch('/meetings/:id', async (req, res) => {
         if (moved && f.startsAt.getTime() < Date.now() - 5 * 60000) return res.status(400).json({ error: 'That time has already passed.' });
 
         const m = await MeetingRepository.updateMeeting(before.id, { ...f, startsAt: f.startsAt.toISOString() });
+        CalendarSync.syncMeeting(m).catch(() => { });
         if (!m) return res.status(404).json({ error: 'Meeting not found, or not yours.' });
 
         const was = new Set(before.invitees || []);
@@ -283,6 +289,7 @@ router.delete('/meetings/:id', async (req, res) => {
         if (!who) return res.status(401).json({ error: 'Sign in first.' });
         const m = await MeetingRepository.deleteMeeting(req.params.id, who.uid);
         if (!m) return res.status(404).json({ error: 'Meeting not found, or not yours.' });
+        CalendarSync.syncMeeting({ ...m, deleted: true }).catch(() => { });
         const upcoming = !m.cancelled_at && new Date(m.starts_at).getTime() + m.duration_min * 60000 > Date.now();
         const sent = upcoming ? await tellInvitees(m, { kind: 'cancelled', by: who.uid }) : { emailed: 0, limited: 0, failed: 0 };
         res.json({ success: true, ...sent });
@@ -343,6 +350,62 @@ async function organiserOnly(req, res) {
     if (!m || !isOrganiser(m, who)) { res.status(404).json({ error: 'Meeting not found, or not yours.' }); return null; }
     return { who, m };
 }
+
+// Anyone in a room: is a scheduled meeting on here now, and may guests use the AI copilot?
+// (No details: just enough for the room to show "recording for playback" and hide the copilot.)
+router.get('/rooms/:roomId/live-meeting', async (req, res) => {
+    try {
+        const m = await InterviewRepository.liveMeetingRow(String(req.params.roomId).slice(0, 255));
+        res.set('Cache-Control', 'no-store');
+        res.json({ live: !!m, aiAllowed: !m || m.ai_policy !== 'off' });
+    } catch (err) {
+        res.json({ live: false, aiAllowed: true });
+    }
+});
+
+// Organisers: allow or turn off the AI copilot for guests during this meeting.
+router.put('/meetings/:id/ai-policy', async (req, res) => {
+    try {
+        const ctx = await organiserOnly(req, res);
+        if (!ctx) return;
+        const policy = req.body?.aiPolicy === 'off' ? 'off' : 'on';
+        const m = await InterviewRepository.setAiPolicy(ctx.m.id, policy);
+        res.json(hostView(m, ctx.who));
+    } catch (err) {
+        res.status(500).json({ error: 'Could not save that.' });
+    }
+});
+
+// Guests, after the meeting: how was it? (1 to 5 and an optional comment; no sign-in needed.)
+router.post('/meetings/:id/candidate-feedback', async (req, res) => {
+    try {
+        const m = await MeetingRepository.getMeeting(req.params.id);
+        if (!m || m.cancelled_at) return res.status(404).json({ error: 'Meeting not found.' });
+        if (new Date(m.starts_at).getTime() > Date.now()) return res.status(400).json({ error: 'The meeting hasn’t happened yet.' });
+        const rating = Math.round(Number(req.body?.rating));
+        if (!(rating >= 1 && rating <= 5)) return res.status(400).json({ error: 'Pick a rating from 1 to 5.' });
+        const row = await InterviewRepository.addGuestFeedback(m.id, {
+            name: String(req.body?.name || '').replace(/\s+/g, ' ').trim().slice(0, 80) || null,
+            rating,
+            comment: String(req.body?.comment || '').slice(0, 2000),
+        });
+        if (!row) return res.status(429).json({ error: 'This meeting already has plenty of answers. Thank you!' });
+        NotificationRepository.notifyUser(m.host_uid, { type: 'meeting', message: `New guest feedback for ${m.title}`, url: `/meet/${m.id}`, data: { meetingId: m.id } }).catch(() => { });
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: 'Could not send that.' });
+    }
+});
+
+router.get('/meetings/:id/candidate-feedback', async (req, res) => {
+    try {
+        const ctx = await organiserOnly(req, res);
+        if (!ctx) return;
+        res.json((await InterviewRepository.guestFeedback(ctx.m.id)).map((r) => ({ id: r.id, name: r.name, rating: r.rating, comment: r.comment, at: r.created_at })));
+    } catch (err) {
+        res.status(500).json({ error: 'Could not load guest feedback.' });
+    }
+});
 
 // The room's meeting that you organise (now, next or last), for the tools inside the room.
 router.get('/meetings/room/:roomId', async (req, res) => {

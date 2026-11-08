@@ -1,8 +1,8 @@
 import React, { useCallback, useEffect, useState } from "react";
 import toast from "react-hot-toast";
-import { KeyRound, Lock, LockOpen, ShieldCheck, Plus, Trash2, Zap, ExternalLink, Check, X, Clock } from "lucide-react";
+import { KeyRound, Lock, LockOpen, ShieldCheck, Plus, Trash2, Zap, ExternalLink, Check, X, Clock, Pencil } from "lucide-react";
 import {
-    PROVIDERS, providerById, listConnections, addConnection, removeConnection, getDefault, setDefault,
+    PROVIDERS, providerById, listConnections, addConnection, updateConnection, removeConnection, getDefault, setDefault,
     listPlatformModels, requestModelAccess, listAccessRequests, decideAccessRequest, testConnection, vaultInfo,
 } from "../utils/aiModels";
 
@@ -14,6 +14,7 @@ export default function AIModelsPanel({ user }) {
     const [choice, setChoice] = useState(() => getDefault(uid));
     const [platform, setPlatform] = useState(null); // { admin, models }
     const [adding, setAdding] = useState(false);
+    const [editing, setEditing] = useState(null); // connection id
     const [testing, setTesting] = useState(null);
     const [vault, setVault] = useState({ kind: vaultInfo.kind(), passphrase: false, locked: false });
 
@@ -102,11 +103,21 @@ export default function AIModelsPanel({ user }) {
                     }} />
                 )}
                 <ul className="aim-list">
-                    {connections.map((c) => (
+                    {connections.map((c) => editing === c.id ? (
+                        <li key={c.id} className="aim-editing">
+                            <EditForm connection={c} onCancel={() => setEditing(null)} onSave={(form) => {
+                                const next = updateConnection(uid, c.id, form);
+                                setConnections(listConnections(uid));
+                                setEditing(null);
+                                toast.success(`${next.label} saved`);
+                            }} />
+                        </li>
+                    ) : (
                         <li key={c.id}>
                             <span className="aim-main"><b>{c.label}</b><span className="u-mono">{providerById(c.provider)?.name} · {c.model} · key ••••{c.last4}</span></span>
                             <span className="aim-actions">
                                 <button type="button" className="u-btn u-btn--ghost u-btn--sm" onClick={() => test(c)} disabled={testing === c.id || vault.locked}><Zap size={14} /> {testing === c.id ? "Testing…" : "Test"}</button>
+                                <button type="button" className="u-icon" onClick={() => setEditing(c.id)} title="Edit" aria-label={`Edit ${c.label}`}><Pencil size={15} /></button>
                                 <button type="button" className="u-icon" onClick={() => remove(c)} title="Remove" aria-label={`Remove ${c.label}`}><Trash2 size={15} /></button>
                             </span>
                         </li>
@@ -223,6 +234,41 @@ function AddForm({ onSave, onCancel }) {
             <div className="aim-actions">
                 <button type="button" className="u-btn u-btn--ghost u-btn--sm" onClick={onCancel}>Cancel</button>
                 <button type="submit" className="u-btn u-btn--solid u-btn--sm" disabled={busy || !key.trim() || !model.trim()}>{busy ? "Encrypting…" : "Save & test"}</button>
+            </div>
+        </form>
+    );
+}
+
+// Edit a saved model: its name and model id. The key is shown masked and can't be changed here.
+function EditForm({ connection: c, onSave, onCancel }) {
+    const p = providerById(c.provider);
+    const [model, setModel] = useState(c.model);
+    const [label, setLabel] = useState(c.label);
+    return (
+        <form className="aim-add" onSubmit={(e) => {
+            e.preventDefault();
+            try { onSave({ model, label }); } catch (err) { toast.error(err.message); }
+        }}>
+            <div className="u-field">
+                <label htmlFor={`aim-e-label-${c.id}`}>Name</label>
+                <input id={`aim-e-label-${c.id}`} className="u-input" value={label} onChange={(e) => setLabel(e.target.value)} autoFocus />
+            </div>
+            <div className="u-field">
+                <label htmlFor={`aim-e-model-${c.id}`}>Model id</label>
+                <input id={`aim-e-model-${c.id}`} className="u-input u-mono" list={`aim-e-models-${c.id}`} value={model} onChange={(e) => setModel(e.target.value)} />
+                <datalist id={`aim-e-models-${c.id}`}>{(p?.models || []).map((m) => <option key={m} value={m} />)}</datalist>
+            </div>
+            <div className="u-field">
+                <span className="u-field-label">Provider{c.base ? " and server" : ""}</span>
+                <input className="u-input" value={`${p?.name || c.provider}${c.base ? ` · ${c.base}` : ""}`} disabled aria-label="Provider" />
+            </div>
+            <div className="u-field">
+                <span className="u-field-label">API key <span className="u-faint">— locked; remove and add the model again to change it</span></span>
+                <input className="u-input u-mono" value={`••••••••${c.last4 || ""}`} disabled aria-label="API key (locked)" />
+            </div>
+            <div className="aim-actions">
+                <button type="button" className="u-btn u-btn--ghost u-btn--sm" onClick={onCancel}>Cancel</button>
+                <button type="submit" className="u-btn u-btn--solid u-btn--sm" disabled={!model.trim()}>Save</button>
             </div>
         </form>
     );

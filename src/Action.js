@@ -33,6 +33,11 @@ const ACTIONS = {
   START_STREAMING: "start-streaming",
   STOP_STREAMING: "stop-streaming",
   STREAM_DATA: "stream-data",
+  SESSION_SYNC_REQUEST: "session-sync-request",
+  SESSION_SYNC: "session-sync",
+  SESSION_TIMER: "session-timer",
+  CODE_PASTE: "code-paste",
+  CAPTION: "caption",
 };
 
 module.exports = ACTIONS;

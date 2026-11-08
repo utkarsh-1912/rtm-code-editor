@@ -37,7 +37,10 @@ function EditorComp({
   lockLanguage,
   statusTarget, // element in the page's status bar that shows cursor info
   dragHandle, // layout grip, shown at the start of the file bar
-  fileId // Added fileId prop
+  fileId, // Added fileId prop
+  presenting, // "Follow me" is on for this person: others' editors scroll with this one
+  followId, // socket id of the presenter this person follows (null: not following)
+  onPaste, // (chars) a sizeable paste, for the meeting playback's markers
 }) {
   const [editorCode, setEditorCode] = React.useState(code || "");
   const [remoteCursors, setRemoteCursors] = React.useState({});
@@ -45,8 +48,38 @@ function EditorComp({
   // Latest callback without re-subscribing on every render (the parent passes an inline fn).
   const onCodeChangeRef = React.useRef(onCodeChange);
   onCodeChangeRef.current = onCodeChange;
-  const keybindingRef = React.useRef(settings?.keybinding);
-  keybindingRef.current = settings?.keybinding;
+  const viewRef = React.useRef(null);
+  const presentingRef = React.useRef(presenting);
+  presentingRef.current = presenting && !fileId;
+  const followIdRef = React.useRef(followId);
+  followIdRef.current = fileId ? null : followId;
+  const onPasteRef = React.useRef(onPaste);
+  onPasteRef.current = onPaste;
+
+  // Presenter: tell the room which line is at the top of the screen and where the cursor is
+  // (lines, not pixels, so it works across screen and font sizes).
+  const lastSent = React.useRef("");
+  const sendView = React.useCallback(() => {
+    const view = viewRef.current;
+    if (!presentingRef.current || !view) return;
+    const doc = view.state.doc;
+    const topLine = doc.lineAt(view.lineBlockAtHeight(view.scrollDOM.scrollTop).from).number;
+    const cursorLine = doc.lineAt(view.state.selection.main.head).number;
+    const key = `${topLine}:${cursorLine}`;
+    if (key === lastSent.current) return;
+    lastSent.current = key;
+    socketRef.current?.emit(ACTIONS.SYNC_SCROLL, { roomId, topLine, cursorLine });
+  }, [roomId, socketRef]);
+  useEffect(() => {
+    const view = viewRef.current;
+    if (!presenting || fileId || !view) return undefined;
+    lastSent.current = "";
+    sendView();
+    let t = null;
+    const onScroll = () => { if (!t) t = setTimeout(() => { t = null; sendView(); }, 120); };
+    view.scrollDOM.addEventListener("scroll", onScroll, { passive: true });
+    return () => { clearTimeout(t); view.scrollDOM.removeEventListener("scroll", onScroll); };
+  }, [presenting, fileId, sendView]);
 
   useEffect(() => {
     const socket = socketRef.current;
@@ -75,10 +108,13 @@ function EditorComp({
     const onLeft = ({ socketId }) => {
       setRemoteCursors((prev) => { const next = { ...prev }; delete next[socketId]; return next; });
     };
-    const onScroll = ({ scrollPos, fileId: incomingFileId }) => {
-      if (incomingFileId !== fileId || keybindingRef.current === "vim" || keybindingRef.current === "emacs") return;
-      const wrap = document.querySelector('.cm-content')?.closest('.cm-scroller');
-      if (wrap) wrap.scrollTop = scrollPos;
+    // Following someone: show what's at the top of their screen.
+    const onScroll = ({ topLine, socketId }) => {
+      const view = viewRef.current;
+      if (!view || !followIdRef.current || socketId !== followIdRef.current) return;
+      const doc = view.state.doc;
+      const line = doc.line(Math.min(Math.max(1, topLine), doc.lines));
+      view.scrollDOM.scrollTo({ top: view.lineBlockAt(line.from).top, behavior: "smooth" });
     };
 
     socket.on(ACTIONS.CODE_CHANGE, onRemoteCode);
@@ -132,18 +168,7 @@ function EditorComp({
       color: "#3b82f6", // Default color, could be dynamic per user
     });
 
-    // Sync scroll if presenter
-    if (viewUpdate.transactions[0]?.isUserEvent("scroll") || viewUpdate.docChanged) {
-      const scroller = viewUpdate.view.scrollDOM;
-      if (scroller) {
-        socketRef.current?.emit(ACTIONS.SYNC_SCROLL, {
-          roomId,
-          fileId,
-          scrollPos: scroller.scrollTop,
-          userName
-        });
-      }
-    }
+    if (presentingRef.current) sendView();
   };
 
   const getLanguageExtension = (lang) => editorLanguage(String(lang || "").toLowerCase());
@@ -173,6 +198,16 @@ function EditorComp({
     const line = state.doc.lineAt(sel.head);
     const next = { line: line.number, col: sel.head - line.from + 1, sel: Math.abs(sel.to - sel.from), lines: state.doc.lines };
     setPos((p) => (p.line === next.line && p.col === next.col && p.sel === next.sel && p.lines === next.lines ? p : next));
+    if (u.selectionSet && presentingRef.current) sendView();
+  }), [sendView]);
+
+  // A sizeable paste is reported (it shows as a marker in a meeting's code playback).
+  const pasteListener = useMemo(() => EditorView.domEventHandlers({
+    paste: (e) => {
+      const n = (e.clipboardData?.getData("text") || "").length;
+      if (n >= 40) onPasteRef.current?.(n);
+      return false;
+    },
   }), []);
 
   // Empty file: offer the language's starter template (synced like a normal edit).
@@ -200,13 +235,14 @@ function EditorComp({
     getLanguageExtension(language),
     editorChrome,
     positionListener,
+    pasteListener,
     ...(settings?.wordWrap ? [EditorView.lineWrapping] : []),
     ...(settings?.keybinding === "vim" ? [vim()] : []),
     ...(settings?.keybinding === "emacs" ? [emacs()] : []),
     ...esLintLinter,
     memoizedCursorPlugin,
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  ], [language, settings?.wordWrap, settings?.keybinding, esLintLinter, memoizedCursorPlugin]);
+  ], [language, settings?.wordWrap, settings?.keybinding, esLintLinter, memoizedCursorPlugin, positionListener, pasteListener]);
 
 
   const fileName = filename || roomFileName(language);
@@ -260,6 +296,7 @@ function EditorComp({
           }}
           style={{ height: "100%" }}
           extensions={editorExtensions}
+          onCreateEditor={(view) => { viewRef.current = view; }}
         />
         {isEmpty && !isReadOnly && templateFor(language) && notchOff !== language && (
           <div className="ec-notch" role="note">

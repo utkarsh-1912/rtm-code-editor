@@ -67,4 +67,13 @@ async function finish(meetingId) {
     for (const [roomId, v] of roomMeeting) if (v.meetingId === meetingId) roomMeeting.delete(roomId);
 }
 
-module.exports = { onCode, finish, delta };
+// A sizeable paste during a meeting: a marker on the playback timeline ({ paste, by }).
+async function onPaste(roomId, { chars, by }) {
+    const n = Math.round(Number(chars) || 0);
+    if (n < 40) return;
+    const meetingId = await meetingFor(roomId);
+    if (!meetingId) return;
+    await InterviewRepository.addFrame(meetingId, { paste: Math.min(n, 1e6), by: String(by || '').slice(0, 60) }).catch(() => { });
+}
+
+module.exports = { onCode, onPaste, finish, delta };

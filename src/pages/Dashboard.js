@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { CalendarPlus, CalendarClock, WifiOff, ServerOff, Plus, Search, MoreHorizontal, Pencil, Trash2, Folder, FolderOpen, FileUp, Terminal, Link2, ArrowUpRight, ArrowRight, Check, Sparkles, RotateCcw, X } from 'lucide-react';
+import { ChevronDown, UserCheck, CalendarPlus, CalendarClock, WifiOff, ServerOff, Plus, Search, MoreHorizontal, Pencil, Trash2, Folder, FolderOpen, FileUp, Terminal, Link2, ArrowUpRight, ArrowRight, Check, Sparkles, RotateCcw, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
 import AppLayout from '../components/AppLayout';
@@ -14,6 +14,7 @@ import { pickFolder, pickFiles, importProject, describeSkipped } from '../utils/
 import { usePlan, isPlanLimit, showUpgradeToast, catalogue } from '../utils/billing';
 import { track } from '../utils/track';
 import { ScheduleModal, UpcomingMeetings } from '../components/Meetings';
+import NewInterview from '../components/NewInterview';
 import { useOnline } from '../components/ux/Shell';
 import { useBackend } from '../context/BackendContext';
 
@@ -68,6 +69,35 @@ function RowMenu({ open, onToggle, children }) {
     );
 }
 
+// One place to start anything: a room now, a call later, a booking link, a project.
+function NewMenu({ items }) {
+    const [open, setOpen] = useState(false);
+    const ref = useRef(null);
+    useEffect(() => {
+        if (!open) return undefined;
+        const close = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+        const key = (e) => e.key === 'Escape' && setOpen(false);
+        document.addEventListener('mousedown', close);
+        document.addEventListener('keydown', key);
+        return () => { document.removeEventListener('mousedown', close); document.removeEventListener('keydown', key); };
+    }, [open]);
+    return (
+        <div className="d-menu-wrap" ref={ref}>
+            <button className={`u-btn u-btn--ghost${open ? ' on' : ''}`} onClick={() => setOpen((v) => !v)} aria-haspopup="menu" aria-expanded={open}>New <ChevronDown size={15} /></button>
+            {open && (
+                <div className="u-pop db-new" role="menu">
+                    {items.map(({ id, Icon, title, sub, run, disabled }) => (
+                        <button key={id} role="menuitem" disabled={disabled} onClick={() => { setOpen(false); run(); }}>
+                            <Icon size={16} />
+                            <span className="db-new-text"><b>{title}</b><span>{sub}</span></span>
+                        </button>
+                    ))}
+                </div>
+            )}
+        </div>
+    );
+}
+
 const Dashboard = () => {
     const { user, loading, refreshProfile } = useAuth();
     const navigate = useNavigate();
@@ -96,6 +126,8 @@ const Dashboard = () => {
     const [newName, setNewName] = useState('');
     const [createOpen, setCreateOpen] = useState(false);
     const [scheduleOpen, setScheduleOpen] = useState(false);
+    const [scheduleNow, setScheduleNow] = useState(false);
+    const [interviewOpen, setInterviewOpen] = useState(false);
     const [meetingsKey, setMeetingsKey] = useState(0);
     const [form, setForm] = useState({ name: '', description: '', type: 'web' });
     const [busy, setBusy] = useState(false);
@@ -360,10 +392,15 @@ const Dashboard = () => {
                     <h1 className="db-title">Welcome back, {first}</h1>
                 </div>
                 <div className="db-actions">
-                    <button className="u-btn u-btn--ghost db-open" onClick={() => importFromDisk('folder')} disabled={busy} title="Open a folder from your computer as a project (Ctrl+Shift+O in the desktop app)"><FolderOpen size={16} /> Open folder</button>
-                    <button className="u-btn u-btn--ghost db-open" onClick={() => importFromDisk('files')} disabled={busy} title="Open files from your computer as a project"><FileUp size={16} /> Open files</button>
-                    <button className="u-btn u-btn--ghost" onClick={() => setScheduleOpen(true)}><CalendarPlus size={16} /> Schedule</button>
-                    <button className="u-btn u-btn--ghost" onClick={() => setCreateOpen(true)}><Folder size={16} /> New project</button>
+                    <NewMenu items={[
+                        { id: 'interview', Icon: UserCheck, title: 'Interview', sub: 'Start now, pick a time, or let them pick', run: () => setInterviewOpen(true) },
+                        { id: 'room', Icon: Plus, title: 'Room now', sub: 'Code, talk and draw together; share the link', run: () => enterRoom(newRoomId()) },
+                        { id: 'call', Icon: CalendarPlus, title: 'Scheduled call', sub: 'A room for later, with calendar invites', run: () => setScheduleOpen(true) },
+                        { id: 'book', Icon: CalendarClock, title: 'Booking link', sub: 'Let people pick a time from your hours', run: () => navigate('/settings?section=scheduling') },
+                        { id: 'project', Icon: Folder, title: 'Project', sub: 'Files, history and teammates in one place', run: () => setCreateOpen(true) },
+                        { id: 'folder', Icon: FolderOpen, title: 'Open a folder', sub: 'From your computer, as a project', run: () => importFromDisk('folder'), disabled: busy },
+                        { id: 'files', Icon: FileUp, title: 'Open files', sub: 'From your computer, as a project', run: () => importFromDisk('files'), disabled: busy },
+                    ]} />
                     <button className="u-btn u-btn--solid" onClick={() => enterRoom(newRoomId())}><Plus size={16} /> New room</button>
                 </div>
             </header>
@@ -409,7 +446,11 @@ const Dashboard = () => {
             )}
 
             <UpcomingMeetings user={user} onSchedule={() => setScheduleOpen(true)} refreshKey={meetingsKey} />
-            <ScheduleModal open={scheduleOpen} onClose={() => setScheduleOpen(false)} hostName={user?.name} onScheduled={() => setMeetingsKey((k) => k + 1)} />
+            <ScheduleModal open={scheduleOpen} onClose={() => { setScheduleOpen(false); setScheduleNow(false); }} hostName={user?.name} startNow={scheduleNow} presetTitle={scheduleNow ? 'Interview' : ''} onScheduled={() => setMeetingsKey((k) => k + 1)} />
+            <NewInterview open={interviewOpen} onClose={() => setInterviewOpen(false)}
+                onNow={() => { setScheduleNow(true); setScheduleOpen(true); }}
+                onSchedule={() => { setScheduleNow(false); setScheduleOpen(true); }}
+                onBookingLink={() => navigate('/settings?section=scheduling&new=1')} />
 
             <div className="db-kpis" data-rise>
                 {kpis.map((k) => (

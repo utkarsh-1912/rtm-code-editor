@@ -1,18 +1,21 @@
 import React, { useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
 import { CalendarClock, Copy, Pencil, Plus, Trash2, ExternalLink } from "lucide-react";
+import { useSearchParams } from "react-router-dom";
 import { listBookingLinks, createBookingLink, updateBookingLink, deleteBookingLink, bookingUrl, allZones, localZone, zoneLabel } from "../utils/meetings";
+import { listKits } from "../utils/kits";
 
 const DAYS = [["mon", "Mon"], ["tue", "Tue"], ["wed", "Wed"], ["thu", "Thu"], ["fri", "Fri"], ["sat", "Sat"], ["sun", "Sun"]];
 const WORKWEEK = Object.fromEntries(DAYS.map(([d]) => [d, ["sat", "sun"].includes(d) ? [] : [["09:00", "17:00"]]]));
 const LENGTHS = [15, 30, 45, 60, 90, 120];
 
-const blank = () => ({ title: "", description: "", durationMin: 45, timeZone: localZone(), hours: WORKWEEK, daysAhead: 14, noticeMin: 240, bufferMin: 15, access: "invite", coHosts: [], active: true });
+const blank = () => ({ title: "", description: "", durationMin: 45, timeZone: localZone(), hours: WORKWEEK, daysAhead: 14, noticeMin: 240, bufferMin: 15, access: "invite", coHosts: [], active: true, kitId: null, calendarUrl: "" });
 
 // Settings > Booking links: share a link, candidates pick a time from your weekly hours.
 export default function BookingLinksPanel() {
     const [links, setLinks] = useState(null);
-    const [editing, setEditing] = useState(null); // link being edited, or blank() for a new one
+    const [params] = useSearchParams();
+    const [editing, setEditing] = useState(() => (params.get("new") ? blank() : null)); // link being edited, or blank() for a new one
     const load = () => listBookingLinks().then(setLinks).catch(() => setLinks([]));
     useEffect(() => { load(); }, []);
 
@@ -69,6 +72,8 @@ function LinkForm({ initial, onSaved, onCancel }) {
     const [f, setF] = useState(() => ({ ...initial, hours: JSON.parse(JSON.stringify(initial.hours || WORKWEEK)) }));
     const [co, setCo] = useState((initial.coHosts || []).join(", "));
     const [busy, setBusy] = useState(false);
+    const [kits, setKits] = useState([]);
+    useEffect(() => { listKits().then(setKits).catch(() => setKits([])); }, []);
     const zones = useMemo(() => {
         const list = allZones();
         return [...new Set([localZone(), f.timeZone, "UTC", ...list])];
@@ -132,6 +137,17 @@ function LinkForm({ initial, onSaved, onCancel }) {
             </div>
             <div className="u-field"><label htmlFor="bl-co">Co-interviewers <span className="u-faint">— emails; they join as co-organisers and their meetings count as busy</span></label>
                 <input id="bl-co" className="u-input" value={co} onChange={(e) => setCo(e.target.value)} placeholder="ada@company.com, alan@company.com" />
+            </div>
+            <div className="bl-grid">
+                <div className="u-field"><label htmlFor="bl-kit">Session kit <span className="u-faint">— sets up each booked room</span></label>
+                    <select id="bl-kit" className="u-select" value={f.kitId || ""} onChange={(e) => set("kitId", e.target.value ? Number(e.target.value) : null)}>
+                        <option value="">None</option>
+                        {kits.map((k) => <option key={k.id} value={k.id}>{k.title}</option>)}
+                    </select>
+                </div>
+                <div className="u-field bl-wide2"><label htmlFor="bl-cal">Your calendar <span className="u-faint">— private iCal address; its busy times are never offered</span></label>
+                    <input id="bl-cal" className="u-input u-mono" value={f.calendarUrl || ""} onChange={(e) => set("calendarUrl", e.target.value)} placeholder="Google: Settings › your calendar › Secret address in iCal format" spellCheck={false} />
+                </div>
             </div>
             <div className="u-field"><label htmlFor="bl-desc">What to expect <span className="u-faint">— shown to candidates and added to the invite</span></label>
                 <textarea id="bl-desc" className="u-textarea" rows={3} value={f.description} onChange={(e) => set("description", e.target.value)} maxLength={2000} />

@@ -5,6 +5,14 @@ async function getRoom(roomId) {
     return rooms[0] || null;
 }
 
+async function getRoomProblem(roomId) {
+    const rows = await sql`SELECT problem FROM rooms WHERE room_id = ${roomId}`;
+    return rows[0]?.problem || '';
+}
+async function setRoomProblem(roomId, text) {
+    await sql`UPDATE rooms SET problem = ${String(text || '').slice(0, 20 * 1024)} WHERE room_id = ${roomId}`;
+}
+
 async function saveRoom(roomId, code, language, chatHistory) {
     return await sql`
         INSERT INTO rooms (room_id, code, language, chat_history, updated_at)
@@ -234,6 +242,8 @@ async function getUserRoomsPage(userId, { limit, offset }) {
 }
 
 module.exports = {
+    getRoomProblem,
+    setRoomProblem,
     getUserRoomsPage,
     getRoom,
     saveRoom,

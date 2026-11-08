@@ -7,13 +7,44 @@ import { CalendarLinks, ScheduleModal, confirmDeleteMeeting } from "../component
 import { useAuth } from "../context/AuthContext";
 import DeviceCheck from "../components/DeviceCheck";
 import MeetingOrganiser from "../components/MeetingOrganiser";
-import { getMeeting, meetingLink, isJoinable, isOver, startsIn, rsvpMeeting } from "../utils/meetings";
+import { getMeeting, meetingLink, isJoinable, isOver, startsIn, rsvpMeeting, sendCandidateFeedback } from "../utils/meetings";
 
 const ACCESS = {
     public: { Icon: Globe, short: "Anyone", text: "Anyone with the link" },
     invite: { Icon: DoorOpen, short: "Invited", text: "Others knock to come in" },
     private: { Icon: Lock, short: "Invitees only", text: "Signed in with the invited email" },
 };
+
+// After the meeting, guests can say how it went (the organisers see it on this page).
+function GuestSurvey({ meetingId, name }) {
+    const key = `meet-survey-${meetingId}`;
+    const [sent, setSent] = useState(() => { try { return !!localStorage.getItem(key); } catch { return false; } });
+    const [rating, setRating] = useState(0);
+    const [comment, setComment] = useState("");
+    const [busy, setBusy] = useState(false);
+    if (sent) return <p className="mp-lead">Thanks for your feedback.</p>;
+    const send = async (e) => {
+        e.preventDefault();
+        setBusy(true);
+        try {
+            await sendCandidateFeedback(meetingId, { rating, comment, name });
+            try { localStorage.setItem(key, "1"); } catch { /* storage blocked */ }
+            setSent(true);
+        } catch (err) { toast.error(err.message); } finally { setBusy(false); }
+    };
+    return (
+        <form className="mp-survey" onSubmit={send}>
+            <span className="u-label">How was the meeting for you?</span>
+            <span className="mp-stars" role="radiogroup" aria-label="Rating">
+                {[1, 2, 3, 4, 5].map((v) => (
+                    <button key={v} type="button" role="radio" aria-checked={rating === v} aria-label={`${v} of 5`} className={v <= rating ? "on" : ""} onClick={() => setRating(v)}>★</button>
+                ))}
+            </span>
+            <textarea className="u-textarea" rows={3} maxLength={2000} value={comment} onChange={(e) => setComment(e.target.value)} placeholder="Anything that would have made it better? (optional — the organisers will see it)" />
+            <button type="submit" className="u-btn u-btn--solid u-btn--sm" style={{ alignSelf: "flex-start" }} disabled={busy || !rating}>{busy ? "Sending…" : "Send"}</button>
+        </form>
+    );
+}
 
 // The page an invite links to: when, who, add to calendar, and Join once it's time.
 export default function MeetPage() {
@@ -161,6 +192,7 @@ export default function MeetPage() {
         <section className="u-card mp-card mp-card--done" data-rise>
             <span className="u-label">{m.cancelled ? "Cancelled" : "Finished"}</span>
             <p className="mp-lead">{m.cancelled ? "The organiser cancelled this meeting." : organiser ? "Your notes, snapshots and comments are kept here to review." : "The room is closed now. Thanks for joining."}</p>
+            {!m.cancelled && !m.isHost && <GuestSurvey meetingId={m.id} name={user?.name || guestName.trim()} />}
         </section>
     );
 

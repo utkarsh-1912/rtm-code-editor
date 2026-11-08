@@ -1,6 +1,30 @@
 import React, { useCallback, useEffect, useImperativeHandle, useRef, useState, forwardRef } from "react";
 import { Mic, MicOff, Video, VideoOff, ShieldAlert } from "lucide-react";
 import { getCallPrefs, saveCallPrefs } from "../utils/callPrefs";
+import { getBackendUrl } from "../utils/api";
+
+// A few round trips to the server: how much delay a call through it would have.
+function useConnectionCheck() {
+    const [net, setNet] = useState(null); // { ms, grade } | { offline: true }
+    useEffect(() => {
+        let live = true;
+        (async () => {
+            const times = [];
+            for (let i = 0; i < 4 && live; i++) {
+                const t0 = performance.now();
+                try { await fetch(`${getBackendUrl()}/api/ping`, { cache: "no-store" }); times.push(performance.now() - t0); } catch { /* counted as missing */ }
+            }
+            if (!live) return;
+            if (!times.length) return setNet({ offline: true });
+            times.sort((a, b) => a - b);
+            const ms = Math.round(times[Math.floor(times.length / 2)]);
+            const slowLink = navigator.connection?.downlink && navigator.connection.downlink < 1.5;
+            setNet({ ms, grade: ms > 300 || slowLink ? "weak" : ms > 150 ? "ok" : "good" });
+        })();
+        return () => { live = false; };
+    }, []);
+    return net;
+}
 
 // Before a meeting: ask for camera and microphone, show a preview and a mic level, and let
 // people pick whether each starts on. The choice is saved, so the call starts that way.
@@ -90,6 +114,7 @@ const DeviceCheck = forwardRef(function DeviceCheck({ name }, ref) {
                 )}
                 {name && <span className="devc-name">{name}</span>}
             </div>
+            <ConnectionLine />
             <div className="devc-row">
                 <button type="button" className={`devc-toggle${mic ? " on" : ""}`} onClick={() => setMic((v) => !v)} disabled={status !== "ready"} aria-pressed={mic} title={mic ? "Join with mic on" : "Join muted"}>
                     {mic ? <Mic size={16} /> : <MicOff size={16} />}
@@ -112,5 +137,13 @@ const DeviceCheck = forwardRef(function DeviceCheck({ name }, ref) {
         </div>
     );
 });
+
+function ConnectionLine() {
+    const net = useConnectionCheck();
+    if (!net) return <span className="devc-net">Checking your connection…</span>;
+    if (net.offline) return <span className="devc-net is-weak"><i /> Can’t reach the server. Check your internet before joining.</span>;
+    const text = net.grade === "good" ? "Good for video" : net.grade === "ok" ? "Fine for video; a little delay" : "Weak: turn your camera off if the call stutters";
+    return <span className={`devc-net is-${net.grade}`}><i /> Connection · {net.ms} ms · {text}</span>;
+}
 
 export default DeviceCheck;

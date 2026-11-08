@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 import { CalendarPlus, CalendarDays, Clock, Copy, X, Video, Download, MoreHorizontal, Mail, Check, Pencil, Trash2 } from "lucide-react";
 import { Modal } from "./ux/primitives";
+import { listKits } from "../utils/kits";
 import { VISIBILITY_OPTIONS } from "./RoomAccess";
 import {
     scheduleMeeting, updateMeeting, deleteMeeting, listMeetings, listPastMeetings, meetingLink, icsUrl, googleCalendarUrl, outlookCalendarUrl,
@@ -106,9 +107,10 @@ function ZonePicker({ value, options, onChange, labelledBy }) {
 
 // Schedule a call in a new room, or in `roomId` when given (from inside a room).
 // With `meeting`, edits that meeting instead: a new time reschedules it and everyone is told.
-export function ScheduleModal({ open, onClose, roomId = null, hostName, onScheduled, meeting = null }) {
+export function ScheduleModal({ open, onClose, roomId = null, hostName, onScheduled, meeting = null, startNow = false, presetTitle = "" }) {
     const editing = !!meeting;
-    const slot = useMemo(nextSlot, [open]); // eslint-disable-line react-hooks/exhaustive-deps
+    // "Now": the current minute (rounded down), so the room is open straight away.
+    const slot = useMemo(() => (startNow ? new Date(Math.floor(Date.now() / 60000) * 60000) : nextSlot()), [open, startNow]); // eslint-disable-line react-hooks/exhaustive-deps
     const [title, setTitle] = useState("");
     const [date, setDate] = useState(localDate(slot));
     const [time, setTime] = useState(localTime(slot));
@@ -125,6 +127,9 @@ export function ScheduleModal({ open, onClose, roomId = null, hostName, onSchedu
     const [emails, setEmails] = useState([]);
     const [draft, setDraft] = useState("");
     const [description, setDescription] = useState("");
+    const [kits, setKits] = useState([]);
+    const [kitId, setKitId] = useState("");
+    useEffect(() => { if (open && !meeting && !roomId) listKits().then(setKits).catch(() => setKits([])); }, [open, meeting, roomId]);
     const [busy, setBusy] = useState(false);
     const [done, setDone] = useState(null); // { meeting, emailed }
 
@@ -138,11 +143,11 @@ export function ScheduleModal({ open, onClose, roomId = null, hostName, onSchedu
             setAccess(meeting.access || "invite"); setEmails(meeting.invitees || []); setDescription(meeting.description || "");
         } else {
             setZone(localZone());
-            setTitle(""); setDate(localDate(slot)); setTime(localTime(slot)); setDuration(30); setAccess("invite");
+            setTitle(presetTitle); setDate(localDate(slot)); setTime(localTime(slot)); setDuration(startNow ? 45 : 30); setAccess("invite");
             setEmails([]); setDescription("");
         }
         setDraft(""); setDone(null);
-    }, [open, slot, meeting, zones]);
+    }, [open, slot, meeting, zones]); // eslint-disable-line react-hooks/exhaustive-deps
     const durations = DURATIONS.includes(duration) ? DURATIONS : [...DURATIONS, duration].sort((a, b) => a - b);
 
     const addDraft = () => {
@@ -164,7 +169,7 @@ export function ScheduleModal({ open, onClose, roomId = null, hostName, onSchedu
                 title: title.trim(), description, startsAt: startsAt.toISOString(), durationMin: duration,
                 timeZone: zone, invitees: [...new Set(all.map((e) => e.toLowerCase()))], access,
             };
-            const res = editing ? await updateMeeting(meeting.id, fields) : await scheduleMeeting({ ...fields, roomId, hostName });
+            const res = editing ? await updateMeeting(meeting.id, fields) : await scheduleMeeting({ ...fields, roomId, hostName, ...(kitId ? { kitId: Number(kitId) } : {}) });
             if (editing) {
                 // Nothing to show after an edit: close and say who was told.
                 const n = (x) => `${x} ${x === 1 ? "person" : "people"}`;
@@ -290,6 +295,15 @@ export function ScheduleModal({ open, onClose, roomId = null, hostName, onSchedu
                 <label htmlFor="mt-desc">Notes <span className="u-faint">— optional</span></label>
                 <textarea id="mt-desc" className="u-textarea" rows={3} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Agenda, links, what to prepare" maxLength={2000} />
             </div>
+            {kits.length > 0 && (
+                <div className="u-field">
+                    <label htmlFor="mt-kit">Session kit <span className="u-faint">— sets up the room's problem and starter code</span></label>
+                    <select id="mt-kit" className="u-select" value={kitId} onChange={(e) => setKitId(e.target.value)}>
+                        <option value="">None</option>
+                        {kits.map((k) => <option key={k.id} value={k.id}>{k.title}</option>)}
+                    </select>
+                </div>
+            )}
         </Modal>
     );
 }

@@ -1,6 +1,6 @@
 # Utkristi CoLabs
 
-Real-time pair programming in the browser and on the desktop. Rooms for quick sessions, projects that stick around, and snippets you can reuse, with voice, video, a whiteboard, chat, a code runner and an AI copilot in the same window.
+Remote collaboration for code, in the browser and on the desktop. Rooms for quick sessions, projects that stick around, and snippets you can reuse, with voice, video, live captions, a whiteboard, chat, a code runner and an AI copilot in the same window. Follow each other through the code, keep time together, and take a meeting from booking link to debrief without leaving the room.
 
 **Web:** https://utkristi-colabs.onrender.com · **Desktop:** Windows, macOS and Linux installers on the [releases page](https://github.com/utkarsh-1912/rtm-code-editor/releases)
 
@@ -10,11 +10,13 @@ Real-time pair programming in the browser and on the desktop. Rooms for quick se
 
 | Area | Features |
 | --- | --- |
-| Rooms | One-click rooms with a shareable link, guests join with just a name, spectator (read-only) links, live cursors, room chat. Open, ask-to-join or invited-only access |
+| Rooms | One-click rooms with a shareable link, guests join with just a name, spectator (read-only) links, live cursors, room chat with line breaks. Open, ask-to-join or invited-only access |
+| Working together | **Follow me** (everyone's editor scrolls with the presenter's, by line), a shared **session timer**, **live captions** in calls, a simpler room for guests |
+| Problems & kits | Import a **LeetCode or Codeforces** link: statement, starter code and example tests (one click into the Input box). **Session kits** save a problem, starter code, language and timer to apply in a room or attach to a booking link or call |
 | Projects | Multi-file workspace with a file tree and tabs, card or classic layouts. Web projects get a live preview + console; other languages get stdin + output. Private to the owner, invitees and holders of the project's share link |
 | Running code | 17 languages through the code runner (Judge0, or local processes in development); the desktop app runs them all on your computer, offline |
 | Calls | Peer-to-peer voice and video, screen sharing with the presenter's camera beside it, shared pointers and drawing, a "call started" prompt for the room, camera/mic check before joining |
-| Meetings | Scheduled calls in any time zone: email with a calendar invite attached, Yes / No replies, reminders, edit and reschedule (calendars update). Organisers get the guest list, private notes, code snapshots with line-by-line changes and comments, co-organisers, and End meeting (guests lose access; auto-ends an hour after running over) |
+| Meetings | Scheduled calls in any time zone: email with a calendar invite attached, Yes / No replies, reminders, edit and reschedule (calendars update). A **New interview** flow: start now, pick a time, or send a **booking link** (free slots in the guest's time zone; busy times from Google Calendar, Outlook or an iCal feed are skipped). Organisers get the guest list, private notes, snapshots, co-organisers, a private **interviewer panel**, **structured feedback** (independent until submitted, AI draft, Markdown export), **code playback** with paste markers, a guest AI-copilot switch, **guest feedback**, and End meeting. The meeting page checks camera, mic and connection first. Enterprise adds **custom branding** |
 | Whiteboard | Freehand drawing and system-design diagrams with labelled connectors, live for everyone |
 | History | Save named snapshots, compare them line by line with the current code, restore any version |
 | AI copilot | Explain, refactor, audit & fix, write tests, or ask anything. Choose the default model: the hosted one, models the site provides (some by request), or your own key for Gemini, Claude Sonnet/Haiku, OpenAI, OpenRouter, Grok, Qwen, Kimi, Sarvam or any OpenAI-compatible server |
@@ -68,6 +70,16 @@ GITHUB_CLIENT_ID=…                   # GitHub OAuth app
 GITHUB_CLIENT_SECRET=…
 GITHUB_TOKEN_ENCRYPTION_KEY=…        # any long random string: openssl rand -base64 32
 # GITHUB_CALLBACK_URL=http://localhost:5000/api/github/callback   # defaults to <this server>/api/github/callback
+
+# Calendar sync (optional): busy times off booking links, meetings added to your calendar.
+# Register <CALENDAR_CALLBACK_BASE or APP_URL>/api/calendar/google/callback (and /microsoft/callback)
+# as the redirect URL in each provider's OAuth app.
+CALENDAR_TOKEN_KEY=…                 # any long random string; encrypts stored calendar tokens
+GOOGLE_CLIENT_ID=…                   # Google Cloud OAuth client (Calendar API enabled)
+GOOGLE_CLIENT_SECRET=…
+MICROSOFT_CLIENT_ID=…                # Microsoft Entra app (Calendars.ReadWrite, offline_access)
+MICROSOFT_CLIENT_SECRET=…
+# CALENDAR_CALLBACK_BASE=http://localhost:5000   # if APP_URL is the web app, not this server
 
 # Web app
 REACT_APP_BACKEND_URL=http://localhost:5000
@@ -150,6 +162,8 @@ To use a fine-tuned model, load your GGUF into Ollama with a `Modelfile` (`FROM 
 ### Meetings
 
 Schedule from the workspace or inside a room. The meeting page (`/meet/:id`) is the invite link: a camera and mic check, the guest's name carried over from the email, and Join from 10 minutes before the start. Organisers (the host and co-organisers) see the guest list with replies, private notes, and the code snapshots taken in the room during the call (each with its changes since the previous one and a private comment). **End meeting** takes a final snapshot, makes the room private to organisers and sends everyone else out. A background job sends reminders, asks organisers to end meetings that run over, and ends them an hour after their end time.
+
+**Booking links** (Settings › Booking links) offer quarter-hour slots inside your weekly hours, minus notice, buffers, your other meetings and anything busy in a connected calendar (Settings › Connections: Google or Outlook over OAuth, or a private iCal address on the link). Booking creates the meeting, room and invites; a **session kit** on the link sets up each room's problem and starter code. While a meeting runs, the room shows "recording for playback", records changed lines for **code playback** (pastes of 40+ characters are marked), and hides the AI copilot from guests if organisers turned it off (the server enforces it too).
 
 Invite emails carry an `.ics` invite (`METHOD:REQUEST`, cancellations as `METHOD:CANCEL`) so mail apps add and update the calendar entry themselves, plus signed Yes / No links. Each account can send `MEETING_EMAILS_PER_DAY` meeting emails a day; failed sends don't count.
 

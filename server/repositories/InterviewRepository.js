@@ -66,4 +66,27 @@ async function liveMeetingForRoom(roomId) {
     return rows[0]?.id || null;
 }
 
-module.exports = { getFeedback, saveFeedback, saveNotes, addPanelMessage, panelMessages, addFrame, frames, liveMeetingForRoom };
+async function addGuestFeedback(meetingId, { name, rating, comment }) {
+    const count = await sql`SELECT COUNT(*)::int n FROM meeting_guest_feedback WHERE meeting_id = ${meetingId}`;
+    if (count[0].n >= 50) return null;
+    return (await sql`INSERT INTO meeting_guest_feedback (meeting_id, name, rating, comment) VALUES (${meetingId}, ${name}, ${rating}, ${comment}) RETURNING *`)[0];
+}
+const guestFeedback = (meetingId) => sql`SELECT * FROM meeting_guest_feedback WHERE meeting_id = ${meetingId} ORDER BY created_at`;
+
+async function setAiPolicy(meetingId, policy) {
+    return (await sql`UPDATE meetings SET ai_policy = ${policy} WHERE id = ${meetingId} RETURNING *`)[0];
+}
+
+// The scheduled meeting running in a room right now (same window as liveMeetingForRoom).
+async function liveMeetingRow(roomId) {
+    const rows = await sql`
+        SELECT id, ai_policy FROM meetings
+        WHERE room_id = ${roomId} AND cancelled_at IS NULL AND ended_at IS NULL
+          AND starts_at - INTERVAL '10 minutes' <= NOW()
+          AND starts_at + make_interval(mins => duration_min + 60) >= NOW()
+        ORDER BY starts_at DESC LIMIT 1
+    `;
+    return rows[0] || null;
+}
+
+module.exports = { addGuestFeedback, guestFeedback, setAiPolicy, liveMeetingRow, getFeedback, saveFeedback, saveNotes, addPanelMessage, panelMessages, addFrame, frames, liveMeetingForRoom };
