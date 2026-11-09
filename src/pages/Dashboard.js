@@ -15,7 +15,7 @@ import { usePlan, isPlanLimit, showUpgradeToast, catalogue } from '../utils/bill
 import { track } from '../utils/track';
 import { ScheduleModal, UpcomingMeetings } from '../components/Meetings';
 import NewInterview from '../components/NewInterview';
-import NewSplit from '../components/NewSplit';
+import NewSplit, { MenuButton } from '../components/NewSplit';
 import { useOnline } from '../components/ux/Shell';
 import { useBackend } from '../context/BackendContext';
 
@@ -368,14 +368,17 @@ const Dashboard = () => {
                     <h1 className="db-title">Welcome back, {first}</h1>
                 </div>
                 <div className="db-actions">
+                    <MenuButton label="Open" Icon={FolderOpen} items={[
+                        { id: 'folder', Icon: FolderOpen, title: 'Folder', sub: 'From your computer, as a project', run: () => importFromDisk('folder'), disabled: busy },
+                        { id: 'files', Icon: FileUp, title: 'Files', sub: 'From your computer, as a project', run: () => importFromDisk('files'), disabled: busy },
+                        { id: 'join', Icon: ArrowRight, title: 'Room by link or ID', sub: 'Join a room someone shared', run: () => { const el = document.querySelector('.db-join input, input[aria-label*="room" i]'); if (el) { el.scrollIntoView({ block: 'center' }); el.focus(); } } },
+                    ]} />
                     <NewSplit onRoom={() => enterRoom(newRoomId())} items={[
                         { id: 'interview', Icon: UserCheck, title: 'Interview', sub: 'Start now, pick a time, or let them pick', run: () => setInterviewOpen(true) },
                         { id: 'room', Icon: Plus, title: 'Room now', sub: 'Code, talk and draw together; share the link', run: () => enterRoom(newRoomId()) },
                         { id: 'call', Icon: CalendarPlus, title: 'Scheduled call', sub: 'A room for later, with calendar invites', run: () => setScheduleOpen(true) },
                         { id: 'book', Icon: CalendarClock, title: 'Booking link', sub: 'Let people pick a time from your hours', run: () => navigate('/settings?section=scheduling') },
                         { id: 'project', Icon: Folder, title: 'Project', sub: 'Files, history and teammates in one place', run: () => setCreateOpen(true) },
-                        { id: 'folder', Icon: FolderOpen, title: 'Open a folder', sub: 'From your computer, as a project', run: () => importFromDisk('folder'), disabled: busy },
-                        { id: 'files', Icon: FileUp, title: 'Open files', sub: 'From your computer, as a project', run: () => importFromDisk('files'), disabled: busy },
                     ]} />
                 </div>
             </header>

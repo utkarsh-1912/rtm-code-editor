@@ -1106,6 +1106,13 @@ function Editor() {
         language={language}
         fileName={roomFileName(language)}
         isLightMode={isLightMode}
+        problem={showFocusModal ? (() => { try { return localStorage.getItem(`room-problem-${roomId}`) || ""; } catch { return ""; } })() : ""}
+        onRun={handleCompile}
+        isExecuting={isExecuting}
+        output={output}
+        isError={isError}
+        stdin={stdin}
+        setStdin={editStdin}
       />
     </div>
   );

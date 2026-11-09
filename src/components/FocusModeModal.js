@@ -1,11 +1,26 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import Icon from "./icons/Icon";
-import { editorLanguage } from '../utils/languages';
+import { editorLanguage, languageForFile } from '../utils/languages';
 import CodeMirror from '@uiw/react-codemirror';
-import { dracula } from '@uiw/codemirror-theme-dracula';
 import { EditorView } from '@codemirror/view';
+import { colabsDark, colabsLight, editorChrome } from '../utils/editorTheme';
+import { Formatted } from './ProblemPane';
 import toast from 'react-hot-toast';
 
+const PRESETS = [25, 50, 90];
+const SOUNDS = [
+    { id: 'off', label: 'Off' },
+    { id: 'rain', label: 'Rain' },
+    { id: 'binaural', label: 'Alpha focus (10 Hz)' },
+    { id: 'synth', label: 'Deep space drone' },
+];
+const read = (k, fallback) => { try { const v = localStorage.getItem(k); return v == null ? fallback : JSON.parse(v); } catch { return fallback; } };
+const write = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* storage blocked */ } };
+const clock = (s) => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
+
+// Focus mode: the code full screen in the app's own theme, with what you need beside it — the
+// problem, a task list, Run with input and output — plus a pomodoro timer and a soundscape.
+// Panels open and close from the top bar; on phones they slide over the editor.
 export default function FocusModeModal({
     isOpen,
     onClose,
@@ -16,658 +31,264 @@ export default function FocusModeModal({
     files = [],
     activeFile = null,
     onFileSelect,
-    isLightMode = false
+    isLightMode = false,
+    problem = "",
+    onRun,
+    isExecuting = false,
+    output = "",
+    isError = false,
+    stdin = "",
+    setStdin,
 }) {
-    const [showFileDropdown, setShowFileDropdown] = useState(false);
-    // Focus Timer State
-    const [timerMode, setTimerMode] = useState(25); // 25, 50, or custom
-    const [timeLeft, setTimeLeft] = useState(25 * 60);
-    const [isTimerRunning, setIsTimerRunning] = useState(false);
+    // Panels: which are open (remembered).
+    const [panels, setPanels] = useState(() => read('focus-panels', { side: true, out: !!onRun }));
+    const [sideTab, setSideTab] = useState(() => (problem ? 'problem' : 'tasks'));
+    const togglePanel = (p) => setPanels((v) => { const next = { ...v, [p]: !v[p] }; write('focus-panels', next); return next; });
+    useEffect(() => { if (isOpen && problem) setSideTab('problem'); }, [isOpen, problem]);
 
-    // Goal Tracker State
-    const [goal, setGoal] = useState(() => localStorage.getItem('rtm_focus_goal') || 'Deep Work Session: Build core features');
-    const [isGoalEditing, setIsGoalEditing] = useState(false);
-    const [tasks, setTasks] = useState(() => {
-        try {
-            const saved = localStorage.getItem('rtm_focus_tasks');
-            return saved ? JSON.parse(saved) : [
-                { id: 1, text: 'Review implementation requirements', completed: false },
-                { id: 2, text: 'Refactor complex logic', completed: false }
-            ];
-        } catch { return []; }
-    });
-    const [newTaskText, setNewTaskText] = useState('');
+    // Goal and tasks.
+    const [goal, setGoal] = useState(() => read('focus-goal', ''));
+    const [tasks, setTasks] = useState(() => read('focus-tasks', []));
+    const [newTask, setNewTask] = useState('');
+    const saveTasks = (list) => { setTasks(list); write('focus-tasks', list); };
+    const done = tasks.filter((t) => t.done).length;
 
-    // Audio Soundscape State (Web Audio API Synthesizer)
-    const [soundMode, setSoundMode] = useState('off'); // 'off', 'rain', 'binaural', 'synth'
-    const [volume, setVolume] = useState(0.4);
-    const audioCtxRef = useRef(null);
-    const soundNodesRef = useRef([]);
-
-    // Audio Soundscape State (Web Audio API Synthesizer)
-
-    // Code State
-    const [focusCode, setFocusCode] = useState(code);
-
+    // Pomodoro timer.
+    const [minutes, setMinutes] = useState(() => read('focus-minutes', 25));
+    const [left, setLeft] = useState(minutes * 60);
+    const [running, setRunning] = useState(false);
+    const [focused, setFocused] = useState(() => read(`focus-today-${new Date().toDateString()}`, 0)); // seconds today
     useEffect(() => {
-        setFocusCode(code);
-    }, [code]);
-
-    // Timer Countdown Effect
+        if (!running) return undefined;
+        const t = setInterval(() => {
+            setLeft((s) => s - 1);
+            setFocused((f) => { const n = f + 1; if (n % 15 === 0) write(`focus-today-${new Date().toDateString()}`, n); return n; });
+        }, 1000);
+        return () => clearInterval(t);
+    }, [running]);
     useEffect(() => {
-        let interval = null;
-        if (isTimerRunning && timeLeft > 0) {
-            interval = setInterval(() => {
-                setTimeLeft(prev => prev - 1);
-            }, 1000);
-        } else if (timeLeft === 0 && isTimerRunning) {
-            setIsTimerRunning(false);
-            playChimeSound();
-            toast.success('🎉 Focus Session Completed! Time for a short break.', { duration: 6000 });
+        if (running && left <= 0) {
+            setRunning(false);
+            setLeft(0);
+            chime();
+            toast.success('Focus block done. Take a short break.', { duration: 6000 });
         }
-        return () => clearInterval(interval);
-    }, [isTimerRunning, timeLeft]);
+    }, [left, running]);
+    const pickMinutes = (m) => { setMinutes(m); write('focus-minutes', m); setLeft(m * 60); setRunning(false); };
 
-    // Handle Escape Key to exit Focus Mode
+    // Soundscape (synthesised with Web Audio; nothing is downloaded).
+    const [sound, setSound] = useState('off');
+    const [volume, setVolume] = useState(0.35);
+    const [soundOpen, setSoundOpen] = useState(false);
+    const audioRef = useRef(null);
+    const nodesRef = useRef([]);
+    const stopSound = useCallback(() => {
+        nodesRef.current.forEach((n) => { try { n.stop?.(); n.disconnect?.(); } catch { /* already stopped */ } });
+        nodesRef.current = [];
+    }, []);
     useEffect(() => {
-        const handleKeyDown = (e) => {
-            if (e.key === 'Escape' && isOpen) {
-                onClose();
-            }
-        };
-        window.addEventListener('keydown', handleKeyDown);
-        return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [isOpen, onClose]);
-
-    // Web Audio Soundscape Synthesizer
-    useEffect(() => {
-        if (soundMode === 'off') {
-            stopSoundscape();
-            return;
-        }
-
+        stopSound();
+        if (sound === 'off' || !isOpen) return undefined;
         try {
-            if (!audioCtxRef.current) {
-                audioCtxRef.current = new (window.AudioContext || window.webkitAudioContext)();
-            }
-            if (audioCtxRef.current.state === 'suspended') {
-                audioCtxRef.current.resume();
-            }
-
-            stopSoundscape();
-
-            const ctx = audioCtxRef.current;
-            const masterGain = ctx.createGain();
-            masterGain.gain.setValueAtTime(volume, ctx.currentTime);
-            masterGain.connect(ctx.destination);
-
-            if (soundMode === 'rain') {
-                // Pink noise generator for rain sound
-                const bufferSize = 2 * ctx.sampleRate;
-                const noiseBuffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
-                const output = noiseBuffer.getChannelData(0);
-                let b0 = 0, b1 = 0, b2 = 0, b3 = 0, b4 = 0, b5 = 0, b6 = 0;
-                for (let i = 0; i < bufferSize; i++) {
-                    const white = Math.random() * 2 - 1;
-                    b0 = 0.99886 * b0 + white * 0.0555179;
-                    b1 = 0.99332 * b1 + white * 0.0750759;
-                    b2 = 0.96900 * b2 + white * 0.1538520;
-                    b3 = 0.86650 * b3 + white * 0.3104856;
-                    b4 = 0.55000 * b4 + white * 0.5329522;
-                    b5 = -0.7616 * b5 - white * 0.0168980;
-                    output[i] = b0 + b1 + b2 + b3 + b4 + b5 + b6 + white * 0.5362;
-                    output[i] *= 0.11;
-                    b6 = white * 0.115926;
-                }
-                const whiteNoise = ctx.createBufferSource();
-                whiteNoise.buffer = noiseBuffer;
-                whiteNoise.loop = true;
-                whiteNoise.connect(masterGain);
-                whiteNoise.start();
-                soundNodesRef.current = [whiteNoise, masterGain];
-
-            } else if (soundMode === 'binaural') {
-                // 200Hz Left / 210Hz Right binaural beat (10Hz Alpha Focus Frequency)
-                const oscLeft = ctx.createOscillator();
-                const oscRight = ctx.createOscillator();
-                const merger = ctx.createChannelMerger(2);
-
-                oscLeft.type = 'sine';
-                oscLeft.frequency.setValueAtTime(200, ctx.currentTime);
-                oscLeft.connect(merger, 0, 0);
-
-                oscRight.type = 'sine';
-                oscRight.frequency.setValueAtTime(210, ctx.currentTime);
-                oscRight.connect(merger, 0, 1);
-
-                merger.connect(masterGain);
-                oscLeft.start();
-                oscRight.start();
-                soundNodesRef.current = [oscLeft, oscRight, masterGain];
-
-            } else if (soundMode === 'synth') {
-                // Deep Space Ambient Drone
-                const osc1 = ctx.createOscillator();
-                const osc2 = ctx.createOscillator();
-                osc1.type = 'sawtooth';
-                osc2.type = 'sine';
-                osc1.frequency.setValueAtTime(55, ctx.currentTime); // A1
-                osc2.frequency.setValueAtTime(110, ctx.currentTime); // A2
-
-                const filter = ctx.createBiquadFilter();
-                filter.type = 'lowpass';
-                filter.frequency.setValueAtTime(300, ctx.currentTime);
-
-                osc1.connect(filter);
-                osc2.connect(filter);
-                filter.connect(masterGain);
-
-                osc1.start();
-                osc2.start();
-                soundNodesRef.current = [osc1, osc2, filter, masterGain];
-            }
-        } catch (err) {
-            console.error('Audio synthesizer error:', err);
-        }
-
-        return () => stopSoundscape();
-    }, [soundMode, volume]);
-
-    const stopSoundscape = () => {
-        soundNodesRef.current.forEach(node => {
-            try {
-                if (node.stop) node.stop();
-                if (node.disconnect) node.disconnect();
-            } catch (e) {}
-        });
-        soundNodesRef.current = [];
-    };
-
-    const playChimeSound = () => {
-        try {
-            const ctx = new (window.AudioContext || window.webkitAudioContext)();
-            const osc = ctx.createOscillator();
+            if (!audioRef.current) audioRef.current = new (window.AudioContext || window.webkitAudioContext)();
+            const ctx = audioRef.current;
+            if (ctx.state === 'suspended') ctx.resume();
             const gain = ctx.createGain();
-            osc.type = 'sine';
-            osc.frequency.setValueAtTime(587.33, ctx.currentTime); // D5
-            osc.frequency.exponentialRampToValueAtTime(880, ctx.currentTime + 0.5); // A5
-            gain.gain.setValueAtTime(0.3, ctx.currentTime);
-            gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 1.2);
-            osc.connect(gain);
+            gain.gain.setValueAtTime(volume, ctx.currentTime);
             gain.connect(ctx.destination);
-            osc.start();
-            osc.stop(ctx.currentTime + 1.2);
-        } catch (e) {}
-    };
+            if (sound === 'rain') {
+                const size = 2 * ctx.sampleRate;
+                const buf = ctx.createBuffer(1, size, ctx.sampleRate);
+                const out = buf.getChannelData(0);
+                let b0 = 0, b1 = 0, b2 = 0, b3 = 0, b4 = 0, b5 = 0, b6 = 0;
+                for (let i = 0; i < size; i++) {
+                    const w = Math.random() * 2 - 1;
+                    b0 = 0.99886 * b0 + w * 0.0555179; b1 = 0.99332 * b1 + w * 0.0750759; b2 = 0.969 * b2 + w * 0.153852;
+                    b3 = 0.8665 * b3 + w * 0.3104856; b4 = 0.55 * b4 + w * 0.5329522; b5 = -0.7616 * b5 - w * 0.016898;
+                    out[i] = (b0 + b1 + b2 + b3 + b4 + b5 + b6 + w * 0.5362) * 0.11; b6 = w * 0.115926;
+                }
+                const src = ctx.createBufferSource();
+                src.buffer = buf; src.loop = true; src.connect(gain); src.start();
+                nodesRef.current = [src, gain];
+            } else if (sound === 'binaural') {
+                const l = ctx.createOscillator(); const r = ctx.createOscillator(); const merge = ctx.createChannelMerger(2);
+                l.frequency.setValueAtTime(200, ctx.currentTime); r.frequency.setValueAtTime(210, ctx.currentTime);
+                l.connect(merge, 0, 0); r.connect(merge, 0, 1); merge.connect(gain); l.start(); r.start();
+                nodesRef.current = [l, r, merge, gain];
+            } else if (sound === 'synth') {
+                const a = ctx.createOscillator(); const b = ctx.createOscillator(); const f = ctx.createBiquadFilter();
+                a.type = 'sawtooth'; a.frequency.setValueAtTime(55, ctx.currentTime); b.frequency.setValueAtTime(110, ctx.currentTime);
+                f.type = 'lowpass'; f.frequency.setValueAtTime(300, ctx.currentTime);
+                a.connect(f); b.connect(f); f.connect(gain); a.start(); b.start();
+                nodesRef.current = [a, b, f, gain];
+            }
+        } catch { /* audio not available */ }
+        return stopSound;
+    }, [sound, volume, isOpen, stopSound]);
 
-    const handleTimerModeChange = (minutes) => {
-        setTimerMode(minutes);
-        setTimeLeft(minutes * 60);
-        setIsTimerRunning(false);
-    };
+    // Code.
+    const [text, setText] = useState(code);
+    useEffect(() => { setText(code); }, [code]);
+    const change = (v) => { setText(v); onCodeChange?.(v); };
+    const currentName = activeFile?.name || fileName;
+    const lang = activeFile ? (languageForFile(activeFile.name) || language) : language;
+    const extensions = useMemo(() => [editorLanguage(String(lang || '').toLowerCase()), editorChrome, EditorView.lineWrapping], [lang]);
+    const stats = useMemo(() => ({ lines: text.split('\n').length, words: text.trim() ? text.trim().split(/\s+/).length : 0, chars: text.length }), [text]);
+    const [fileOpen, setFileOpen] = useState(false);
 
-    const formatTime = (seconds) => {
-        const m = Math.floor(seconds / 60);
-        const s = seconds % 60;
-        return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
-    };
-
-    const handleAddTask = (e) => {
-        e.preventDefault();
-        if (!newTaskText.trim()) return;
-        const updated = [...tasks, { id: Date.now(), text: newTaskText.trim(), completed: false }];
-        setTasks(updated);
-        setNewTaskText('');
-        localStorage.setItem('rtm_focus_tasks', JSON.stringify(updated));
-    };
-
-    const toggleTask = (id) => {
-        const updated = tasks.map(t => t.id === id ? { ...t, completed: !t.completed } : t);
-        setTasks(updated);
-        localStorage.setItem('rtm_focus_tasks', JSON.stringify(updated));
-    };
-
-    const currentFileName = activeFile?.name || fileName;
-    const currentLanguage = activeFile ? (activeFile.name.endsWith('.py') ? 'python' : activeFile.name.endsWith('.cpp') ? 'cpp' : activeFile.name.endsWith('.html') ? 'html' : 'javascript') : language;
-
-    const handleSwitchFile = (file) => {
-        setShowFileDropdown(false);
-        setFocusCode(file.content || "");
-        if (onFileSelect) onFileSelect(file);
-        toast.success(`Focusing on ${file.name}`);
-    };
-
-    const handleEditorChange = (val) => {
-        setFocusCode(val);
-        if (onCodeChange) onCodeChange(val);
-    };
-
-    const stats = useMemo(() => {
-        const text = focusCode || "";
-        const lines = text.split('\n').length;
-        const words = text.trim() ? text.trim().split(/\s+/).length : 0;
-        const chars = text.length;
-        return { lines, words, chars };
-    }, [focusCode]);
-
-    const getLanguageExtension = (lang) => editorLanguage(String(lang || "").toLowerCase());
+    // Keys: Esc leaves (or closes a menu first), Ctrl/Cmd+Enter runs.
+    useEffect(() => {
+        if (!isOpen) return undefined;
+        const onKey = (e) => {
+            if (e.key === 'Escape') { if (soundOpen || fileOpen) { setSoundOpen(false); setFileOpen(false); } else onClose(); }
+            if ((e.ctrlKey || e.metaKey) && e.key === 'Enter' && onRun && !isExecuting) { e.preventDefault(); onRun(); }
+        };
+        window.addEventListener('keydown', onKey);
+        return () => window.removeEventListener('keydown', onKey);
+    }, [isOpen, onClose, onRun, isExecuting, soundOpen, fileOpen]);
+    useEffect(() => () => stopSound(), [stopSound]);
 
     if (!isOpen) return null;
+    const pct = minutes ? Math.max(0, Math.min(1, 1 - left / (minutes * 60))) : 0;
 
     return (
-        <div style={{
-            position: 'fixed',
-            inset: 0,
-            backgroundColor: 'var(--u-bg, rgba(5, 7, 15, 0.95))',
-            backdropFilter: 'blur(16px)',
-            zIndex: 999999,
-            display: 'flex',
-            flexDirection: 'column',
-            color: 'var(--text-main)',
-            fontFamily: "var(--u-text, 'Inter', sans-serif)"
-        }}>
-            {/* Focus Top Bar */}
-            <div style={{
-                height: '56px',
-                padding: '0 24px',
-                backgroundColor: 'var(--u-bg-2)',
-                borderBottom: '1px solid var(--u-line)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between'
-            }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <div style={{
-                            width: '32px',
-                            height: '32px',
-                            borderRadius: '8px',
-                            backgroundColor: 'rgba(59, 130, 246, 0.2)',
-                            border: '1px solid rgba(59, 130, 246, 0.4)',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            color: 'var(--u-accent)'
-                        }}>
-                            <Icon name="focus" size={20} />
-                        </div>
-                        <div>
-                            <span style={{ fontSize: '14px', fontWeight: '800', letterSpacing: '-0.02em', color: 'var(--u-ink)' }}>
-                                FOCUS MODE
-                            </span>
-                        <div style={{ position: 'relative' }}>
-                            <button
-                                onClick={() => setShowFileDropdown(!showFileDropdown)}
-                                style={{
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '6px',
-                                    backgroundColor: 'var(--u-line)',
-                                    border: '1px solid var(--u-line)',
-                                    color: 'var(--u-ink)',
-                                    padding: '4px 10px',
-                                    borderRadius: '6px',
-                                    fontSize: '12px',
-                                    fontWeight: '600',
-                                    cursor: 'pointer'
-                                }}
-                            >
-                                <Icon name="file" size={14} style={{ color: "var(--u-accent)" }} />
-                                <span>{currentFileName}</span>
-                                <Icon name="dropdown" size={12} style={{ color: "var(--text-muted)" }} />
-                            </button>
-
-                            {showFileDropdown && (
-                                <div style={{
-                                    position: 'absolute',
-                                    top: '36px',
-                                    left: 0,
-                                    width: '220px',
-                                    backgroundColor: 'var(--u-bg-2)',
-                                    border: '1px solid var(--u-line)',
-                                    borderRadius: '8px',
-                                    boxShadow: '0 10px 25px rgba(0,0,0,0.5)',
-                                    zIndex: 1000,
-                                    padding: '6px',
-                                    display: 'flex',
-                                    flexDirection: 'column',
-                                    gap: '2px'
-                                }}>
-                                    <div style={{ fontSize: '10px', fontWeight: '800', color: 'var(--text-muted)', padding: '4px 8px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                                        Switch Focus File
-                                    </div>
-                                    {files.length > 0 ? (
-                                        files.map(f => (
-                                            <div
-                                                key={f.id || f.name}
-                                                onClick={() => handleSwitchFile(f)}
-                                                style={{
-                                                    display: 'flex',
-                                                    alignItems: 'center',
-                                                    gap: '8px',
-                                                    padding: '6px 8px',
-                                                    borderRadius: '6px',
-                                                    fontSize: '12px',
-                                                    cursor: 'pointer',
-                                                    backgroundColor: (f.name === currentFileName || f.id === activeFile?.id) ? 'rgba(59, 130, 246, 0.2)' : 'transparent',
-                                                    color: (f.name === currentFileName || f.id === activeFile?.id) ? 'var(--u-accent)' : 'var(--u-ink)'
-                                                }}
-                                            >
-                                                <Icon name="file" size={14} />
-                                                <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.name}</span>
-                                            </div>
-                                        ))
-                                    ) : (
-                                        <div style={{ padding: '6px 8px', fontSize: '11px', color: 'var(--text-muted)' }}>{currentFileName}</div>
-                                    )}
-                                </div>
-                            )}
-                        </div>
-                        </div>
-                    </div>
-
-                    {/* Goal Header */}
-                    <div style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '8px',
-                        backgroundColor: 'var(--u-tint)',
-                        padding: '6px 14px',
-                        borderRadius: '20px',
-                        border: '1px solid var(--u-line)'
-                    }}>
-                        <Icon name="goal" size={14} style={{ color: "var(--u-accent)" }} />
-                        {isGoalEditing ? (
-                            <input
-                                autoFocus
-                                value={goal}
-                                onChange={(e) => setGoal(e.target.value)}
-                                onBlur={() => {
-                                    setIsGoalEditing(false);
-                                    localStorage.setItem('rtm_focus_goal', goal);
-                                }}
-                                onKeyDown={(e) => {
-                                    if (e.key === 'Enter') {
-                                        setIsGoalEditing(false);
-                                        localStorage.setItem('rtm_focus_goal', goal);
-                                    }
-                                }}
-                                style={{
-                                    backgroundColor: 'transparent',
-                                    border: 'none',
-                                    color: 'var(--u-ink)',
-                                    fontSize: '12px',
-                                    outline: 'none',
-                                    width: '280px'
-                                }}
-                            />
-                        ) : (
-                            <span 
-                                onClick={() => setIsGoalEditing(true)}
-                                title="Click to edit focus goal"
-                                style={{ fontSize: '12px', color: 'var(--u-ink)', cursor: 'pointer', fontWeight: '500' }}
-                            >
-                                {goal}
-                            </span>
-                        )}
-                    </div>
-                </div>
-
-                {/* Focus Timer & Controls */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
-                    {/* Timer */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', backgroundColor: 'rgba(0,0,0,0.4)', padding: '4px 12px', borderRadius: '20px', border: '1px solid var(--u-line)' }}>
-                        <Icon name="timer" size={16} style={{ color: isTimerRunning ? 'var(--u-ok)' : 'var(--text-muted)' }} />
-                        <span style={{ fontSize: '16px', fontWeight: '800', fontFamily: 'monospace', color: isTimerRunning ? 'var(--u-ok)' : 'var(--u-ink)' }}>
-                            {formatTime(timeLeft)}
-                        </span>
-                        <button
-                            onClick={() => setIsTimerRunning(!isTimerRunning)}
-                            style={{
-                                backgroundColor: isTimerRunning ? 'rgba(239, 68, 68, 0.2)' : 'rgba(16, 185, 129, 0.2)',
-                                border: `1px solid ${isTimerRunning ? 'rgba(239, 68, 68, 0.4)' : 'rgba(16, 185, 129, 0.4)'}`,
-                                color: isTimerRunning ? "var(--u-bad)" : 'var(--u-ok)',
-                                borderRadius: '50%',
-                                width: '26px',
-                                height: '26px',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                cursor: 'pointer'
-                            }}
-                        >
-                            {isTimerRunning ? <Icon name="pause" size={12} /> : <Icon name="run" size={12} style={{ marginLeft: '1px' }} />}
+        <div className="fz" role="dialog" aria-modal="true" aria-label="Focus mode">
+            <header className="fz-top">
+                <div className="fz-left">
+                    <span className="fz-brand">Focus</span>
+                    <span className="fz-file-wrap">
+                        <button type="button" className="fz-file" onClick={() => files.length > 1 && setFileOpen((v) => !v)} aria-haspopup={files.length > 1 ? 'menu' : undefined} aria-expanded={fileOpen} disabled={files.length <= 1}>
+                            <Icon name="file" size={14} /> <span className="u-ellipsis">{currentName}</span>{files.length > 1 && <Icon name="dropdown" size={12} />}
                         </button>
-                        <button
-                            onClick={() => { setTimeLeft(timerMode * 60); setIsTimerRunning(false); }}
-                            style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', display: 'flex' }}
-                        >
-                            <Icon name="reset" size={14} />
-                        </button>
-                    </div>
-
-                    {/* Timer presets */}
-                    <div style={{ display: 'flex', gap: '4px' }}>
-                        {[25, 50].map(mins => (
-                            <button
-                                key={mins}
-                                onClick={() => handleTimerModeChange(mins)}
-                                style={{
-                                    padding: '4px 8px',
-                                    fontSize: '11px',
-                                    borderRadius: '6px',
-                                    border: '1px solid var(--u-line)',
-                                    backgroundColor: timerMode === mins ? 'var(--primary)' : 'var(--u-tint)',
-                                    color: timerMode === mins ? '#fff' : 'var(--text-muted)',
-                                    cursor: 'pointer'
-                                }}
-                            >
-                                {mins}m
-                            </button>
-                        ))}
-                    </div>
-
-                    {/* Ambient Sound Generators */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', borderLeft: '1px solid var(--u-line)', paddingLeft: '16px' }}>
-                        <Icon name="music" size={16} style={{ color: "var(--text-muted)" }} />
-                        <select
-                            value={soundMode}
-                            onChange={(e) => setSoundMode(e.target.value)}
-                            style={{
-                                backgroundColor: 'var(--u-tint)',
-                                border: '1px solid var(--u-line)',
-                                color: 'var(--u-ink)',
-                                fontSize: '11px',
-                                padding: '4px 8px',
-                                borderRadius: '6px',
-                                outline: 'none',
-                                cursor: 'pointer'
-                            }}
-                        >
-                            <option value="off" style={{ background: 'var(--u-bg-2)' }}>Soundscape: Off</option>
-                            <option value="rain" style={{ background: 'var(--u-bg-2)' }}>🌧️ Rain Noise</option>
-                            <option value="binaural" style={{ background: 'var(--u-bg-2)' }}>🧠 10Hz Alpha Focus</option>
-                            <option value="synth" style={{ background: 'var(--u-bg-2)' }}>🚀 Deep Space Synth</option>
-                        </select>
-
-                        {soundMode !== 'off' && (
-                            <input
-                                type="range"
-                                min="0"
-                                max="1"
-                                step="0.05"
-                                value={volume}
-                                onChange={(e) => setVolume(parseFloat(e.target.value))}
-                                style={{ width: '60px', accentColor: 'var(--u-accent)', cursor: 'pointer' }}
-                                title="Volume"
-                            />
-                        )}
-                    </div>
-
-                    {/* Exit Focus */}
-                    <button
-                        onClick={onClose}
-                        title="Exit Focus Mode (ESC)"
-                        style={{
-                            backgroundColor: 'var(--u-line)',
-                            border: '1px solid var(--u-line)',
-                            color: 'var(--u-ink)',
-                            padding: '6px 14px',
-                            borderRadius: '8px',
-                            fontSize: '12px',
-                            fontWeight: '600',
-                            cursor: 'pointer',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '6px',
-                            transition: 'all 0.2s'
-                        }}
-                    >
-                        <Icon name="close" size={14} /> Exit
-                    </button>
-                </div>
-            </div>
-
-            {/* Main Focus Canvas */}
-            <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
-                {/* Left Sidebar: Sprint Tasks & Files */}
-                <div style={{
-                    width: '260px',
-                    backgroundColor: 'rgba(0, 0, 0, 0.4)',
-                    borderRight: '1px solid var(--u-line)',
-                    padding: '20px',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '16px'
-                }}>
-                    {files.length > 1 && (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', borderBottom: '1px solid var(--u-line)', paddingBottom: '12px' }}>
-                            <span style={{ fontSize: '11px', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--text-muted)' }}>
-                                Project Files
-                            </span>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', maxHeight: '140px', overflowY: 'auto' }}>
-                                {files.map(f => (
-                                    <div
-                                        key={f.id || f.name}
-                                        onClick={() => handleSwitchFile(f)}
-                                        style={{
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            gap: '8px',
-                                            padding: '6px 8px',
-                                            borderRadius: '6px',
-                                            fontSize: '12px',
-                                            cursor: 'pointer',
-                                            backgroundColor: (f.name === currentFileName || f.id === activeFile?.id) ? 'rgba(59, 130, 246, 0.2)' : 'var(--u-bg-2)',
-                                            border: `1px solid ${(f.name === currentFileName || f.id === activeFile?.id) ? 'rgba(59, 130, 246, 0.4)' : 'var(--u-tint)'}`,
-                                            color: (f.name === currentFileName || f.id === activeFile?.id) ? 'var(--u-accent)' : 'white'
-                                        }}
-                                    >
-                                        <Icon name="file" size={14} style={{ color: (f.name === currentFileName || f.id === activeFile?.id) ? 'var(--u-accent)' : 'var(--text-muted)' }} />
-                                        <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.name}</span>
-                                    </div>
+                        {fileOpen && (
+                            <div className="u-pop fz-menu" role="menu">
+                                {files.map((f) => (
+                                    <button key={f.id || f.name} role="menuitem" className={f.name === currentName ? 'on' : ''} onClick={() => { setFileOpen(false); onFileSelect?.(f); }}>
+                                        <Icon name="file" size={14} /> <span className="u-ellipsis">{f.name}</span>
+                                    </button>
                                 ))}
                             </div>
-                        </div>
-                    )}
+                        )}
+                    </span>
+                    <input className="fz-goal" value={goal} onChange={(e) => { setGoal(e.target.value); write('focus-goal', e.target.value); }} placeholder="What are you working on?" maxLength={120} aria-label="Session goal" />
+                </div>
 
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                        <span style={{ fontSize: '11px', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--text-muted)' }}>
-                            Sprint Checklist
+                <div className="fz-right">
+                    <div className={`fz-timer${running ? ' is-on' : ''}`} style={{ '--p': pct }}>
+                        <span className="u-seg fz-presets" role="radiogroup" aria-label="Timer length">
+                            {PRESETS.map((m) => <button key={m} type="button" role="radio" aria-checked={minutes === m} className={minutes === m ? 'on' : ''} onClick={() => pickMinutes(m)}>{m}</button>)}
                         </span>
-                        <span style={{ fontSize: '10px', color: 'var(--u-ok)', fontWeight: '700' }}>
-                            {tasks.filter(t => t.completed).length} / {tasks.length} Done
-                        </span>
+                        <b aria-live="off">{clock(Math.max(0, left))}</b>
+                        <button type="button" className="u-icon" onClick={() => { if (left <= 0) setLeft(minutes * 60); setRunning((v) => !v); }} aria-label={running ? 'Pause timer' : 'Start timer'} title={running ? 'Pause' : 'Start'}>
+                            <Icon name={running ? 'pause' : 'run'} size={15} />
+                        </button>
+                        <button type="button" className="u-icon" onClick={() => { setRunning(false); setLeft(minutes * 60); }} aria-label="Reset timer" title="Reset"><Icon name="reset" size={15} /></button>
                     </div>
 
-                    <form onSubmit={handleAddTask} style={{ display: 'flex', gap: '6px' }}>
-                        <input
-                            placeholder="Add sub-task..."
-                            value={newTaskText}
-                            onChange={(e) => setNewTaskText(e.target.value)}
-                            style={{
-                                flex: 1,
-                                backgroundColor: 'var(--u-tint)',
-                                border: '1px solid var(--u-line)',
-                                color: 'var(--u-ink)',
-                                padding: '6px 10px',
-                                borderRadius: '6px',
-                                fontSize: '12px',
-                                outline: 'none'
-                            }}
-                        />
-                    </form>
-
-                    <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                        {tasks.map(t => (
-                            <div 
-                                key={t.id}
-                                onClick={() => toggleTask(t.id)}
-                                style={{
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '10px',
-                                    padding: '8px 10px',
-                                    borderRadius: '6px',
-                                    backgroundColor: t.completed ? 'rgba(16, 185, 129, 0.08)' : 'var(--u-bg-2)',
-                                    border: `1px solid ${t.completed ? 'rgba(16, 185, 129, 0.2)' : 'var(--u-tint)'}`,
-                                    cursor: 'pointer',
-                                    fontSize: '12px',
-                                    color: t.completed ? 'var(--u-ink-3)' : 'white',
-                                    textDecoration: t.completed ? 'line-through' : 'none'
-                                }}
-                            >
-                                <Icon name="success" size={14} style={{ color: t.completed ? 'var(--u-ok)' : 'var(--text-muted)' }} />
-                                <span style={{ flex: 1 }}>{t.text}</span>
+                    <span className="fz-pop-wrap">
+                        <button type="button" className={`u-icon${sound !== 'off' ? ' on' : ''}`} onClick={() => setSoundOpen((v) => !v)} aria-label="Soundscape" aria-haspopup="menu" aria-expanded={soundOpen} title="Soundscape"><Icon name="music" size={17} /></button>
+                        {soundOpen && (
+                            <div className="u-pop fz-menu fz-sound" role="menu">
+                                {SOUNDS.map((s) => (
+                                    <button key={s.id} role="menuitemradio" aria-checked={sound === s.id} className={sound === s.id ? 'on' : ''} onClick={() => setSound(s.id)}>
+                                        <span className={`fz-radio${sound === s.id ? ' on' : ''}`} /> {s.label}
+                                    </button>
+                                ))}
+                                <label className="fz-volume">Volume
+                                    <input type="range" min="0" max="1" step="0.05" value={volume} onChange={(e) => setVolume(Number(e.target.value))} />
+                                </label>
                             </div>
-                        ))}
-                    </div>
-                </div>
+                        )}
+                    </span>
 
-                {/* Central Code Editor */}
-                <div style={{ flex: 1, height: '100%', backgroundColor: 'var(--u-tint)', position: 'relative' }}>
+                    <span className="fz-toggles">
+                        <button type="button" className={`u-icon${panels.side ? ' on' : ''}`} onClick={() => togglePanel('side')} aria-pressed={!!panels.side} aria-label="Problem and tasks" title="Problem and tasks"><Icon name="problem" size={17} /></button>
+                        {onRun && <button type="button" className={`u-icon${panels.out ? ' on' : ''}`} onClick={() => togglePanel('out')} aria-pressed={!!panels.out} aria-label="Input and output" title="Input and output"><Icon name="terminal" size={17} /></button>}
+                    </span>
+                    {onRun && (
+                        <button type="button" className="u-btn u-btn--solid u-btn--sm fz-run" onClick={() => onRun()} disabled={isExecuting} title="Run (Ctrl Enter)">
+                            <Icon name="run" size={14} /> {isExecuting ? 'Running…' : 'Run'}
+                        </button>
+                    )}
+                    <button type="button" className="u-btn u-btn--ghost u-btn--sm" onClick={onClose} title="Leave focus mode (Esc)"><Icon name="exit-full-screen" size={14} /> Exit</button>
+                </div>
+            </header>
+
+            <div className={`fz-body${panels.side ? ' has-side' : ''}${panels.out && onRun ? ' has-out' : ''}`}>
+                {panels.side && (
+                    <aside className="fz-side" aria-label="Problem and tasks">
+                        <div className="u-seg fz-tabs" role="tablist">
+                            <button role="tab" aria-selected={sideTab === 'problem'} className={sideTab === 'problem' ? 'on' : ''} onClick={() => setSideTab('problem')}>Problem</button>
+                            <button role="tab" aria-selected={sideTab === 'tasks'} className={sideTab === 'tasks' ? 'on' : ''} onClick={() => setSideTab('tasks')}>Tasks {tasks.length > 0 && <em>{done}/{tasks.length}</em>}</button>
+                            <button type="button" className="fz-close" onClick={() => togglePanel('side')} aria-label="Close panel"><Icon name="close" size={13} /></button>
+                        </div>
+                        {sideTab === 'problem' ? (
+                            <div className="fz-scroll pb-view">
+                                {problem.trim() ? <Formatted text={problem} /> : <p className="fz-empty">No problem in this room yet. Add one in the Problem card, then come back.</p>}
+                            </div>
+                        ) : (
+                            <div className="fz-scroll fz-tasks">
+                                <span className="fz-progress" style={{ '--p': tasks.length ? done / tasks.length : 0 }} aria-hidden="true"><i /></span>
+                                <form onSubmit={(e) => { e.preventDefault(); if (!newTask.trim()) return; saveTasks([...tasks, { id: Date.now(), text: newTask.trim(), done: false }]); setNewTask(''); }}>
+                                    <input className="u-input" value={newTask} onChange={(e) => setNewTask(e.target.value)} placeholder="Add a task and press Enter" maxLength={160} aria-label="New task" />
+                                </form>
+                                <ul>
+                                    {tasks.map((t) => (
+                                        <li key={t.id} className={t.done ? 'is-done' : ''}>
+                                            <label><input type="checkbox" checked={t.done} onChange={() => saveTasks(tasks.map((x) => (x.id === t.id ? { ...x, done: !x.done } : x)))} /> <span>{t.text}</span></label>
+                                            <button type="button" className="ec-icon" onClick={() => saveTasks(tasks.filter((x) => x.id !== t.id))} aria-label={`Remove ${t.text}`}><Icon name="close" size={12} /></button>
+                                        </li>
+                                    ))}
+                                    {!tasks.length && <li className="fz-empty">Break the session into small steps.</li>}
+                                </ul>
+                                {done > 0 && <button type="button" className="u-btn u-btn--quiet u-btn--sm" onClick={() => saveTasks(tasks.filter((t) => !t.done))}>Clear done</button>}
+                            </div>
+                        )}
+                    </aside>
+                )}
+
+                <main className="fz-editor">
                     <CodeMirror
-                        value={focusCode}
+                        value={text}
                         height="100%"
-                        theme={isLightMode ? 'light' : dracula}
-                        onChange={handleEditorChange}
-                        basicSetup={{
-                            lineNumbers: true,
-                            indentOnInput: true,
-                            bracketMatching: true,
-                            closeBrackets: true,
-                            autocompletion: true,
-                            highlightActiveLine: true,
-                            tabSize: 4
-                        }}
-                        style={{ height: '100%', fontSize: '16px' }}
-                        extensions={[getLanguageExtension(currentLanguage), EditorView.lineWrapping]}
+                        theme={isLightMode ? colabsLight : colabsDark}
+                        extensions={extensions}
+                        onChange={change}
+                        basicSetup={{ lineNumbers: true, highlightActiveLine: true, foldGutter: false }}
+                        style={{ height: '100%' }}
+                        autoFocus
                     />
-                </div>
+                </main>
+
+                {panels.out && onRun && (
+                    <aside className="fz-out" aria-label="Input and output">
+                        <div className="fz-out-head"><span>Input</span><button type="button" className="fz-close" onClick={() => togglePanel('out')} aria-label="Close panel"><Icon name="close" size={13} /></button></div>
+                        <textarea className="fz-stdin" value={stdin} onChange={(e) => setStdin?.(e.target.value)} placeholder="What your program reads from input" spellCheck={false} aria-label="Program input" />
+                        <div className="fz-out-head"><span>Output</span>{output && <b className={isError ? 'io-bad' : 'io-ok'}>{isError ? 'error' : 'ok'}</b>}</div>
+                        <pre className={`fz-console${isError ? ' is-error' : ''}`} aria-live="polite">{isExecuting ? 'Running…' : output || 'Press Run (Ctrl Enter).'}</pre>
+                    </aside>
+                )}
             </div>
 
-            {/* Bottom Productivity Bar */}
-            <div style={{
-                height: '32px',
-                padding: '0 24px',
-                backgroundColor: 'rgba(0, 0, 0, 0.6)',
-                borderTop: '1px solid var(--u-line)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                fontSize: '11px',
-                color: 'var(--text-muted)'
-            }}>
-                <div style={{ display: 'flex', gap: '16px' }}>
-                    <span>Lines: <strong style={{ color: 'var(--u-ink)' }}>{stats.lines}</strong></span>
-                    <span>Words: <strong style={{ color: 'var(--u-ink)' }}>{stats.words}</strong></span>
-                    <span>Characters: <strong style={{ color: 'var(--u-ink)' }}>{stats.chars}</strong></span>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <Icon name="focus" size={12} style={{ color: "var(--u-ok)" }} />
-                    <span>Distraction-Free Environment Active</span>
-                </div>
-            </div>
+            <footer className="fz-foot">
+                <span>{stats.lines} lines · {stats.words} words · {stats.chars} chars</span>
+                <span>Focused today: <b>{Math.floor(focused / 60)} min</b></span>
+                <span className="fz-hint">Esc to leave{onRun ? ' · Ctrl Enter to run' : ''}</span>
+            </footer>
         </div>
     );
+}
+
+function chime() {
+    try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.frequency.setValueAtTime(587.33, ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(880, ctx.currentTime + 0.5);
+        gain.gain.setValueAtTime(0.3, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 1.2);
+        osc.connect(gain); gain.connect(ctx.destination);
+        osc.start(); osc.stop(ctx.currentTime + 1.2);
+    } catch { /* audio not available */ }
 }

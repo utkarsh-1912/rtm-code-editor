@@ -27,7 +27,7 @@ function inline(text, keyBase) {
 
 // Light formatting for pasted questions (LeetCode style). Plain text in, React nodes out:
 // nothing is injected as HTML.
-function Formatted({ text }) {
+export function Formatted({ text }) {
     const blocks = text.split(/```[^\n]*\n?/);
     return blocks.map((block, bi) => {
         if (bi % 2 === 1) return <pre key={bi} className="pb-code">{block.replace(/\n$/, "")}</pre>;
